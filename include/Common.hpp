@@ -1,19 +1,22 @@
-#ifndef __COMMON_HPP__
-#define __COMMON_HPP__
+#ifndef __TINY_CORO_COMMON_HPP__
+#define __TINY_CORO_COMMON_HPP__
 
 #include <iostream>
 #include <syncstream>
 
-auto SyncOut(std::ostream& stream = std::cout)
+namespace tinycoro
 {
-    return std::osyncstream{ stream };
+    auto SyncOut(std::ostream &stream = std::cout)
+    {
+        return std::osyncstream{stream};
+    }
+
+    enum class ECoroResumeState
+    {
+        SUSPENDED,
+        PAUSED,
+        DONE
+    };
 }
 
-enum class ECoroResumeState
-{
-    SUSPENDED,
-    PAUSED,
-    DONE
-};
-
-#endif // !__COMMON_HPP__
+#endif // !__TINY_CORO_COMMON_HPP__
