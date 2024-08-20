@@ -21,11 +21,21 @@
 
 using namespace std::chrono_literals;
 
-template<std::move_constructible TaskT, template<typename> class FutureStateT>
-requires requires(TaskT t) {
-	{std::invoke(t)} -> std::same_as<ECoroResumeState>;
-	{t.Pause(typename TaskT::PauseCallbackType{})};
+namespace concepts
+{
+	template<typename T>
+	concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; } && requires(T f) { f.set_exception(std::exception_ptr{}); });
+
+	template<typename CoroT>
+	concept Resumable = requires(CoroT c) { { c.resume() } -> std::same_as<ECoroResumeState>; };
 }
+
+template<std::move_constructible TaskT, template<typename> class FutureStateT>
+	requires requires(TaskT t) {
+		{std::invoke(t)} -> std::same_as<ECoroResumeState>;
+		{t.Pause(typename TaskT::PauseCallbackType{})};
+	} && 
+	concepts::FutureState<FutureStateT<void>>
 class CoroThreadPool
 {
 public:
@@ -166,17 +176,7 @@ private:
 	std::condition_variable_any _cv;
 };
 
-namespace concepts
-{
-	template<typename FutureStateT>
-	concept FutureState = (requires(FutureStateT f) { { f.set_value() }; } || requires(FutureStateT f) { { f.set_value(f.get_future().get()) }; });
-	//concept FutureState = (requires(FutureStateT f) { { f.set_value() }; } || requires(FutureStateT f) { { f.set_value(std::declval<typename FutureStateT::value_type>()) }; });
-
-	template<typename CoroT>
-	concept Resumable = requires(CoroT c) { { c.resume() } -> std::same_as<ECoroResumeState>; };
-}
-
-template<std::unsigned_integral auto BUFFER_SIZE>
+template<std::unsigned_integral auto BUFFER_SIZE = 64u>
 struct PackedSchedulableTask
 {
 	using PauseCallbackType = std::function<void()>;
@@ -215,19 +215,6 @@ private:
 					_futureState.set_value();
 				}
 			}
-			
-
-				/*if(_futureState.valid())
-				{
-					if constexpr (requires{ _coro.hdl.promise().ReturnValue(); })
-					{
-						_futureState.set_value(std::move(_coro.hdl.promise().ReturnValue()));
-					}
-					else
-					{
-						_futureState.set_value();
-					}
-				}*/
 		}
 
 		ECoroResumeState resume() override
@@ -270,12 +257,11 @@ public:
 	{
 		using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
 
-		if constexpr (sizeof(BridgeType) < BUFFER_SIZE)
-		{
-			struct TypeCarrier { using value_type = BridgeType; };
-			Storage<ISchedulableBridged, BUFFER_SIZE> temp(TypeCarrier{}, std::move(coro), std::move(futureState));
+		SyncOut() << "sizeof(BridgeType): " << sizeof(BridgeType) << '\n';
 
-			_bridge = std::move(temp);
+		if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
+		{
+			_bridge = Storage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
 		}
 		else
 		{
@@ -285,26 +271,12 @@ public:
 
 	ECoroResumeState operator()()
 	{
-		if (std::holds_alternative<StaticStorageType>(_bridge))
-		{
-			return std::get<StaticStorageType>(_bridge).Get()->resume();
-		}
-
-		return std::get<DynamicStorageType>(_bridge)->resume();
-
-		//return _bridge->resume();
+		return std::visit([](auto& bridge){ return bridge->resume(); }, _bridge);
 	}
 
 	void Pause(std::invocable auto pauseCallback)
 	{
-		if (std::holds_alternative<StaticStorageType>(_bridge))
-		{
-			return std::get<StaticStorageType>(_bridge).Get()->pause(std::move(pauseCallback));
-		}
-
-		return std::get<DynamicStorageType>(_bridge)->pause(std::move(pauseCallback));
-
-		//return _bridge->pause(std::move(pauseCallback));
+		std::visit([&pauseCallback](auto& bridge){ bridge->pause(std::move(pauseCallback)); }, _bridge);
 	}
 
 private:
@@ -314,7 +286,7 @@ private:
 	std::variant<StaticStorageType, DynamicStorageType> _bridge;
 };
 
-//using CoroScheduler = CoroThreadPool<PackedSchedulableTask<40u>, std::promise>;
-using CoroScheduler = CoroThreadPool<PackedSchedulableTask<40u>, FutureState>;
+//using CoroScheduler = CoroThreadPool<PackedSchedulableTask<48u>, std::promise>;
+using CoroScheduler = CoroThreadPool<PackedSchedulableTask<>, FutureState>;
 
 #endif // !__CORO_SCHEDULER_HPP__

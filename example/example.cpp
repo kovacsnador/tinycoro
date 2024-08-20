@@ -248,8 +248,54 @@ struct S
     int32_t i;
 };
 
+struct PromiseTest1
+{
+};
+
+struct PromiseTest2
+{
+    std::vector<int> v;
+};
+
+struct PromiseTest3
+{
+    int64_t ii;
+    int64_t ir;
+    int64_t iu;
+    int64_t io;
+    std::vector<int> v;
+};
+
+struct PromiseTest4
+{
+    std::array<int, 100> arr;
+};
+
 int main()
 {
+    std::cout << "sizeof(std::coroutine_handle<>): " << sizeof(std::coroutine_handle<>) << '\n';
+    std::cout << "sizeof(std::coroutine_handle<PromiseTest1>): " << sizeof(std::coroutine_handle<PromiseTest1>) << '\n';
+    std::cout << "sizeof(std::coroutine_handle<PromiseTest2>): " << sizeof(std::coroutine_handle<PromiseTest2>) << '\n';
+    std::cout << "sizeof(std::coroutine_handle<PromiseTest3>): " << sizeof(std::coroutine_handle<PromiseTest3>) << '\n';
+    std::cout << "sizeof(std::coroutine_handle<PromiseTest4>): " << sizeof(std::coroutine_handle<PromiseTest4>) << '\n';
+
+    std::cout << "sizeof(std::promise<void>): " << sizeof(std::promise<void>) << '\n';
+    std::cout << "sizeof(std::promise<int>): " << sizeof(std::promise<int>) << '\n';
+    std::cout << "sizeof(std::promise<bool>): " << sizeof(std::promise<bool>) << '\n';
+    std::cout << "sizeof(std::promise<PromiseTest1>): " << sizeof(std::promise<PromiseTest1>) << '\n';
+    std::cout << "sizeof(std::promise<PromiseTest2>): " << sizeof(std::promise<PromiseTest2>) << '\n';
+    std::cout << "sizeof(std::promise<PromiseTest3>): " << sizeof(std::promise<PromiseTest3>) << '\n';
+    std::cout << "sizeof(std::promise<PromiseTest4>): " << sizeof(std::promise<PromiseTest4>) << '\n';
+
+    std::cout << "sizeof(FutureState<void>): " << sizeof(FutureState<void>) << '\n';
+    std::cout << "sizeof(FutureState<int>): " << sizeof(FutureState<int>) << '\n';
+    std::cout << "sizeof(FutureState<bool>): " << sizeof(FutureState<bool>) << '\n';
+    std::cout << "sizeof(FutureState<PromiseTest1>): " << sizeof(FutureState<PromiseTest1>) << '\n';
+    std::cout << "sizeof(FutureState<PromiseTest2>): " << sizeof(FutureState<PromiseTest2>) << '\n';
+    std::cout << "sizeof(FutureState<PromiseTest3>): " << sizeof(FutureState<PromiseTest3>) << '\n';
+    std::cout << "sizeof(FutureState<PromiseTest4>): " << sizeof(FutureState<PromiseTest4>) << '\n';
+
+
     CoroScheduler scheduler{std::thread::hardware_concurrency()};
     {
         //auto voidWorkFut = scheduler.Enqueue(SimpleWork());
@@ -260,20 +306,19 @@ int main()
 
         scheduler.Enqueue(CoroTaskView{simpleWorkCoro.hdl});*/
 
-        /*auto futureSW = scheduler.Enqueue(SimpleWork());
-        auto futureVoid = scheduler.Enqueue(PrintVoid());
+        auto futureSW = scheduler.Enqueue(SimpleWork());
+        //auto futureVoid = scheduler.Enqueue(PrintVoid());
 
         try
         {
-            auto val = futureSW.Get();
-            SyncOut() << val << '\n';
+            futureSW.get();
         }
         catch (const std::exception& ex)
         {
             SyncOut() << ex.what() << '\n';
         }
         
-        futureVoid.Get();
+        //futureVoid.get();
 
         //auto workAsyncFut = scheduler.Enqueue(SimpleWork42());*/
 

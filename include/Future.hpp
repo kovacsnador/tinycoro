@@ -260,8 +260,6 @@ template<template<typename> class FutureT, typename... Ts>
 	requires concepts::AllSame<void, Ts...>
 void WaitAll(std::tuple<FutureT<Ts>...>& futures)
 {
-	//std::apply([](auto&... args) { ((args.get()), ...); }, futures);
-
 	auto futureGet = [](auto& fut) { if(fut.valid()) { fut.get(); } };
 	std::apply([futureGet](auto&... future) { ((futureGet(future)), ...); }, futures);
 }

@@ -7,6 +7,7 @@
 #include <cstddef>
 
 #include "Common.hpp"
+#include "Storage.hpp"
 
 struct [[nodiscard]] PackedCoroHandle
 {
@@ -21,6 +22,7 @@ private:
         virtual bool Done() const = 0;
         virtual ECoroResumeState ResumeState() const = 0;
         virtual std::coroutine_handle<> Handle() = 0;
+        virtual std::coroutine_handle<> Handle() const = 0;
         virtual void ReleaseHandle() = 0;
     };
 
@@ -43,6 +45,11 @@ private:
         }
 
         std::coroutine_handle<> Handle() override
+        {
+            return _hdl;
+        }
+
+        std::coroutine_handle<> Handle() const override
         {
             return _hdl;
         }
@@ -78,21 +85,23 @@ private:
         std::coroutine_handle<PromiseT> _hdl;
     };
 
+    using UniversalBridgeT = CoroHandleBridgeImpl<void>;
+
 public:
     PackedCoroHandle() = default;
 
     template<typename PromiseT, template<typename> class HandleT>
-        requires std::constructible_from<CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
+        requires std::constructible_from<CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>> && (std::alignment_of_v<CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
     PackedCoroHandle(HandleT<PromiseT> hdl)
+        : _bridge{std::type_identity<CoroHandleBridgeImpl<PromiseT>>{}, hdl}
     {
-        _bridge = std::make_unique<CoroHandleBridgeImpl<PromiseT>>(hdl);
     }
 
     template<typename PromiseT, template<typename> class HandleT>
        requires std::constructible_from<CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
     PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
     {
-        _bridge = std::make_unique<CoroHandleBridgeImpl<PromiseT>>(hdl);
+        _bridge = decltype(_bridge){std::type_identity<CoroHandleBridgeImpl<PromiseT>>{}, hdl};
         return *this;
     }
 
@@ -152,7 +161,7 @@ public:
         return ECoroResumeState::DONE;
     }
 
-    ECoroResumeState Resume()
+    [[nodiscard]] ECoroResumeState Resume()
     {
         if (_bridge)
         {
@@ -179,7 +188,7 @@ public:
     }
 
 private:
-    std::unique_ptr<ICoroHandleBridge> _bridge{ nullptr };
+    Storage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
 };
 
 struct FinalAwaiter
