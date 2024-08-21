@@ -17,7 +17,7 @@
 
 #include "Future.hpp"
 #include "Common.hpp"
-#include "Storage.hpp"
+#include "InPlaceStorage.hpp"
 
 using namespace std::chrono_literals;
 
@@ -84,12 +84,6 @@ namespace tinycoro
 		{
 			return std::make_tuple(Enqueue(std::forward<CoroTs>(tasks))...);
 		}
-
-		/*template<typename... CoroT>
-		auto EnqueueTasks(CoroT&&... tasks)
-		{
-			return std::make_tuple(Enqueue(std::forward<Tasks>(tasks))...);
-		}*/
 
 		void Wait()
 		{
@@ -197,6 +191,11 @@ namespace tinycoro
 		class ISchedulableBridged
 		{
 		public:
+			ISchedulableBridged() = default;
+
+			ISchedulableBridged(ISchedulableBridged&&) = default;
+			ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
+
 			virtual ~ISchedulableBridged() = default;
 			virtual ECoroResumeState resume() = 0;
 			virtual void pause(PauseCallbackType) = 0;
@@ -206,12 +205,14 @@ namespace tinycoro
 		class SchedulableBridgeImpl : public ISchedulableBridged
 		{
 		public:
-			SchedulableBridgeImpl(CoroT &&coro, FutureStateT &&futureState)
-				: _coro{std::move(coro)}, _futureState{std::move(futureState)}
+			SchedulableBridgeImpl(CoroT&& coro, FutureStateT&& futureState)
+				: _coro{std::move(coro)}
+				, _futureState{std::move(futureState)}
 			{
 			}
 
-			SchedulableBridgeImpl(SchedulableBridgeImpl &&) = delete;
+			SchedulableBridgeImpl(SchedulableBridgeImpl&&) = default;
+			SchedulableBridgeImpl& operator=(SchedulableBridgeImpl&&) = default;
 
 			~SchedulableBridgeImpl()
 			{
@@ -256,7 +257,7 @@ namespace tinycoro
 			FutureStateT _futureState;
 		};
 
-		using StaticStorageType = Storage<ISchedulableBridged, BUFFER_SIZE>;
+		using StaticStorageType = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>;
 		using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
 
 	public:
@@ -271,7 +272,7 @@ namespace tinycoro
 
 			if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
 			{
-				_bridge = Storage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
+				_bridge = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
 			}
 			else
 			{

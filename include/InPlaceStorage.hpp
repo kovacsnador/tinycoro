@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_STORAGE_HPP__
-#define __TINY_CORO_STORAGE_HPP__
+#ifndef __TINY_CORO_IN_PLACE_STORAGE_HPP__
+#define __TINY_CORO_IN_PLACE_STORAGE_HPP__
 
 #include <concepts>
 #include <utility>
@@ -10,27 +10,27 @@
 namespace tinycoro
 {
 
-	template <typename BaseClassT, std::unsigned_integral auto SIZE, typename AlignasT = char>
+	template <typename InterpreterClassT, std::unsigned_integral auto SIZE, typename AlignasT = char>
 		requires(SIZE >= sizeof(AlignasT))
-	struct Storage
+	struct InPlaceStorage
 	{
-		Storage() = default;
+		InPlaceStorage() = default;
 
 		template <typename ClassT, typename... Args>
 			requires std::constructible_from<ClassT, Args...>
-		Storage([[maybe_unused]] std::type_identity<ClassT>, Args &&...args)
+		InPlaceStorage([[maybe_unused]] std::type_identity<ClassT>, Args &&...args)
 			: _owner{true}
 		{
 			std::construct_at(GetAs<ClassT>(), std::forward<Args>(args)...);
 		}
 
-		Storage(Storage &&other) noexcept
+		InPlaceStorage(InPlaceStorage&& other) noexcept
 			: _owner{std::exchange(other._owner, false)}
 		{
 			std::memcpy(_buffer, other._buffer, SIZE);
 		}
 
-		Storage &operator=(Storage &&other) noexcept
+		InPlaceStorage& operator=(InPlaceStorage&& other) noexcept
 		{
 			if (std::addressof(other) != this)
 			{
@@ -43,7 +43,7 @@ namespace tinycoro
 			return *this;
 		}
 
-		~Storage()
+		~InPlaceStorage()
 		{
 			Destroy();
 		}
@@ -53,14 +53,14 @@ namespace tinycoro
 			Destroy();
 		}
 
-		auto *operator->()
+		auto* operator->()
 		{
-			return GetAs<BaseClassT>();
+			return GetAs<InterpreterClassT>();
 		}
 
-		const auto *operator->() const
+		const auto* operator->() const
 		{
-			return GetAs<BaseClassT>();
+			return GetAs<InterpreterClassT>();
 		}
 
 		operator bool() const noexcept
@@ -76,14 +76,14 @@ namespace tinycoro
 	private:
 		template <typename T>
 			requires(sizeof(T) <= SIZE)
-		T *GetAs()
+		T* GetAs()
 		{
 			return std::launder(reinterpret_cast<T *>(_buffer));
 		}
 
 		template <typename T>
 			requires(sizeof(T) <= SIZE)
-		const T *GetAs() const
+		const T* GetAs() const
 		{
 			return std::launder(reinterpret_cast<const T *>(_buffer));
 		}
@@ -92,7 +92,7 @@ namespace tinycoro
 		{
 			if (_owner)
 			{
-				std::destroy_at(GetAs<BaseClassT>());
+				std::destroy_at(GetAs<InterpreterClassT>());
 				_owner = false;
 			}
 		}
@@ -103,4 +103,4 @@ namespace tinycoro
 	};
 
 }
-#endif // !__TINY_CORO_STORAGE_HPP__
+#endif // !__TINY_CORO_IN_PLACE_STORAGE_HPP__

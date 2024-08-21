@@ -7,7 +7,7 @@
 #include <cstddef>
 
 #include "Common.hpp"
-#include "Storage.hpp"
+#include "InPlaceStorage.hpp"
 
 namespace tinycoro
 {
@@ -189,7 +189,7 @@ namespace tinycoro
         }
 
     private:
-        Storage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
+        InPlaceStorage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
     };
 
     struct FinalAwaiter
@@ -246,7 +246,7 @@ namespace tinycoro
         }
     };
 
-    template <typename CoroTaskT>
+    template <typename ReturnValueT, typename CoroTaskT>
     class AwaiterValue : private AwaiterBase<CoroTaskT>
     {
     protected:
@@ -256,7 +256,7 @@ namespace tinycoro
         using AwaiterBase<CoroTaskT>::await_ready;
         using AwaiterBase<CoroTaskT>::await_suspend;
 
-        [[nodiscard]] constexpr const auto &await_resume() noexcept
+        [[nodiscard]] constexpr const auto& await_resume() noexcept
         {
             SyncOut() << "      Awaiter: await_resume()\n";
 
@@ -266,6 +266,22 @@ namespace tinycoro
     };
 
     template <typename CoroTaskT>
+    class AwaiterValue<void, CoroTaskT> : private AwaiterBase<CoroTaskT>
+    {
+    protected:
+        AwaiterValue() = default;
+
+    public:
+        using AwaiterBase<CoroTaskT>::await_ready;
+        using AwaiterBase<CoroTaskT>::await_suspend;
+
+        constexpr void await_resume() noexcept
+        {
+            SyncOut() << "      Awaiter: await_resume()\n";
+        }
+    };
+
+    /*template <typename CoroTaskT>
     class AwaiterVoid : private AwaiterBase<CoroTaskT>
     {
     protected:
@@ -279,7 +295,7 @@ namespace tinycoro
         {
             SyncOut() << "      Awaiter: await_resume()\n";
         }
-    };
+    };*/
 
     struct CoroResumer
     {
@@ -302,12 +318,12 @@ namespace tinycoro
         }
     };
 
-    template <typename PromiseT, template <typename> class AwaiterT, typename CoroResumerT = CoroResumer>
-    struct CoroTask : private AwaiterT<CoroTask<PromiseT, AwaiterT>>
+    template <typename ReturnValueT, typename PromiseT, template <typename, typename> class AwaiterT, typename CoroResumerT = CoroResumer>
+    struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>
     {
-        friend class AwaiterT<CoroTask<PromiseT, AwaiterT>>;
+        friend class AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
 
-        using awaiter_type = AwaiterT<CoroTask<PromiseT, AwaiterT>>;
+        using awaiter_type = AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
 
         using awaiter_type::await_ready;
         using awaiter_type::await_resume;
@@ -395,14 +411,14 @@ namespace tinycoro
         }
     };
 
-    struct PromiseReturnVoid
+    /*struct PromiseReturnVoid
     {
         using value_type = void;
 
         void return_void()
         {
         }
-    };
+    };*/
 
     template <typename ValueT>
     struct PromiseReturnValue
@@ -410,7 +426,7 @@ namespace tinycoro
         using value_type = ValueT;
 
         template <typename U>
-        void return_value(U &&v)
+        void return_value(U&& v)
         {
             _value = std::forward<U>(v);
         }
@@ -424,13 +440,23 @@ namespace tinycoro
         std::optional<value_type> _value{};
     };
 
+    template <>
+    struct PromiseReturnValue<void>
+    {
+        using value_type = void;
+
+        void return_void()
+        {
+        }
+    };
+
     template <typename ValueT, typename AwaiterT>
     struct PromiseYieldValue
     {
         using value_type = ValueT;
 
         template <typename U>
-        auto yield_value(U &&v)
+        auto yield_value(U&& v)
         {
             _value = std::forward<U>(v);
             return AwaiterT{};
@@ -509,17 +535,21 @@ namespace tinycoro
         }
     };
 
-    using CoroTaskVoid = CoroTask<Promise<FinalAwaiter, PromiseReturnVoid>, AwaiterVoid>;
+    //using CoroTaskVoid = CoroTask<Promise<FinalAwaiter, PromiseReturnVoid>, AwaiterVoid>;
+    using CoroTaskVoid = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>>, AwaiterValue>;
 
     template <typename ReturnValueT>
-    using CoroTaskReturn = CoroTask<Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
+    using CoroTaskReturn = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
 
     template <typename YieldValueT, typename YieldAwaiterT = std::suspend_always>
-    using CoroTaskYield = CoroTask<Promise<FinalAwaiter, PromiseReturnVoid, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterVoid>;
+    using CoroTaskYield = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterValue>;
+    //using CoroTaskYield = CoroTask<void, Promise<FinalAwaiter, PromiseReturnVoid, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterVoid>;
 
     template <typename YieldValueT, typename ReturnValueT, typename YieldAwaiterT = std::suspend_always>
-    using CoroTaskYieldReturn = CoroTask<Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterValue>;
+    using CoroTaskYieldReturn = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterValue>;
 
+    template<typename ReturnValueT>
+    using Task = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
 }
 
 #endif //!__TINY_CORO_CORO_TASK_HPP__

@@ -39,7 +39,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<int> auto cb)
 template<typename... T>
 class TD;
 
-tinycoro::CoroTaskVoid AsyncCallback()
+tinycoro::Task<void> AsyncCallback()
 {
     tinycoro::SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -75,7 +75,7 @@ tinycoro::CoroTaskVoid AsyncCallback()
     co_return;
 }
 
-tinycoro::CoroTaskReturn<int32_t> Calculate(int32_t i)
+tinycoro::Task<int32_t> Calculate(int32_t i)
 {
     tinycoro::SyncOut() << "  Calculate... Thread id: " << std::this_thread::get_id() << '\n';
     auto future = std::async(std::launch::async, [](auto i) { std::this_thread::sleep_for(1s); return i * i; }, i);
@@ -91,7 +91,7 @@ tinycoro::CoroTaskReturn<int32_t> Calculate(int32_t i)
 }
 
 
-tinycoro::CoroTaskReturn<int32_t> Print()
+tinycoro::Task<int32_t> Print()
 {
     tinycoro::SyncOut() << "  Print1... Thread id: " << std::this_thread::get_id() << '\n';
     co_await std::suspend_always{};
@@ -106,7 +106,7 @@ tinycoro::CoroTaskReturn<int32_t> Print()
     co_return val;
 }
 
-tinycoro::CoroTaskReturn<int32_t> DoWork()
+tinycoro::Task<int32_t> DoWork()
 {
     auto start = std::chrono::system_clock::now();
 
@@ -128,7 +128,7 @@ tinycoro::CoroTaskReturn<int32_t> DoWork()
     co_return val;
 }
 
-tinycoro::CoroTaskVoid PrintVoid()
+tinycoro::Task<void> PrintVoid()
 {
     tinycoro::SyncOut() << "  PrintVoid 1... Thread id: " << std::this_thread::get_id() << '\n';
     co_await std::suspend_always{};
@@ -136,7 +136,7 @@ tinycoro::CoroTaskVoid PrintVoid()
     co_return;
 }
 
-tinycoro::CoroTaskVoid PrintVoidSub()
+tinycoro::Task<void> PrintVoidSub()
 {
     tinycoro::SyncOut() << "  PrintVoidSub 1... Thread id: " << std::this_thread::get_id() << '\n';
     co_await PrintVoid();
@@ -144,7 +144,7 @@ tinycoro::CoroTaskVoid PrintVoidSub()
     co_return;
 }
 
-tinycoro::CoroTaskVoid DoWorkVoid()
+tinycoro::Task<void> DoWorkVoid()
 {
     auto start = std::chrono::system_clock::now();
 
@@ -168,7 +168,7 @@ tinycoro::CoroTaskVoid DoWorkVoid()
     co_return;
 }
 
-tinycoro::CoroTaskReturn<int32_t> SimpleWork42()
+tinycoro::Task<int32_t> SimpleWork42()
 {
     tinycoro::SyncOut() << "  SimpleWork42... Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -183,7 +183,7 @@ tinycoro::CoroTaskReturn<int32_t> SimpleWork42()
     co_return 42;
 }
 
-tinycoro::CoroTaskVoid SimpleWork()
+tinycoro::Task<void> SimpleWork()
 {
     tinycoro::SyncOut() << "  SimpleWork... Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -196,7 +196,7 @@ tinycoro::CoroTaskVoid SimpleWork()
     co_return;
 }
 
-tinycoro::CoroTaskYieldReturn<int32_t, double> SimpleWorkYieldReturnValue()
+/*tinycoro::CoroTaskYieldReturn<int32_t, double> SimpleWorkYieldReturnValue()
 {
     tinycoro::SyncOut() << "  SimpleWork... Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -213,9 +213,9 @@ tinycoro::CoroTaskYield<int32_t> Test3()
     co_yield 42;
     tinycoro::SyncOut() << "  Test4... Thread id: " << std::this_thread::get_id() << '\n';
     co_return;
-}
+}*/
 
-tinycoro::CoroTaskVoid Test1()
+/*tinycoro::Task<void> Test1()
 {
     tinycoro::SyncOut() << "  Test1... Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -230,7 +230,7 @@ tinycoro::CoroTaskVoid Test1()
 
     tinycoro::SyncOut() << "  Test2... Thread id: " << std::this_thread::get_id() << '\n';
     co_return;
-}
+}*/
 
 struct S
 {
@@ -328,16 +328,16 @@ int main()
 
         //auto val = workAsyncFut.Get();*/
 
-        auto test1Tasks = scheduler.EnqueueTasks(Test1(), Test1(), Test1());
+        auto simpleWorkTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork(), SimpleWork());
 
-        /*std::get<0>(test1Tasks).get();
-        std::get<1>(test1Tasks).get();
-        std::get<2>(test1Tasks).get();*/
+        /*std::get<0>(simpleWorkTasks).get();
+        std::get<1>(simpleWorkTasks).get();
+        std::get<2>(simpleWorkTasks).get();*/
 
-        tinycoro::WaitAll(test1Tasks);
+        tinycoro::WaitAll(simpleWorkTasks);
 
 
-        auto mixedTasks = scheduler.EnqueueTasks(Test1(), SimpleWork42(), SimpleWork42(), Test1());
+        auto mixedTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork42(), SimpleWork42(), SimpleWork());
 
         auto results = tinycoro::WaitAll(mixedTasks);
 
