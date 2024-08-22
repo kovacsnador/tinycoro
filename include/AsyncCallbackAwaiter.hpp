@@ -15,8 +15,7 @@ namespace tinycoro
     std::function<void()> PauseTask(std::coroutine_handle<PromiseT> &hdl)
     {
         hdl.promise().paused = true;
-        return [hdl]
-        { hdl.promise().pauseResume(); };
+        return [hdl] { hdl.promise().pauseResume(); };
     }
 
     namespace concepts

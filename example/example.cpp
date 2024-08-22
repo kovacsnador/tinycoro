@@ -36,9 +36,6 @@ void AsyncCallbackAPIvoid(std::regular_invocable<int> auto cb)
     t.detach();
 }
 
-template<typename... T>
-class TD;
-
 tinycoro::Task<void> AsyncCallback()
 {
     tinycoro::SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
@@ -172,15 +169,43 @@ tinycoro::Task<int32_t> SimpleWork42()
 {
     tinycoro::SyncOut() << "  SimpleWork42... Thread id: " << std::this_thread::get_id() << '\n';
 
-    std::this_thread::sleep_for(1s);
+    //std::this_thread::sleep_for(1s);
 
     //co_yield 41;
 
-    co_await std::suspend_always{};
+    //co_await std::suspend_always{};
 
     //throw std::runtime_error("SimpleWork exception");
 
     co_return 42;
+}
+
+struct OnlyMoveable
+{
+    OnlyMoveable(int ii)
+    : i{ii}
+    {
+    }
+
+    OnlyMoveable(OnlyMoveable&& other) = default;
+    OnlyMoveable& operator=(OnlyMoveable&& other) = default;
+
+    int i;
+};
+
+tinycoro::Task<OnlyMoveable> WorkOnlyMoveable()
+{
+    tinycoro::SyncOut() << "  WorkOnlyMoveable... Thread id: " << std::this_thread::get_id() << '\n';
+
+    //std::this_thread::sleep_for(1s);
+
+    //co_yield 41;
+
+    //co_await std::suspend_always{};
+
+    //throw std::runtime_error("SimpleWork exception");
+
+    co_return OnlyMoveable{42};
 }
 
 tinycoro::Task<void> SimpleWork()
@@ -322,26 +347,26 @@ int main()
 
         //auto workAsyncFut = scheduler.Enqueue(SimpleWork42());*/
 
-        auto futAsync = scheduler.Enqueue(AsyncCallback());
+        /*auto futAsync = scheduler.Enqueue(AsyncCallback());
 
-        futAsync.get();
+        futAsync.get();*/
 
         //auto val = workAsyncFut.Get();*/
 
-        auto simpleWorkTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork(), SimpleWork());
+        //auto simpleWorkTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork(), SimpleWork());
 
         /*std::get<0>(simpleWorkTasks).get();
         std::get<1>(simpleWorkTasks).get();
         std::get<2>(simpleWorkTasks).get();*/
 
-        tinycoro::WaitAll(simpleWorkTasks);
+        //tinycoro::WaitAll(simpleWorkTasks);
 
 
-        auto mixedTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork42(), SimpleWork42(), SimpleWork());
+        /*auto mixedTasks = scheduler.EnqueueTasks(SimpleWork(), SimpleWork42(), SimpleWork42(), SimpleWork());
 
         auto results = tinycoro::WaitAll(mixedTasks);
 
-        tinycoro::SyncOut() << "result 1: " << std::get<1>(results) << " result 2: " << std::get<2>(results) << '\n';
+        tinycoro::SyncOut() << "result 1: " << std::get<1>(results) << " result 2: " << std::get<2>(results) << '\n';*/
  
         //auto value = futureSW->Get();
 

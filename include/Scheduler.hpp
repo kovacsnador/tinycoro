@@ -13,6 +13,7 @@
 #include <assert.h>
 #include <ranges>
 #include <memory>
+#include <type_traits>
 #include <algorithm>
 
 #include "Future.hpp"
@@ -29,8 +30,14 @@ namespace tinycoro
 		template <typename T>
 		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; } && requires(T f) { f.set_exception(std::exception_ptr{}); });
 
-		template <typename CoroT>
-		concept Resumable = requires(CoroT c) { { c.resume() } -> std::same_as<ECoroResumeState>; };
+		template<typename T>
+		concept RValueReference = std::is_rvalue_reference_v<T>;
+
+		template <typename T>
+		concept CoroTask = requires(T c) { { c.resume() } -> std::same_as<ECoroResumeState>;
+			{c.await_resume()};
+			{c.pause([]{})};
+		 };
 	}
 
 	template <std::move_constructible TaskT, template <typename> class FutureStateT>
@@ -201,7 +208,7 @@ namespace tinycoro
 			virtual void pause(PauseCallbackType) = 0;
 		};
 
-		template <concepts::Resumable CoroT, concepts::FutureState FutureStateT>
+		template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
 		class SchedulableBridgeImpl : public ISchedulableBridged
 		{
 		public:
@@ -218,9 +225,10 @@ namespace tinycoro
 			{
 				if (_exceptionSet == false)
 				{
-					if constexpr (requires { _coro.hdl.promise().ReturnValue(); })
+					if constexpr (requires { {_coro.await_resume()} -> concepts::RValueReference; })
 					{
-						_futureState.set_value(std::move(_coro.hdl.promise().ReturnValue()));
+						//_futureState.set_value(_coro.promise().ReturnValue());
+						_futureState.set_value(_coro.await_resume());
 					}
 					else
 					{
@@ -248,7 +256,8 @@ namespace tinycoro
 
 			void pause(PauseCallbackType func) override
 			{
-				_coro.hdl.promise().pauseResume = std::move(func);
+				//_coro.promise().pauseResume = std::move(func);
+				_coro.pause(std::move(func));
 			}
 
 		private:
@@ -261,7 +270,7 @@ namespace tinycoro
 		using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
 
 	public:
-		template <concepts::Resumable CoroT, concepts::FutureState FutureStateT>
+		template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
 			requires(!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackedSchedulableTask>)
 		PackedSchedulableTask(CoroT &&coro, FutureStateT futureState)
 		//: _bridge{std::make_unique<SchedulableBridgeImpl<CoroT, FutureStateT>>(std::move(coro), std::move(futureState))}
