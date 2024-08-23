@@ -11,11 +11,13 @@
 
 namespace tinycoro {
 
-    namespace concepts
-    {
-        template<typename T>
-        concept Pausable = requires (T t) { {t.paused = true}; requires std::regular_invocable<decltype(t.pauseResume)>; };
-    }
+    namespace concepts {
+        template <typename T>
+        concept Pausable = requires (T t) {
+            { t.paused = true };
+            requires std::regular_invocable<decltype(t.pauseResume)>;
+        };
+    } // namespace concepts
 
     struct [[nodiscard]] PackedCoroHandle
     {
@@ -292,8 +294,8 @@ namespace tinycoro {
         using awaiter_type = AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
 
         using awaiter_type::await_ready;
-        using awaiter_type::await_suspend;
         using awaiter_type::await_resume;
+        using awaiter_type::await_suspend;
 
         using promise_type  = PromiseT;
         using coro_hdl_type = std::coroutine_handle<promise_type>;
@@ -340,7 +342,7 @@ namespace tinycoro {
 
         void pause(std::regular_invocable auto resumerCallback)
         {
-            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; } )
+            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; })
             {
                 hdl.promise().pauseResume = resumerCallback;
             }
@@ -359,7 +361,7 @@ namespace tinycoro {
         }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
-        coro_hdl_type hdl;
+        coro_hdl_type                      hdl;
     };
 
     template <typename PromiseT, typename CoroResumerT = CoroResumer>
@@ -383,7 +385,7 @@ namespace tinycoro {
 
         void pause(std::regular_invocable auto resumerCallback)
         {
-            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; } )
+            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; })
             {
                 hdl.promise().pauseResume = resumerCallback;
             }
@@ -401,8 +403,18 @@ namespace tinycoro {
         template <typename U>
         void return_value(U&& v)
         {
+            if constexpr (requires { _value = std::forward<U>(v); })
+            {
+                _value = std::forward<U>(v);
+            }
+            else
+            {
+                // to support aggregate initialization
+                _value = decltype(_value){std::in_place, std::forward<U>(v)};
+            }
+
             //_value = std::forward<U>(v);
-            _value = decltype(_value){std::in_place, std::forward<U>(v)};
+            //_value = decltype(_value){std::in_place, std::forward<U>(v)};
         }
 
         auto&& ReturnValue() { return std::move(_value.value()); }
@@ -473,14 +485,14 @@ namespace tinycoro {
     };
 
     template <typename ReturnerT>
-    concept PromiseReturnerConcept = requires(ReturnerT r) {
+    concept PromiseReturnerConcept = requires (ReturnerT r) {
         { r.return_void() };
-    } || requires(ReturnerT r) {
+    } || requires (ReturnerT r) {
         { r.return_value(std::declval<typename ReturnerT::value_type>()) };
     };
 
     template <typename YielderT>
-    concept PromiseYielderConcept = requires(YielderT y) {
+    concept PromiseYielderConcept = requires (YielderT y) {
         { y.yield_value(std::declval<typename YielderT::value_type>()) };
     };
 
@@ -525,6 +537,7 @@ namespace tinycoro {
 
     template <typename ReturnValueT>
     using Task = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
+
 } // namespace tinycoro
 
 #endif //!__TINY_CORO_CORO_TASK_HPP__

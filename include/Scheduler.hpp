@@ -5,309 +5,174 @@
 #include <future>
 #include <functional>
 #include <vector>
-#include <variant>
 #include <queue>
 #include <mutex>
 #include <condition_variable>
 #include <concepts>
 #include <assert.h>
 #include <ranges>
-#include <memory>
-#include <type_traits>
 #include <algorithm>
 
 #include "Future.hpp"
 #include "Common.hpp"
-#include "InPlaceStorage.hpp"
+
+#include "PackagedCoro.hpp"
 
 using namespace std::chrono_literals;
 
-namespace tinycoro
-{
+namespace tinycoro {
 
-	namespace concepts
-	{
-		template <typename T>
-		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; } && requires(T f) { f.set_exception(std::exception_ptr{}); });
+    template <std::move_constructible TaskT, template <typename> class FutureStateT>
+        requires requires (TaskT t) {
+            { std::invoke(t) } -> std::same_as<ECoroResumeState>;
+            { t.Pause(typename TaskT::PauseCallbackType{}) };
+        } && concepts::FutureState<FutureStateT<void>>
+    class CoroThreadPool
+    {
+    public:
+        CoroThreadPool(size_t workerThreadCount) { _AddWorkers(workerThreadCount); }
 
-		template<typename T>
-		concept RValueReference = std::is_rvalue_reference_v<T>;
+        ~CoroThreadPool()
+        {
+            _stopSource.request_stop();
+            std::ranges::for_each(_workerThreads, [](auto& it) {
+                if (it.joinable())
+                {
+                    it.join();
+                }
+            });
+        }
 
-		template <typename T>
-		concept CoroTask = requires(T c) { { c.resume() } -> std::same_as<ECoroResumeState>;
-			{c.await_resume()};
-			{c.pause([]{})};
-		 };
-	}
+        // Disable copy and move
+        CoroThreadPool(const CoroThreadPool&) = delete;
+        CoroThreadPool(CoroThreadPool&&)      = delete;
 
-	template <std::move_constructible TaskT, template <typename> class FutureStateT>
-		requires requires(TaskT t) {
-			{ std::invoke(t) } -> std::same_as<ECoroResumeState>;
-			{ t.Pause(typename TaskT::PauseCallbackType{}) };
-		} &&
-				 concepts::FutureState<FutureStateT<void>>
-	class CoroThreadPool
-	{
-	public:
-		CoroThreadPool(size_t workerThreadCount)
-		{
-			_AddWorkers(workerThreadCount);
-		}
+        template <typename CoroT>
+            requires (!std::is_reference_v<CoroT>) && requires (CoroT) { typename CoroT::promise_type::value_type; }
+        [[nodiscard]] auto Enqueue(CoroT&& coro)
+        {
+            FutureStateT<typename CoroT::promise_type::value_type> futureState;
+            auto                                                   future = futureState.get_future();
 
-		~CoroThreadPool()
-		{
-			_stopSource.request_stop();
-			std::ranges::for_each(_workerThreads, [](auto &it)
-								  { if (it.joinable()) { it.join(); } });
-		}
+            _tasksCount.fetch_add(1, std::memory_order_acquire);
 
-		// Disable copy and move
-		CoroThreadPool(const CoroThreadPool &) = delete;
-		CoroThreadPool(CoroThreadPool &&) = delete;
+            {
+                std::scoped_lock lock{_mtx};
+                _tasks.emplace(std::move(coro), std::move(futureState));
+            }
 
-		// template<typename ValueT, template<typename> class CoroT>
-		template <typename CoroT>
-			requires(!std::is_reference_v<CoroT>) && requires(CoroT) { typename CoroT::promise_type::value_type; }
-		auto Enqueue(CoroT &&coro)
-		{
-			FutureStateT<typename CoroT::promise_type::value_type> futureState;
-			// FutureStateT<ValueT> futureState;
-			auto future = futureState.get_future();
+            _cv.notify_all();
 
-			_tasksCount.fetch_add(1, std::memory_order_acquire);
+            return future;
+        }
 
-			{
-				std::scoped_lock lock{_mtx};
-				_tasks.emplace(std::move(coro), std::move(futureState));
-			}
+        template <typename... CoroTs>
+        [[nodiscard]] auto EnqueueTasks(CoroTs&&... tasks)
+        {
+            return std::make_tuple(Enqueue(std::forward<CoroTs>(tasks))...);
+        }
 
-			_cv.notify_all();
+        void Wait()
+        {
+            auto count = _tasksCount.load(std::memory_order_acquire);
+            while (count > 0)
+            {
+                _tasksCount.wait(count, std::memory_order_acquire);
+                count = _tasksCount.load(std::memory_order_acquire);
+            }
+        }
 
-			return future;
-		}
+    private:
+        void _AddWorkers(size_t workerThreadCount)
+        {
+            assert(workerThreadCount >= 1);
 
-		template <typename... CoroTs>
-		auto EnqueueTasks(CoroTs &&...tasks)
-		{
-			return std::make_tuple(Enqueue(std::forward<CoroTs>(tasks))...);
-		}
+            for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
+            {
+                _workerThreads.emplace_back(
+                    [this](std::stop_token stopToken) {
+                        while (stopToken.stop_requested() == false)
+                        {
+                            {
+                                using enum ECoroResumeState;
 
-		void Wait()
-		{
-			auto count = _tasksCount.load(std::memory_order_acquire);
-			while (count > 0)
-			{
-				_tasksCount.wait(count, std::memory_order_acquire);
-				count = _tasksCount.load(std::memory_order_acquire);
-			}
-		}
+                                std::unique_lock lock{_mtx};
+                                if (_cv.wait(lock, stopToken, [this] { return !_tasks.empty(); }) == false)
+                                {
+                                    // stop was requested
+                                    return;
+                                }
 
-	private:
-		void _AddWorkers(size_t workerThreadCount)
-		{
-			assert(workerThreadCount >= 1);
+                                TaskT task{std::move(_tasks.front())};
+                                _tasks.pop();
 
-			for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
-			{
-				_workerThreads.emplace_back([this](std::stop_token stopToken)
-											{
-				while (stopToken.stop_requested() == false)
-				{
-					{
-						using enum ECoroResumeState;
+                                lock.unlock();
 
-						std::unique_lock lock{ _mtx };
-						if (_cv.wait(lock, stopToken, [this] {return !_tasks.empty(); }) == false)
-						{
-							// stop was requested
-							return;
-						}
+                                // resume the task
+                                auto resumeState = std::invoke(task);
 
-						TaskT task{ std::move(_tasks.front()) };
-						_tasks.pop();
+                                if (resumeState == SUSPENDED)
+                                {
+                                    lock.lock();
+                                    _tasks.emplace(std::move(task));
+                                    lock.unlock();
 
-						lock.unlock();
+                                    _cv.notify_all();
+                                }
+                                else if (resumeState == PAUSED)
+                                {
+                                    static size_t id = 0;
 
-						// resume the task
-						auto resumeState = std::invoke(task);
+                                    lock.lock();
 
-						if (resumeState == SUSPENDED)
-						{
-							lock.lock();
-							_tasks.emplace(std::move(task));
-							lock.unlock();
+                                    task.Pause([this, i = id] {
+                                        {
+                                            std::scoped_lock lock{_mtx};
+                                            if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
+                                            {
+                                                _tasks.emplace(std::move(it->second));
+                                            }
+                                            _pausedTasks.erase(i);
+                                        }
 
-							_cv.notify_all();
-						}
-						else if (resumeState == PAUSED)
-						{
-							static size_t id = 0;
+                                        _cv.notify_all();
+                                    });
 
-							lock.lock();
+                                    _pausedTasks.emplace(id++, std::move(task));
 
-							task.Pause([this, i = id] {
-								{
-									std::scoped_lock lock{ _mtx };
-									if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
-									{
-										_tasks.emplace(std::move(it->second));
-									}
-									_pausedTasks.erase(i);
-								}
+                                    lock.unlock();
+                                }
+                                else if (resumeState == DONE)
+                                {
+                                    // task is done
+                                    _tasksCount.fetch_sub(1, std::memory_order_release);
+                                    _tasksCount.notify_all();
+                                }
+                            }
 
-								_cv.notify_all();
-							});
+                            // TODO remove (only for
+                            // testing)!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+                            std::this_thread::sleep_for(100ms);
+                        }
+                    },
+                    _stopSource.get_token());
+            }
+        }
 
-							_pausedTasks.emplace(id++, std::move(task));
+        std::queue<TaskT>                 _tasks;
+        std::unordered_map<size_t, TaskT> _pausedTasks;
+        std::atomic<size_t>               _tasksCount{0};
 
-							lock.unlock();
+        std::vector<std::jthread> _workerThreads;
+        std::stop_source          _stopSource;
 
-						}
-						else if(resumeState == DONE)
-						{
-							// task is done
-							_tasksCount.fetch_sub(1, std::memory_order_release);
-							_tasksCount.notify_all();
-						}
-					}
+        std::mutex                  _mtx;
+        std::condition_variable_any _cv;
+    };
 
-					// TODO remove (only for testing)
-					std::this_thread::sleep_for(100ms);
+    using CoroScheduler = CoroThreadPool<PackagedCoro<>, std::promise>;
+    // using CoroScheduler = CoroThreadPool<PackedSchedulableTask<>, FutureState>;
 
-				} }, _stopSource.get_token());
-			}
-		}
-
-		std::queue<TaskT> _tasks;
-		std::unordered_map<size_t, TaskT> _pausedTasks;
-		std::atomic<size_t> _tasksCount{0};
-
-		std::vector<std::jthread> _workerThreads;
-		std::stop_source _stopSource;
-
-		std::mutex _mtx;
-		std::condition_variable_any _cv;
-	};
-
-	template <std::unsigned_integral auto BUFFER_SIZE = 64u>
-	struct PackedSchedulableTask
-	{
-		using PauseCallbackType = std::function<void()>;
-
-	private:
-		class ISchedulableBridged
-		{
-		public:
-			ISchedulableBridged() = default;
-
-			ISchedulableBridged(ISchedulableBridged&&) = default;
-			ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
-
-			virtual ~ISchedulableBridged() = default;
-			virtual ECoroResumeState resume() = 0;
-			virtual void pause(PauseCallbackType) = 0;
-		};
-
-		template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
-		class SchedulableBridgeImpl : public ISchedulableBridged
-		{
-		public:
-			SchedulableBridgeImpl(CoroT&& coro, FutureStateT&& futureState)
-				: _coro{std::move(coro)}
-				, _futureState{std::move(futureState)}
-			{
-			}
-
-			SchedulableBridgeImpl(SchedulableBridgeImpl&&) = default;
-			SchedulableBridgeImpl& operator=(SchedulableBridgeImpl&&) = default;
-
-			~SchedulableBridgeImpl()
-			{
-				if (_exceptionSet == false)
-				{
-					if constexpr (requires { {_coro.await_resume()} -> concepts::RValueReference; })
-					{
-						//_futureState.set_value(_coro.promise().ReturnValue());
-						_futureState.set_value(_coro.await_resume());
-					}
-					else
-					{
-						_futureState.set_value();
-					}
-				}
-			}
-
-			ECoroResumeState resume() override
-			{
-				ECoroResumeState resumeState{ECoroResumeState::DONE};
-
-				try
-				{
-					resumeState = _coro.resume();
-				}
-				catch (...)
-				{
-					_futureState.set_exception(std::current_exception());
-					_exceptionSet = true;
-				}
-
-				return resumeState;
-			}
-
-			void pause(PauseCallbackType func) override
-			{
-				//_coro.promise().pauseResume = std::move(func);
-				_coro.pause(std::move(func));
-			}
-
-		private:
-			bool _exceptionSet{false};
-			CoroT _coro;
-			FutureStateT _futureState;
-		};
-
-		using StaticStorageType = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>;
-		using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
-
-	public:
-		template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
-			requires(!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackedSchedulableTask>)
-		PackedSchedulableTask(CoroT &&coro, FutureStateT futureState)
-		//: _bridge{std::make_unique<SchedulableBridgeImpl<CoroT, FutureStateT>>(std::move(coro), std::move(futureState))}
-		{
-			using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
-
-			SyncOut() << "sizeof(BridgeType): " << sizeof(BridgeType) << '\n';
-
-			if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
-			{
-				_bridge = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
-			}
-			else
-			{
-				_bridge = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
-			}
-		}
-
-		ECoroResumeState operator()()
-		{
-			return std::visit([](auto &bridge) { return bridge->resume(); }, _bridge);
-		}
-
-		void Pause(std::invocable auto pauseCallback)
-		{
-			std::visit([&pauseCallback](auto &bridge) { bridge->pause(std::move(pauseCallback)); }, _bridge);
-		}
-
-	private:
-		// DynamicStorageType _bridge;
-
-		std::variant<StaticStorageType, DynamicStorageType> _bridge;
-	};
-
-	// using CoroScheduler = CoroThreadPool<PackedSchedulableTask<48u>, std::promise>;
-	using CoroScheduler = CoroThreadPool<PackedSchedulableTask<>, FutureState>;
-
-}
+} // namespace tinycoro
 
 #endif // !__TINY_CORO_CORO_SCHEDULER_HPP__

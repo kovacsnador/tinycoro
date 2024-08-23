@@ -9,20 +9,21 @@
 
 #include "Common.hpp"
 
-namespace tinycoro
-{
+namespace tinycoro {
+
     template <typename PromiseT>
-    std::function<void()> PauseTask(std::coroutine_handle<PromiseT> &hdl)
+    std::function<void()> PauseTask(std::coroutine_handle<PromiseT>& hdl)
     {
         hdl.promise().paused = true;
         return [hdl] { hdl.promise().pauseResume(); };
     }
 
-    namespace concepts
-    {
+    namespace concepts {
         template <typename E>
-        concept Event = requires(E e) { { e.Notify() }; };
-    }
+        concept Event = requires (E e) {
+            { e.Notify() };
+        };
+    } // namespace concepts
 
     template <typename, typename, concepts::Event, typename, typename>
     struct AsyncCallbackAwaiter;
@@ -51,40 +52,42 @@ namespace tinycoro
         std::function<void()> _done;
     };
 
-    template <typename AsyncFunctionT, typename CallbackT, concepts::Event EventT = Event, typename ReturnT = std::invoke_result_t<AsyncFunctionT, CallbackT>, typename DummyLambdaT = decltype([] {})>
+    template <typename AsyncFunctionT,
+              typename CallbackT,
+              concepts::Event EventT = Event,
+              typename ReturnT       = std::invoke_result_t<AsyncFunctionT, CallbackT>,
+              typename DummyLambdaT  = decltype([] {})>
     struct AsyncCallbackAwaiter
     {
         AsyncCallbackAwaiter(AsyncFunctionT asyncFunc, CallbackT cb)
-            : _asyncFunction{asyncFunc}, _userCallback{cb}
+        : _asyncFunction{asyncFunc}
+        , _userCallback{cb}
         {
         }
 
         // disable copy and move
-        AsyncCallbackAwaiter(AsyncCallbackAwaiter &&) = delete;
+        AsyncCallbackAwaiter(AsyncCallbackAwaiter&&) = delete;
 
-        [[nodiscard]] constexpr bool await_ready() const noexcept
-        {
-            return false;
-        }
+        [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
         void await_suspend(auto hdl) noexcept
         {
-            static EventT s_event;
+            static EventT    s_event;
             static CallbackT s_callback{_userCallback};
 
             // put tast on pause
             s_event.Set(PauseTask(hdl));
 
             // invoke callback
-            _result = _asyncFunction([]<typename... Ts>(Ts... ts)
-                                     {
-            s_callback(std::forward<Ts>(ts)...);
-            s_event.Notify(); });
+            _result = _asyncFunction([]<typename... Ts>(Ts... ts) {
+                s_callback(std::forward<Ts>(ts)...);
+                s_event.Notify();
+            });
 
             SyncOut() << "      AsyncCallbackAwaiter... await_suspend Thread id: " << std::this_thread::get_id() << '\n';
         }
 
-        [[nodiscard]] auto &&await_resume() noexcept
+        [[nodiscard]] auto&& await_resume() noexcept
         {
             SyncOut() << "      AsyncCallbackAwaiter... await_resume Thread id: " << std::this_thread::get_id() << '\n';
 
@@ -93,7 +96,7 @@ namespace tinycoro
 
     private:
         AsyncFunctionT _asyncFunction;
-        CallbackT _userCallback;
+        CallbackT      _userCallback;
 
         std::optional<ReturnT> _result;
     };
@@ -102,31 +105,29 @@ namespace tinycoro
     struct AsyncCallbackAwaiter<AsyncFunctionT, CallbackT, EventT, void, DummyLambdaT>
     {
         AsyncCallbackAwaiter(AsyncFunctionT asyncFunc, CallbackT cb)
-            : _asyncFunction{asyncFunc}, _userCallback{cb}
+        : _asyncFunction{asyncFunc}
+        , _userCallback{cb}
         {
         }
 
         // disable copy and move
-        AsyncCallbackAwaiter(AsyncCallbackAwaiter &&) = delete;
+        AsyncCallbackAwaiter(AsyncCallbackAwaiter&&) = delete;
 
-        [[nodiscard]] constexpr bool await_ready() const noexcept
-        {
-            return false;
-        }
+        [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
         void await_suspend(auto hdl) noexcept
         {
-            static EventT s_event;
+            static EventT    s_event;
             static CallbackT s_callback{_userCallback};
 
             // put tast on pause
             s_event.Set(PauseTask(hdl));
 
             // invoke callback
-            _asyncFunction([]<typename... Ts>(Ts... ts)
-                           {
-            s_callback(std::forward<Ts>(ts)...);
-            s_event.Notify(); });
+            _asyncFunction([]<typename... Ts>(Ts... ts) {
+                s_callback(std::forward<Ts>(ts)...);
+                s_event.Notify();
+            });
 
             SyncOut() << "      AsyncCallbackAwaiter... await_suspend Thread id: " << std::this_thread::get_id() << '\n';
         }
@@ -138,9 +139,9 @@ namespace tinycoro
 
     private:
         AsyncFunctionT _asyncFunction;
-        CallbackT _userCallback;
+        CallbackT      _userCallback;
     };
 
-}
+} // namespace tinycoro
 
 #endif //!__TINY_CORO_ASYNC_CALLBACK_AWAITER_HPP__

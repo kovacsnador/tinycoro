@@ -4,9 +4,9 @@
 #include <iostream>
 #include <syncstream>
 
-namespace tinycoro
-{
-    auto SyncOut(std::ostream &stream = std::cout)
+namespace tinycoro {
+    
+    auto SyncOut(std::ostream& stream = std::cout)
     {
         return std::osyncstream{stream};
     }
@@ -17,6 +17,6 @@ namespace tinycoro
         PAUSED,
         DONE
     };
-}
+} // namespace tinycoro
 
 #endif // !__TINY_CORO_COMMON_HPP__
