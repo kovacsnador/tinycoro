@@ -22,6 +22,19 @@ using namespace std::chrono_literals;
 
 namespace tinycoro {
 
+    namespace concepts {
+
+        template <typename T>
+        concept Iterable = requires (T) {
+            typename std::decay_t<T>::iterator;
+            typename std::decay_t<T>::value_type;
+        };
+
+        template <typename T>
+        concept NonIterable = !Iterable<T>;
+
+    } // namespace concepts
+
     template <std::move_constructible TaskT, template <typename> class FutureStateT>
         requires requires (TaskT t) {
             { std::invoke(t) } -> std::same_as<ECoroResumeState>;
@@ -52,7 +65,8 @@ namespace tinycoro {
         [[nodiscard]] auto Enqueue(CoroT&& coro)
         {
             FutureStateT<typename CoroT::promise_type::value_type> futureState;
-            auto                                                   future = futureState.get_future();
+
+            auto future = futureState.get_future();
 
             _tasksCount.fetch_add(1, std::memory_order_acquire);
 
@@ -66,10 +80,33 @@ namespace tinycoro {
             return future;
         }
 
-        template <typename... CoroTs>
+        template <concepts::NonIterable... CoroTs>
         [[nodiscard]] auto EnqueueTasks(CoroTs&&... tasks)
         {
             return std::make_tuple(Enqueue(std::forward<CoroTs>(tasks))...);
+        }
+
+        template <concepts::Iterable ContainerT>
+        [[nodiscard]] auto EnqueueTasks(ContainerT&& tasks)
+        {
+            using FutureStateType = FutureStateT<typename std::decay_t<ContainerT>::value_type::promise_type::value_type>;
+
+            std::vector<decltype(std::declval<FutureStateType>().get_future())> futures;
+            futures.reserve(tasks.size());
+
+            for (auto&& task : tasks)
+            {
+                if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
+                {
+                    futures.emplace_back(Enqueue(std::move(task)));
+                }
+                else
+                {
+                    futures.emplace_back(Enqueue(task.task_view()));
+                }
+            }
+
+            return futures;
         }
 
         void Wait()

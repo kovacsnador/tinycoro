@@ -25,9 +25,6 @@ namespace tinycoro {
             { t = std::move(f) };
         };
 
-        template <typename T, typename... Ts>
-        concept AllSame = (std::same_as<T, Ts> && ...);
-
     } // namespace concepts
 
     template <typename ValueT>
@@ -58,7 +55,7 @@ namespace tinycoro {
             }
         }
 
-        const auto& Get() const
+        auto&& Get()
         {
             _done.wait(false);
 
@@ -133,7 +130,7 @@ namespace tinycoro {
             assert(_state);
         }
 
-        [[nodiscard]] const auto& get() const
+        [[nodiscard]] auto&& get()
         {
             assert(_state);
 
@@ -222,7 +219,7 @@ namespace tinycoro {
         std::shared_ptr<AssociatedState<ValueT>> _state;
     };
 
-    template <template <typename> class FutureT, typename... Ts>
+    /*template <template <typename> class FutureT, typename... Ts>
         requires (!concepts::AllSame<void, Ts...>)
     [[nodiscard]] auto WaitAll(std::tuple<FutureT<Ts>...>& futures)
     {
@@ -253,6 +250,30 @@ namespace tinycoro {
         };
         std::apply([futureGet](auto&... future) { ((futureGet(future)), ...); }, futures);
     }
+
+    template <template <typename> class FutureT, typename ReturnT>
+        requires std::same_as<void, ReturnT>
+    void WaitAll(std::vector<FutureT<ReturnT>>& futures)
+    {
+        for(auto& it : futures)
+        {
+            it.get();
+        }
+    }
+
+    template <template <typename> class FutureT, typename ReturnT>
+        requires (!std::same_as<void, ReturnT>)
+    std::vector<ReturnT> WaitAll(std::vector<FutureT<ReturnT>>& futures)
+    {
+        std::vector<ReturnT> results(futures.size());
+
+        for(auto& it : futures)
+        {
+            results.emplace_back{std::move(it.get())};
+        }
+
+        return results;
+    }*/
 
 } // namespace tinycoro
 

@@ -10,6 +10,7 @@
 #include "CoroTask.hpp"
 #include "Generator.hpp"
 #include "AsyncCallbackAwaiter.hpp"
+#include "Wait.hpp"
 
 using namespace std::chrono_literals;
 
@@ -549,6 +550,66 @@ void Example_multiTasks(auto& scheduler)
     SyncOut() << "WaitAll co_return => void" << '\n';
 }
 
+void Example_multiMovedTasksDynamic(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_multiMovedTasksDynamic:\n";
+
+    auto task1 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 41;
+    };
+
+    auto task2 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 42;
+    };
+
+    auto task3 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 43;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.push_back(task1());
+    tasks.push_back(task2());
+    tasks.push_back(task3());
+
+    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto results = tinycoro::WaitAll(futures);
+
+    SyncOut() << "WaitAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
+}
+
+void Example_multiTasksDynamic(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_multiTasksDynamic:\n";
+
+    auto task1 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 41;
+    };
+
+    auto task2 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 42;
+    };
+
+    auto task3 = []() -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return 43;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.push_back(task1());
+    tasks.push_back(task2());
+    tasks.push_back(task3());
+
+    auto futures = scheduler.EnqueueTasks(tasks);
+    auto results = tinycoro::WaitAll(futures);
+
+    SyncOut() << "WaitAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
+}
+
 void Example_multiTaskDifferentValues(auto& scheduler)
 {
     SyncOut() << "\n\nExample_multiTaskDifferentValues:\n";
@@ -749,6 +810,10 @@ int main()
         Example_generator(scheduler);
 
         Example_multiTasks(scheduler);
+
+        Example_multiMovedTasksDynamic(scheduler);
+
+        Example_multiTasksDynamic(scheduler);
 
         Example_multiTaskDifferentValues(scheduler);
 
