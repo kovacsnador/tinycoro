@@ -43,16 +43,6 @@ namespace tinycoro {
     }
 
     template <template <typename> class FutureT, typename ReturnT>
-        requires std::same_as<void, ReturnT>
-    void WaitAll(std::vector<FutureT<ReturnT>>& futures)
-    {
-        for (auto& it : futures)
-        {
-            it.get();
-        }
-    }
-
-    template <template <typename> class FutureT, typename ReturnT>
         requires (!std::same_as<void, ReturnT>)
     [[nodiscard]] std::vector<ReturnT> WaitAll(std::vector<FutureT<ReturnT>>& futures)
     {
@@ -65,6 +55,16 @@ namespace tinycoro {
         }
 
         return results;
+    }
+
+    template <template <typename> class FutureT, typename ReturnT>
+        requires std::same_as<void, ReturnT>
+    void WaitAll(std::vector<FutureT<ReturnT>>& futures)
+    {
+        for (auto& it : futures)
+        {
+            it.get();
+        }
     }
 
 } // namespace tinycoro

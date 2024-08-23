@@ -4,7 +4,7 @@
 #include <concepts>
 #include <variant>
 
-#include "InPlaceStorage.hpp"
+#include "StaticStorage.hpp"
 #include "Common.hpp"
 
 namespace tinycoro {
@@ -101,7 +101,7 @@ namespace tinycoro {
             FutureStateT _futureState;
         };
 
-        using StaticStorageType  = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>;
+        using StaticStorageType  = StaticStorage<ISchedulableBridged, BUFFER_SIZE>;
         using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
 
     public:
@@ -113,7 +113,7 @@ namespace tinycoro {
 
             if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
             {
-                _bridge = InPlaceStorage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
+                _bridge = StaticStorage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
             }
             else
             {

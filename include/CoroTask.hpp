@@ -7,7 +7,7 @@
 #include <cstddef>
 
 #include "Common.hpp"
-#include "InPlaceStorage.hpp"
+#include "StaticStorage.hpp"
 
 namespace tinycoro {
 
@@ -180,7 +180,7 @@ namespace tinycoro {
         operator bool() const noexcept { return _bridge != nullptr && _bridge->Handle(); }
 
     private:
-        InPlaceStorage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
+        StaticStorage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
     };
 
     struct FinalAwaiter
@@ -386,7 +386,7 @@ namespace tinycoro {
             }
         }
 
-        [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type>{_hdl}; }
+        [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl}; }
 
     private:
         void destroy()

@@ -5,6 +5,7 @@
 #include <chrono>
 #include <future>
 #include <syncstream>
+#include <stop_token>
 
 #include "Scheduler.hpp"
 #include "CoroTask.hpp"
@@ -452,6 +453,45 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
     SyncOut() << "co_return => " << future.get() << '\n';
 }
 
+void Example_usageWithStopToken(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_usageWithStopToken:\n";
+
+    auto task1 = [](auto duration, std::stop_source& source) -> tinycoro::Task<void> {
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await std::suspend_always{};
+        }
+        source.request_stop();
+    };
+
+    auto task2 = [](std::stop_token token) -> tinycoro::Task<int32_t> {
+
+        auto sleep = [](auto duration) -> tinycoro::Task<void> {
+            for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+            {
+                co_await std::suspend_always{};
+            }
+        };
+
+        int32_t result{};
+        while (token.stop_requested() == false)
+        {
+            ++result;
+            co_await sleep(100ms);
+        }
+        co_return result;
+    };
+
+    std::stop_source source;
+
+    auto futures = scheduler.EnqueueTasks(task1(1s, source), task2(source.get_token()));
+
+    auto results = tinycoro::WaitAll(futures);
+
+    SyncOut() << "co_return => " << std::get<1>(results) << '\n';
+}
+
 int main()
 {
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
@@ -489,6 +529,8 @@ int main()
         Example_asyncCallbackAwaiter(scheduler);
 
         Example_asyncCallbackAwaiterWithReturnValue(scheduler);
+
+        Example_usageWithStopToken(scheduler);
     }
 
     return 0;

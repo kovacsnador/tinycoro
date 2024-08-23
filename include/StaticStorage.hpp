@@ -11,25 +11,25 @@ namespace tinycoro {
 
     template <typename InterpreterClassT, std::unsigned_integral auto SIZE, typename AlignasT = char>
         requires (SIZE >= sizeof(AlignasT))
-    struct InPlaceStorage
+    struct StaticStorage
     {
-        InPlaceStorage() = default;
+        StaticStorage() = default;
 
         template <typename ClassT, typename... Args>
             requires std::constructible_from<ClassT, Args...>
-        InPlaceStorage([[maybe_unused]] std::type_identity<ClassT>, Args&&... args)
+        StaticStorage([[maybe_unused]] std::type_identity<ClassT>, Args&&... args)
         : _owner{true}
         {
             std::construct_at(GetAs<ClassT>(), std::forward<Args>(args)...);
         }
 
-        InPlaceStorage(InPlaceStorage&& other) noexcept
+        StaticStorage(StaticStorage&& other) noexcept
         : _owner{std::exchange(other._owner, false)}
         {
             std::memcpy(_buffer, other._buffer, SIZE);
         }
 
-        InPlaceStorage& operator=(InPlaceStorage&& other) noexcept
+        StaticStorage& operator=(StaticStorage&& other) noexcept
         {
             if (std::addressof(other) != this)
             {
@@ -42,7 +42,7 @@ namespace tinycoro {
             return *this;
         }
 
-        ~InPlaceStorage() { Destroy(); }
+        ~StaticStorage() { Destroy(); }
 
         void reset() { Destroy(); }
 
