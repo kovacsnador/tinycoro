@@ -12,11 +12,13 @@
 namespace tinycoro {
 
     namespace concepts {
+
         template <typename T>
         concept Pausable = requires (T t) {
             { t.paused = true };
             requires std::regular_invocable<decltype(t.pauseResume)>;
         };
+
     } // namespace concepts
 
     struct [[nodiscard]] PackedCoroHandle
@@ -225,7 +227,7 @@ namespace tinycoro {
 
             auto* coroTask = reinterpret_cast<CoroTaskT*>(this);
 
-            auto hdl                   = coroTask->hdl;
+            auto hdl                   = coroTask->_hdl;
             parentCoro.promise().child = hdl;
             hdl.promise().parent       = parentCoro;
             return hdl;
@@ -247,7 +249,7 @@ namespace tinycoro {
             SyncOut() << "      Awaiter: await_resume()\n";
 
             auto* coroTask = static_cast<CoroTaskT*>(this);
-            return coroTask->hdl.promise().ReturnValue();
+            return coroTask->_hdl.promise().ReturnValue();
         }
     };
 
@@ -285,6 +287,42 @@ namespace tinycoro {
         }
     };
 
+    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = CoroResumer>
+    struct CoroTaskView : private AwaiterT
+    {
+        using promise_type  = PromiseT;
+        using coro_hdl_type = std::coroutine_handle<promise_type>;
+
+        using AwaiterT::await_ready;
+        using AwaiterT::await_resume;
+        using AwaiterT::await_suspend;
+
+        CoroTaskView(coro_hdl_type hdl)
+        : _hdl{hdl}
+        {
+            SyncOut() << "    CoroTaskView: constructor\n";
+        }
+
+        [[nodiscard]] auto resume()
+        {
+            SyncOut() << "    CoroTaskView: resume()\n";
+
+            return std::invoke(_coroResumer, _hdl);
+        }
+
+        void pause(std::regular_invocable auto resumerCallback)
+        {
+            if constexpr (requires { requires concepts::Pausable<decltype(_hdl.promise())>; })
+            {
+                _hdl.promise().pauseResume = resumerCallback;
+            }
+        }
+
+    private:
+        [[no_unique_address]] CoroResumerT _coroResumer{};
+        coro_hdl_type                      _hdl;
+    };
+
     template <typename ReturnValueT, typename PromiseT, template <typename, typename> class AwaiterT, typename CoroResumerT = CoroResumer>
     struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>
     {
@@ -303,13 +341,13 @@ namespace tinycoro {
         template <typename... Args>
             requires std::constructible_from<coro_hdl_type, Args...>
         CoroTask(Args&&... args)
-        : hdl{std::forward<Args>(args)...}
+        : _hdl{std::forward<Args>(args)...}
         {
             SyncOut() << "    CoroTask: constructor\n";
         }
 
         CoroTask(CoroTask&& other) noexcept
-        : hdl{std::exchange(other.hdl, nullptr)}
+        : _hdl{std::exchange(other._hdl, nullptr)}
         {
             SyncOut() << "    CoroTask: move constructor\n";
         }
@@ -321,7 +359,7 @@ namespace tinycoro {
             if (std::addressof(other) != this)
             {
                 destroy();
-                hdl = std::exchange(other.hdl, nullptr);
+                _hdl = std::exchange(other._hdl, nullptr);
             }
             return *this;
         }
@@ -337,62 +375,33 @@ namespace tinycoro {
         {
             SyncOut() << "    CoroTask: resume()\n";
 
-            return std::invoke(_coroResumer, hdl);
+            return std::invoke(_coroResumer, _hdl);
         }
 
         void pause(std::regular_invocable auto resumerCallback)
         {
-            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; })
+            if constexpr (requires { requires concepts::Pausable<decltype(_hdl.promise())>; })
             {
-                hdl.promise().pauseResume = resumerCallback;
+                _hdl.promise().pauseResume = resumerCallback;
             }
         }
+
+        [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type>{_hdl}; }
 
     private:
         void destroy()
         {
-            if (hdl)
+            if (_hdl)
             {
                 SyncOut() << "    CoroTask: destroy()\n";
 
-                hdl.destroy();
-                hdl = nullptr;
+                _hdl.destroy();
+                _hdl = nullptr;
             }
         }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
-        coro_hdl_type                      hdl;
-    };
-
-    template <typename PromiseT, typename CoroResumerT = CoroResumer>
-    struct CoroTaskView
-    {
-        using promise_type  = PromiseT;
-        using coro_hdl_type = std::coroutine_handle<promise_type>;
-
-        CoroTaskView(coro_hdl_type hdl)
-        : hdl{hdl}
-        {
-            SyncOut() << "    CoroTaskView: constructor\n";
-        }
-
-        [[nodiscard]] auto resume()
-        {
-            SyncOut() << "    CoroTaskView: resume()\n";
-
-            return std::invoke(CoroResumerT{}, hdl);
-        }
-
-        void pause(std::regular_invocable auto resumerCallback)
-        {
-            if constexpr (requires { requires concepts::Pausable<decltype(hdl.promise())>; })
-            {
-                hdl.promise().pauseResume = resumerCallback;
-            }
-        }
-
-    private:
-        coro_hdl_type hdl;
+        coro_hdl_type                      _hdl;
     };
 
     template <typename ValueT>
@@ -412,9 +421,6 @@ namespace tinycoro {
                 // to support aggregate initialization
                 _value = decltype(_value){std::in_place, std::forward<U>(v)};
             }
-
-            //_value = std::forward<U>(v);
-            //_value = decltype(_value){std::in_place, std::forward<U>(v)};
         }
 
         auto&& ReturnValue() { return std::move(_value.value()); }
@@ -520,20 +526,20 @@ namespace tinycoro {
     };
 
     // using CoroTaskVoid = CoroTask<Promise<FinalAwaiter, PromiseReturnVoid>, AwaiterVoid>;
-    using CoroTaskVoid = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>>, AwaiterValue>;
+    // using CoroTaskVoid = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>>, AwaiterValue>;
 
-    template <typename ReturnValueT>
-    using CoroTaskReturn = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
+    // template <typename ReturnValueT>
+    // using CoroTaskReturn = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
 
-    template <typename YieldValueT, typename YieldAwaiterT = std::suspend_always>
+    /*template <typename YieldValueT, typename YieldAwaiterT = std::suspend_always>
     using CoroTaskYield
-        = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterValue>;
+        = CoroTask<void, Promise<FinalAwaiter, PromiseReturnValue<void>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterValue>;*/
     // using CoroTaskYield = CoroTask<void, Promise<FinalAwaiter, PromiseReturnVoid, PromiseYieldValue<YieldValueT, YieldAwaiterT>>, AwaiterVoid>;
 
-    template <typename YieldValueT, typename ReturnValueT, typename YieldAwaiterT = std::suspend_always>
+    /*template <typename YieldValueT, typename ReturnValueT, typename YieldAwaiterT = std::suspend_always>
     using CoroTaskYieldReturn = CoroTask<ReturnValueT,
                                          Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>, PromiseYieldValue<YieldValueT, YieldAwaiterT>>,
-                                         AwaiterValue>;
+                                         AwaiterValue>;*/
 
     template <typename ReturnValueT>
     using Task = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;

@@ -346,6 +346,23 @@ void Example_voidTask(auto& scheduler)
     SyncOut() << "co_return => void" << '\n';
 }
 
+void Example_taskView(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_taskView:\n";
+
+    auto task = []() -> tinycoro::Task<void> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return;
+    };
+
+    auto coro = task();
+    auto future = scheduler.Enqueue(coro.task_view());
+
+    future.get();
+
+    SyncOut() << "co_return => void" << '\n';
+}
+
 void Example_returnValueTask(auto& scheduler)
 {
     SyncOut() << "\n\nExample_returnValueTask:\n";
@@ -680,7 +697,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
             SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
         };
 
-        // wait without return value
+        // wait with return value
         auto jthread = co_await tinycoro::AsyncCallbackAwaiter{[](auto cbWithNotify) { return AsyncCallbackAPI(nullptr, cbWithNotify); }, cb};
         co_return 42;
     };
@@ -716,6 +733,8 @@ int main()
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
     {
         Example_voidTask(scheduler);
+
+        Example_taskView(scheduler);
 
         Example_returnValueTask(scheduler);
 
