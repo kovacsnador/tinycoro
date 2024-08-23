@@ -7,7 +7,7 @@
 #include <syncstream>
 #include <stop_token>
 
-#include "tinycoro/tinycoro.h"
+#include "tinycoro/tinycoro_all.h"
 
 using namespace std::chrono_literals;
 
