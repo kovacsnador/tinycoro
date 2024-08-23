@@ -355,7 +355,7 @@ void Example_taskView(auto& scheduler)
         co_return;
     };
 
-    auto coro = task();
+    auto coro   = task();
     auto future = scheduler.Enqueue(coro.task_view());
 
     future.get();
@@ -693,9 +693,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
     auto task = []() -> tinycoro::Task<int32_t> {
         SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
-        auto cb = [](void* userData, int i) {
-            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
-        };
+        auto cb = [](void* userData, int i) { SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n'; };
 
         // wait with return value
         auto jthread = co_await tinycoro::AsyncCallbackAwaiter{[](auto cbWithNotify) { return AsyncCallbackAPI(nullptr, cbWithNotify); }, cb};

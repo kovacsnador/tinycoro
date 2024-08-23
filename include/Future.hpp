@@ -9,6 +9,7 @@
 #include "Common.hpp"
 
 namespace tinycoro {
+
     struct AssociatedStateStatisfiedException : std::runtime_error
     {
         using BaseT = std::runtime_error;
@@ -17,11 +18,16 @@ namespace tinycoro {
 
     namespace concepts {
 
-		template<typename To, typename From>
-		concept Assignable = requires (To t, From f) { { t = f }; } || requires (To t, From && f) { { t = std::move(f) }; };
+        template <typename To, typename From>
+        concept Assignable = requires (To t, From f) {
+            { t = f };
+        } || requires (To t, From&& f) {
+            { t = std::move(f) };
+        };
 
         template <typename T, typename... Ts>
         concept AllSame = (std::same_as<T, Ts> && ...);
+
     } // namespace concepts
 
     template <typename ValueT>
@@ -32,8 +38,8 @@ namespace tinycoro {
 
     public:
         template <typename T>
-			requires concepts::Assignable<value_type, T>
-		void Set(T&& val)
+            requires concepts::Assignable<value_type, T>
+        void Set(T&& val)
         {
             if (Valid())
             {
