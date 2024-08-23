@@ -6,6 +6,7 @@
 #include <functional>
 #include <coroutine>
 #include <type_traits>
+#include <cassert>
 
 #include "Common.hpp"
 
@@ -83,16 +84,9 @@ namespace tinycoro {
                 s_callback(std::forward<Ts>(ts)...);
                 s_event.Notify();
             });
-
-            SyncOut() << "      AsyncCallbackAwaiter... await_suspend Thread id: " << std::this_thread::get_id() << '\n';
         }
 
-        [[nodiscard]] auto&& await_resume() noexcept
-        {
-            SyncOut() << "      AsyncCallbackAwaiter... await_resume Thread id: " << std::this_thread::get_id() << '\n';
-
-            return std::move(_result.value());
-        }
+        [[nodiscard]] auto&& await_resume() noexcept { return std::move(_result.value()); }
 
     private:
         AsyncFunctionT _asyncFunction;
@@ -128,14 +122,9 @@ namespace tinycoro {
                 s_callback(std::forward<Ts>(ts)...);
                 s_event.Notify();
             });
-
-            SyncOut() << "      AsyncCallbackAwaiter... await_suspend Thread id: " << std::this_thread::get_id() << '\n';
         }
 
-        void await_resume() const noexcept
-        {
-            SyncOut() << "      AsyncCallbackAwaiter... await_resume Thread id: " << std::this_thread::get_id() << '\n';
-        }
+        void await_resume() const noexcept { }
 
     private:
         AsyncFunctionT _asyncFunction;

@@ -59,23 +59,11 @@ namespace tinycoro {
 
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
 
-        auto initial_suspend()
-        {
-            SyncOut() << "      GeneratorPromise: initial_suspend()\n";
-            return InitialAwaiterT{};
-        }
+        auto initial_suspend() { return InitialAwaiterT{}; }
 
-        auto final_suspend() noexcept
-        {
-            SyncOut() << "      GeneratorPromise: final_suspend()\n";
-            return FinalAwaiterT{};
-        }
+        auto final_suspend() noexcept { return FinalAwaiterT{}; }
 
-        void unhandled_exception()
-        {
-            SyncOut() << "      GeneratorPromise: unhandled_exception()\n";
-            std::rethrow_exception(std::current_exception());
-        }
+        void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
 
         void return_void() { }
 
@@ -103,19 +91,15 @@ namespace tinycoro {
         GeneratorT(Args&&... args)
         : _hdl{std::forward<Args>(args)...}
         {
-            SyncOut() << "    Generator: constructor\n";
         }
 
         GeneratorT(GeneratorT&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
         {
-            SyncOut() << "    Generator: move constructor\n";
         }
 
         GeneratorT& operator=(GeneratorT&& other) noexcept
         {
-            SyncOut() << "    Generator: move assign\n";
-
             if (std::addressof(other) != this)
             {
                 destroy();
@@ -124,11 +108,7 @@ namespace tinycoro {
             return *this;
         }
 
-        ~GeneratorT()
-        {
-            SyncOut() << "    Generator: ~destructor\n";
-            destroy();
-        }
+        ~GeneratorT() { destroy(); }
 
         auto begin() const { return GeneratorIterator<PromiseT>{_hdl}; }
 
@@ -139,8 +119,6 @@ namespace tinycoro {
         {
             if (_hdl)
             {
-                SyncOut() << "    CoroTask: destroy()\n";
-
                 _hdl.destroy();
                 _hdl = nullptr;
             }

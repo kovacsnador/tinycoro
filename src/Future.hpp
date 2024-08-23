@@ -5,6 +5,7 @@
 #include <atomic>
 #include <memory>
 #include <optional>
+#include <cassert>
 
 #include "Common.hpp"
 

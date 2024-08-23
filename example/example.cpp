@@ -7,11 +7,7 @@
 #include <syncstream>
 #include <stop_token>
 
-#include "Scheduler.hpp"
-#include "CoroTask.hpp"
-#include "Generator.hpp"
-#include "AsyncCallbackAwaiter.hpp"
-#include "Wait.hpp"
+#include "tinycoro/tinycoro.h"
 
 using namespace std::chrono_literals;
 
@@ -466,7 +462,6 @@ void Example_usageWithStopToken(auto& scheduler)
     };
 
     auto task2 = [](std::stop_token token) -> tinycoro::Task<int32_t> {
-
         auto sleep = [](auto duration) -> tinycoro::Task<void> {
             for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
             {
