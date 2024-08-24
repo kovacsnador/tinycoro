@@ -186,10 +186,6 @@ namespace tinycoro {
                                     _tasksCount.notify_all();
                                 }
                             }
-
-                            // TODO remove (only for
-                            // testing)!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-                            std::this_thread::sleep_for(100ms);
                         }
                     },
                     _stopSource.get_token());
