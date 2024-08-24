@@ -6,6 +6,7 @@
 
 #include "StaticStorage.hpp"
 #include "Common.hpp"
+#include "Exception.hpp"
 
 namespace tinycoro {
 
@@ -83,6 +84,11 @@ namespace tinycoro {
                 try
                 {
                     resumeState = _coro.resume();
+
+                    if (resumeState == ECoroResumeState::STOPPED)
+                    {
+                        throw StopRequestedException("Stop requested");
+                    }
                 }
                 catch (...)
                 {

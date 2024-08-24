@@ -8,14 +8,9 @@
 #include <cassert>
 
 #include "Common.hpp"
+#include "Exception.hpp"
 
 namespace tinycoro {
-
-    struct AssociatedStateStatisfiedException : std::runtime_error
-    {
-        using BaseT = std::runtime_error;
-        using BaseT::BaseT;
-    };
 
     namespace concepts {
 
@@ -166,12 +161,6 @@ namespace tinycoro {
 
     private:
         std::shared_ptr<AssociatedState<void>> _state;
-    };
-
-    struct FutureStateException : std::runtime_error
-    {
-        using BaseT = std::runtime_error;
-        using BaseT::BaseT;
     };
 
     template <typename ValueT>

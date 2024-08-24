@@ -8,6 +8,7 @@
 
 #include "Common.hpp"
 #include "StaticStorage.hpp"
+#include "Exception.hpp"
 
 namespace tinycoro {
 
@@ -114,7 +115,7 @@ namespace tinycoro {
         {
             if (_bridge == nullptr)
             {
-                throw std::runtime_error("No Child coroutine");
+                throw CoroHandleException("No Child coroutine");
             }
             return _bridge->Child();
         }
@@ -123,7 +124,7 @@ namespace tinycoro {
         {
             if (_bridge == nullptr)
             {
-                throw std::runtime_error("No Parent coroutine");
+                throw CoroHandleException("No Parent coroutine");
             }
             return _bridge->Parent();
         }
@@ -252,8 +253,13 @@ namespace tinycoro {
 
     struct CoroResumer
     {
-        ECoroResumeState operator()(auto coroHdl)
+        ECoroResumeState operator()(auto coroHdl, const auto& stopSource)
         {
+            if (stopSource.stop_requested())
+            {
+                return ECoroResumeState::STOPPED;
+            }
+
             PackedCoroHandle  hdl{coroHdl};
             PackedCoroHandle* hdlPtr = std::addressof(hdl);
 
@@ -271,7 +277,7 @@ namespace tinycoro {
         }
     };
 
-    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = CoroResumer>
+    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = CoroResumer, typename StopSourceT = std::stop_source>
     struct CoroTaskView : private AwaiterT
     {
         using promise_type  = PromiseT;
@@ -281,12 +287,32 @@ namespace tinycoro {
         using AwaiterT::await_resume;
         using AwaiterT::await_suspend;
 
-        CoroTaskView(coro_hdl_type hdl)
+        CoroTaskView(coro_hdl_type hdl, StopSourceT source)
         : _hdl{hdl}
+        , _source{source}
         {
         }
 
-        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl); }
+        CoroTaskView(CoroTaskView&& other) noexcept
+        : _hdl{std::exchange(other._hdl, nullptr)}
+        , _source{std::exchange(other._source, StopSourceT{std::nostopstate})}
+        {
+        }
+
+        CoroTaskView& operator=(CoroTaskView&& other) noexcept
+        {
+            if (std::addressof(other) != this)
+            {
+                destroy();
+                _hdl    = std::exchange(other._hdl, nullptr);
+                _source = std::exchange(other._source, StopSourceT{std::nostopstate});
+            }
+            return *this;
+        }
+
+        ~CoroTaskView() { destroy(); }
+
+        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
         void pause(std::regular_invocable auto resumerCallback)
         {
@@ -296,12 +322,27 @@ namespace tinycoro {
             }
         }
 
+        template <typename T>
+            requires std::constructible_from<StopSourceT, T>
+        void SetStopSource(T&& arg)
+        {
+            _source = std::forward<T>(arg);
+        }
+
     private:
+        void destroy() { _source.request_stop(); }
+
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
+        StopSourceT                        _source{std::nostopstate};
     };
 
-    template <typename ReturnValueT, typename PromiseT, template <typename, typename> class AwaiterT, typename CoroResumerT = CoroResumer>
+    template <typename ReturnValueT,
+              typename PromiseT,
+              template <typename, typename>
+              class AwaiterT,
+              typename CoroResumerT = CoroResumer,
+              typename StopSourceT  = std::stop_source>
     struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>
     {
         friend class AwaiterBase<CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
@@ -325,6 +366,7 @@ namespace tinycoro {
 
         CoroTask(CoroTask&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
+        , _source{std::exchange(other._source, StopSourceT{std::nostopstate})}
         {
         }
 
@@ -333,14 +375,15 @@ namespace tinycoro {
             if (std::addressof(other) != this)
             {
                 destroy();
-                _hdl = std::exchange(other._hdl, nullptr);
+                _hdl    = std::exchange(other._hdl, nullptr);
+                _source = std::exchange(other._source, StopSourceT{std::nostopstate});
             }
             return *this;
         }
 
         ~CoroTask() { destroy(); }
 
-        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl); }
+        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
         void pause(std::regular_invocable auto resumerCallback)
         {
@@ -350,13 +393,21 @@ namespace tinycoro {
             }
         }
 
-        [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl}; }
+        [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl, _source}; }
+
+        template <typename T>
+            requires std::constructible_from<StopSourceT, T>
+        void SetStopSource(T&& arg)
+        {
+            _source = std::forward<T>(arg);
+        }
 
     private:
         void destroy()
         {
             if (_hdl)
             {
+                _source.request_stop();
                 _hdl.destroy();
                 _hdl = nullptr;
             }
@@ -364,6 +415,7 @@ namespace tinycoro {
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
+        StopSourceT                        _source{std::nostopstate};
     };
 
     template <typename ValueT>

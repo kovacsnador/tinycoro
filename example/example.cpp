@@ -229,7 +229,7 @@ void Example_multiTasks(auto& scheduler)
     };
 
     auto futures = scheduler.EnqueueTasks(task(), task(), task());
-    tinycoro::WaitAll(futures);
+    std::ignore = tinycoro::WaitAll(futures);
 
     SyncOut() << "WaitAll co_return => void" << '\n';
 }
@@ -261,7 +261,35 @@ void Example_multiMovedTasksDynamic(auto& scheduler)
     auto futures = scheduler.EnqueueTasks(std::move(tasks));
     auto results = tinycoro::WaitAll(futures);
 
-    SyncOut() << "WaitAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
+    SyncOut() << "WaitAll co_return => " << std::get<0>(results[0]) << ", " << std::get<0>(results[1]) << ", " << std::get<0>(results[2]) << '\n';
+}
+
+void Example_multiMovedTasksDynamicVoid(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_multiMovedTasksDynamic:\n";
+
+    auto task1 = []() -> tinycoro::Task<void> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return;
+    };
+
+    auto task2 = []() -> tinycoro::Task<void> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return;
+    };
+
+    auto task3 = []() -> tinycoro::Task<void> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        co_return;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    tasks.push_back(task1());
+    tasks.push_back(task2());
+    tasks.push_back(task3());
+
+    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    std::ignore = tinycoro::WaitAll(futures);
 }
 
 void Example_multiTasksDynamic(auto& scheduler)
@@ -291,7 +319,7 @@ void Example_multiTasksDynamic(auto& scheduler)
     auto futures = scheduler.EnqueueTasks(tasks);
     auto results = tinycoro::WaitAll(futures);
 
-    SyncOut() << "WaitAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
+    SyncOut() << "WaitAll co_return => " << std::get<0>(results[0]) << ", " << std::get<0>(results[1]) << ", " << std::get<0>(results[2]) << '\n';
 }
 
 void Example_multiTaskDifferentValues(auto& scheduler)
@@ -325,9 +353,9 @@ void Example_multiTaskDifferentValues(auto& scheduler)
     auto val       = std::get<1>(results);
     auto s         = std::get<2>(results);
 
-    SyncOut() << std::boolalpha << "WaitAll task1 co_return => void " << std::is_same_v<std::monostate, decltype(monostate)> << '\n';
-    SyncOut() << "WaitAll task2 co_return => " << val << '\n';
-    SyncOut() << "WaitAll task3 co_return => " << s.i << '\n';
+    SyncOut() << std::boolalpha << "WaitAll task1 co_return => void " << std::is_same_v<std::monostate, std::decay_t<decltype(std::get<0>(monostate))>> << '\n';
+    SyncOut() << "WaitAll task2 co_return => " << std::get<0>(val) << '\n';
+    SyncOut() << "WaitAll task3 co_return => " << std::get<0>(s).i << '\n';
 }
 
 void Example_sleep(auto& scheduler)
@@ -484,7 +512,88 @@ void Example_usageWithStopToken(auto& scheduler)
 
     auto results = tinycoro::WaitAll(futures);
 
-    SyncOut() << "co_return => " << std::get<1>(results) << '\n';
+    auto var = std::get<1>(results);
+
+    SyncOut() << "co_return => " << std::get<0>(var) << '\n';
+}
+
+void Example_AnyOfVoid(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_AnyOfVoid:\n";
+
+    auto task1 = [](auto duration) -> tinycoro::Task<void> {
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await std::suspend_always{};
+        }
+    };
+
+    std::stop_source source;
+
+    std::ignore = tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
+}
+
+void Example_AnyOf(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_AnyOf:\n";
+
+    auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
+        int32_t count{};
+
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            ++count;
+            co_await std::suspend_always{};
+        }
+        co_return count;
+    };
+
+    std::stop_source source;
+
+    auto results = tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
+
+    auto var0 = std::get<0>(results);
+    auto var1 = std::get<1>(results);
+    auto var2 = std::get<2>(results);
+
+    assert(std::holds_alternative<std::exception_ptr>(var0) == false);
+    assert(std::holds_alternative<std::exception_ptr>(var1));
+    assert(std::holds_alternative<std::exception_ptr>(var2));
+
+    SyncOut() << "co_return => " << std::get<0>(var0) << '\n';
+}
+
+void Example_AnyOfDynamic(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_AnyOfDynamic:\n";
+
+    auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
+        int32_t count{};
+
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            ++count;
+            co_await std::suspend_always{};
+        }
+        co_return count;
+    };
+
+    std::stop_source source;
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.push_back(task1(1s));
+    tasks.push_back(task1(2s));
+    tasks.push_back(task1(3s));
+
+    auto results = tinycoro::AnyOf(scheduler, source, tasks);
+
+    auto task1Result = std::get<0>(results[0]);
+
+    assert(std::holds_alternative<std::exception_ptr>(results[0]) == false);
+    assert(std::holds_alternative<std::exception_ptr>(results[1]));
+    assert(std::holds_alternative<std::exception_ptr>(results[2]));
+
+    SyncOut() << "co_return => " << task1Result << '\n';
 }
 
 int main()
@@ -513,6 +622,8 @@ int main()
 
         Example_multiMovedTasksDynamic(scheduler);
 
+        Example_multiMovedTasksDynamicVoid(scheduler);
+
         Example_multiTasksDynamic(scheduler);
 
         Example_multiTaskDifferentValues(scheduler);
@@ -526,6 +637,12 @@ int main()
         Example_asyncCallbackAwaiterWithReturnValue(scheduler);
 
         Example_usageWithStopToken(scheduler);
+
+        Example_AnyOfVoid(scheduler);
+
+        Example_AnyOf(scheduler);
+
+        Example_AnyOfDynamic(scheduler);
     }
 
     return 0;

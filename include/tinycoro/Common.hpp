@@ -6,10 +6,16 @@
 
 namespace tinycoro {
 
+    auto SyncOut(std::ostream& stream = std::cout)
+    {
+        return std::osyncstream{stream};
+    }
+
     enum class ECoroResumeState
     {
         SUSPENDED,
         PAUSED,
+        STOPPED,
         DONE
     };
 
