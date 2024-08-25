@@ -628,6 +628,38 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
     SyncOut() << "co_return => void\n";
 }
 
+void Example_AnyOfVoidException(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_AnyOfVoidException:\n";
+
+    auto task1 = [](auto duration) -> tinycoro::Task<void> {
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await tinycoro::CancellableSuspend<void>{};
+        }
+    };
+
+    auto task2 = [](auto duration) -> tinycoro::Task<int32_t> {
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            throw std::runtime_error("ERROR");
+            co_await tinycoro::CancellableSuspend<void>{};
+        }
+        co_return 42;
+    };
+
+    std::stop_source source;
+
+    try
+    {
+        auto results = tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s), task2(5s));
+    }
+    catch (const std::exception& e)
+    {
+        SyncOut() << "Exception: " << e.what() << '\n';
+    }
+}
+
 int main()
 {
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
@@ -677,6 +709,8 @@ int main()
         Example_AnyOfDynamic(scheduler);
 
         Example_AnyOfDynamicVoid(scheduler);
+
+        Example_AnyOfVoidException(scheduler);
     }
 
     return 0;
