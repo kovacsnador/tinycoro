@@ -13,23 +13,10 @@
 
 namespace tinycoro {
 
-    template <typename>
-    struct IsStdVector : std::false_type
-    {
-    };
-
-    template <typename T, typename A>
-    struct IsStdVector<std::vector<T, A>> : std::true_type
-    {
-    };
-
     namespace concepts {
 
         template<typename T, typename... Ts>
         concept AllSame = (std::same_as<T, Ts> && ...);
-
-        template<typename T>
-        concept NoStdVector = !IsStdVector<T>::value;
 
     } // namespace concepts
 
@@ -181,49 +168,6 @@ namespace tinycoro {
             std::rethrow_exception(exception);
         }
     }
-
-    template<typename... Args>
-    struct Test{};
-
-    /*template <typename SchedulerT, typename StopSourceT, concepts::NonIterable... CoroTasksT>
-        requires requires {{ Test<typename std::decay_t<CoroTasksT>::promise_type::value_type...>{} };} && (!concepts::AllSame<void, typename CoroTasksT::promise_type::value_type...>)
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
-    {
-        (tasks.SetStopSource(source), ...);
-
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroTasksT>(tasks)...);
-        return GetAll(futures);
-    }
-
-    template <typename SchedulerT, typename StopSourceT, concepts::NonIterable... CoroTasksT>
-        requires requires {{ Test<typename std::decay_t<CoroTasksT>::promise_type::value_type...>{} };} && concepts::AllSame<void, typename CoroTasksT::promise_type::value_type...>
-    void AnyOf(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
-    {
-        (tasks.SetStopSource(source), ...);
-
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroTasksT>(tasks)...);
-        GetAll(futures);
-    }
-
-    template <typename SchedulerT, typename StopSourceT, concepts::Iterable CoroContainerT>
-        requires (!std::same_as<void, typename std::decay_t<CoroContainerT>::value_type::promise_type::value_type>)
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
-    {
-        std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
-
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroContainerT>(tasks));
-        return GetAll(futures);
-    }
-
-    template <typename SchedulerT, typename StopSourceT, concepts::Iterable CoroContainerT>
-        requires std::same_as<void, typename std::decay_t<CoroContainerT>::value_type::promise_type::value_type>
-    void AnyOf(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
-    {
-        std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
-
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroContainerT>(tasks));
-        GetAll(futures);
-    }*/
 
     template <typename SchedulerT, typename StopSourceT, typename... CoroTasksT>
         requires (!concepts::AllSame<void, typename std::decay_t<CoroTasksT>::promise_type::value_type...>)

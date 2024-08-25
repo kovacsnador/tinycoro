@@ -536,11 +536,7 @@ void Example_AnyOfVoid(auto& scheduler)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            auto cancelled = co_await tinycoro::SuspendCancellable{};
-            if (cancelled)
-            {
-                co_return;
-            }
+            co_await tinycoro::CancellableSuspend<void>{};
         }
     };
 
@@ -562,11 +558,7 @@ void Example_AnyOf(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            ++count;
-            if(co_await tinycoro::SuspendCancellable{})
-            {
-                break;
-            }
+            co_await tinycoro::CancellableSuspend{++count};
         }
         co_return count;
     };
@@ -593,11 +585,7 @@ void Example_AnyOfDynamic(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            ++count;
-            if(co_await tinycoro::SuspendCancellable{})
-            {
-                break;
-            }
+            co_await tinycoro::CancellableSuspend{++count};
         }
         co_return count;
     };
@@ -616,17 +604,14 @@ void Example_AnyOfDynamic(auto& scheduler)
 
 void Example_AnyOfDynamicVoid(auto& scheduler)
 {
-    SyncOut() << "\n\nExample_AnyOfDynamic:\n";
+    SyncOut() << "\n\nExample_AnyOfDynamicVoid:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            if(co_await tinycoro::SuspendCancellable{})
-            {
-                break;
-            }
+            co_await tinycoro::CancellableSuspend<void>{};
         }
         co_return;
     };
