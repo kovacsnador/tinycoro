@@ -1,0 +1,4 @@
+- GetAll WaitAll helyett, elsö exceptiont eldobni.
+
+- AnyOf terminate option but not for default.
+- Suspend_and_terminate return simple value, no exception
