@@ -22,19 +22,6 @@ using namespace std::chrono_literals;
 
 namespace tinycoro {
 
-    namespace concepts {
-
-        template <typename T>
-        concept Iterable = requires (T) {
-            typename std::decay_t<T>::iterator;
-            typename std::decay_t<T>::value_type;
-        };
-
-        template <typename T>
-        concept NonIterable = !Iterable<T>;
-
-    } // namespace concepts
-
     template <std::move_constructible TaskT, template <typename> class FutureStateT>
         requires requires (TaskT t) {
             { std::invoke(t) } -> std::same_as<ECoroResumeState>;
@@ -148,15 +135,18 @@ namespace tinycoro {
                                 // resume the task
                                 auto resumeState = std::invoke(task);
 
-                                if (resumeState == SUSPENDED)
+                                switch (resumeState)
+                                {
+                                case SUSPENDED:
                                 {
                                     lock.lock();
                                     _tasks.emplace(std::move(task));
                                     lock.unlock();
 
                                     _cv.notify_all();
+                                    break;
                                 }
-                                else if (resumeState == PAUSED)
+                                case PAUSED:
                                 {
                                     static size_t id = 0;
 
@@ -178,12 +168,19 @@ namespace tinycoro {
                                     _pausedTasks.emplace(id++, std::move(task));
 
                                     lock.unlock();
+                                    break;
                                 }
-                                else if (resumeState == DONE)
+                                case STOPPED:
+                                    [[fallthrough]];
+                                case DONE:
                                 {
                                     // task is done
                                     _tasksCount.fetch_sub(1, std::memory_order_release);
                                     _tasksCount.notify_all();
+                                    break;
+                                }
+                                default:
+                                    break;
                                 }
                             }
                         }

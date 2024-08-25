@@ -253,12 +253,12 @@ namespace tinycoro {
 
     struct CoroResumer
     {
-        ECoroResumeState operator()(auto coroHdl, const auto& stopSource)
+        ECoroResumeState operator()(auto coroHdl, [[maybe_unused]] const auto& stopSource)
         {
-            if (stopSource.stop_requested())
+            /*if (stopSource.stop_requested())
             {
                 return ECoroResumeState::STOPPED;
-            }
+            }*/
 
             PackedCoroHandle  hdl{coroHdl};
             PackedCoroHandle* hdlPtr = std::addressof(hdl);
@@ -327,10 +327,14 @@ namespace tinycoro {
         void SetStopSource(T&& arg)
         {
             _source = std::forward<T>(arg);
+            _hdl.promise().stopToken = _source.get_token();
         }
 
     private:
-        void destroy() { _source.request_stop(); }
+        void destroy()
+        { 
+            _source.request_stop();
+        }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
@@ -400,6 +404,7 @@ namespace tinycoro {
         void SetStopSource(T&& arg)
         {
             _source = std::forward<T>(arg);
+            _hdl.promise().stopToken = _source.get_token();
         }
 
     private:
@@ -476,7 +481,7 @@ namespace tinycoro {
         PackedCoroHandleT child;
     };
 
-    template <typename FinalAwaiterT>
+    template <typename FinalAwaiterT, typename StopTokenT = std::stop_token>
     struct PromiseBase : private CoroHandleNode<PackedCoroHandle>
     {
         using CoroHandleNode::child;
@@ -484,6 +489,8 @@ namespace tinycoro {
 
         std::function<void()> pauseResume;
         bool                  paused{false};
+
+        StopTokenT stopToken{};
 
         auto initial_suspend() { return std::suspend_always{}; }
 
