@@ -327,6 +327,7 @@ namespace tinycoro {
         void SetStopSource(T&& arg)
         {
             _source = std::forward<T>(arg);
+            _hdl.promise().stopSource = _source;
         }
 
     private:
@@ -403,6 +404,7 @@ namespace tinycoro {
         void SetStopSource(T&& arg)
         {
             _source = std::forward<T>(arg);
+            _hdl.promise().stopSource = _source;
         }
 
     private:
@@ -479,15 +481,25 @@ namespace tinycoro {
         PackedCoroHandleT child;
     };
 
-    template <typename FinalAwaiterT>
+    template <typename FinalAwaiterT, typename StopSourceT = std::stop_source>
     struct PromiseBase : private CoroHandleNode<PackedCoroHandle>
     {
+        PromiseBase() = default;
+        virtual ~PromiseBase() = default;
+
+        PromiseBase(const PromiseBase&) = default;
+        PromiseBase(PromiseBase&&) = default;
+
+        PromiseBase& operator=(const PromiseBase&) = default;
+        PromiseBase& operator=(PromiseBase&&) = default;
+
         using CoroHandleNode::child;
         using CoroHandleNode::parent;
 
         std::function<void()> pauseResume;
         bool                  paused{false};
 
+        StopSourceT stopSource;
         bool cancellable{false};
 
         auto initial_suspend() { return std::suspend_always{}; }
@@ -524,8 +536,11 @@ namespace tinycoro {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
+    template<typename ReturnValueT>
+    using PromiseT = Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>;
+
     template <typename ReturnValueT>
-    using Task = CoroTask<ReturnValueT, Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>, AwaiterValue>;
+    using Task = CoroTask<ReturnValueT, PromiseT<ReturnValueT>, AwaiterValue>;
 
 } // namespace tinycoro
 

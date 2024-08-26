@@ -40,6 +40,7 @@ namespace tinycoro {
 
         constexpr void await_resume() const noexcept { }
     };
+    
 } // namespace tinycoro
 
 #endif //!__TINY_CORO_CANCELLABLE_AWAITER_HPP__

@@ -607,7 +607,19 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
     SyncOut() << "\n\nExample_AnyOfDynamicVoid:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
-        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+        SyncOut() << "  Coro starting... before StopTokenAwaiter " << "  Thread id : " << std::this_thread::get_id() << '\n';
+
+        [[maybe_unused]] auto stopToken = co_await tinycoro::StopTokenAwaiter{};
+        [[maybe_unused]] auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+
+        /*stopSource.request_stop();
+
+        if(stopToken.stop_requested())
+        {
+            co_return;
+        }*/
+
+        SyncOut() << "  Coro starting... after StopTokenAwaiter " << "  Thread id : " << std::this_thread::get_id() << '\n';
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
@@ -633,6 +645,8 @@ void Example_AnyOfVoidException(auto& scheduler)
     SyncOut() << "\n\nExample_AnyOfVoidException:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
             co_await tinycoro::CancellableSuspend<void>{};
@@ -640,8 +654,11 @@ void Example_AnyOfVoidException(auto& scheduler)
     };
 
     auto task2 = [](auto duration) -> tinycoro::Task<int32_t> {
+        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
+
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
+            SyncOut() << "  Throwing exception\n";
             throw std::runtime_error("ERROR");
             co_await tinycoro::CancellableSuspend<void>{};
         }
