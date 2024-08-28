@@ -19,13 +19,12 @@ namespace tinycoro {
         concept CoroTask = requires (T c) {
             { c.resume() } -> std::same_as<ECoroResumeState>;
             { c.await_resume() };
-            {
-                c.pause([] {})
-            };
+            { c.IsPaused() } -> std::same_as<bool>;
         };
 
         template <typename T>
         concept RValueReference = std::is_rvalue_reference_v<T>;
+        
     } // namespace concepts
 
     template <std::unsigned_integral auto BUFFER_SIZE = 48u>
@@ -42,9 +41,9 @@ namespace tinycoro {
             ISchedulableBridged(ISchedulableBridged&&)            = default;
             ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
 
-            virtual ~ISchedulableBridged()                    = default;
-            virtual ECoroResumeState resume()                 = 0;
-            virtual void             pause(PauseCallbackType) = 0;
+            virtual ~ISchedulableBridged()                     = default;
+            virtual ECoroResumeState resume()                  = 0;
+            virtual bool             isPaused() const noexcept = 0;
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -94,7 +93,7 @@ namespace tinycoro {
                 return resumeState;
             }
 
-            void pause(PauseCallbackType func) override { _coro.pause(std::move(func)); }
+            bool isPaused() const noexcept { return _coro.IsPaused(); }
 
         private:
             bool         _exceptionSet{false};
@@ -108,7 +107,8 @@ namespace tinycoro {
     public:
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
             requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedCoro>)
-        PackagedCoro(CoroT&& coro, FutureStateT futureState)
+        PackagedCoro(CoroT&& coro, FutureStateT futureState, size_t pauseId)
+        : id{pauseId}
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
 
@@ -127,10 +127,12 @@ namespace tinycoro {
             return std::visit([](auto& bridge) { return bridge->resume(); }, _bridge);
         }
 
-        void Pause(std::invocable auto pauseCallback)
+        bool isPaused() const noexcept
         {
-            std::visit([&pauseCallback](auto& bridge) { bridge->pause(std::move(pauseCallback)); }, _bridge);
+            return std::visit([](auto& bridge) { return bridge->isPaused(); }, _bridge);
         }
+
+        const size_t id;
 
     private:
         std::variant<StaticStorageType, DynamicStorageType> _bridge;

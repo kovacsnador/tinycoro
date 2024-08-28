@@ -9,6 +9,7 @@
 #include "Common.hpp"
 #include "StaticStorage.hpp"
 #include "Exception.hpp"
+#include "PauseHandler.hpp"
 
 namespace tinycoro {
 
@@ -67,9 +68,12 @@ namespace tinycoro {
             {
                 if (Done() == false)
                 {
-                    if (_hdl.promise().paused)
+                    if constexpr (requires { requires concepts::PauseHandler<std::decay_t<decltype(*_hdl.promise().pauseHandler)>>; })
                     {
-                        return ECoroResumeState::PAUSED;
+                        if (_hdl.promise().pauseHandler->pause.load())
+                        {
+                            return ECoroResumeState::PAUSED;
+                        }
                     }
                     return ECoroResumeState::SUSPENDED;
                 }
@@ -217,6 +221,8 @@ namespace tinycoro {
             auto hdl                   = coroTask->_hdl;
             parentCoro.promise().child = hdl;
             hdl.promise().parent       = parentCoro;
+            hdl.promise().stopSource   = parentCoro.promise().stopSource;
+            hdl.promise().pauseHandler = parentCoro.promise().pauseHandler;
             return hdl;
         }
     };
@@ -314,27 +320,35 @@ namespace tinycoro {
 
         [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
-        void pause(std::regular_invocable auto resumerCallback)
+        void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
-            if constexpr (requires { requires concepts::Pausable<decltype(_hdl.promise())>; })
+            if constexpr (requires { requires concepts::PauseHandler<std::decay_t<decltype(*_hdl.promise().pauseHandler)>>; })
             {
-                _hdl.promise().pauseResume = resumerCallback;
+                using elementType = std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
+                _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
+
             }
+        }
+
+        bool IsPaused() const noexcept
+        {
+            if constexpr (requires { requires concepts::PauseHandler<std::decay_t<decltype(*_hdl.promise().pauseHandler)>>; })
+            {
+                return _hdl.promise().pauseHandler->pause.load();
+            }
+            return false;
         }
 
         template <typename T>
             requires std::constructible_from<StopSourceT, T>
         void SetStopSource(T&& arg)
         {
-            _source = std::forward<T>(arg);
+            _source                   = std::forward<T>(arg);
             _hdl.promise().stopSource = _source;
         }
 
     private:
-        void destroy()
-        { 
-            _source.request_stop();
-        }
+        void destroy() { _source.request_stop(); }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
@@ -389,12 +403,22 @@ namespace tinycoro {
 
         [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
-        void pause(std::regular_invocable auto resumerCallback)
+        void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
-            if constexpr (requires { requires concepts::Pausable<decltype(_hdl.promise())>; })
+            if constexpr (requires { requires concepts::PauseHandler<decltype(*_hdl.promise().pauseHandler)>; })
             {
-                _hdl.promise().pauseResume = resumerCallback;
+                using elementType = std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
+                _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
             }
+        }
+
+        bool IsPaused() const noexcept
+        {
+            if constexpr (requires { requires concepts::PauseHandler<decltype(*_hdl.promise().pauseHandler)>; })
+            {
+                return _hdl.promise().pauseHandler->pause.load();
+            }
+            return false;
         }
 
         [[nodiscard]] auto task_view() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl, _source}; }
@@ -403,7 +427,7 @@ namespace tinycoro {
             requires std::constructible_from<StopSourceT, T>
         void SetStopSource(T&& arg)
         {
-            _source = std::forward<T>(arg);
+            _source                   = std::forward<T>(arg);
             _hdl.promise().stopSource = _source;
         }
 
@@ -481,26 +505,25 @@ namespace tinycoro {
         PackedCoroHandleT child;
     };
 
-    template <typename FinalAwaiterT, typename StopSourceT = std::stop_source>
+    template <typename FinalAwaiterT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
     struct PromiseBase : private CoroHandleNode<PackedCoroHandle>
     {
-        PromiseBase() = default;
+        PromiseBase()          = default;
         virtual ~PromiseBase() = default;
 
         PromiseBase(const PromiseBase&) = default;
-        PromiseBase(PromiseBase&&) = default;
+        PromiseBase(PromiseBase&&)      = default;
 
         PromiseBase& operator=(const PromiseBase&) = default;
-        PromiseBase& operator=(PromiseBase&&) = default;
+        PromiseBase& operator=(PromiseBase&&)      = default;
 
         using CoroHandleNode::child;
         using CoroHandleNode::parent;
 
-        std::function<void()> pauseResume;
-        bool                  paused{false};
+        std::shared_ptr<PauseHandlerT> pauseHandler;
 
         StopSourceT stopSource;
-        bool cancellable{false};
+        bool        cancellable{false};
 
         auto initial_suspend() { return std::suspend_always{}; }
 
@@ -536,7 +559,7 @@ namespace tinycoro {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
-    template<typename ReturnValueT>
+    template <typename ReturnValueT>
     using PromiseT = Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>;
 
     template <typename ReturnValueT>

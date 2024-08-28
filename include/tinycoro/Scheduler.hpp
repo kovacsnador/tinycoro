@@ -15,7 +15,7 @@
 
 #include "Future.hpp"
 #include "Common.hpp"
-
+#include "PauseHandler.hpp"
 #include "PackagedCoro.hpp"
 
 using namespace std::chrono_literals;
@@ -25,7 +25,7 @@ namespace tinycoro {
     template <std::move_constructible TaskT, template <typename> class FutureStateT>
         requires requires (TaskT t) {
             { std::invoke(t) } -> std::same_as<ECoroResumeState>;
-            { t.Pause(typename TaskT::PauseCallbackType{}) };
+            { t.isPaused() } -> std::same_as<bool>;
         } && concepts::FutureState<FutureStateT<void>>
     class CoroThreadPool
     {
@@ -57,9 +57,12 @@ namespace tinycoro {
 
             _tasksCount.fetch_add(1, std::memory_order_acquire);
 
+            static size_t id{0};
+
             {
                 std::scoped_lock lock{_mtx};
-                _tasks.emplace(std::move(coro), std::move(futureState));
+                coro.SetPauseHandler(GeneratePauseResume(id));
+                _tasks.emplace(std::move(coro), std::move(futureState), id++);
             }
 
             _cv.notify_all();
@@ -107,6 +110,22 @@ namespace tinycoro {
         }
 
     private:
+        PauseHandlerCallbackT GeneratePauseResume(size_t id)
+        {
+            return [this, i = id](auto pauseHandler) {
+                std::scoped_lock lock{_mtx};
+                if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
+                {
+                    _tasks.emplace(std::move(it->second));
+                    _pausedTasks.erase(i);
+
+                    _cv.notify_all();
+                }
+
+                pauseHandler->pause.store(false);
+            };
+        }
+
         void _AddWorkers(size_t workerThreadCount)
         {
             assert(workerThreadCount >= 1);
@@ -137,8 +156,7 @@ namespace tinycoro {
 
                                 switch (resumeState)
                                 {
-                                case SUSPENDED:
-                                {
+                                case SUSPENDED: {
                                     lock.lock();
                                     _tasks.emplace(std::move(task));
                                     lock.unlock();
@@ -146,34 +164,27 @@ namespace tinycoro {
                                     _cv.notify_all();
                                     break;
                                 }
-                                case PAUSED:
-                                {
-                                    static size_t id = 0;
+                                case PAUSED: {
 
                                     lock.lock();
 
-                                    task.Pause([this, i = id] {
-                                        {
-                                            std::scoped_lock lock{_mtx};
-                                            if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
-                                            {
-                                                _tasks.emplace(std::move(it->second));
-                                            }
-                                            _pausedTasks.erase(i);
-                                        }
-
+                                    if (task.isPaused())
+                                    {
+                                        auto id = task.id;
+                                        _pausedTasks.emplace(id, std::move(task));
+                                    }
+                                    else
+                                    {
+                                        _tasks.emplace(std::move(task));
                                         _cv.notify_all();
-                                    });
-
-                                    _pausedTasks.emplace(id++, std::move(task));
+                                    }
 
                                     lock.unlock();
                                     break;
                                 }
                                 case STOPPED:
                                     [[fallthrough]];
-                                case DONE:
-                                {
+                                case DONE: {
                                     // task is done
                                     _tasksCount.fetch_sub(1, std::memory_order_release);
                                     _tasksCount.notify_all();
@@ -201,7 +212,6 @@ namespace tinycoro {
     };
 
     using CoroScheduler = CoroThreadPool<PackagedCoro<>, std::promise>;
-    // using CoroScheduler = CoroThreadPool<PackedSchedulableTask<>, FutureState>;
 
 } // namespace tinycoro
 

@@ -1,10 +1,15 @@
 #ifndef __TINY_CORO_COMMON_HPP__
 #define __TINY_CORO_COMMON_HPP__
 
-#include <iostream>
-#include <syncstream>
+#include <type_traits>
+#include <functional>
+#include <atomic>
+#include <memory>
+#include <cassert>
 
 namespace tinycoro {
+
+    struct PauseHandler;
 
     namespace concepts {
 
