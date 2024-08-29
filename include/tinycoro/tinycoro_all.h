@@ -5,6 +5,8 @@
 #include "CancellableSuspend.hpp"
 #include "Common.hpp"
 #include "CoroTask.hpp"
+#include "Exception.hpp"
+#include "Finally.hpp"
 #include "Future.hpp"
 #include "Generator.hpp"
 #include "PackagedCoro.hpp"

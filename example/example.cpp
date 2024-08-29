@@ -454,6 +454,30 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
 
 void Example_asyncCallbackAwaiter(auto& scheduler)
 {
+    SyncOut() << "\n\Example_asyncCallbackAwaiter:\n";
+
+    auto task = []() -> tinycoro::Task<int32_t> {
+
+        SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        auto cb = [](void* userData, int i) {
+            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+
+            // do some work
+            std::this_thread::sleep_for(100ms);
+        };
+
+        // wait with return value
+        co_await tinycoro::AsyncCallbackAwaiter{[](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb};
+        co_return 42;
+    };
+
+    auto future = scheduler.Enqueue(task());
+    SyncOut() << "co_return => " << future.get() << '\n';
+}
+
+void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
+{
     SyncOut() << "\n\nExample_asyncCallbackAwaiter:\n";
 
     auto task1 = []() -> tinycoro::Task<void> {
@@ -474,7 +498,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
             };
 
             // wait without return value
-            co_await tinycoro::AsyncCallbackAwaiter{[&event, &cb]() { AsyncCallbackAPIvoid(cb, std::addressof(event)); }, event};
+            co_await tinycoro::AsyncCallbackAwaiter_CStyle{[&event, &cb]() { AsyncCallbackAPIvoid(cb, std::addressof(event)); }, event};
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
@@ -499,16 +523,20 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
         auto cb = [](void* userData, int i) {
-            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
             tinycoro::Event* event = static_cast<tinycoro::Event*>(userData);
 
-            // notify on done
-            event->Notify();
+            // calling event notify with an exception safe environment
+            auto finalAction = tinycoro::Finally([event] { event->Notify(); });
+
+            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+
+            // do some work
+            std::this_thread::sleep_for(100ms);
         };
 
         // wait with return value
-        auto jthread = co_await tinycoro::AsyncCallbackAwaiter{[&event, cb]() { return AsyncCallbackAPI(std::addressof(event), cb); }, event};
+        auto jthread = co_await tinycoro::AsyncCallbackAwaiter_CStyle{[&event, cb]() { return AsyncCallbackAPI(std::addressof(event), cb); }, event};
         co_return 42;
     };
 
@@ -639,14 +667,8 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
         [[maybe_unused]] auto stopToken  = co_await tinycoro::StopTokenAwaiter{};
         [[maybe_unused]] auto stopSource = co_await tinycoro::StopSourceAwaiter{};
 
-        /*stopSource.request_stop();
-
-        if(stopToken.stop_requested())
-        {
-            co_return;
-        }*/
-
         SyncOut() << "  Coro starting... after StopTokenAwaiter " << "  Thread id : " << std::this_thread::get_id() << '\n';
+
         co_await tinycoro::Sleep(duration);
 
         SyncOut() << std::boolalpha <<  "  Coro stop was requested:  " << stopToken.stop_requested() << "  Thread id : " << std::this_thread::get_id() << '\n';
@@ -738,6 +760,8 @@ int main()
         Example_asyncPulling(scheduler);
 
         Example_asyncCallbackAwaiter(scheduler);
+
+        Example_asyncCallbackAwaiter_CStyle(scheduler);
 
         Example_asyncCallbackAwaiterWithReturnValue(scheduler);
 

@@ -1,0 +1,61 @@
+#ifndef __TINY_CORO_FINALLY_HPP__
+#define __TINY_CORO_FINALLY_HPP__
+
+#include <utility>
+#include <type_traits>
+#include <concepts>
+
+namespace tinycoro {
+
+    namespace concepts {
+
+        template <typename T>
+        concept NoRefConstVolatile = std::same_as<T, std::remove_cvref_t<T>>;
+
+    } // namespace concepts
+
+    template <std::regular_invocable T>
+        requires concepts::NoRefConstVolatile<T>
+    class [[nodiscard]] FinalAction
+    {
+    public:
+        using value_type = T;
+
+        explicit FinalAction(const value_type& func)
+        : _func{func}
+        {
+        }
+
+        explicit FinalAction(value_type&& func)
+        : _func{std::move(func)}
+        {
+        }
+
+        FinalAction(FinalAction&& other) noexcept
+        : _func{std::move(other._func)}
+        , _own{std::exchange(other._own, false)}
+        {
+        }
+
+        ~FinalAction()
+        {
+            if (_own)
+            {
+                _func();
+            }
+        }
+
+    private:
+        value_type _func{};
+        bool       _own{true};
+    };
+
+    template <std::invocable T>
+    auto Finally(T&& func)
+    {
+        return FinalAction<std::decay_t<T>>(std::forward<std::decay_t<T>>(func));
+    }
+
+} // namespace tinycoro
+
+#endif //!__TINY_CORO_FINALLY_HPP__

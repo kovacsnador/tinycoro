@@ -34,14 +34,12 @@ namespace tinycoro
 
     } // namespace concepts
     
-
+    
     Task<void> Sleep(concepts::IsDuration auto duration)
     {
         auto stopToken = co_await StopTokenAwaiter{};
 
-        tinycoro::Event event;
-
-        auto asyncCallback = [&stopToken, duration, &event] () {
+        auto asyncCallback = [&stopToken, duration] () {
 
             struct NonMutex
             {
@@ -57,11 +55,9 @@ namespace tinycoro
 
             std::unique_lock lock{mtx};
             cv.wait_for(lock, stopToken, duration, [&start, &duration]{ return start + duration < std::chrono::system_clock::now(); });
+        };
 
-            event.Notify(); 
-        }; 
-
-        auto future = co_await AsyncCallbackAwaiter{[&asyncCallback] { return std::async(std::launch::async, asyncCallback); }, event};
+        auto future = co_await AsyncCallbackAwaiter{[] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); }, asyncCallback};
         future.get();
     }
     

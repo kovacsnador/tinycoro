@@ -2,3 +2,6 @@
 
 - AnyOf terminate option but not for default.
 - Suspend_and_terminate return simple value, no exception
+
+
+- Pause and play std::function implementáció a promise-ban. àtadni a children-eknek. és ezeket hívni majd az event be illetve a scheduler-be.
