@@ -431,14 +431,14 @@ void Example_asyncPulling(auto& scheduler)
     SyncOut() << "co_return => " << future.get() << '\n';
 }
 
-typedef void (*funcPtr)(void*, int);
+typedef void (*funcPtr)(void*, int, int);
 
-std::jthread AsyncCallbackAPI(void* userData, funcPtr cb)
+std::jthread AsyncCallbackAPI(void* userData, funcPtr cb, int i = 43)
 {
-    return std::jthread{[cb, userData] {
+    return std::jthread{[cb, userData, i] {
         SyncOut() << "  AsyncCallbackAPI... Thread id: " << std::this_thread::get_id() << '\n';
         std::this_thread::sleep_for(1s);
-        cb(userData, 42);
+        cb(userData, 42, i);
     }};
 }
 
@@ -454,7 +454,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
 
 void Example_asyncCallbackAwaiter(auto& scheduler)
 {
-    SyncOut() << "\n\Example_asyncCallbackAwaiter:\n";
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter:\n";
 
     auto task = []() -> tinycoro::Task<int32_t> {
 
@@ -468,7 +468,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
         };
 
         // wait with return value
-        co_await tinycoro::AsyncCallbackAwaiter{[](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb};
+        co_await tinycoro::MakeAsyncCallback([](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
         co_return 42;
     };
 
@@ -478,27 +478,50 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
 
 void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
 {
-    SyncOut() << "\n\nExample_asyncCallbackAwaiter:\n";
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_CStyle:\n";
+
+    auto task = []() -> tinycoro::Task<int32_t> {
+
+        SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        auto cb = [](void* userData, int i) {
+            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+
+            auto d = tinycoro::UserData::Get<int>(userData); 
+            *d = 21;
+        };
+
+        auto async = [](auto wrappedCallback, void* wrappedUserData) { AsyncCallbackAPIvoid(wrappedCallback, wrappedUserData); return 21; };
+        
+        int userData{0};
+
+        auto res = co_await tinycoro::MakeAsyncCallback_CStyle(async, cb, tinycoro::MakeIndexedArgument<0>(&userData));
+        
+        co_return userData + res;
+    };
+
+    auto future = scheduler.Enqueue(task());
+    SyncOut() << "co_return => " << future.get() << '\n';
+}
+
+void Example_asyncCallbackAwaiter_CStyle2(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_CStyle2:\n";
 
     auto task1 = []() -> tinycoro::Task<void> {
         
         auto task2 = []() -> tinycoro::Task<void> {
-            tinycoro::Event event;
-
                 SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
 
             auto cb = [](void* userData, int i) {
                 SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
-                tinycoro::Event* event = static_cast<tinycoro::Event*>(userData);
-
-                // notify on done
-                event->Notify();
+                auto null = tinycoro::UserData::Get<std::nullptr_t>(userData);
+                assert(*null == nullptr);
             };
 
-            // wait without return value
-            co_await tinycoro::AsyncCallbackAwaiter_CStyle{[&event, &cb]() { AsyncCallbackAPIvoid(cb, std::addressof(event)); }, event};
+            co_await tinycoro::MakeAsyncCallback_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::MakeIndexedArgument<0>(nullptr));
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
@@ -518,26 +541,30 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
     SyncOut() << "\n\nExample_asyncCallbackAwaiterWithReturnValue:\n";
 
     auto task = []() -> tinycoro::Task<int32_t> {
-        tinycoro::Event event;
-
         SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
-        auto cb = [](void* userData, int i) {
+        struct S
+        {
+            int i{42};
+        };
 
-            tinycoro::Event* event = static_cast<tinycoro::Event*>(userData);
-
-            // calling event notify with an exception safe environment
-            auto finalAction = tinycoro::Finally([event] { event->Notify(); });
-
+        auto cb = [](void* userData, int i, int j) {
             SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+
+            auto* s = tinycoro::UserData::Get<S>(userData);
+            s->i++;
 
             // do some work
             std::this_thread::sleep_for(100ms);
         };
 
+        S s;
+
+        auto asyncCb = [](auto cb, auto userData){ return AsyncCallbackAPI(userData, cb); };
+
         // wait with return value
-        auto jthread = co_await tinycoro::AsyncCallbackAwaiter_CStyle{[&event, cb]() { return AsyncCallbackAPI(std::addressof(event), cb); }, event};
-        co_return 42;
+        auto jthread = co_await tinycoro::MakeAsyncCallback_CStyle(asyncCb, cb, tinycoro::MakeIndexedArgument<0>(&s));
+        co_return s.i;
     };
 
     auto future = scheduler.Enqueue(task());
@@ -762,6 +789,8 @@ int main()
         Example_asyncCallbackAwaiter(scheduler);
 
         Example_asyncCallbackAwaiter_CStyle(scheduler);
+
+        Example_asyncCallbackAwaiter_CStyle2(scheduler);
 
         Example_asyncCallbackAwaiterWithReturnValue(scheduler);
 

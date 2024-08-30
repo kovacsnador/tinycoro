@@ -57,7 +57,7 @@ namespace tinycoro
             cv.wait_for(lock, stopToken, duration, [&start, &duration]{ return start + duration < std::chrono::system_clock::now(); });
         };
 
-        auto future = co_await AsyncCallbackAwaiter{[] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); }, asyncCallback};
+        auto future = co_await MakeAsyncCallback([] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); }, asyncCallback);
         future.get();
     }
     
