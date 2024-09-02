@@ -545,25 +545,25 @@ namespace tinycoro {
     };
 
     template <typename... Types>
-    struct Promise;
+    struct PromiseT;
 
     template <typename FinalAwaiterT, PromiseReturnerConcept ReturnerT>
-    struct Promise<FinalAwaiterT, ReturnerT> : public PromiseBase<FinalAwaiterT>, public ReturnerT
+    struct PromiseT<FinalAwaiterT, ReturnerT> : public PromiseBase<FinalAwaiterT>, public ReturnerT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
     template <typename FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT>
-    struct Promise<FinalAwaiterT, ReturnerT, YielderT> : public PromiseBase<FinalAwaiterT>, public ReturnerT, public YielderT
+    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT> : public PromiseBase<FinalAwaiterT>, public ReturnerT, public YielderT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
     template <typename ReturnValueT>
-    using PromiseT = Promise<FinalAwaiter, PromiseReturnValue<ReturnValueT>>;
+    using Promise = PromiseT<FinalAwaiter, PromiseReturnValue<ReturnValueT>>;
 
     template <typename ReturnValueT>
-    using Task = CoroTask<ReturnValueT, PromiseT<ReturnValueT>, AwaiterValue>;
+    using Task = CoroTask<ReturnValueT, Promise<ReturnValueT>, AwaiterValue>;
 
 } // namespace tinycoro
 

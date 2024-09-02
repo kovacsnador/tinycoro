@@ -33,8 +33,7 @@ namespace tinycoro {
         {
         }
 
-        template <typename PromiseT>
-        [[nodiscard]] static auto PauseTask(std::coroutine_handle<PromiseT>& coroHdl)
+        [[nodiscard]] static auto PauseTask(auto& coroHdl)
         {
             auto pauseHandler = coroHdl.promise().pauseHandler;
             assert(pauseHandler);

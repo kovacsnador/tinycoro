@@ -9,8 +9,6 @@
 
 namespace tinycoro {
 
-    struct PauseHandler;
-
     namespace concepts {
 
         template <typename T>

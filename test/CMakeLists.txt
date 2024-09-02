@@ -16,8 +16,8 @@ target_include_directories(${PROJECT_NAME}
     PRIVATE
     ${GOOGLE_TEST_DIR}/googletest/include
     ${GOOGLE_TEST_DIR}/googlemock/include
-    ${CMAKE_CURRENT_SOURCE_DIR}/../src
-    ${CMAKE_CURRENT_SOURCE_DIR}/include
+    ${CMAKE_CURRENT_SOURCE_DIR}/../include
+    ${CMAKE_CURRENT_SOURCE_DIR}/src
 )
 
 # Collect all source files

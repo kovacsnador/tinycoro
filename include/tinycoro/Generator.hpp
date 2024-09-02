@@ -4,8 +4,6 @@
 #include <coroutine>
 #include <type_traits>
 
-#include "Common.hpp"
-
 namespace tinycoro {
 
     template <typename PromiseT>

@@ -2,7 +2,6 @@
 #define __TINY_CORO_CANCELLABLE_AWAITER_HPP__
 
 #include <coroutine>
-#include <stop_token>
 
 namespace tinycoro {
 
