@@ -4,7 +4,7 @@
 #include <type_traits>
 
 #include <tinycoro/PauseHandler.hpp>
-#include <tinycoro/CoroTask.hpp>
+#include <tinycoro/Task.hpp>
 
 #include <mock/CoroutineHandleMock.h>
 

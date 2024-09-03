@@ -7,7 +7,7 @@
 #include <condition_variable>
 
 #include "AsyncCallbackAwaiter.hpp"
-#include "CoroTask.hpp"
+#include "Task.hpp"
 #include "StopSourceAwaiter.hpp"
 
 namespace tinycoro

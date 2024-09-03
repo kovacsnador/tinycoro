@@ -1,6 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <tinycoro/CoroTask.hpp>
+#include <tinycoro/Task.hpp>
 #include <tinycoro/CancellableSuspend.hpp>
 
 #include "mock/CoroutineHandleMock.h"
