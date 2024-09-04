@@ -41,7 +41,7 @@ void Example_taskView(auto& scheduler)
     };
 
     auto coro   = task();
-    auto future = scheduler.Enqueue(coro.task_view());
+    auto future = scheduler.Enqueue(coro.TaskView());
 
     future.get();
 
@@ -801,7 +801,7 @@ int main()
         Example_AnyOf(scheduler);
 
         Example_AnyOfDynamic(scheduler);
-
+            
         Example_AnyOfDynamicVoid(scheduler);
 
         Example_AnyOfVoidException(scheduler);

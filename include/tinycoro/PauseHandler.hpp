@@ -11,38 +11,45 @@ namespace tinycoro {
 
     struct PauseHandler;
 
+    using PauseHandlerCallbackT = std::function<void()>;
+
     namespace concepts {
 
         template <typename T>
-        concept PauseHandler = requires (T t) {
-            { t.pause.load() } -> std::same_as<bool>;
-            requires std::invocable<decltype(t.pauseResume), std::shared_ptr<tinycoro::PauseHandler>>;
+        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
+            { t.IsPaused() } -> std::same_as<bool>;
         };
 
         template <typename T>
-        concept PauseHandlerCb = std::invocable<T, std::shared_ptr<tinycoro::PauseHandler>>;
+        concept PauseHandlerCb = std::regular_invocable<T>;
 
     } // namespace concepts
-
-    using PauseHandlerCallbackT = std::function<void(std::shared_ptr<PauseHandler>)>;
 
     struct PauseHandler
     {
         PauseHandler(concepts::PauseHandlerCb auto pr)
-        : pauseResume{pr}
+        : _pauseResume{pr}
         {
         }
 
-        [[nodiscard]] static auto PauseTask(auto& coroHdl)
+        [[nodiscard]] static auto PauseTask(auto coroHdl)
         {
-            auto pauseHandler = coroHdl.promise().pauseHandler;
-            assert(pauseHandler);
-            pauseHandler->pause.store(true);
-            return [pauseHandler] { pauseHandler->pauseResume(pauseHandler); };
+            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
+            assert(pauseHandlerPtr);
+
+            pauseHandlerPtr->_pause.store(true);
+
+            return [pauseHandlerPtr] {
+                pauseHandlerPtr->_pause.store(false);
+                pauseHandlerPtr->_pauseResume();
+            };
         }
 
-        PauseHandlerCallbackT pauseResume;
-        std::atomic<bool>     pause{false};
+        [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(); }
+
+    private:
+        PauseHandlerCallbackT _pauseResume;
+        std::atomic<bool>     _pause{false};
     };
 
 } // namespace tinycoro

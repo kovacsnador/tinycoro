@@ -56,9 +56,9 @@ namespace tinycoro
             {
                 if (Done() == false)
                 {
-                    if constexpr (requires { requires concepts::PauseHandler<std::decay_t<decltype(*_hdl.promise().pauseHandler)>>; })
+                    if constexpr (requires { _hdl.promise().pauseHandler; })
                     {
-                        if (_hdl.promise().pauseHandler->pause.load())
+                        if (_hdl.promise().pauseHandler->IsPaused())
                         {
                             return ECoroResumeState::PAUSED;
                         }

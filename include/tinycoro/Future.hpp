@@ -6,6 +6,7 @@
 #include <memory>
 #include <optional>
 #include <cassert>
+#include <variant>
 
 #include "Common.hpp"
 #include "Exception.hpp"

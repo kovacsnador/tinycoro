@@ -14,10 +14,10 @@ struct Concepts_PauseHandlerCbTest : public testing::Test
     using value_type = T;
 };
 
-using lambdaType1 = decltype([](std::shared_ptr<tinycoro::PauseHandler>){});
+using lambdaType1 = decltype([](){});
 using lambdaType2 = decltype([](std::unique_ptr<tinycoro::PauseHandler>){});
 
-using FuncType1 = void (*)(std::shared_ptr<tinycoro::PauseHandler>);
+using FuncType1 = void (*)();
 
 using PauseHandlerCbTestTypes = testing::Types<std::tuple<lambdaType1, std::true_type>,
                                                 std::tuple<lambdaType2, std::false_type>,
@@ -74,10 +74,15 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
 {
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
 
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>(lambdaType1{});
+    bool called = false;
 
-    std::ignore = tinycoro::PauseHandler::PauseTask(hdl);
+    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&called](){ called = true; });
 
-    EXPECT_TRUE(hdl.promise().pauseHandler->pause.load());
-    EXPECT_NE(hdl.promise().pauseHandler->pauseResume, nullptr);
+    auto pauseResumerCallback = tinycoro::PauseHandler::PauseTask(hdl);
+
+    EXPECT_TRUE(hdl.promise().pauseHandler->IsPaused());
+    
+    std::invoke(pauseResumerCallback);
+
+    EXPECT_TRUE(called);
 }

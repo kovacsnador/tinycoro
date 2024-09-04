@@ -28,7 +28,7 @@ namespace tinycoro {
     } // namespace concepts
 
     template <std::unsigned_integral auto BUFFER_SIZE = 48u>
-    struct PackagedCoro
+    struct PackagedTask
     {
         using PauseCallbackType = std::function<void()>;
 
@@ -106,8 +106,8 @@ namespace tinycoro {
 
     public:
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
-            requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedCoro>)
-        PackagedCoro(CoroT&& coro, FutureStateT futureState, size_t pauseId)
+            requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedTask>)
+        PackagedTask(CoroT&& coro, FutureStateT futureState, size_t pauseId)
         : id{pauseId}
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;

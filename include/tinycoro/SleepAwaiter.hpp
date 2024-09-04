@@ -54,11 +54,16 @@ namespace tinycoro
             auto start = std::chrono::system_clock::now();
 
             std::unique_lock lock{mtx};
-            cv.wait_for(lock, stopToken, duration, [&start, &duration]{ return start + duration < std::chrono::system_clock::now(); });
+            cv.wait_for(lock, stopToken, duration, [start, duration]{ return start + duration < std::chrono::system_clock::now(); });
         };
 
-        auto future = co_await MakeAsyncCallback([] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); }, asyncCallback);
-        future.get();
+        auto async = [] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); };
+
+        auto future = co_await MakeAsyncCallback(async, asyncCallback);
+        if (future.valid())
+        {
+            future.get();
+        }
     }
     
 } // namespace tinycoro
