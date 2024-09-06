@@ -74,6 +74,12 @@ namespace tinycoro
             std::coroutine_handle<PromiseT> _hdl;
         };
 
+        template <>
+        struct CoroHandleBridgeImpl<void> : public ICoroHandleBridge
+        {
+            std::coroutine_handle<void> hdl;
+        };
+
         using UniversalBridgeT = CoroHandleBridgeImpl<void>;
 
     public:

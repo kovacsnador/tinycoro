@@ -518,7 +518,7 @@ void Example_asyncCallbackAwaiter_CStyle2(auto& scheduler)
                 SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
                 auto null = tinycoro::UserData::Get<std::nullptr_t>(userData);
-                assert(*null == nullptr);
+                assert(null == nullptr);
             };
 
             co_await tinycoro::MakeAsyncCallback_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::MakeIndexedArgument<0>(nullptr));

@@ -36,7 +36,6 @@ namespace tinycoro {
         template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
         friend struct AsyncCallbackAwaiter_CStyle;
 
-    private:
         void Notify()
         {
             if (_done)
@@ -46,6 +45,7 @@ namespace tinycoro {
             }
         }
 
+    private:
         void Set(std::invocable auto cb)
         {
             assert(_done == nullptr);
