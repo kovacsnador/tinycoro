@@ -1,11 +1,9 @@
 project(tinycoro_tests) # name of your project
 
-
-
 if (MSVC)
-    # warning level 4
-    set(CMAKE_CXX_FLAGS "${CMAKE_CXX_FLAGS} /W4")
-    set(CMAKE_CXX_FLAGS_DEBUG "/MTd") # for dynamic libs
+    # warning level
+    set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} /W3")
+    set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MTd") # for dynamic libs
 else() 
     set(CMAKE_CXX_FLAGS                     "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -fexceptions")
     set(CMAKE_CXX_FLAGS_DEBUG               "${CMAKE_CXX_FLAGS} -O0 -g")

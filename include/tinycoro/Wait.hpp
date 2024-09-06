@@ -2,12 +2,12 @@
 #define __TINY_CORO_WAIT_HPP__
 
 #include <algorithm>
-// #include <variant>
 #include <tuple>
 #include <vector>
 #include <exception>
 #include <type_traits>
 #include <concepts>
+#include <stop_token>
 
 #include "Common.hpp"
 
@@ -170,8 +170,7 @@ namespace tinycoro {
     }
 
     template <typename SchedulerT, typename StopSourceT, typename... CoroTasksT>
-        requires (!concepts::AllSame<void, typename std::decay_t<CoroTasksT>::promise_type::value_type...>)
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
+    [[nodiscard]] auto AnyOfWithStopSource(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
     {
         (tasks.SetStopSource(source), ...);
 
@@ -179,19 +178,8 @@ namespace tinycoro {
         return GetAll(futures);
     }
 
-    template <typename SchedulerT, typename StopSourceT, typename... CoroTasksT>
-        requires concepts::AllSame<void, typename std::decay_t<CoroTasksT>::promise_type::value_type...>
-    void AnyOf(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
-    {
-        (tasks.SetStopSource(source), ...);
-
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroTasksT>(tasks)...);
-        GetAll(futures);
-    }
-
     template <typename SchedulerT, typename StopSourceT, typename CoroContainerT>
-        requires (!std::same_as<void, typename std::decay_t<CoroContainerT>::value_type::promise_type::value_type>)
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
+    [[nodiscard]] auto AnyOfWithStopSource(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
     {
         std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
 
@@ -199,14 +187,16 @@ namespace tinycoro {
         return GetAll(futures);
     }
 
-    template <typename SchedulerT, typename StopSourceT, typename CoroContainerT>
-        requires std::same_as<void, typename std::decay_t<CoroContainerT>::value_type::promise_type::value_type>
-    void AnyOf(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
+    template <typename StopSourceT = std::stop_source, typename SchedulerT, typename... CoroTasksT>
+    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroTasksT&&... tasks)
     {
-        std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
+        return AnyOfWithStopSource(scheduler, StopSourceT{}, std::forward<CoroTasksT>(tasks)...);
+    }
 
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroContainerT>(tasks));
-        GetAll(futures);
+    template <typename StopSourceT = std::stop_source, typename SchedulerT, typename CoroContainerT>
+    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroContainerT&& tasks)
+    {
+        return AnyOfWithStopSource(scheduler, StopSourceT{}, std::forward<CoroContainerT>(tasks));
     }
 
 } // namespace tinycoro

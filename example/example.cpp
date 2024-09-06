@@ -194,7 +194,7 @@ void Example_nestedException(auto& scheduler)
     }
 }
 
-void Example_generator(auto& scheduler)
+void Example_generator()
 {
     SyncOut() << "\n\nExample_generator:\n";
 
@@ -460,7 +460,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
 
         SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
-        auto cb = [](void* userData, int i) {
+        auto cb = []([[maybe_unused]] void* userData, int i) {
             SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
             // do some work
@@ -549,7 +549,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         };
 
         auto cb = [](void* userData, int i, int j) {
-            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+            SyncOut() << "  Callback called... " << i << " " << j << " Thread id: " << std::this_thread::get_id() << '\n';
 
             auto* s = tinycoro::UserData::Get<S>(userData);
             s->i++;
@@ -624,7 +624,7 @@ void Example_AnyOfVoid(auto& scheduler)
 
     std::stop_source source;
 
-    tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
+    tinycoro::AnyOfWithStopSource(scheduler, source, task1(1s), task1(2s), task1(3s));
 
     SyncOut() << "co_return => void" << '\n';
 }
@@ -645,9 +645,7 @@ void Example_AnyOf(auto& scheduler)
         co_return count;
     };
 
-    std::stop_source source;
-
-    auto results = tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
+    auto results = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s));
 
     auto t1 = std::get<0>(results);
     auto t2 = std::get<1>(results);
@@ -672,14 +670,12 @@ void Example_AnyOfDynamic(auto& scheduler)
         co_return count;
     };
 
-    std::stop_source source;
-
     std::vector<tinycoro::Task<int32_t>> tasks;
     tasks.push_back(task1(1s));
     tasks.push_back(task1(2s));
     tasks.push_back(task1(3s));
 
-    auto results = tinycoro::AnyOf(scheduler, source, tasks);
+    auto results = tinycoro::AnyOf(scheduler, tasks);
 
     SyncOut() << "co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
 }
@@ -704,11 +700,11 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
     std::stop_source source;
 
     std::vector<tinycoro::Task<void>> tasks;
-    tasks.push_back(task1(1s));
-    tasks.push_back(task1(2s));
-    tasks.push_back(task1(3s));
+    tasks.push_back(task1(10ms));
+    tasks.push_back(task1(20ms));
+    tasks.push_back(task1(30ms));
 
-    tinycoro::AnyOf(scheduler, source, tasks);
+    tinycoro::AnyOfWithStopSource(scheduler, source, tasks);
 
     SyncOut() << "co_return => void\n";
 }
@@ -738,11 +734,9 @@ void Example_AnyOfVoidException(auto& scheduler)
         co_return 42;
     };
 
-    std::stop_source source;
-
     try
     {
-        auto results = tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s), task2(5s));
+        [[maybe_unused]] auto results = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s), task2(5s));
     }
     catch (const std::exception& e)
     {
@@ -770,7 +764,7 @@ int main()
 
         Example_nestedException(scheduler);
 
-        Example_generator(scheduler);
+        Example_generator();
 
         Example_multiTasks(scheduler);
 
@@ -801,7 +795,7 @@ int main()
         Example_AnyOf(scheduler);
 
         Example_AnyOfDynamic(scheduler);
-            
+
         Example_AnyOfDynamicVoid(scheduler);
 
         Example_AnyOfVoidException(scheduler);

@@ -94,6 +94,7 @@ namespace tinycoro {
         template <typename PromiseT, template <typename> class HandleT>
             requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
             && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
+            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT))
         PackedCoroHandle(HandleT<PromiseT> hdl)
         : _bridge{std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl}
         {
@@ -101,6 +102,8 @@ namespace tinycoro {
 
         template <typename PromiseT, template <typename> class HandleT>
             requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
+            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
+            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT))
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
             _bridge = decltype(_bridge){std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl};

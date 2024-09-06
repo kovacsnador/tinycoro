@@ -43,8 +43,8 @@ namespace tinycoro {
                     _value = std::forward<T>(val);
                 }
 
-                _done.store(true, std::memory_order_release);
-                _done.notify_all();
+                _state.store(EState::VALID, std::memory_order_release);
+                _state.notify_all();
             }
             else
             {
@@ -54,7 +54,10 @@ namespace tinycoro {
 
         auto&& Get()
         {
-            _done.wait(false);
+            _state.wait(EState::WAITING);
+
+            EState state = EState::VALID;
+            _state.compare_exchange_strong(state, EState::DONE);
 
             if (std::holds_alternative<std::exception_ptr>(_value))
             {
@@ -64,12 +67,19 @@ namespace tinycoro {
             return std::get<ValueT>(_value);
         }
 
-        [[nodiscard]] bool Valid() const noexcept { return !_done.load(); }
+        [[nodiscard]] bool Valid() const noexcept { return _state.load() != EState::DONE; }
 
     private:
-        mutable std::mutex _mtx;
-        value_type         _value;
-        std::atomic<bool>  _done{false};
+        enum class EState
+        {
+            WAITING,
+            VALID,
+            DONE
+        };
+
+        mutable std::mutex  _mtx;
+        value_type          _value;
+        std::atomic<EState> _state{EState::WAITING};
     };
 
     template <>

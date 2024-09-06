@@ -78,7 +78,7 @@ namespace tinycoro {
             }
         }
 
-        alignas(AlignasT) unsigned char _buffer[SIZE];
+        alignas(AlignasT) unsigned char _buffer[SIZE]{};
 
         bool _owner{false};
     };
