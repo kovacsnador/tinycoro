@@ -9,11 +9,12 @@
 #include "PauseHandler.hpp"
 #include "StaticStorage.hpp"
 
-namespace tinycoro
-{
-    struct [[nodiscard]] PackedCoroHandle
-    {
-    private:
+namespace tinycoro {
+
+    struct PackedCoroHandle;
+
+    namespace detail {
+
         struct ICoroHandleBridge
         {
             virtual ~ICoroHandleBridge() = default;
@@ -77,27 +78,32 @@ namespace tinycoro
         template <>
         struct CoroHandleBridgeImpl<void> : public ICoroHandleBridge
         {
-            std::coroutine_handle<void> hdl;
+            std::coroutine_handle<void> _hdl;
         };
 
-        using UniversalBridgeT = CoroHandleBridgeImpl<void>;
+    } // namespace detail
+
+    struct [[nodiscard]] PackedCoroHandle
+    {
+    private:
+        using UniversalBridgeT = detail::CoroHandleBridgeImpl<void>;
 
     public:
         PackedCoroHandle() = default;
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires std::constructible_from<CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
-            && (std::alignment_of_v<CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
+            requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
+            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
         PackedCoroHandle(HandleT<PromiseT> hdl)
-        : _bridge{std::type_identity<CoroHandleBridgeImpl<PromiseT>>{}, hdl}
+        : _bridge{std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl}
         {
         }
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires std::constructible_from<CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
+            requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
-            _bridge = decltype(_bridge){std::type_identity<CoroHandleBridgeImpl<PromiseT>>{}, hdl};
+            _bridge = decltype(_bridge){std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl};
             return *this;
         }
 
@@ -179,9 +185,9 @@ namespace tinycoro
         operator bool() const noexcept { return _bridge != nullptr && _bridge->Handle(); }
 
     private:
-        StaticStorage<ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
+        StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
     };
-} // namespace tinycoro
 
+} // namespace tinycoro
 
 #endif //!__TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP__

@@ -16,7 +16,7 @@ namespace tinycoro {
         StaticStorage() = default;
 
         template <typename ClassT, typename... Args>
-            requires std::constructible_from<ClassT, Args...>
+            requires std::constructible_from<ClassT, Args...> && (SIZE >= sizeof(ClassT))
         StaticStorage([[maybe_unused]] std::type_identity<ClassT>, Args&&... args)
         : _owner{true}
         {

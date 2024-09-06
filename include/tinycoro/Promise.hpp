@@ -6,6 +6,7 @@
 #include <stop_token>
 
 #include "tinycoro/PauseHandler.hpp"
+#include "PackedCoroHandle.hpp"
 
 namespace tinycoro {
 
