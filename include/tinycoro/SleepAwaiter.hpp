@@ -59,7 +59,7 @@ namespace tinycoro
 
         auto async = [] (auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); };
 
-        auto future = co_await MakeAsyncCallback(async, asyncCallback);
+        auto future = co_await AsyncCallbackAwaiter(async, asyncCallback);
         if (future.valid())
         {
             future.get();

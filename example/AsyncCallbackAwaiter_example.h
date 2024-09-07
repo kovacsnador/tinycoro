@@ -21,7 +21,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
         };
 
         // wait with return value
-        co_await tinycoro::MakeAsyncCallback([](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
+        co_await tinycoro::AsyncCallbackAwaiter([](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
         co_return 42;
     };
 

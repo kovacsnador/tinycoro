@@ -32,7 +32,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         auto asyncCb = [](auto cb, auto userData){ return AsyncCallbackAPI(userData, cb); };
 
         // wait with return value
-        auto jthread = co_await tinycoro::MakeAsyncCallback_CStyle(asyncCb, cb, tinycoro::MakeIndexedArgument<0>(&s));
+        auto jthread = co_await tinycoro::AsyncCallbackAwaiter_CStyle(asyncCb, cb, tinycoro::IndexedUserData<0>(&s));
         co_return s.i;
     };
 

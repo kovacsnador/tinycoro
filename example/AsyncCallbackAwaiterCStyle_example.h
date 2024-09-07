@@ -24,7 +24,7 @@ void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
         
         int userData{0};
 
-        auto res = co_await tinycoro::MakeAsyncCallback_CStyle(async, cb, tinycoro::MakeIndexedArgument<0>(&userData));
+        auto res = co_await tinycoro::AsyncCallbackAwaiter_CStyle(async, cb, tinycoro::IndexedUserData<0>(&userData));
         
         co_return userData + res;
     };

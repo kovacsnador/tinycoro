@@ -22,6 +22,22 @@ namespace tinycoro {
 
     } // namespace concepts
 
+    template <std::integral auto NthArgument, typename T>
+    struct IndexedArgument
+    {
+        static constexpr auto value = NthArgument;
+
+        IndexedArgument(T d)
+        : data{d}
+        {
+        }
+
+        T data;
+    };
+
+    template<std::integral auto Nth>
+    using IndexedUserData = IndexedArgument<Nth, void*>;
+
     template <typename T, std::invocable<T>, concepts::AsyncCallbackEvent, typename>
     struct AsyncCallbackAwaiter;
 
@@ -170,9 +186,9 @@ namespace tinycoro {
               typename ReturnT       = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
     struct AsyncCallbackAwaiter_CStyle
     {
-        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, void* userData)
+        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
         : _asyncFunction{asyncFunc}
-        , _userData{cb, userData}
+        , _userData{cb, userData.data}
         {
         }
 
@@ -214,9 +230,9 @@ namespace tinycoro {
               concepts::AsyncCallbackEvent EventT>
     struct AsyncCallbackAwaiter_CStyle<Nth, AsyncFunctionT, CallbackT, EventT, void>
     {
-        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, void* userData)
+        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
         : _asyncFunction{asyncFunc}
-        , _userData{cb, userData}
+        , _userData{cb, userData.data}
         {
         }
 
@@ -249,49 +265,6 @@ namespace tinycoro {
         AsyncFunctionT                     _asyncFunction;
         UserDataWrapper<CallbackT, EventT> _userData;
     };
-
-    template <std::integral auto NthArgument, typename T>
-    struct IndexedArgument
-    {
-        static constexpr auto value = NthArgument;
-
-        IndexedArgument(T d) requires std::is_rvalue_reference_v<decltype(d)>
-        : data{std::move(d)}
-        {
-        }
-
-        IndexedArgument(T d)
-        : data{d}
-        {
-        }
-
-        T data;
-    };
-
-    template <std::integral auto NthArgument, typename T>
-    auto MakeIndexedArgument(T&& d)
-    {
-        if constexpr (std::is_rvalue_reference_v<decltype(d)>)
-        {
-            return IndexedArgument<NthArgument, std::remove_reference_t<T>>{std::forward<T>(d)};
-        }
-        else
-        {
-            return IndexedArgument<NthArgument, T>{std::forward<T>(d)};
-        }
-    }
-
-    template <std::integral auto Nth, typename AsnyCallbackT, typename CallbackT, typename UserDataT>
-    auto MakeAsyncCallback_CStyle(AsnyCallbackT async, CallbackT cb, IndexedArgument<Nth, UserDataT> userData)
-    {
-        return AsyncCallbackAwaiter_CStyle<Nth, decltype(async), decltype(cb)>{async, cb, userData.data};
-    }
-
-    template <typename... Args>
-    auto MakeAsyncCallback(Args&&... args)
-    {
-        return AsyncCallbackAwaiter{std::forward<Args>(args)...};
-    }
 
 } // namespace tinycoro
 
