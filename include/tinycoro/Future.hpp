@@ -24,18 +24,55 @@ namespace tinycoro {
 
     } // namespace concepts
 
+    struct AssociatedStateBase
+    {
+        enum class EState
+        {
+            WAITING,
+            VALID,
+            DONE
+        };
+
+        void Wait()
+        {
+            _state.wait(EState::WAITING);
+
+            EState state = EState::VALID;
+            _state.compare_exchange_strong(state, EState::DONE);
+        }
+
+        void Notify()
+        {
+            _state.store(EState::VALID, std::memory_order_release);
+            _state.notify_all();
+        }
+
+        [[nodiscard]] bool Ready() const noexcept
+        {
+            return _state.load() == EState::WAITING;
+        }
+
+        [[nodiscard]] bool Valid() const noexcept { return _state.load() != EState::DONE; }
+
+    
+        std::atomic<EState> _state{EState::WAITING};
+    };
+
     template <typename ValueT>
-    struct AssociatedState
+    struct AssociatedState : private AssociatedStateBase
     {
     private:
         using value_type = std::variant<std::monostate, ValueT, std::exception_ptr>;
 
     public:
+        using AssociatedStateBase::Valid;
+        using AssociatedStateBase::Ready;
+
         template <typename T>
             requires concepts::Assignable<value_type, T>
         void Set(T&& val)
         {
-            if (Valid())
+            if (Ready())
             {
                 {
                     std::scoped_lock lock{_mtx};
@@ -43,8 +80,7 @@ namespace tinycoro {
                     _value = std::forward<T>(val);
                 }
 
-                _state.store(EState::VALID, std::memory_order_release);
-                _state.notify_all();
+                Notify();
             }
             else
             {
@@ -54,10 +90,7 @@ namespace tinycoro {
 
         auto&& Get()
         {
-            _state.wait(EState::WAITING);
-
-            EState state = EState::VALID;
-            _state.compare_exchange_strong(state, EState::DONE);
+            Wait();
 
             if (std::holds_alternative<std::exception_ptr>(_value))
             {
@@ -67,39 +100,29 @@ namespace tinycoro {
             return std::get<ValueT>(_value);
         }
 
-        [[nodiscard]] bool Valid() const noexcept { return _state.load() != EState::DONE; }
-
     private:
-        enum class EState
-        {
-            WAITING,
-            VALID,
-            DONE
-        };
-
         mutable std::mutex  _mtx;
         value_type          _value;
-        std::atomic<EState> _state{EState::WAITING};
     };
 
     template <>
-    struct AssociatedState<void>
-    {
-        AssociatedState() = default;
+    struct AssociatedState<void> : private AssociatedStateBase
+    {   
+        using AssociatedStateBase::Valid;
+        using AssociatedStateBase::Ready;
 
         template <typename T = std::monostate>
-        void Set(T&& t = {})
+        void Set(T&& value = {})
         {
-            if (Valid())
+            if (Ready())
             {
                 if constexpr (std::same_as<std::exception_ptr, std::decay_t<T>>)
                 {
                     std::scoped_lock lock{_mtx};
-                    _exception = std::forward<T>(t);
+                    _exception = std::forward<T>(value);
                 }
 
-                _done.store(true, std::memory_order_release);
-                _done.notify_all();
+                Notify();
             }
             else
             {
@@ -107,9 +130,9 @@ namespace tinycoro {
             }
         }
 
-        void Get() const
+        void Get()
         {
-            _done.wait(false);
+            Wait();
 
             if (std::scoped_lock lock{_mtx}; _exception)
             {
@@ -117,13 +140,10 @@ namespace tinycoro {
             }
         }
 
-        [[nodiscard]] bool Valid() const noexcept { return !_done.load(); }
-
     private:
+
         mutable std::mutex _mtx;
         std::exception_ptr _exception;
-
-        std::atomic<bool> _done{false};
     };
 
     template <typename ValueT>
@@ -132,22 +152,22 @@ namespace tinycoro {
         using value_type = ValueT;
 
         Future(std::shared_ptr<AssociatedState<ValueT>> state)
-        : _state{std::move(state)}
+        : _associatedState{std::move(state)}
         {
-            assert(_state);
+            assert(_associatedState);
         }
 
         [[nodiscard]] auto&& get()
         {
-            assert(_state);
+            assert(_associatedState);
 
-            return _state->Get();
+            return _associatedState->Get();
         }
 
-        [[nodiscard]] bool valid() const { return _state->Valid(); }
+        [[nodiscard]] bool valid() const { return _associatedState->Valid(); }
 
     private:
-        std::shared_ptr<AssociatedState<ValueT>> _state;
+        std::shared_ptr<AssociatedState<ValueT>> _associatedState;
     };
 
     template <>
@@ -156,35 +176,35 @@ namespace tinycoro {
         using value_type = void;
 
         Future(std::shared_ptr<AssociatedState<void>> state)
-        : _state{std::move(state)}
+        : _associatedState{std::move(state)}
         {
-            assert(_state);
+            assert(_associatedState);
         }
 
         void get() const
         {
-            assert(_state);
+            assert(_associatedState);
 
-            _state->Get();
+            _associatedState->Get();
         }
 
-        [[nodiscard]] bool valid() const { return _state->Valid(); }
+        [[nodiscard]] bool valid() const { return _associatedState->Valid(); }
 
     private:
-        std::shared_ptr<AssociatedState<void>> _state;
+        std::shared_ptr<AssociatedState<void>> _associatedState;
     };
 
     template <typename ValueT>
     struct FutureState
     {
         FutureState()
-        : _state{std::make_shared<AssociatedState<ValueT>>()}
+        : _associatedState{std::make_shared<AssociatedState<ValueT>>()}
         {
         }
 
         ~FutureState()
         {
-            if (_state && _state->Valid())
+            if (_associatedState && _associatedState->Ready())
             {
                 try
                 {
@@ -192,7 +212,7 @@ namespace tinycoro {
                 }
                 catch (const std::exception&)
                 {
-                    _state->Set(std::current_exception());
+                    _associatedState->Set(std::current_exception());
                 }
             }
         }
@@ -200,24 +220,30 @@ namespace tinycoro {
         FutureState(FutureState&&)            = default;
         FutureState& operator=(FutureState&&) = default;
 
-        auto get_future() { return Future<ValueT>{_state}; }
+        auto get_future() { return Future<ValueT>{_associatedState}; }
 
         template <typename... Ts>
+            requires (!std::same_as<void, ValueT>)
         void set_value(Ts&&... val)
         {
-            _state->Set(std::forward<Ts>(val)...);
+            _associatedState->Set(std::forward<Ts>(val)...);
+        }
+
+        void set_value() requires std::same_as<void, ValueT>
+        {
+            _associatedState->Set();
         }
 
         template <typename... Ts>
         void set_exception(Ts&&... val)
         {
-            _state->Set(std::forward<Ts>(val)...);
+            _associatedState->Set(std::forward<Ts>(val)...);
         }
 
-        [[nodiscard]] bool valid() const { return _state->Valid(); }
+        [[nodiscard]] bool valid() const { return _associatedState->Valid(); }
 
     private:
-        std::shared_ptr<AssociatedState<ValueT>> _state;
+        std::shared_ptr<AssociatedState<ValueT>> _associatedState;
     };
 
 } // namespace tinycoro

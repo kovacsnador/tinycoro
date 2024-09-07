@@ -1,8 +1,9 @@
 #include <gtest/gtest.h>
 
-#include <future>
+#include "common/ExceptionCheck.hpp"
 
 #include <tinycoro/Future.hpp>
+
 
 TEST(FutureTest, FutureTestSimpleCase)
 {
@@ -22,21 +23,6 @@ TEST(FutureTest, FutureTestSimpleCase)
 
 TEST(FutureTest, FutureTestValidTest)
 {
-    std::promise<int> promise;
-
-    auto f = promise.get_future();
-
-    EXPECT_TRUE(f.valid());
-
-    promise.set_value(42);
-
-    EXPECT_TRUE(f.valid());
-
-    std::ignore = f.get();
-
-    EXPECT_FALSE(f.valid());
-
-
     tinycoro::FutureState<int> futureState;
 
     auto future1 = futureState.get_future();
@@ -64,4 +50,39 @@ TEST(FutureTest, FutureTestValidTest)
     EXPECT_FALSE(future2.valid());
     EXPECT_FALSE(future3.valid());
     EXPECT_FALSE(future4.valid());
+}
+
+TEST(FutureStateTest, FutureTest_set)
+{
+    tinycoro::FutureState<void> futureState;
+
+    futureState.set_value();
+    EXPECT_THROW(futureState.set_value(), tinycoro::AssociatedStateStatisfiedException);
+}
+
+TEST(FutureStateTest, FutureStateTest_destructor)
+{
+    auto futureState = std::make_unique<tinycoro::FutureState<void>>();
+    auto future = futureState->get_future();
+
+    // destroy future state
+    futureState.reset();
+
+    EXPECT_THROW(future.get(), tinycoro::FutureStateException);
+}
+
+TEST(FutureTest, FutureTest_get)
+{
+    tinycoro::FutureState<void> futureState;
+
+    auto future = futureState.get_future();
+
+    futureState.set_value();
+    EXPECT_THROW(futureState.set_value(), tinycoro::AssociatedStateStatisfiedException);
+
+    EXPECT_TRUE(future.valid());
+    future.get();
+    EXPECT_FALSE(future.valid());
+    future.get();
+    EXPECT_FALSE(future.valid());
 }
