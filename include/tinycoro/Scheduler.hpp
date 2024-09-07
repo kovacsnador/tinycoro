@@ -24,8 +24,8 @@ namespace tinycoro {
 
     template <std::move_constructible TaskT, template <typename> class FutureStateT>
         requires requires (TaskT t) {
-            { std::invoke(t) } -> std::same_as<ECoroResumeState>;
-            { t.isPaused() } -> std::same_as<bool>;
+            { std::invoke(t) } -> std::same_as<ETaskResumeState>;
+            { t.IsPaused() } -> std::same_as<bool>;
         } && concepts::FutureState<FutureStateT<void>>
     class CoroThreadPool
     {
@@ -135,7 +135,7 @@ namespace tinycoro {
                         while (stopToken.stop_requested() == false)
                         {
                             {
-                                using enum ECoroResumeState;
+                                using enum ETaskResumeState;
 
                                 std::unique_lock lock{_mtx};
                                 if (_cv.wait(lock, stopToken, [this] { return !_tasks.empty(); }) == false)
@@ -166,7 +166,7 @@ namespace tinycoro {
 
                                     lock.lock();
 
-                                    if (task.isPaused())
+                                    if (task.IsPaused())
                                     {
                                         auto id = task.id;
                                         _pausedTasks.emplace(id, std::move(task));

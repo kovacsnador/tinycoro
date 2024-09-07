@@ -22,7 +22,7 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    enum class ECoroResumeState
+    enum class ETaskResumeState
     {
         SUSPENDED,
         PAUSED,

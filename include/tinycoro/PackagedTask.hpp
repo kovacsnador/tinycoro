@@ -17,7 +17,7 @@ namespace tinycoro {
 
         template <typename T>
         concept CoroTask = requires (T c) {
-            { c.resume() } -> std::same_as<ECoroResumeState>;
+            { c.Resume() } -> std::same_as<ETaskResumeState>;
             { c.await_resume() };
             { c.IsPaused() } -> std::same_as<bool>;
         };
@@ -42,8 +42,8 @@ namespace tinycoro {
             ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
 
             virtual ~ISchedulableBridged()                     = default;
-            virtual ECoroResumeState resume()                  = 0;
-            virtual bool             isPaused() const noexcept = 0;
+            virtual ETaskResumeState Resume()                  = 0;
+            virtual bool             IsPaused() const noexcept = 0;
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -76,13 +76,13 @@ namespace tinycoro {
                 }
             }
 
-            ECoroResumeState resume() override
+            ETaskResumeState Resume() override
             {
-                ECoroResumeState resumeState{ECoroResumeState::DONE};
+                ETaskResumeState resumeState{ETaskResumeState::DONE};
 
                 try
                 {
-                    resumeState = _coro.resume();
+                    resumeState = _coro.Resume();
                 }
                 catch (...)
                 {
@@ -93,7 +93,7 @@ namespace tinycoro {
                 return resumeState;
             }
 
-            bool isPaused() const noexcept { return _coro.IsPaused(); }
+            bool IsPaused() const noexcept { return _coro.IsPaused(); }
 
         private:
             bool         _exceptionSet{false};
@@ -122,14 +122,14 @@ namespace tinycoro {
             }
         }
 
-        ECoroResumeState operator()()
+        ETaskResumeState operator()()
         {
-            return std::visit([](auto& bridge) { return bridge->resume(); }, _bridge);
+            return std::visit([](auto& bridge) { return bridge->Resume(); }, _bridge);
         }
 
-        bool isPaused() const noexcept
+        bool IsPaused() const noexcept
         {
-            return std::visit([](auto& bridge) { return bridge->isPaused(); }, _bridge);
+            return std::visit([](auto& bridge) { return bridge->IsPaused(); }, _bridge);
         }
 
         const size_t id;

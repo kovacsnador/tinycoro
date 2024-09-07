@@ -1,7 +1,5 @@
 #include <gtest/gtest.h>
 
-#include "common/ExceptionCheck.hpp"
-
 #include <tinycoro/Future.hpp>
 
 

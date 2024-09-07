@@ -13,84 +13,12 @@
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
 #include "Promise.hpp"
+#include "TaskAwaiter.hpp"
+#include "TaskResumer.hpp"
 
 namespace tinycoro {
 
-    template <typename CoroTaskT>
-    struct AwaiterBase
-    {
-        [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
-
-        [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
-        {
-            auto* coroTask = reinterpret_cast<CoroTaskT*>(this);
-
-            auto hdl                   = coroTask->_hdl;
-            parentCoro.promise().child = hdl;
-            hdl.promise().parent       = parentCoro;
-            hdl.promise().stopSource   = parentCoro.promise().stopSource;
-            hdl.promise().pauseHandler = parentCoro.promise().pauseHandler;
-            return hdl;
-        }
-    };
-
-    template <typename ReturnValueT, typename CoroTaskT>
-    class AwaiterValue : private AwaiterBase<CoroTaskT>
-    {
-    protected:
-        AwaiterValue() = default;
-
-    public:
-        using AwaiterBase<CoroTaskT>::await_ready;
-        using AwaiterBase<CoroTaskT>::await_suspend;
-
-        [[nodiscard]] constexpr auto&& await_resume() noexcept
-        {
-            auto* coroTask = static_cast<CoroTaskT*>(this);
-            return coroTask->_hdl.promise().ReturnValue();
-        }
-    };
-
-    template <typename CoroTaskT>
-    class AwaiterValue<void, CoroTaskT> : private AwaiterBase<CoroTaskT>
-    {
-    protected:
-        AwaiterValue() = default;
-
-    public:
-        using AwaiterBase<CoroTaskT>::await_ready;
-        using AwaiterBase<CoroTaskT>::await_suspend;
-
-        constexpr void await_resume() noexcept { }
-    };
-
-    struct CoroResumer
-    {
-        ECoroResumeState operator()(auto coroHdl, [[maybe_unused]] const auto& stopSource)
-        {
-            if (stopSource.stop_requested() && coroHdl.promise().cancellable)
-            {
-                return ECoroResumeState::STOPPED;
-            }
-
-            PackedCoroHandle  hdl{coroHdl};
-            PackedCoroHandle* hdlPtr = std::addressof(hdl);
-
-            while (*hdlPtr && hdlPtr->Child() && hdlPtr->Child().Done() == false)
-            {
-                hdlPtr = std::addressof(hdlPtr->Child());
-            }
-
-            if (*hdlPtr && hdlPtr->Done() == false)
-            {
-                return hdlPtr->Resume();
-            }
-
-            return ECoroResumeState::DONE;
-        }
-    };
-
-    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = CoroResumer, typename StopSourceT = std::stop_source>
+    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = TaskResumer, typename StopSourceT = std::stop_source>
     struct CoroTaskView : private AwaiterT
     {
         using promise_type  = PromiseT;
@@ -125,7 +53,7 @@ namespace tinycoro {
 
         ~CoroTaskView() { destroy(); }
 
-        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
         void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
@@ -165,7 +93,7 @@ namespace tinycoro {
               typename PromiseT,
               template <typename, typename>
               class AwaiterT,
-              typename CoroResumerT = CoroResumer,
+              typename CoroResumerT = TaskResumer,
               typename StopSourceT  = std::stop_source>
     struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>
     {
@@ -207,7 +135,7 @@ namespace tinycoro {
 
         ~CoroTask() { destroy(); }
 
-        [[nodiscard]] auto resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
         void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {

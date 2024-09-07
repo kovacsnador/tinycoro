@@ -22,7 +22,7 @@ namespace tinycoro {
             virtual PackedCoroHandle&       Child()             = 0;
             virtual PackedCoroHandle&       Parent()            = 0;
             virtual bool                    Done() const        = 0;
-            virtual ECoroResumeState        ResumeState() const = 0;
+            virtual ETaskResumeState        ResumeState() const = 0;
             virtual std::coroutine_handle<> Handle()            = 0;
             virtual std::coroutine_handle<> Handle() const      = 0;
             virtual void                    ReleaseHandle()     = 0;
@@ -53,7 +53,7 @@ namespace tinycoro {
                 return true;
             }
 
-            ECoroResumeState ResumeState() const override
+            ETaskResumeState ResumeState() const override
             {
                 if (Done() == false)
                 {
@@ -61,12 +61,12 @@ namespace tinycoro {
                     {
                         if (_hdl.promise().pauseHandler->IsPaused())
                         {
-                            return ECoroResumeState::PAUSED;
+                            return ETaskResumeState::PAUSED;
                         }
                     }
-                    return ECoroResumeState::SUSPENDED;
+                    return ETaskResumeState::SUSPENDED;
                 }
-                return ECoroResumeState::DONE;
+                return ETaskResumeState::DONE;
             }
 
             void ReleaseHandle() override { _hdl = nullptr; }
@@ -161,10 +161,10 @@ namespace tinycoro {
                 return _bridge->ResumeState();
             }
 
-            return ECoroResumeState::DONE;
+            return ETaskResumeState::DONE;
         }
 
-        [[nodiscard]] ECoroResumeState Resume()
+        [[nodiscard]] ETaskResumeState Resume()
         {
             if (_bridge)
             {
