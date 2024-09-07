@@ -35,7 +35,7 @@ namespace tinycoro {
         T data;
     };
 
-    template<std::integral auto Nth>
+    template <std::integral auto Nth>
     using IndexedUserData = IndexedArgument<Nth, void*>;
 
     template <typename T, std::invocable<T>, concepts::AsyncCallbackEvent, typename>
@@ -52,7 +52,7 @@ namespace tinycoro {
         template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
         friend struct AsyncCallbackAwaiter_CStyle;
 
-        void Notify() const 
+        void Notify() const
         {
             if (_notifyCallback)
             {
@@ -72,9 +72,9 @@ namespace tinycoro {
     };
 
     template <typename CallbackT,
-              std::invocable<CallbackT> AsyncFunctionT,
-              concepts::AsyncCallbackEvent           EventT = AsyncCallbackEvent,
-              typename ReturnT                 = std::invoke_result_t<AsyncFunctionT, CallbackT>>
+              std::invocable<CallbackT>    AsyncFunctionT,
+              concepts::AsyncCallbackEvent EventT = AsyncCallbackEvent,
+              typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT>>
     struct AsyncCallbackAwaiter
     {
         AsyncCallbackAwaiter(AsyncFunctionT asyncFunc, CallbackT cb)
@@ -183,7 +183,7 @@ namespace tinycoro {
               typename AsyncFunctionT,
               typename CallbackT,
               concepts::AsyncCallbackEvent EventT = AsyncCallbackEvent,
-              typename ReturnT       = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
+              typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
     struct AsyncCallbackAwaiter_CStyle
     {
         AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
@@ -224,10 +224,7 @@ namespace tinycoro {
         std::optional<ReturnT> _result;
     };
 
-    template <std::integral auto Nth,
-              typename AsyncFunctionT,
-              typename CallbackT,
-              concepts::AsyncCallbackEvent EventT>
+    template <std::integral auto Nth, typename AsyncFunctionT, typename CallbackT, concepts::AsyncCallbackEvent EventT>
     struct AsyncCallbackAwaiter_CStyle<Nth, AsyncFunctionT, CallbackT, EventT, void>
     {
         AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
