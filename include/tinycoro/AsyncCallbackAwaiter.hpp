@@ -255,8 +255,13 @@ namespace tinycoro {
     {
         static constexpr auto value = NthArgument;
 
-        IndexedArgument(T d)
+        IndexedArgument(T d) requires std::is_rvalue_reference_v<decltype(d)>
         : data{std::move(d)}
+        {
+        }
+
+        IndexedArgument(T d)
+        : data{d}
         {
         }
 
@@ -266,7 +271,14 @@ namespace tinycoro {
     template <std::integral auto NthArgument, typename T>
     auto MakeIndexedArgument(T&& d)
     {
-        return IndexedArgument<NthArgument, std::remove_reference_t<T>>{std::forward<T>(d)};
+        if constexpr (std::is_rvalue_reference_v<decltype(d)>)
+        {
+            return IndexedArgument<NthArgument, std::remove_reference_t<T>>{std::forward<T>(d)};
+        }
+        else
+        {
+            return IndexedArgument<NthArgument, T>{std::forward<T>(d)};
+        }
     }
 
     template <std::integral auto Nth, typename AsnyCallbackT, typename CallbackT, typename UserDataT>

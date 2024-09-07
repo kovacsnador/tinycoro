@@ -22,7 +22,9 @@ void Example_asyncCallbackAwaiter_CStyleVoid(auto& scheduler)
                 assert(null == nullptr);
             };
 
-            co_await tinycoro::MakeAsyncCallback_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::MakeIndexedArgument<0>(nullptr));
+            std::nullptr_t nullp;
+
+            co_await tinycoro::MakeAsyncCallback_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::MakeIndexedArgument<0>(nullp));
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
