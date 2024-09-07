@@ -188,7 +188,7 @@ namespace tinycoro {
         operator bool() const noexcept { return _bridge != nullptr && _bridge->Handle(); }
 
     private:
-        StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
+        detail::StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
     };
 
 } // namespace tinycoro

@@ -7,7 +7,9 @@
 #include <cstring>
 #include <type_traits>
 
-namespace tinycoro {
+#include "Exception.hpp"
+
+namespace tinycoro { namespace detail {
 
     template <typename InterpreterClassT, std::unsigned_integral auto SIZE, typename AlignasT = char>
         requires (SIZE >= sizeof(AlignasT))
@@ -16,7 +18,7 @@ namespace tinycoro {
         StaticStorage() = default;
 
         template <typename ClassT, typename... Args>
-            requires std::constructible_from<ClassT, Args...> && (SIZE >= sizeof(ClassT))
+            requires std::constructible_from<ClassT, Args...> && (SIZE >= sizeof(ClassT)) && std::derived_from<ClassT, InterpreterClassT>
         StaticStorage([[maybe_unused]] std::type_identity<ClassT>, Args&&... args)
         : _owner{true}
         {
@@ -59,6 +61,11 @@ namespace tinycoro {
             requires (sizeof(T) <= SIZE)
         T* GetAs()
         {
+            if(_owner == false)
+            {
+                throw StaticStorageException{"Storage is empty"};
+            }
+
             return std::launder(reinterpret_cast<T*>(_buffer));
         }
 
@@ -66,6 +73,11 @@ namespace tinycoro {
             requires (sizeof(T) <= SIZE)
         const T* GetAs() const
         {
+            if(_owner == false)
+            {
+                throw StaticStorageException{"Storage is empty"};
+            }
+
             return std::launder(reinterpret_cast<const T*>(_buffer));
         }
 
@@ -83,5 +95,5 @@ namespace tinycoro {
         bool _owner{false};
     };
 
-} // namespace tinycoro
+}} // namespace tinycoro::detail
 #endif // !__TINY_CORO_IN_PLACE_STORAGE_HPP__

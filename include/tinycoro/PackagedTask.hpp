@@ -101,7 +101,7 @@ namespace tinycoro {
             FutureStateT _futureState;
         };
 
-        using StaticStorageType  = StaticStorage<ISchedulableBridged, BUFFER_SIZE>;
+        using StaticStorageType  = detail::StaticStorage<ISchedulableBridged, BUFFER_SIZE>;
         using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
 
     public:
@@ -114,7 +114,7 @@ namespace tinycoro {
 
             if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
             {
-                _bridge = StaticStorage<ISchedulableBridged, BUFFER_SIZE>{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
+                _bridge = StaticStorageType{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
             }
             else
             {
