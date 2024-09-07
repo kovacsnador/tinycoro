@@ -7,6 +7,7 @@
 #include <optional>
 #include <cassert>
 #include <variant>
+#include <mutex>
 
 #include "Common.hpp"
 #include "Exception.hpp"
