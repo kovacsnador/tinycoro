@@ -35,5 +35,5 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
-      run: ./build/test/tinycoro_test
+      run: ./build/test/tinycoro_tests
       working-directory: ${{ github.workspace }}
