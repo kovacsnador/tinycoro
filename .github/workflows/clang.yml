@@ -17,7 +17,7 @@ jobs:
     - name: Install dependencies
       run: |
         apt update -y
-        apt install -y clang cmake g++ libstdc++-12-dev
+        apt install -y git clang cmake g++ libstdc++-12-dev
 
     - name: Add safe repository directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
@@ -38,6 +38,11 @@ jobs:
     - name: Run Unit Tests
       run: ./build/test/tinycoro_tests
       working-directory: ${{ github.workspace }}
+
+    - name: Run Examples
+      run: ./build/tinycoro_example
+      working-directory: ${{ github.workspace }}
+
 
     - name: Run Examples
       run: ./build/tinycoro_example
