@@ -1,0 +1,44 @@
+name: C/C++ CI
+
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: gcc:13
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install CMake
+      run: |
+          apt update -y
+          apt install -y cmake
+
+    - name: Add safe repo dirercory
+      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+
+    - name: Initialize Git submodules
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+    
+    - name: Configure
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Release
+      working-directory: ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build build
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Unit Tests
+      run: ./build/test/tinycoro_tests
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Examples
+      run: ./build/tinycoro_example
+      working-directory: ${{ github.workspace }}
