@@ -13,6 +13,8 @@ jobs:
     
     steps:
     - uses: actions/checkout@v3
+      with:
+        submodules: true  # Automatically checkout and initialize submodules
 
     - name: Install dependencies
       run: |
@@ -21,13 +23,6 @@ jobs:
 
     - name: Add safe repository directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
-
-    - name: folder
-      run: ls -la
-
-    - name: Initialize Git submodules
-      run: git submodule update --init --recursive
-      working-directory: ${{ github.workspace }}
     
     - name: Configure
       run: |
@@ -41,11 +36,6 @@ jobs:
     - name: Run Unit Tests
       run: ./build/test/tinycoro_tests
       working-directory: ${{ github.workspace }}
-
-    - name: Run Examples
-      run: ./build/tinycoro_example
-      working-directory: ${{ github.workspace }}
-
 
     - name: Run Examples
       run: ./build/tinycoro_example
