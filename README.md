@@ -10,6 +10,7 @@ This library combines the C++ coroutine API with the familiar promise/future-bas
 ## Overview
 * [Usage](#usage)
 * [Examples](#examples)
+    - [Scheduler](#scheduler)
     - [Void Task](#example1)
     - [Void TaskView](#example2)
     - [Task with return value](#example3)
@@ -48,6 +49,15 @@ You only need to copy the *include* folder into your C++ 20 (or greater) project
 ## Examples
 The following examples demonstrate various use cases of the `tinycoro` library:
 
+### Scheduler
+Creating a coroutine task scheduler
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+// create a scheduler
+tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+```
 
 ### Example1
 Simple void Task
