@@ -1,4 +1,4 @@
-name: C/C++ CI
+nname: C/C++ CI
 
 on:
   push:
@@ -10,20 +10,23 @@ jobs:
   build:
     runs-on: ubuntu-latest
     container: ubuntu:22.04
-    
-    steps:
-    - uses: actions/checkout@v3
-      with:
-        submodules: true  # Automatically checkout and initialize submodules
 
-    - name: Install dependencies
+    steps:
+    - name: Install Git and other dependencies
       run: |
         apt update -y
         apt install -y git clang cmake g++ libstdc++-12-dev
 
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
     - name: Add safe repository directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
-    
+
+    - name: Initialize Git submodules
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+
     - name: Configure
       run: |
         cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=clang++ -D CMAKE_C_COMPILER=clang
@@ -35,6 +38,10 @@ jobs:
 
     - name: Run Unit Tests
       run: ./build/test/tinycoro_tests
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Examples
+      run: ./build/tinycoro_example
       working-directory: ${{ github.workspace }}
 
     - name: Run Examples
