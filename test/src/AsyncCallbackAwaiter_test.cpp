@@ -13,12 +13,15 @@ using namespace std::chrono_literals;
 template <typename T>
 struct AsyncCallbackAwaiterTest : public testing::Test
 {
+    using value_type = T;
+
     AsyncCallbackAwaiterTest()
     {
         hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([this]() { pauseHandlerCalled = true; });
     }
 
-    bool                                                      pauseHandlerCalled{false};
+    bool pauseHandlerCalled{false};
+
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
 };
 
@@ -33,7 +36,13 @@ void AsyncCallbackAwaiterTest1(const bool& pauseHandlerCalled, auto hdl)
 
     tinycoro::AsyncCallbackAwaiter awaiter{asyncCallback, cb};
 
+    EXPECT_FALSE(awaiter.await_ready());
     awaiter.await_suspend(hdl);
+
+    if constexpr (!std::same_as<decltype(awaiter.await_resume()), void>)
+    {
+        EXPECT_TRUE(false) << "await_resume return not void!";
+    }
 
     EXPECT_EQ(i, 42);
     EXPECT_TRUE(pauseHandlerCalled);

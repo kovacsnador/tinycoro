@@ -36,13 +36,13 @@ TYPED_TEST(Concepts_IterableTest, Concepts_IterableTest_Positive)
     if constexpr (std::same_as<secondParamT, std::true_type>)
     {
         if constexpr (!tinycoro::concepts::Iterable<firstParamT>) {
-            EXPECT_FALSE(true);   
+            EXPECT_FALSE(true)  << "Type not iterable!";   
         }
     }
     else
     {
         if constexpr (tinycoro::concepts::Iterable<firstParamT>) {
-            EXPECT_FALSE(true);   
+            EXPECT_FALSE(true)  << "Type is iterable but should be not!";  
         }
     }
 }
