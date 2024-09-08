@@ -22,6 +22,9 @@ jobs:
     - name: Add safe repository directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
+    - name: folder
+      run: ls -la
+
     - name: Initialize Git submodules
       run: git submodule update --init --recursive
       working-directory: ${{ github.workspace }}
