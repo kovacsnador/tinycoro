@@ -526,7 +526,7 @@ void Example_asyncPulling(tinycoro::CoroScheduler& scheduler)
 ```
 
 ### Example17
-Async callback awaiter and usage
+`tinycoro::AsyncCallbackAwaiter` is an awaiter interface that requires an asynchronous callback function or lambda with one parameter, which is the wrapped user callback. The wrapped user callback mimics the same parameters and return value as the original user callback, but it also includes the necessary tools to notify the scheduler to resume the coroutine on the CPU.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -562,7 +562,9 @@ void Example_asyncCallbackAwaiter(tinycoro::CoroScheduler& scheduler)
 ```
 
 ### Example18
-Async callback awaiter and usage with a C-style API with return value
+Async callback awaiter and usage with a C-style API with return value.
+
+`tinycoro::AsyncCallbackAwaiter_CStyle` is an awaiter interface that requires an asynchronous callback function or lambda with two parameters: the first is the `wrappedCallback`, and the second is the `userData` (usually a void*). The wrapped user callback mimics the same parameters and return value as the original user callback, but it also includes the necessary tools to notify the scheduler to resume the coroutine on the CPU.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
