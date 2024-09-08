@@ -17,9 +17,9 @@ namespace tinycoro {
 
         using iterator_category = std::input_iterator_tag;
         using difference_type   = std::ptrdiff_t;
-        using value_type        = PromiseT::value_type;
-        using pointer           = PromiseT::pointer;
-        using reference         = PromiseT::reference;
+        using value_type        = typename PromiseT::value_type;
+        using pointer           = typename PromiseT::pointer;
+        using reference         = typename PromiseT::reference;
 
         GeneratorIterator(auto hdl)
         : _hdl{hdl}

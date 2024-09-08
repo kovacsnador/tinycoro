@@ -59,7 +59,7 @@ namespace tinycoro {
         {
             if constexpr (requires { _hdl.promise().pauseHandler; } )
             {
-                using elementType = std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
+                using elementType = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
                 _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
             }
         }
@@ -141,7 +141,7 @@ namespace tinycoro {
         {
             if constexpr (requires { _hdl.promise().pauseHandler; } )
             {
-                using elementType = std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
+                using elementType = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
                 _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
             }
         }

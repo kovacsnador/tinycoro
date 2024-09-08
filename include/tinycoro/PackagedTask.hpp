@@ -42,6 +42,7 @@ namespace tinycoro {
             ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
 
             virtual ~ISchedulableBridged()                     = default;
+
             virtual ETaskResumeState Resume()                  = 0;
             virtual bool             IsPaused() const noexcept = 0;
         };
@@ -93,7 +94,7 @@ namespace tinycoro {
                 return resumeState;
             }
 
-            bool IsPaused() const noexcept { return _coro.IsPaused(); }
+            bool IsPaused() const noexcept override { return _coro.IsPaused(); }
 
         private:
             bool         _exceptionSet{false};
