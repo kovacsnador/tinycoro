@@ -20,7 +20,7 @@ jobs:
           apt install -y cmake
 
     - name: Add safe repo dirercory
-      run: git config --global --add safe.directory /__w/voxerium/voxerium
+      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
     - name: Initialize Git submodules
       run: git submodule update --init --recursive
