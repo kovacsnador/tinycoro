@@ -14,9 +14,10 @@ jobs:
     - uses: actions/checkout@v3
 
     - name: Set up MSVC environment
+      shell: cmd
       run: |
-        call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
-    
+        "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+
     - name: Install CMake
       run: |
         choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress
