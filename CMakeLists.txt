@@ -22,11 +22,6 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE             "${CMAKE_CXX_FLAGS} -O2")
   set(CMAKE_CXX_FLAGS_RELWITHDEBINFO      "${CMAKE_CXX_FLAGS} -O2")
   set(CMAKE_CXX_FLAGS_MINSIZEREL          "${CMAKE_CXX_FLAGS} -O2")
-elseif (CMAKE_CXX_COMPILER_ID STREQUAL "MSVC")
-  # using Visual Studio C++
-  # warning level
-  set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} /W3")
-  set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MTd") # for dynamic libs
 endif()
 
 # Add an executable with the source file
