@@ -13,6 +13,16 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
+    - name: Install Visual Studio Build Tools
+      run: |
+        choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --locale en-US"
+      shell: powershell
+
+    - name: Check installed Visual Studio versions
+      run: |
+        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -format table
+      shell: cmd
+
     - name: Set up MSVC environment
       shell: cmd
       run: |
@@ -24,16 +34,6 @@ jobs:
       run: |
         choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress
       shell: powershell
-
-    - name: Install Visual Studio Build Tools
-      run: |
-        choco install visualstudio2019buildtools --package-parameters "--add Microsoft.VisualStudio.Workload.VCTools --includeRecommended --passive --locale en-US"
-      shell: powershell
-
-    - name: Check installed Visual Studio versions
-      run: |
-        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -format table
-      shell: cmd
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory ${{ github.workspace }}
