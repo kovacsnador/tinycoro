@@ -98,7 +98,7 @@ namespace tinycoro {
                 std::rethrow_exception(std::get<std::exception_ptr>(_value));
             }
 
-            return std::get<ValueT>(_value);
+            return std::move(std::get<ValueT>(_value));
         }
 
     private:

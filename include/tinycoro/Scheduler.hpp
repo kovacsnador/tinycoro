@@ -209,8 +209,12 @@ namespace tinycoro {
         std::condition_variable_any _cv;
     };
 
+
+#if defined(__clang__)
+    using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
+#else
     using CoroScheduler = CoroThreadPool<PackagedTask<>, std::promise>;
-    //using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
+#endif
 
 } // namespace tinycoro
 
