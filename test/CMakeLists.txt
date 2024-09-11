@@ -6,7 +6,7 @@ if (MSVC)
     # warning level
     #set(CMAKE_CXX_FLAGS         "${CMAKE_CXX_FLAGS} /W3")
     #if (WIN32)
-        set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MT") # for dynamic libs
+        set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MD") # for dynamic libs
     #else()
     #set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MT") # for static libs
     #endif()
