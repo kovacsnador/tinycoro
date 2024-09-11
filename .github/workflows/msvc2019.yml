@@ -16,7 +16,9 @@ jobs:
     - name: Set up MSVC environment
       shell: cmd
       run: |
-        "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
+        call "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath > vs_path.txt
+        for /F "usebackq tokens=*" %%i in (`type vs_path.txt`) do set vs_path=%%i
+        call "%vs_path%\VC\Auxiliary\Build\vcvars64.bat"
 
     - name: Install CMake
       run: |
