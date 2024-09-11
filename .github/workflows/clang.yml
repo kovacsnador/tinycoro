@@ -15,7 +15,15 @@ jobs:
     - name: Install Git and other dependencies
       run: |
         apt update -y
-        apt install -y git clang cmake g++ libstdc++-12-dev
+        apt install -y git cmake g++ libstdc++-12-dev wget lsb-release software-properties-common
+
+    - name: Install Clang 18
+      run: |
+        wget https://apt.llvm.org/llvm.sh
+        chmod +x llvm.sh
+        ./llvm.sh 18
+        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
 
     - name: Print clang version
       run: clang --version
@@ -41,10 +49,6 @@ jobs:
 
     - name: Run Unit Tests
       run: ./build/test/tinycoro_tests
-      working-directory: ${{ github.workspace }}
-
-    - name: Run Examples
-      run: ./build/tinycoro_example
       working-directory: ${{ github.workspace }}
 
     - name: Run Examples
