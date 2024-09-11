@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: gcc_13
 
 
 on:
