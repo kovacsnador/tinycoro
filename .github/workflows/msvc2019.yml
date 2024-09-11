@@ -20,7 +20,7 @@ jobs:
 
     - name: Check installed Visual Studio versions
       run: |
-        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -all -products * -format table
+        "C:\Program Files (x86)\Microsoft Visual Studio\Installer\vswhere.exe" -all -products *
       shell: cmd
 
     - name: Set up MSVC environment
