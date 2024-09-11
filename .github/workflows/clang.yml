@@ -21,13 +21,11 @@ jobs:
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         ./llvm.sh 18
-        export PATH="/usr/lib/llvm-18/bin:$PATH"
-        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
-        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
-        which clang
-        which clang++
-        clang --version
-        clang++ --version
+        apt update
+        apt install -y libc++-dev libc++abi-dev
+    - name: Print clang version
+      run: clang --version
+
     - name: Checkout repository
       uses: actions/checkout@v3
 
@@ -40,7 +38,7 @@ jobs:
 
     - name: Configure
       run: |
-        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=/usr/bin/clang++ -D CMAKE_C_COMPILER=/usr/bin/clang
+        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=clang++ -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_FLAGS="-stdlib=libc++" -D CMAKE_EXE_LINKER_FLAGS="-stdlib=libc++ -ltcmalloc"
       working-directory: ${{ github.workspace }}
 
     - name: Build
