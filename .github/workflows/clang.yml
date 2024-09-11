@@ -17,6 +17,9 @@ jobs:
         apt update -y
         apt install -y git clang cmake g++ libstdc++-12-dev
 
+    - name: Print clang version
+      run: clang --version
+
     - name: Checkout repository
       uses: actions/checkout@v3
 
