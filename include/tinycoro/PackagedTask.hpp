@@ -22,9 +22,6 @@ namespace tinycoro {
             { c.IsPaused() } -> std::same_as<bool>;
         };
 
-        template <typename T>
-        concept RValueReference = std::is_rvalue_reference_v<T>;
-        
     } // namespace concepts
 
     template <std::unsigned_integral auto BUFFER_SIZE = 48u>
@@ -41,7 +38,7 @@ namespace tinycoro {
             ISchedulableBridged(ISchedulableBridged&&)            = default;
             ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
 
-            virtual ~ISchedulableBridged()                     = default;
+            virtual ~ISchedulableBridged() = default;
 
             virtual ETaskResumeState Resume()                  = 0;
             virtual bool             IsPaused() const noexcept = 0;
@@ -65,14 +62,14 @@ namespace tinycoro {
                 if (_exceptionSet == false)
                 {
                     if constexpr (requires {
-                                      { _coro.await_resume() } -> concepts::RValueReference;
+                                      { _coro.await_resume() } -> std::same_as<void>;
                                   })
                     {
-                        _futureState.set_value(_coro.await_resume());
+                        _futureState.set_value();
                     }
                     else
                     {
-                        _futureState.set_value();
+                        _futureState.set_value(_coro.await_resume());
                     }
                 }
             }
