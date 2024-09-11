@@ -21,10 +21,13 @@ jobs:
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         ./llvm.sh 18
-        apt install -y libc++-dev libc++abi-dev
-    - name: Print clang version
-      run: clang --version
-
+        export PATH="/usr/lib/llvm-18/bin:$PATH"
+        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
+        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+        which clang
+        which clang++
+        clang --version
+        clang++ --version
     - name: Checkout repository
       uses: actions/checkout@v3
 
