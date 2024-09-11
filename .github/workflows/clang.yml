@@ -1,4 +1,4 @@
-name: Clang18
+name: clang_18
 
 on:
   push:
@@ -16,13 +16,12 @@ jobs:
       run: |
         apt update -y
         apt install -y git cmake g++ libstdc++-12-dev wget lsb-release software-properties-common
-    - name: Install Clang 18
+    - name: Install Clang 18 and Dependencies
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         ./llvm.sh 18
-        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
-        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
+        apt install -y libc++-dev libc++abi-dev
     - name: Print clang version
       run: clang --version
 
@@ -38,7 +37,7 @@ jobs:
 
     - name: Configure
       run: |
-        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=clang++ -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_FLAGS="-stdlib=libc++" -D CMAKE_EXE_LINKER_FLAGS="-stdlib=libc++"
+        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=/usr/bin/clang++ -D CMAKE_C_COMPILER=/usr/bin/clang
       working-directory: ${{ github.workspace }}
 
     - name: Build
