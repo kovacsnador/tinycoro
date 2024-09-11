@@ -1,4 +1,4 @@
-name: C/C++ CI
+name: msvc_2019
 
 on:
   push:
