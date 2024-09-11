@@ -210,11 +210,11 @@ namespace tinycoro {
     };
 
 
-#if defined(__clang__)
-    using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
-#else
+//#if defined(__clang__)
+//    using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
+//#else
     using CoroScheduler = CoroThreadPool<PackagedTask<>, std::promise>;
-#endif
+//#endif
 
 } // namespace tinycoro
 
