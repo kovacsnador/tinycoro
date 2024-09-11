@@ -15,13 +15,14 @@ jobs:
     - name: Install Git and other dependencies
       run: |
         apt update -y
-        apt install -y git cmake g++ libstdc++-12-dev wget lsb-release software-properties-common
+        apt install -y git cmake g++ wget lsb-release software-properties-common
 
-    - name: Install Clang 18
+    - name: Install Clang 18 and libc++
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         ./llvm.sh 18
+        apt install -y libc++-18-dev libc++abi-18-dev
         update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-18 100
         update-alternatives --install /usr/bin/clang clang /usr/bin/clang-18 100
 
@@ -40,7 +41,7 @@ jobs:
 
     - name: Configure
       run: |
-        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=clang++ -D CMAKE_C_COMPILER=clang
+        cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_COMPILER=clang++ -D CMAKE_C_COMPILER=clang -D CMAKE_CXX_FLAGS="-stdlib=libc++ -pthread"
       working-directory: ${{ github.workspace }}
 
     - name: Build
