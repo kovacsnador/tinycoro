@@ -18,9 +18,9 @@ jobs:
         call "C:\Program Files (x86)\Microsoft Visual Studio\2019\BuildTools\VC\Auxiliary\Build\vcvars64.bat"
     
     - name: Install CMake
-      uses: chrislgarry/install-cmake@v1
-      with:
-        cmake-version: "3.20.0"
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System' --no-progress
+      shell: powershell
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory ${{ github.workspace }}
