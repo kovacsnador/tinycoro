@@ -64,7 +64,7 @@ namespace tinycoro {
             auto start = std::chrono::system_clock::now();
 
             std::unique_lock lock{mtx};
-            cv.wait_for(lock, stopToken, duration, [start, duration] { return start + duration < std::chrono::system_clock::now(); });
+            cv.wait_for(lock, stopToken, duration, [deadLine = start + duration] { return deadLine < std::chrono::system_clock::now(); });
         };
 
         auto async = [](auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); };
