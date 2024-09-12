@@ -57,9 +57,6 @@ TEST_F(SchedulerTest, SchedulerTest_paused)
 
     auto future = scheduler.Enqueue(std::move(task));
 
-    // trigger callback to unpause task
-    mock.pauseCallback();
-
     auto val = future.get();
 
     EXPECT_EQ(val, 42);
@@ -95,9 +92,6 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock3, IsPaused).Times(0);
 
     auto futures = scheduler.EnqueueTasks(std::move(task1), std::move(task2), std::move(task3));
-
-    // trigger callback to unpause task
-    mock1.pauseCallback();
 
     EXPECT_EQ(std::get<0>(futures).get(), 42);
     EXPECT_EQ(std::get<1>(futures).get(), 41);
@@ -137,9 +131,6 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
 
     auto futures = scheduler.EnqueueTasks(std::move(tasks));
 
-    // trigger callback to unpause task
-    mock1.pauseCallback();
-
     EXPECT_EQ(futures[0].get(), 42);
     EXPECT_EQ(futures[1].get(), 41);
     EXPECT_EQ(futures[2].get(), 40);
@@ -175,9 +166,6 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock3, IsPaused).Times(0);
 
     auto futures = scheduler.EnqueueTasks(std::move(task1), std::move(task2), std::move(task3));
-
-    // trigger callback to unpause task
-    mock1.pauseCallback();
 
     scheduler.Wait();
 }
