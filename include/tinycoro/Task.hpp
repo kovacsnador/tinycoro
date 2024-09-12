@@ -9,7 +9,6 @@
 
 #include "Common.hpp"
 #include "StaticStorage.hpp"
-#include "PackedCoroHandle.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
 #include "Promise.hpp"

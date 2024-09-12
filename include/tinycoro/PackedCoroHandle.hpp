@@ -78,10 +78,19 @@ namespace tinycoro {
         template <>
         struct CoroHandleBridgeImpl<void> : public ICoroHandleBridge
         {
-            std::coroutine_handle<void> _hdl;
+            std::coroutine_handle<> _hdl;
         };
 
     } // namespace detail
+
+    namespace concepts {
+
+        template <typename PromiseT, template <typename> class HandleT, typename UniversalBridgeT>
+        concept CoroHandle = std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
+            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
+            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT));
+
+    } // namespace concepts
 
     struct [[nodiscard]] PackedCoroHandle
     {
@@ -92,18 +101,14 @@ namespace tinycoro {
         PackedCoroHandle() = default;
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
-            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
-            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT))
+            requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle(HandleT<PromiseT> hdl)
         : _bridge{std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl}
         {
         }
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
-            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
-            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT))
+            requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
             _bridge = decltype(_bridge){std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl};

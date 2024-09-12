@@ -48,7 +48,10 @@ namespace tinycoro {
         CoroThreadPool(CoroThreadPool&&)      = delete;
 
         template <typename CoroTaksT>
-            requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT) { typename CoroTaksT::promise_type::value_type; }
+            requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
+                typename CoroTaksT::promise_type::value_type;
+                { c.SetPauseHandler(PauseHandlerCallbackT{}) };
+            }
         [[nodiscard]] auto Enqueue(CoroTaksT&& coro)
         {
             FutureStateT<typename CoroTaksT::promise_type::value_type> futureState;
@@ -209,12 +212,11 @@ namespace tinycoro {
         std::condition_variable_any _cv;
     };
 
-
-//#if defined(__clang__)
-//    using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
-//#else
+    // #if defined(__clang__)
+    //     using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
+    // #else
     using CoroScheduler = CoroThreadPool<PackagedTask<>, std::promise>;
-//#endif
+    // #endif
 
 } // namespace tinycoro
 
