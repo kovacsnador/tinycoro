@@ -10,6 +10,17 @@
 
 namespace tinycoro {
 
+    namespace concepts {
+
+        template <typename T>
+        concept Awaiter = requires (T t) {
+            { t.await_ready() };
+            { t.await_suspend(std::coroutine_handle<>{}) };
+            { t.await_resume() };
+        };
+
+    } // namespace concepts
+
     struct FinalAwaiter
     {
         [[nodiscard]] bool await_ready() const noexcept { return false; }
@@ -64,7 +75,7 @@ namespace tinycoro {
         void return_void() { }
     };
 
-    template <typename ValueT, typename AwaiterT>
+    template <typename ValueT, concepts::Awaiter AwaiterT>
     struct PromiseYieldValue
     {
         using value_type = ValueT;
@@ -89,7 +100,7 @@ namespace tinycoro {
         PackedCoroHandleT child;
     };
 
-    template <typename FinalAwaiterT, concepts::PauseHandler PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
+    template <concepts::Awaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
     struct PromiseBase : private CoroHandleNode<PackedCoroHandle>
     {
         PromiseBase()          = default;
@@ -131,13 +142,13 @@ namespace tinycoro {
     template <typename... Types>
     struct PromiseT;
 
-    template <typename FinalAwaiterT, PromiseReturnerConcept ReturnerT>
+    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT>
     struct PromiseT<FinalAwaiterT, ReturnerT> : public PromiseBase<FinalAwaiterT>, public ReturnerT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
-    template <typename FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT>
+    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT>
     struct PromiseT<FinalAwaiterT, ReturnerT, YielderT> : public PromiseBase<FinalAwaiterT>, public ReturnerT, public YielderT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }

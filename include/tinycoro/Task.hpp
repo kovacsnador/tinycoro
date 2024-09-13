@@ -67,7 +67,10 @@ namespace tinycoro {
         {
             if constexpr (requires { _hdl.promise().pauseHandler; } )
             {
-                return _hdl.promise().pauseHandler->IsPaused();
+                if(_hdl.promise().pauseHandler)
+                {
+                    return _hdl.promise().pauseHandler->IsPaused();
+                }
             }
             return false;
         }
@@ -94,12 +97,14 @@ namespace tinycoro {
               class AwaiterT,
               typename CoroResumerT = TaskResumer,
               typename StopSourceT  = std::stop_source>
-    struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>
+    struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
     {
-        friend struct AwaiterBase<CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
-        friend class AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
+        using SelfType = CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
 
-        using awaiter_type = AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT>>;
+        friend struct AwaiterBase<SelfType>;
+        friend class AwaiterT<ReturnValueT, SelfType>;
+
+        using awaiter_type = AwaiterT<ReturnValueT, SelfType>;
 
         using awaiter_type::await_ready;
         using awaiter_type::await_resume;
@@ -149,7 +154,10 @@ namespace tinycoro {
         {
             if constexpr (requires { _hdl.promise().pauseHandler; } )
             {
-                return _hdl.promise().pauseHandler->IsPaused();
+                if(_hdl.promise().pauseHandler)
+                {
+                    return _hdl.promise().pauseHandler->IsPaused();
+                }
             }
             return false;
         }
