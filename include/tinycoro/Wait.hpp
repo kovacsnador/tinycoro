@@ -80,7 +80,16 @@ namespace tinycoro {
 
         auto optConverter = []<typename T>(std::optional<T>& o) { return std::move(o.value()); };
 
-        return std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(optConverter(args)...); }, tupleResultOpt);
+        auto resultTuple = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(optConverter(args)...); }, tupleResultOpt);
+
+        if constexpr (sizeof...(Ts) == 1)
+        {
+            return std::get<0>(resultTuple);
+        }
+        else 
+        {
+            return resultTuple;
+        }
     }
 
     template <template <typename> class FutureT, typename... Ts>
@@ -167,6 +176,13 @@ namespace tinycoro {
             // rethrows the first exception
             std::rethrow_exception(exception);
         }
+    }
+
+    template<template<typename> class FutureT, typename... Ts>
+    [[nodiscard]] auto GetAll(FutureT<Ts>&... futures)
+    {
+        auto tuple = std::make_tuple(std::forward<FutureT<Ts>>(futures)...);
+        return GetAll(tuple);
     }
 
     template <typename SchedulerT, typename StopSourceT, typename... CoroTasksT>
