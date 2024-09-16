@@ -84,7 +84,7 @@ namespace tinycoro {
 
         if constexpr (sizeof...(Ts) == 1)
         {
-            return std::get<0>(resultTuple);
+            return std::move(std::get<0>(resultTuple));
         }
         else 
         {
