@@ -25,11 +25,10 @@ TEST(IsDurationTest, IsDurationTest)
     }
 }
 
-using namespace std::chrono_literals;
-
-
 TEST(SleepAwaiterTest, SleepAwaiterTest)
 {
+    using namespace std::chrono_literals;
+
     auto timeout = 200ms;
 
     auto task = [timeout]() -> tinycoro::Task<void> {
