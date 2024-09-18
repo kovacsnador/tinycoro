@@ -12,18 +12,18 @@ TEST(SimpleSleepAwaiterTest, SimpleSleepAwaiterTest)
 
     auto timeout = 200ms;
 
-    auto sleepTask = [timeout]() -> tinycoro::Task<void> {
-        co_await tinycoro::Sleep(timeout);
-    };
+    {
+        auto sleepTask = [timeout]() -> tinycoro::Task<void> { co_await tinycoro::Sleep(timeout); };
 
-    tinycoro::CoroScheduler scheduler{4};
+        tinycoro::CoroScheduler scheduler{4};
 
-    auto start = std::chrono::system_clock::now();
-    auto future = scheduler.Enqueue(sleepTask());
+        auto start  = std::chrono::system_clock::now();
+        auto future = scheduler.Enqueue(sleepTask());
 
-    EXPECT_NO_THROW(future.get());
+        EXPECT_NO_THROW(future.get());
 
-    EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
+        EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
+    }
 }
 
 TEST(IsDurationTest, IsDurationTest)
