@@ -6,6 +6,26 @@
 #include <tinycoro/SleepAwaiter.hpp>
 #include <tinycoro/Scheduler.hpp>
 
+TEST(SimpleSleepAwaiterTest, SimpleSleepAwaiterTest)
+{
+    using namespace std::chrono_literals;
+
+    auto timeout = 200ms;
+
+    auto sleepTask = [timeout]() -> tinycoro::Task<void> {
+        co_await tinycoro::Sleep(timeout);
+    };
+
+    tinycoro::CoroScheduler scheduler{4};
+
+    auto start = std::chrono::system_clock::now();
+    auto future = scheduler.Enqueue(sleepTask());
+
+    EXPECT_NO_THROW(future.get());
+
+    EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
+}
+
 TEST(IsDurationTest, IsDurationTest)
 {
     EXPECT_TRUE((tinycoro::concepts::IsDuration<std::chrono::milliseconds>));
@@ -24,22 +44,4 @@ TEST(IsDurationTest, IsDurationTest)
     {
         EXPECT_FALSE(true);
     }
-}
-
-TEST(SleepAwaiterTest, SleepAwaiterTest_simple)
-{
-    std::chrono::milliseconds timeout{200};
-
-    auto task = [timeout]() -> tinycoro::Task<void> {
-        co_await tinycoro::Sleep(timeout);
-    };
-
-    tinycoro::CoroScheduler scheduler{4};
-
-    auto start = std::chrono::system_clock::now();
-    auto future = scheduler.Enqueue(task());
-
-    EXPECT_NO_THROW(future.get());
-
-    EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
 }
