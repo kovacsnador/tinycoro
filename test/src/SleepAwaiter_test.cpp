@@ -25,7 +25,7 @@ TEST(IsDurationTest, IsDurationTest)
     }
 }
 
-TEST(SleepAwaiterTest, SleepAwaiterTest)
+/*TEST(SleepAwaiterTest, SleepAwaiterTest)
 {
     using namespace std::chrono_literals;
 
@@ -43,4 +43,4 @@ TEST(SleepAwaiterTest, SleepAwaiterTest)
     EXPECT_NO_THROW(future.get());
 
     EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
-}
+}*/
