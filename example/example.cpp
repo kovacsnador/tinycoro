@@ -30,6 +30,8 @@
 #include "UsageWithStopToken_example.h"
 #include "VoidTask_example.h"
 
+#include "CustomAwaiter.h"
+
 int main()
 {
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
@@ -84,7 +86,9 @@ int main()
 
         Example_AnyOfDynamicVoid(scheduler);
 
-        Example_AnyOfVoidException(scheduler);
+        Example_AnyOfException(scheduler);
+
+        Example_CustomAwaiter(scheduler);
     }
 
     return 0;

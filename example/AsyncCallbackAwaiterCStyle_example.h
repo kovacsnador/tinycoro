@@ -16,7 +16,7 @@ void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
         auto cb = [](void* userData, int i) {
             SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
-            auto d = tinycoro::UserData::Get<int>(userData); 
+            auto d = static_cast<int32_t*>(userData); 
             *d = 21;
         };
 

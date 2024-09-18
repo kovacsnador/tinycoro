@@ -20,7 +20,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         auto cb = [](void* userData, int i, int j) {
             SyncOut() << "  Callback called... " << i << " " << j << " Thread id: " << std::this_thread::get_id() << '\n';
 
-            auto* s = tinycoro::UserData::Get<S>(userData);
+            auto* s = static_cast<S*>(userData);
             s->i++;
 
             // do some work

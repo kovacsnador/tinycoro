@@ -36,6 +36,7 @@ This library combines the C++ coroutine API with the familiar promise/future-bas
     - [AnyOf with dynamic tasks](#example23)
     - [AnyOf with dynamic void tasks](#example24)
     - [AnyOf with exception](#example25)
+    - [Custom Awaiter](#example26)
 * [Contributing](#contributing)
 * [Support](#support)
 
@@ -587,7 +588,7 @@ void Example_asyncCallbackAwaiter_CStyle(tinycoro::CoroScheduler& scheduler)
         auto cb = [](void* userData, int i) {
             
             // Converting back to get your user data
-            auto d = tinycoro::UserData::Get<int>(userData); 
+            auto d = static_cast<int*>(userData); 
             *d = 21;
         };
 
@@ -628,7 +629,7 @@ void Example_asyncCallbackAwaiter_CStyleVoid(tinycoro::CoroScheduler& scheduler)
         auto task2 = []() -> tinycoro::Task<void> {
 
             auto cb = [](void* userData, int i) {
-                auto null = tinycoro::UserData::Get<std::nullptr_t>(userData);
+                auto null = static_cast<std::nullptr_t*>(userData);
                 assert(null == nullptr);
             };
 
@@ -671,7 +672,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(tinycoro::CoroScheduler& schedu
 
         auto cb = [](void* userData, int i, int j) {
 
-            auto* s = tinycoro::UserData::Get<S>(userData);
+            auto* s = static_cast<S*>(userData);
             s->i++;
 
             // do some work
@@ -852,7 +853,7 @@ Simple tasks with inbuild std::stop_source mechanism and AnyOf support. One of t
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_AnyOfVoidException(tinycoro::CoroScheduler& scheduler)
+void Example_AnyOfException(tinycoro::CoroScheduler& scheduler)
 {
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
@@ -879,6 +880,61 @@ void Example_AnyOfVoidException(tinycoro::CoroScheduler& scheduler)
     {
         std::cout << "Exception: " << e.what() << '\n';
     }
+}
+```
+
+### Example26
+Simple tasks with CustomAwaiter type. Similar to [AsyncCallbackAwaiter](#example17).
+
+
+```cpp
+// Your custom awaiter
+struct CustomAwaiter
+{
+    constexpr bool await_ready() const noexcept { return false; }
+
+    void await_suspend(auto hdl) noexcept
+    {
+        // save resume task callback
+        _resumeTask = tinycoro::PauseHandler::PauseTask(hdl);
+
+        auto cb = [](void* userData, [[maybe_unused]] int i) {
+
+            auto self = static_cast<decltype(this)>(userData);
+
+            // do some work
+            std::this_thread::sleep_for(100ms);
+            self->_userData++;
+
+            // resume the coroutine (you need to make them exception safe)
+            self->_resumeTask();
+        };
+
+        AsyncCallbackAPIvoid(cb, this);
+    }
+
+    constexpr auto await_resume() const noexcept { return _userData; }
+
+    int32_t _userData{41};
+
+    std::function<void()> _resumeTask;
+};
+
+void Example_CustomAwaiter(auto& scheduler)
+{
+    auto asyncTask = []() -> tinycoro::Task<int32_t> {
+        // do some work before
+
+        auto val = co_await CustomAwaiter{};
+
+        // do some work after
+        co_return val;
+    };
+
+    auto future = scheduler.Enqueue(asyncTask());
+    auto val    = tinycoro::GetAll(future);
+
+    std::cout << "co_return => " << val << '\n'; 
 }
 ```
 

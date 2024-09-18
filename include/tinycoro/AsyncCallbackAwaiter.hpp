@@ -22,6 +22,16 @@ namespace tinycoro {
 
     } // namespace concepts
 
+    template <std::size_t N, class TupleT, class NewT>
+    constexpr auto replace_tuple_element(const TupleT& t, NewT&& n)
+    {
+        constexpr auto tail_size = std::tuple_size<TupleT>::value - N - 1;
+
+        return [&]<std::size_t... I_head, std::size_t... I_tail>(std::index_sequence<I_head...>, std::index_sequence<I_tail...>) {
+            return std::make_tuple(std::move(std::get<I_head>(t))..., std::forward<NewT>(n), std::move(std::get<I_tail + N + 1>(t))...);
+        }(std::make_index_sequence<N>{}, std::make_index_sequence<tail_size>{});
+    }
+
     template <std::integral auto NthArgument, typename T>
     struct IndexedArgument
     {
@@ -213,12 +223,18 @@ namespace tinycoro {
             // invoke callback
             _result = _asyncFunction(
                 []<typename... Ts>(Ts... ts) {
-                    auto ptr = std::get<Nth>(std::forward_as_tuple(ts...));
+                    auto forwardAsTuple = std::forward_as_tuple(ts...);
+
+                    auto ptr = std::get<Nth>(forwardAsTuple);
 
                     auto userDataPtr = static_cast<decltype(_userData)*>(ptr);
 
                     auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
-                    return userDataPtr->userCallback(std::forward<Ts>(ts)...);
+
+                    auto tuple = replace_tuple_element<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
+
+                    return std::apply(
+                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
                 },
                 std::addressof(_userData));
         }
@@ -254,12 +270,18 @@ namespace tinycoro {
             // invoke callback
             _asyncFunction(
                 []<typename... Ts>(Ts... ts) {
-                    auto ptr = std::get<Nth>(std::forward_as_tuple(ts...));
+                    auto forwardAsTuple = std::forward_as_tuple(ts...);
+
+                    auto ptr = std::get<Nth>(forwardAsTuple);
 
                     auto userDataPtr = static_cast<decltype(_userData)*>(ptr);
 
                     auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
-                    return userDataPtr->userCallback(std::forward<Ts>(ts)...);
+
+                    auto tuple = replace_tuple_element<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
+
+                    return std::apply(
+                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
                 },
                 std::addressof(_userData));
         }

@@ -19,7 +19,7 @@ std::jthread AsyncCallbackAPI(void* userData, funcPtr cb, int i = 43)
 {
     return std::jthread{[cb, userData, i] {
         SyncOut() << "  AsyncCallbackAPI... Thread id: " << std::this_thread::get_id() << '\n';
-        std::this_thread::sleep_for(1s);
+        std::this_thread::sleep_for(200ms);
         cb(userData, 42, i);
     }};
 }
@@ -28,7 +28,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
 {
     std::jthread t{[cb, userData] {
         SyncOut() << "  AsyncCallbackAPI... Thread id: " << std::this_thread::get_id() << '\n';
-        std::this_thread::sleep_for(1s);
+        std::this_thread::sleep_for(200ms);
         cb(userData, 42);
     }};
     t.detach();

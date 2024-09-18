@@ -5,9 +5,9 @@
 
 #include "Common.h"
 
-void Example_AnyOfVoidException(auto& scheduler)
+void Example_AnyOfException(auto& scheduler)
 {
-    SyncOut() << "\n\nExample_AnyOfVoidException:\n";
+    SyncOut() << "\n\nExample_AnyOfException:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';

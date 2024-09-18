@@ -59,7 +59,7 @@ namespace tinycoro {
                 {
                     if constexpr (requires { _hdl.promise().pauseHandler; })
                     {
-                        if (_hdl.promise().pauseHandler->IsPaused())
+                        if (_hdl.promise().pauseHandler && _hdl.promise().pauseHandler->IsPaused())
                         {
                             return ETaskResumeState::PAUSED;
                         }

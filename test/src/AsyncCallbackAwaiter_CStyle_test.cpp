@@ -35,19 +35,19 @@ void AsyncCallbackAwaiterTest1(const bool& pauseHandlerCalled, auto hdl)
         bool data{false};
     };
 
-    auto cb = [](void* userData, int32_t i) {
+    auto cb = []([[maybe_unused]] bool b, void* userData, int32_t i) {
         EXPECT_EQ(i, 42);
 
-        auto data = tinycoro::UserData::Get<UserData>(userData);
+        auto data = static_cast<UserData*>(userData);
 
         EXPECT_EQ(data->data, false);
         data->data = true;
     };
-    auto asyncCallback = [](auto cb, auto userData) { cb(userData, 42); };
+    auto asyncCallback = [](auto cb, auto userData) { cb(true, userData, 42); };
 
     UserData uData;
 
-    tinycoro::AsyncCallbackAwaiter_CStyle awaiter{asyncCallback, cb, tinycoro::IndexedUserData<0>(&uData)};
+    tinycoro::AsyncCallbackAwaiter_CStyle awaiter{asyncCallback, cb, tinycoro::IndexedUserData<1>(&uData)};
 
     EXPECT_FALSE(awaiter.await_ready());
     awaiter.await_suspend(hdl);
@@ -68,7 +68,7 @@ void AsyncCallbackAwaiterTest2(const bool& pauseHandlerCalled, auto hdl)
     auto cb = [](void* userData, int32_t i) {
         EXPECT_EQ(i, 42);
 
-        auto data = tinycoro::UserData::Get<int32_t>(userData);
+        auto data = static_cast<int32_t*>(userData);
 
         EXPECT_EQ(*data, 0);
         *data = 42;
@@ -103,7 +103,7 @@ void AsyncCallbackAwaiterTest3(const bool& pauseHandlerCalled, auto hdl)
     auto cb = [](void* userData, int32_t i) {
         EXPECT_EQ(i, 42);
 
-        auto data = tinycoro::UserData::Get<UserData>(userData);
+        auto data = static_cast<UserData*>(userData);
 
         EXPECT_EQ(data->data, false);
         data->data = true;

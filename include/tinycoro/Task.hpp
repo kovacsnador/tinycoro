@@ -54,6 +54,8 @@ namespace tinycoro {
 
         [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
 
+        [[nodiscard]] auto operator()(){ return Resume(); }
+
         void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
             if constexpr (requires { _hdl.promise().pauseHandler; } )
@@ -140,6 +142,8 @@ namespace tinycoro {
         ~CoroTask() { destroy(); }
 
         [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+
+        [[nodiscard]] auto operator()(){ return Resume(); }
 
         void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
