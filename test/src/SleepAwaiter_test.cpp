@@ -26,9 +26,9 @@ TEST(IsDurationTest, IsDurationTest)
     }
 }
 
-TEST(SleepAwaiterTest, SleepAwaiterTest)
+TEST(SleepAwaiterTest, SleepAwaiterTest_simple)
 {
-    std::chrono::milliseconds timeout(200);
+    std::chrono::milliseconds timeout{200};
 
     auto task = [timeout]() -> tinycoro::Task<void> {
         co_await tinycoro::Sleep(timeout);
