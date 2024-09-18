@@ -22,15 +22,19 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    template <std::size_t N, class TupleT, class NewT>
-    constexpr auto replace_tuple_element(const TupleT& t, NewT&& n)
-    {
-        constexpr auto tail_size = std::tuple_size<TupleT>::value - N - 1;
+    namespace detail {
 
-        return [&]<std::size_t... I_head, std::size_t... I_tail>(std::index_sequence<I_head...>, std::index_sequence<I_tail...>) {
-            return std::make_tuple(std::move(std::get<I_head>(t))..., std::forward<NewT>(n), std::move(std::get<I_tail + N + 1>(t))...);
-        }(std::make_index_sequence<N>{}, std::make_index_sequence<tail_size>{});
-    }
+        template <std::size_t N, class TupleT, class NewT>
+        constexpr auto ReplaceTupleElement(TupleT&& t, NewT&& n)
+        {
+            constexpr auto tail_size = std::tuple_size<std::remove_reference_t<TupleT>>::value - N - 1;
+
+            return [&]<std::size_t... I_head, std::size_t... I_tail>(std::index_sequence<I_head...>, std::index_sequence<I_tail...>) {
+                return std::make_tuple(std::move(std::get<I_head>(t))..., std::forward<NewT>(n), std::move(std::get<I_tail + N + 1>(t))...);
+            }(std::make_index_sequence<N>{}, std::make_index_sequence<tail_size>{});
+        }
+
+    } // namespace detail
 
     template <std::integral auto NthArgument, typename T>
     struct IndexedArgument
@@ -231,7 +235,7 @@ namespace tinycoro {
 
                     auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
 
-                    auto tuple = replace_tuple_element<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
+                    auto tuple = detail::ReplaceTupleElement<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
 
                     return std::apply(
                         [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
@@ -278,7 +282,7 @@ namespace tinycoro {
 
                     auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
 
-                    auto tuple = replace_tuple_element<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
+                    auto tuple = detail::ReplaceTupleElement<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
 
                     return std::apply(
                         [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
