@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <chrono>
+#include <future>
 
 #include <tinycoro/SleepAwaiter.hpp>
 #include <tinycoro/Scheduler.hpp>
@@ -25,11 +26,9 @@ TEST(IsDurationTest, IsDurationTest)
     }
 }
 
-/*TEST(SleepAwaiterTest, SleepAwaiterTest)
+TEST(SleepAwaiterTest, SleepAwaiterTest)
 {
-    using namespace std::chrono_literals;
-
-    auto timeout = 200ms;
+    std::chrono::milliseconds timeout(200);
 
     auto task = [timeout]() -> tinycoro::Task<void> {
         co_await tinycoro::Sleep(timeout);
@@ -43,4 +42,4 @@ TEST(IsDurationTest, IsDurationTest)
     EXPECT_NO_THROW(future.get());
 
     EXPECT_TRUE(start + timeout <= std::chrono::system_clock::now());
-}*/
+}
