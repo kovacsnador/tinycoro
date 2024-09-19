@@ -35,7 +35,7 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Log build directory contents
-      run: dir .\build\ /s
+      run: Get-ChildItem -Recurse .\build\
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
