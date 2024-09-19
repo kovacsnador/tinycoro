@@ -125,7 +125,7 @@ jobs:
           }
           - {
             name: "Linux clang-16 C++20",
-            os: ubuntu-22.04,
+            os: debian-latest,
             buildtype: Release,
             cxx: "clang++-16",
             cxx_flags: -stdlib=libc++,
