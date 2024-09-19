@@ -124,12 +124,12 @@ jobs:
             cxxver: 20,
           }
           - {
-            name: "Linux clang-16 C++20",
+            name: "Linux clang-19 C++20",
             os: ubuntu-latest,
             container: "",
             buildtype: Release,
-            cxx: "clang++-16",
-            cxx_flags: -stdlib=libstdc++,
+            cxx: "clang++-19",
+            cxx_flags: -stdlib=libc++,
             exe_linker_flags: -lc++,
             cxxver: 20,
           }
@@ -216,16 +216,16 @@ jobs:
         sudo ./llvm.sh 15
         sudo apt-get install libc++-15-dev libc++abi-15-dev libunwind-15-dev
 
-    - name: Install Clang 16
-      id: install_clang_16
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-16' )
+    - name: Install Clang 19
+      id: install_clang_19
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-19' )
       shell: bash
       working-directory: ${{ env.HOME }}
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
-        sudo ./llvm.sh 16
-        sudo apt-get install libc++-16-dev libc++abi-16-dev libunwind-16-dev
+        sudo ./llvm.sh 19
+        sudo apt-get install libc++-19-dev libc++abi-19-dev libunwind-19-dev
 
     - name: Install g++ 10
       id: install_gcc_10
