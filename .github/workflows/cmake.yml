@@ -128,7 +128,7 @@ jobs:
             os: ubuntu-22.04,
             buildtype: Release,
             cxx: "clang++-16",
-            cxx_flags: -stdlib=libc++,
+            cxx_flags: -stdlib=libstdc++,
             exe_linker_flags: -lc++,
             cxxver: 20,
           }
@@ -224,7 +224,7 @@ jobs:
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
         sudo ./llvm.sh 16
-        sudo apt-get install libstdc++-16-dev libc++-16-dev libc++abi-16-dev libunwind-16-dev
+        sudo apt-get install libc++-16-dev libc++abi-16-dev libunwind-16-dev
 
     - name: Install g++ 10
       id: install_gcc_10
