@@ -38,7 +38,7 @@ jobs:
           }
           - {
             name: "Linux clang-14 C++20",
-            os: ubuntu-latest,
+            os: debian-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-14",
@@ -48,7 +48,7 @@ jobs:
           }
           - {
             name: "Linux clang-15 C++20 Debug",
-            os: ubuntu-latest,
+            os: debian-latest,
             container: "",
             buildtype: Debug,
             cxx: "clang++-15",
@@ -58,7 +58,7 @@ jobs:
           }
           - {
             name: "Linux clang-15 C++20",
-            os: ubuntu-latest,
+            os: debian-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-15",
@@ -68,7 +68,7 @@ jobs:
           }
           - {
             name: "Linux clang-16 C++20",
-            os: ubuntu-latest,
+            os: debian-latest,
             buildtype: Release,
             cxx: "clang++-16",
             cxx_flags: -stdlib=libc++,
