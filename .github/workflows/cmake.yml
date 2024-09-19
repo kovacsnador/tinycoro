@@ -14,6 +14,8 @@ jobs:
     # See: https://docs.github.com/en/actions/configuring-and-managing-workflows/configuring-a-workflow#configuring-a-build-matrix
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
+    if: (matrix.config.container != '')
+    container: ${{ matrix.config.container }}
 
     strategy:
       fail-fast: false
@@ -22,6 +24,7 @@ jobs:
           - {
             name: "Linux g++ 10.2 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "g++-10",
             cxxver: 20,
@@ -29,6 +32,7 @@ jobs:
           - {
             name: "Linux g++ 11 C++20 Debug",
             os: ubuntu-20.04,
+            container: "",
             buildtype: Release,
             cxx: "g++-11",
             cxxver: 20,
@@ -36,6 +40,7 @@ jobs:
           - {
             name: "Linux g++ 11 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "g++-11",
             cxxver: 20,
@@ -43,13 +48,15 @@ jobs:
           - {
             name: "Linux g++ 12 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "g++-12",
             cxxver: 20,
           }
           - {
             name: "Linux g++ 13 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
+            container: gcc:13,
             buildtype: Release,
             cxx: "g++-13",
             cxxver: 20,
@@ -57,6 +64,7 @@ jobs:
           - {
             name: "Linux clang-10 C++20",
             os: ubuntu-20.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-10",
             cxx_flags: -stdlib=libc++,
@@ -66,6 +74,7 @@ jobs:
           - {
             name: "Linux clang-11 C++20",
             os: ubuntu-20.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-11",
             cxx_flags: -stdlib=libc++,
@@ -75,6 +84,7 @@ jobs:
           - {
             name: "Linux clang-12 C++20",
             os: ubuntu-20.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-12",
             cxx_flags: -stdlib=libc++,
@@ -84,6 +94,7 @@ jobs:
           - {
             name: "Linux clang-13 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-13",
             cxx_flags: -stdlib=libc++,
@@ -93,6 +104,7 @@ jobs:
           - {
             name: "Linux clang-14 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-14",
             cxx_flags: -stdlib=libc++,
@@ -102,6 +114,7 @@ jobs:
           - {
             name: "Linux clang-15 C++20 Debug",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Debug,
             cxx: "clang++-15",
             cxx_flags: -stdlib=libc++,
@@ -111,6 +124,7 @@ jobs:
           - {
             name: "Linux clang-15 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-15",
             cxx_flags: -stdlib=libc++,
@@ -120,6 +134,7 @@ jobs:
           - {
             name: "Linux clang-16 C++20",
             os: ubuntu-22.04,
+            container: "",
             buildtype: Release,
             cxx: "clang++-16",
             cxx_flags: -stdlib=libc++,
