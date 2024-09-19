@@ -275,7 +275,7 @@ jobs:
       run: cmake -E make_directory ${{runner.workspace}}/build
 
     - name: Configure CMake
-      if: (!contains(matrix.config.mingw, 'MINGW'))
+      if: (!contains(matrix.config.mingw, 'MINGW') && (matrix.config.cxx != 'g++-13')
       # Use a bash shell so we can use the same syntax for environment variable
       # access regardless of the host operating system
       shell: bash
