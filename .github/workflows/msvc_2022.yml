@@ -27,7 +27,7 @@ jobs:
       working-directory: ${{ github.workspace }}
     
     - name: Configure
-      run: cmake -B build -G "Visual Studio 17 2022" -A x64 -D CMAKE_BUILD_TYPE=Release
+      run: cmake -B build -G "Visual Studio 17 2022" -A x64 -D CMAKE_BUILD_TYPE=Release -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL"
       working-directory: ${{ github.workspace }}
 
     - name: Build
