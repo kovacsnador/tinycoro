@@ -34,10 +34,14 @@ jobs:
       run: cmake --build build --config Debug
       working-directory: ${{ github.workspace }}
 
+    - name: Log build directory contents
+      run: dir .\build\ /s
+      working-directory: ${{ github.workspace }}
+
     - name: Run Unit Tests
-      run: .\build\**\tinycoro_tests.exe
+      run: .\build\x64\Debug\tinycoro_tests.exe
       working-directory: ${{ github.workspace }}
 
     - name: Run Examples
-      run: .\build\**\tinycoro_example.exe
+      run: .\build\x64\Debug\tinycoro_example.exe
       working-directory: ${{ github.workspace }}
