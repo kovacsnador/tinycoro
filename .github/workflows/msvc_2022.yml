@@ -38,8 +38,8 @@ jobs:
       run: Get-ChildItem -Recurse .\build\
       working-directory: ${{ github.workspace }}
 
-    - name: Log out directory contents
-      run: Get-ChildItem -Recurse .\out\
+    - name: Log directory contents
+      run: Get-ChildItem -Recurse .\
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
