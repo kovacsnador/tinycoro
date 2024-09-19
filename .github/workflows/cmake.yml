@@ -260,6 +260,14 @@ jobs:
       run: |
         sudo apt-get install g++-12
 
+    - name: Install g++ 13
+      id: install_gcc_13
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'g++-13' )
+      shell: bash
+      working-directory: ${{ env.HOME }}
+      run: |
+          apt install -y cmake
+
     - name: Add safe repo dirercory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
