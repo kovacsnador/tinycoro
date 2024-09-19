@@ -16,7 +16,8 @@ jobs:
     - name: Install CMake
       run: |
         choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
-        refreshenv
+        $env:Path += ';C:\Program Files\CMake\bin'
+        [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory C:/Users/runneradmin/work/tinycoro/tinycoro
