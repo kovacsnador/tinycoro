@@ -56,7 +56,7 @@ jobs:
           - {
             name: "Linux g++ 13 C++20",
             os: ubuntu-latest,
-            container: gcc:13,
+            container: "gcc:13",
             buildtype: Release,
             cxx: "g++-13",
             cxxver: 20,
