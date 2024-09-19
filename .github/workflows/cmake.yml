@@ -260,15 +260,6 @@ jobs:
       run: |
         sudo apt-get install g++-12
 
-    - name: Install g++ 13
-      id: install_gcc_13
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'g++-13' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
-        sudo apt-get install g++-13
-
     - name: Add safe repo dirercory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
@@ -318,6 +309,14 @@ jobs:
       # Execute tests defined by the CMake configuration.  
       # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
       run: test/tinycoro_tests --output-on-failure -C ${{ matrix.config.buildtype }}
+
+    - name: Ls-la
+      if: (!contains(matrix.config.mingw, 'MINGW'))
+      working-directory: ${{runner.workspace}}/build
+      shell: bash
+      # Execute tests defined by the CMake configuration.  
+      # See https://cmake.org/cmake/help/latest/manual/ctest.1.html for more detail
+      run: ls -la
     
     - name: Examples
       if: (!contains(matrix.config.mingw, 'MINGW'))
