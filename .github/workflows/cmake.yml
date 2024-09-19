@@ -14,7 +14,7 @@ jobs:
     # See: https://docs.github.com/en/actions/configuring-and-managing-workflows/configuring-a-workflow#configuring-a-build-matrix
     name: ${{ matrix.config.name }}
     runs-on: ${{ matrix.config.os }}
-    if: (matrix.config.container != '')
+    if: (${{ matrix.config.container }} != '')
     container: ${{ matrix.config.container }}
 
     strategy:
