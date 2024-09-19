@@ -15,8 +15,17 @@ namespace tinycoro {
 
     namespace concepts {
 
-        template<typename T, typename... Ts>
+        template <typename T, typename... Ts>
         concept AllSame = (std::same_as<T, Ts> && ...);
+
+        template <typename T>
+        concept Future = requires (T t) {
+            { t.get() };
+            { t.valid() } -> std::same_as<bool>;
+        };
+
+        template <typename... Ts>
+        concept AllFuture = (Future<Ts> && ...);
 
     } // namespace concepts
 
@@ -26,7 +35,7 @@ namespace tinycoro {
 
     template <template <typename> class FutureT, typename... Ts>
         requires (!concepts::AllSame<void, Ts...>)
-    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>...>& futures)
+    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>&...>& futures)
     {
         std::exception_ptr exception;
 
@@ -80,21 +89,30 @@ namespace tinycoro {
 
         auto optConverter = []<typename T>(std::optional<T>& o) { return std::move(o.value()); };
 
-        auto resultTuple = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(optConverter(args)...); }, tupleResultOpt);
+        auto resultTuple
+            = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(optConverter(args)...); }, tupleResultOpt);
 
         if constexpr (sizeof...(Ts) == 1)
         {
             return std::move(std::get<0>(resultTuple));
         }
-        else 
+        else
         {
             return resultTuple;
         }
     }
 
     template <template <typename> class FutureT, typename... Ts>
+        requires (!concepts::AllSame<void, Ts...>)
+    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>...>& futures)
+    {
+        auto tuple = std::apply([](auto&... elems) { return std::forward_as_tuple(elems...); }, futures);
+        return GetAll(tuple);
+    }
+
+    template <template <typename> class FutureT, typename... Ts>
         requires concepts::AllSame<void, Ts...>
-    void GetAll(std::tuple<FutureT<Ts>...>& futures)
+    void GetAll(std::tuple<FutureT<Ts>&...>& futures)
     {
         std::exception_ptr exception;
 
@@ -115,6 +133,14 @@ namespace tinycoro {
             // rethrows the first exception
             std::rethrow_exception(exception);
         }
+    }
+
+    template <template <typename> class FutureT, typename... Ts>
+        requires concepts::AllSame<void, Ts...>
+    void GetAll(std::tuple<FutureT<Ts>...>& futures)
+    {
+        auto tuple = std::apply([](auto&... elems) { return std::forward_as_tuple(elems...); }, futures);
+        return GetAll(tuple);
     }
 
     template <template <typename> class FutureT, typename ReturnT>
@@ -178,10 +204,11 @@ namespace tinycoro {
         }
     }
 
-    template<template<typename> class FutureT, typename... Ts>
-    [[nodiscard]] auto GetAll(FutureT<Ts>&... futures)
+    template <typename... FutureT>
+        requires concepts::AllFuture<FutureT...>
+    [[nodiscard]] auto GetAll(FutureT&&... futures)
     {
-        auto tuple = std::make_tuple(std::forward<FutureT<Ts>>(futures)...);
+        auto tuple = std::forward_as_tuple(std::forward<FutureT>(futures)...); // std::make_tuple(std::forward<FutureT<Ts>>(futures)...);
         return GetAll(tuple);
     }
 
