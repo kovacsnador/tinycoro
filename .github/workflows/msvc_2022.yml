@@ -1,0 +1,43 @@
+name: msvc_2022
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: windows-latest
+    
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install CMake
+      run: |
+        choco install cmake --installargs 'ADD_CMAKE_TO_PATH=System'
+        $env:Path += ';C:\Program Files\CMake\bin'
+        [Environment]::SetEnvironmentVariable("Path", $env:Path, [EnvironmentVariableTarget]::Process)
+
+    - name: Add safe repo directory
+      run: git config --global --add safe.directory C:/Users/runneradmin/work/tinycoro/tinycoro
+
+    - name: Initialize Git submodules
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+    
+    - name: Configure
+      run: cmake -B build -G "Visual Studio 17 2022" -A x64 -D CMAKE_BUILD_TYPE=Release -D CMAKE_MSVC_RUNTIME_LIBRARY="MultiThreadedDLL"
+      working-directory: ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build build --config Release
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Unit Tests
+      run: .\build\Release\tinycoro_tests.exe
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Examples
+      run: .\build\Release\tinycoro_example.exe
+      working-directory: ${{ github.workspace }}
