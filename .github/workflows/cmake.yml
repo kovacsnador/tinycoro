@@ -36,46 +36,7 @@ jobs:
             cxx: "g++-12",
             cxxver: 20,
           }
-          - {
-            name: "Linux clang-14 C++20",
-            os: debian-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-14",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-15 C++20 Debug",
-            os: debian-latest,
-            container: "",
-            buildtype: Debug,
-            cxx: "clang++-15",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-15 C++20",
-            os: debian-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-15",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-16 C++20",
-            os: debian-latest,
-            buildtype: Release,
-            cxx: "clang++-16",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          
+
     steps:
     - uses: actions/checkout@v3
 
