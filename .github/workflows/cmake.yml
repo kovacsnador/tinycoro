@@ -30,14 +30,6 @@ jobs:
             cxxver: 20,
           }
           - {
-            name: "Linux g++ 11 C++20 Debug",
-            os: ubuntu-20.04,
-            container: "",
-            buildtype: Release,
-            cxx: "g++-11",
-            cxxver: 20,
-          }
-          - {
             name: "Linux g++ 11 C++20",
             os: ubuntu-22.04,
             container: "",
