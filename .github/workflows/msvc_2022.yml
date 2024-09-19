@@ -34,14 +34,6 @@ jobs:
       run: cmake --build build --config Debug
       working-directory: ${{ github.workspace }}
 
-    - name: Log build directory contents
-      run: Get-ChildItem -Recurse .\build\
-      working-directory: ${{ github.workspace }}
-
-    - name: Log directory contents
-      run: Get-ChildItem -Recurse .\
-      working-directory: ${{ github.workspace }}
-
     - name: Run Unit Tests
       run: .\build\test\Debug\tinycoro_tests.exe
       working-directory: ${{ github.workspace }}
