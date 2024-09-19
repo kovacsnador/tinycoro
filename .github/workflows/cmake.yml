@@ -129,7 +129,7 @@ jobs:
             container: "",
             buildtype: Release,
             cxx: "clang++-16",
-            cxx_flags: -stdlib=libc++,
+            cxx_flags: -stdlib=libstdc++,
             exe_linker_flags: -lc++,
             cxxver: 20,
           }
