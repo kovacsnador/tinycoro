@@ -125,8 +125,7 @@ jobs:
           }
           - {
             name: "Linux clang-16 C++20",
-            os: ubuntu-latest,
-            container: "",
+            os: ubuntu-22.04,
             buildtype: Release,
             cxx: "clang++-16",
             cxx_flags: -stdlib=libstdc++,
@@ -218,13 +217,13 @@ jobs:
 
     - name: Install Clang 16
       id: install_clang_16
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-19' )
+      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-16' )
       shell: bash
       working-directory: ${{ env.HOME }}
       run: |
         wget https://apt.llvm.org/llvm.sh
         chmod +x llvm.sh
-        sudo ./llvm.sh 19
+        sudo ./llvm.sh 16
         sudo apt-get install libstdc++-16-dev libc++-16-dev libc++abi-16-dev libunwind-16-dev
 
     - name: Install g++ 10
