@@ -22,7 +22,7 @@ jobs:
         config:
           - {
             name: "Linux g++ 10.2 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "g++-10",
@@ -31,7 +31,7 @@ jobs:
           }
           - {
             name: "Linux g++ 11 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "g++-11",
@@ -39,7 +39,7 @@ jobs:
           }
           - {
             name: "Linux g++ 12 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "g++-12",
@@ -55,7 +55,7 @@ jobs:
           }
           - {
             name: "Linux clang-10 C++20",
-            os: ubuntu-20.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-10",
@@ -65,7 +65,7 @@ jobs:
           }
           - {
             name: "Linux clang-11 C++20",
-            os: ubuntu-20.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-11",
@@ -75,7 +75,7 @@ jobs:
           }
           - {
             name: "Linux clang-12 C++20",
-            os: ubuntu-20.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-12",
@@ -85,7 +85,7 @@ jobs:
           }
           - {
             name: "Linux clang-13 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-13",
@@ -95,7 +95,7 @@ jobs:
           }
           - {
             name: "Linux clang-14 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-14",
@@ -105,7 +105,7 @@ jobs:
           }
           - {
             name: "Linux clang-15 C++20 Debug",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Debug,
             cxx: "clang++-15",
@@ -115,7 +115,7 @@ jobs:
           }
           - {
             name: "Linux clang-15 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-15",
@@ -125,7 +125,7 @@ jobs:
           }
           - {
             name: "Linux clang-16 C++20",
-            os: ubuntu-22.04,
+            os: ubuntu-latest,
             container: "",
             buildtype: Release,
             cxx: "clang++-16",
