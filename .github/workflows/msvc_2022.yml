@@ -31,7 +31,7 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Build
-      run: cmake --build build --config Release
+      run: cmake --build build --config Debug
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
