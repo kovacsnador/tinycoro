@@ -266,7 +266,8 @@ jobs:
       shell: bash
       working-directory: ${{ env.HOME }}
       run: |
-          apt install -y cmake
+          sudo apt update -y
+          sudo apt install -y cmake
 
     - name: Add safe repo dirercory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
