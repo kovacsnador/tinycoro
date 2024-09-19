@@ -21,15 +21,6 @@ jobs:
       matrix:
         config:
           - {
-            name: "Linux g++ 10.2 C++20",
-            os: ubuntu-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "g++-10",
-            cxx_flags: "-fcoroutines",
-            cxxver: 20,
-          }
-          - {
             name: "Linux g++ 11 C++20",
             os: ubuntu-latest,
             container: "",
@@ -43,54 +34,6 @@ jobs:
             container: "",
             buildtype: Release,
             cxx: "g++-12",
-            cxxver: 20,
-          }
-          - {
-            name: "Linux g++ 13 C++20",
-            os: ubuntu-latest,
-            container: "gcc:13",
-            buildtype: Release,
-            cxx: "g++-13",
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-10 C++20",
-            os: ubuntu-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-10",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-11 C++20",
-            os: ubuntu-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-11",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-12 C++20",
-            os: ubuntu-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-12",
-            cxx_flags: -stdlib=libc++,
-            exe_linker_flags: -lc++,
-            cxxver: 20,
-          }
-          - {
-            name: "Linux clang-13 C++20",
-            os: ubuntu-latest,
-            container: "",
-            buildtype: Release,
-            cxx: "clang++-13",
-            cxx_flags: -stdlib=libc++ -fcoroutines,
-            exe_linker_flags: -lc++,
             cxxver: 20,
           }
           - {
@@ -125,7 +68,7 @@ jobs:
           }
           - {
             name: "Linux clang-16 C++20",
-            os: debian-latest,
+            os: ubuntu-latest,
             buildtype: Release,
             cxx: "clang++-16",
             cxx_flags: -stdlib=libc++,
@@ -135,105 +78,6 @@ jobs:
           
     steps:
     - uses: actions/checkout@v3
-    
-    - name: "Install Msys2"
-      if: (startsWith(matrix.config.os, 'windows-2019') && contains(matrix.config.mingw, 'MINGW'))
-      uses: msys2/setup-msys2@v2
-      with:
-        msystem: ${{ matrix.config.mingw }}
-        install: >-
-          git
-          mingw-w64-${{ matrix.config.mingw-arch }}-cmake
-          mingw-w64-${{ matrix.config.mingw-arch }}-ninja
-          mingw-w64-${{ matrix.config.mingw-arch }}-${{ matrix.config.cxx }}
-          mingw-w64-${{ matrix.config.mingw-arch }}-toolchain
-        update: true
-
-    - name: Install Clang 10
-      id: install_clang_10
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-10' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 10
-        sudo apt-get install libc++-10-dev libc++abi-10-dev
-
-    - name: Install Clang 11
-      id: install_clang_11
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-11' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 11
-        sudo apt-get install libc++-11-dev libc++abi-11-dev
-
-    - name: Install Clang 12
-      id: install_clang_12
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-12' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 12
-        sudo apt-get install libc++-12-dev libc++abi-12-dev libunwind-12-dev
-
-    - name: Install Clang 13
-      id: install_clang_13
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-13' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 13
-        sudo apt-get install libc++-13-dev libc++abi-13-dev libunwind-13-dev
-
-    - name: Install Clang 14
-      id: install_clang_14
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-14' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 14
-        sudo apt-get install libc++-14-dev libc++abi-14-dev libunwind-14-dev
-
-    - name: Install Clang 15
-      id: install_clang_15
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-15' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 15
-        sudo apt-get install libc++-15-dev libc++abi-15-dev libunwind-15-dev
-
-    - name: Install Clang 16
-      id: install_clang_16
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'clang++-16' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        wget https://apt.llvm.org/llvm.sh
-        chmod +x llvm.sh
-        sudo ./llvm.sh 16
-        sudo apt-get install libc++-16-dev libc++abi-16-dev libunwind-16-dev
-
-    - name: Install g++ 10
-      id: install_gcc_10
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'g++-10' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-        sudo add-apt-repository ppa:ubuntu-toolchain-r/ppa
-        sudo apt-get install g++-10
 
     - name: Install g++ 11
       id: install_gcc_11
@@ -251,15 +95,6 @@ jobs:
       working-directory: ${{ env.HOME }}
       run: |
         sudo apt-get install g++-12
-
-    - name: Install g++ 13
-      id: install_gcc_13
-      if: startsWith(matrix.config.os, 'ubuntu') && ( matrix.config.cxx == 'g++-13' )
-      shell: bash
-      working-directory: ${{ env.HOME }}
-      run: |
-          apt update -y
-          apt install -y cmake
 
     - name: Add safe repo dirercory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
