@@ -128,7 +128,7 @@ jobs:
             os: ubuntu-22.04,
             buildtype: Release,
             cxx: "clang++-16",
-            cxx_flags: -stdlib=libstdc++,
+            cxx_flags: -stdlib=libc++,
             exe_linker_flags: -lc++,
             cxxver: 20,
           }
