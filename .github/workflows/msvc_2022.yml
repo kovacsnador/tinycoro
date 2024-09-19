@@ -35,9 +35,9 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
-      run: .\build\Debug\tinycoro_tests.exe
+      run: .\build\x64-Debug\tinycoro_tests.exe
       working-directory: ${{ github.workspace }}
 
     - name: Run Examples
-      run: .\build\Debug\tinycoro_example.exe
+      run: .\build\x64-Debug\tinycoro_example.exe
       working-directory: ${{ github.workspace }}
