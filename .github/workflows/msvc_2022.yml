@@ -38,6 +38,10 @@ jobs:
       run: Get-ChildItem -Recurse .\build\
       working-directory: ${{ github.workspace }}
 
+    - name: Log out directory contents
+      run: Get-ChildItem -Recurse .\out\
+      working-directory: ${{ github.workspace }}
+
     - name: Run Unit Tests
       run: .\build\x64\Debug\tinycoro_tests.exe
       working-directory: ${{ github.workspace }}
