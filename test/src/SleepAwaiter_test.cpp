@@ -10,16 +10,18 @@ struct SleepAwaiterTest : testing::Test
     tinycoro::CoroScheduler scheduler{4};
 };
 
+tinycoro::Task<void> SleepTestTask(auto duration) { co_await tinycoro::Sleep(duration); };
+
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest)
 {
     using namespace std::chrono_literals;
 
     auto timeout = 200ms;
 
-    auto sleepTask = [timeout]() -> tinycoro::Task<void> { co_await tinycoro::Sleep(timeout); };
+    auto sleepTask = SleepTestTask(timeout);
 
     auto start  = std::chrono::system_clock::now();
-    auto future = scheduler.Enqueue(sleepTask());
+    auto future = scheduler.Enqueue(std::move(sleepTask));
 
     EXPECT_NO_THROW(future.get());
 
