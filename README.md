@@ -1,5 +1,7 @@
 # TINYCORO C++20 Coroutine Library
 
+[![codecov](https://codecov.io/github/kovacsnador/tinycoro/graph/badge.svg?token=WRHPY0TE8D)](https://codecov.io/github/kovacsnador/tinycoro)
+
 `tinycoro` is distributed under the MIT license.
 
 ## Description
