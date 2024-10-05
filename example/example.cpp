@@ -66,12 +66,23 @@ std::string DownloadAndPrepare(const std::string& url)
     return result;
 }
 
-tinycoro::Task<std::string> DownloadAndPrepareCoro(const std::string& url)
+tinycoro::Task<std::string> AsyncGet(auto url)
 {
     std::string result;
     co_await tinycoro::MakeAsyncCallbackAwaiter(async_get, url, tinycoro::UserCallback{[&result](auto res){ result = res; }});
+    co_return result;
+}
+
+tinycoro::Task<std::string> AsyncPrepare(auto result)
+{
     co_await tinycoro::MakeAsyncCallbackAwaiter(async_prepare, result, tinycoro::UserCallback{[&result](auto res){ result = res; }});
     co_return result;
+}
+
+tinycoro::Task<std::string> DownloadAndPrepareCoro(const std::string& url)
+{
+    auto result = co_await AsyncGet(url);
+    co_return co_await AsyncPrepare(result);
 }
 
 void Example_asyncCallbackAwaiter_CStyle3(auto& scheduler)
@@ -210,21 +221,14 @@ void Example_asyncCallbackAwaiter_6(auto& scheduler)
 
 int main()
 {
-    /*try
-    {
-        auto result = DownloadAndPrepare("testUrl");
-        std::cout << result << '\n';
-    }
-    catch(const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }*/
+    auto result = DownloadAndPrepare("testUrl");
+    std::cout << result << '\n';
 
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
     
-    /*auto future = scheduler.Enqueue(DownloadAndPrepareCoro("testUrl"));
-    auto result = tinycoro::GetAll(future);
-    std::cout << result << '\n';*/
+    auto future = scheduler.Enqueue(DownloadAndPrepareCoro("testUrl"));
+    auto result2 = tinycoro::GetAll(future);
+    std::cout << result2 << '\n';
     
 
     Example_asyncCallbackAwaiter_CStyle3(scheduler);
@@ -234,7 +238,7 @@ int main()
 
 
 
-    /*tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    //tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
     {
         Example_voidTask(scheduler);
 
@@ -289,7 +293,7 @@ int main()
         Example_AnyOfException(scheduler);
 
         Example_CustomAwaiter(scheduler);
-    }*/
+    }
 
     return 0;
 }

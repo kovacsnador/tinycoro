@@ -15,14 +15,14 @@ void Example_asyncCallbackAwaiter_CStyleVoid(auto& scheduler)
                 SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
 
-            auto cb = [](void* userData, int i) {
+            auto cb = [](tinycoro::CustomUserData userData, int i) {
                 SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
-                auto null = static_cast<std::nullptr_t*>(userData);
+                auto null = static_cast<std::nullptr_t*>(userData.value);
                 assert(null == nullptr);
             };
 
-            co_await tinycoro::AsyncCallbackAwaiter_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::IndexedUserData<0>(nullptr));
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::CustomUserData{nullptr});
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
