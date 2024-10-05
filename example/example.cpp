@@ -32,9 +32,209 @@
 
 #include "CustomAwaiter.h"
 
+#include <semaphore>
+
+void async_get(std::string url, const std::function<void(const std::string&)>& callback)
+{
+    std::jthread t{[url, callback] {
+        std::this_thread::sleep_for(1000ms);
+        callback(url + " Response");
+    }};
+    t.detach();
+}
+
+void async_prepare(std::string response, const std::function<void(const std::string&)>& callback)
+{
+    std::jthread t{[response, callback] {
+        std::this_thread::sleep_for(1000ms);
+        callback(response + " Done");
+    }};
+    t.detach();
+}
+
+std::string DownloadAndPrepare(const std::string& url)
+{
+    std::binary_semaphore semaphore{0};
+    std::string result{};
+    async_get(url, [&result, &semaphore](const std::string& response) {
+        async_prepare(response, [&result, &semaphore](const std::string& response) {
+            result = response;
+            semaphore.release();
+        });
+    });
+    semaphore.acquire();
+    return result;
+}
+
+tinycoro::Task<std::string> DownloadAndPrepareCoro(const std::string& url)
+{
+    std::string result;
+    co_await tinycoro::MakeAsyncCallbackAwaiter(async_get, url, tinycoro::UserCallback{[&result](auto res){ result = res; }});
+    co_await tinycoro::MakeAsyncCallbackAwaiter(async_prepare, result, tinycoro::UserCallback{[&result](auto res){ result = res; }});
+    co_return result;
+}
+
+void Example_asyncCallbackAwaiter_CStyle3(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_CStyle3:\n";
+
+    auto task1 = []() -> tinycoro::Task<void> {
+        
+        auto task2 = []() -> tinycoro::Task<void> {
+                SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+
+            auto cb = [](tinycoro::CustomUserData userData, int i, int j) {
+                SyncOut() << "  Callback called... i: " << i  << "  j: " << j << " Thread id: " << std::this_thread::get_id() << '\n';
+
+                auto val = static_cast<int*>(userData.value);
+                assert(*val == 42);
+            };
+
+            int i = 42;
+
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::CustomUserData{&i}, tinycoro::UserCallback{cb}, 44);
+        };
+
+        SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        co_await task2();
+    };
+
+    auto future = scheduler.Enqueue(task1());
+
+    future.get();
+
+    SyncOut() << "co_return => void" << '\n';
+}
+
+void Example_asyncCallbackAwaiter_CStyle4(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_CStyle4:\n";
+
+    auto task1 = []() -> tinycoro::Task<void> {
+        
+        auto task2 = []() -> tinycoro::Task<void> {
+                SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+
+            auto cb = [](tinycoro::CustomUserData userData, int i) {
+                SyncOut() << "  Callback called... i: " << i << " Thread id: " << std::this_thread::get_id() << '\n';
+
+                auto val = userData.Get<int>();
+                assert(val == 42);
+            };
+
+            int i = 42;
+
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::CustomUserData{&i});
+        };
+
+        SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        co_await task2();
+    };
+
+    auto future = scheduler.Enqueue(task1());
+
+    future.get();
+
+    SyncOut() << "co_return => void" << '\n';
+}
+
+void Example_asyncCallbackAwaiter_5(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_5:\n";
+
+    auto task1 = []() -> tinycoro::Task<void> {
+        
+        auto task2 = []() -> tinycoro::Task<void> {
+                SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+
+            auto cb = [](int i, bool flag) {
+                SyncOut() << "  Callback called... i: " << i  << " flag: " << flag << " Thread id: " << std::this_thread::get_id() << '\n';
+
+                assert(i == 42);
+                assert(flag);
+            };
+
+            auto jthread = co_await tinycoro::MakeAsyncCallbackAwaiter(AsyncCallbackAPIFunctionObject, tinycoro::UserCallback{cb}, true);
+        };
+
+        SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        co_await task2();
+    };
+
+    auto future = scheduler.Enqueue(task1());
+
+    future.get();
+
+    SyncOut() << "co_return => void" << '\n';
+}
+
+void Example_asyncCallbackAwaiter_6(auto& scheduler)
+{
+    SyncOut() << "\n\nExample_asyncCallbackAwaiter_6:\n";
+
+    auto task1 = []() -> tinycoro::Task<void> {
+        
+        auto task2 = []() -> tinycoro::Task<void> {
+                SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+
+            auto cb = [](int i, bool flag) {
+                SyncOut() << "  Callback called... i: " << i  << " flag: " << flag << " Thread id: " << std::this_thread::get_id() << '\n';
+
+                assert(i == 42);
+                assert(flag);
+            };
+
+            co_await tinycoro::MakeAsyncCallbackAwaiter(AsyncCallbackAPIFunctionObjectVoid, tinycoro::UserCallback{cb}, true);
+        };
+
+        SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
+
+        co_await task2();
+    };
+
+    auto future = scheduler.Enqueue(task1());
+
+    future.get();
+
+    SyncOut() << "co_return => void" << '\n';
+}
+
+
+
 int main()
 {
+    /*try
+    {
+        auto result = DownloadAndPrepare("testUrl");
+        std::cout << result << '\n';
+    }
+    catch(const std::exception& e)
+    {
+        std::cerr << e.what() << '\n';
+    }*/
+
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    
+    /*auto future = scheduler.Enqueue(DownloadAndPrepareCoro("testUrl"));
+    auto result = tinycoro::GetAll(future);
+    std::cout << result << '\n';*/
+    
+
+    Example_asyncCallbackAwaiter_CStyle3(scheduler);
+    Example_asyncCallbackAwaiter_CStyle4(scheduler);
+
+    Example_asyncCallbackAwaiter_5(scheduler);
+
+
+
+    /*tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
     {
         Example_voidTask(scheduler);
 
@@ -89,7 +289,7 @@ int main()
         Example_AnyOfException(scheduler);
 
         Example_CustomAwaiter(scheduler);
-    }
+    }*/
 
     return 0;
 }
