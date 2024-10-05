@@ -95,7 +95,7 @@ void Example_asyncCallbackAwaiter_CStyle3(auto& scheduler)
                 SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
 
-            auto cb = [](tinycoro::CustomUserData userData, int i, int j) {
+            auto cb = [](tinycoro::UserData userData, int i, int j) {
                 SyncOut() << "  Callback called... i: " << i  << "  j: " << j << " Thread id: " << std::this_thread::get_id() << '\n';
 
                 auto val = static_cast<int*>(userData.value);
@@ -104,7 +104,7 @@ void Example_asyncCallbackAwaiter_CStyle3(auto& scheduler)
 
             int i = 42;
 
-            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::CustomUserData{&i}, tinycoro::UserCallback{cb}, 44);
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::UserData{&i}, tinycoro::UserCallback{cb}, 44);
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
@@ -129,7 +129,7 @@ void Example_asyncCallbackAwaiter_CStyle4(auto& scheduler)
                 SyncOut() << "  Task2 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
 
-            auto cb = [](tinycoro::CustomUserData userData, int i) {
+            auto cb = [](tinycoro::UserData userData, int i) {
                 SyncOut() << "  Callback called... i: " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
                 auto val = userData.Get<int>();
@@ -138,7 +138,7 @@ void Example_asyncCallbackAwaiter_CStyle4(auto& scheduler)
 
             int i = 42;
 
-            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::CustomUserData{&i});
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::UserData{&i});
         };
 
         SyncOut() << "  Task1 AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';

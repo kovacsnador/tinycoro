@@ -32,9 +32,9 @@ void AsyncCallbackAwaiterTest1(const bool& pauseHandlerCalled, auto hdl)
 {
     int32_t i             = 0;
     auto    cb            = [&i] { i = 42; };
-    auto    asyncCallback = [](auto cb) { cb(); };
+    auto    asyncCallback = [](std::function<void()> cb) { cb(); };
 
-    tinycoro::AsyncCallbackAwaiter awaiter{asyncCallback, cb};
+    auto awaiter = tinycoro::MakeAsyncCallbackAwaiter(asyncCallback, tinycoro::UserCallback{cb});
 
     EXPECT_FALSE(awaiter.await_ready());
     awaiter.await_suspend(hdl);
@@ -53,12 +53,12 @@ void AsyncCallbackAwaiterTest2(const bool& pauseHandlerCalled, auto hdl)
     int32_t i  = 0;
     auto    cb = [&i] { i = 42; };
 
-    auto asyncCallback = [](auto cb) {
+    auto asyncCallback = [](std::function<void()> cb) {
         cb();
         return 44;
     };
 
-    tinycoro::AsyncCallbackAwaiter awaiter{asyncCallback, cb};
+    auto awaiter = tinycoro::MakeAsyncCallbackAwaiter(asyncCallback, tinycoro::UserCallback{cb});
 
     awaiter.await_suspend(hdl);
     auto returnVal = awaiter.await_resume();
@@ -71,17 +71,17 @@ void AsyncCallbackAwaiterTest2(const bool& pauseHandlerCalled, auto hdl)
 void AsyncCallbackAwaiterTest3(const bool& pauseHandlerCalled, auto hdl)
 {
     std::atomic_int32_t i  = 0;
-    auto                cb = [&i] { i = 42; };
+    auto                cb = [&i]([[maybe_unused]] bool flag) { i = 42; };
 
-    auto asyncCallback = [](auto cb) {
+    auto asyncCallback = [](std::function<void(bool)> cb) {
         return std::async(std::launch::async, [cb] {
             std::this_thread::sleep_for(100ms);
-            cb();
+            cb(true);
             return 44;
         });
     };
 
-    tinycoro::AsyncCallbackAwaiter awaiter{asyncCallback, cb};
+    auto awaiter = tinycoro::MakeAsyncCallbackAwaiter(asyncCallback, tinycoro::UserCallback{cb});
 
     awaiter.await_suspend(hdl);
     auto future = awaiter.await_resume();

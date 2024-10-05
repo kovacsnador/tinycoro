@@ -17,7 +17,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
             int i{42};
         };
 
-        auto cb = [](tinycoro::CustomUserData userData, int i, int j) {
+        auto cb = [](tinycoro::UserData userData, int i, int j) {
             SyncOut() << "  Callback called... " << i << " " << j << " Thread id: " << std::this_thread::get_id() << '\n';
 
             auto& s = userData.Get<S>();
@@ -30,7 +30,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         S s;
 
         // wait with return value
-        auto jthread = co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::CustomUserData{&s}, tinycoro::UserCallback{cb}, 43);
+        auto jthread = co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::UserData{&s}, tinycoro::UserCallback{cb}, 43);
         co_return s.i;
     };
 

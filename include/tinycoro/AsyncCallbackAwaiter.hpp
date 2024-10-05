@@ -43,11 +43,8 @@ namespace tinycoro {
     template <typename T, std::invocable<T>, concepts::AsyncCallbackEvent, typename>
     struct AsyncCallbackAwaiter;
 
-    template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
-    struct AsyncCallbackAwaiter_CStyle;
-
     template <typename, typename, typename, typename, typename>
-    struct AsyncCallbackAwaiter_CStyle2;
+    struct AsyncCallbackAwaiter_CStyle;
 
     namespace detail {
 
@@ -56,11 +53,8 @@ namespace tinycoro {
             template <typename T, std::invocable<T>, concepts::AsyncCallbackEvent, typename>
             friend struct tinycoro::AsyncCallbackAwaiter;
 
-            template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
-            friend struct tinycoro::AsyncCallbackAwaiter_CStyle;
-
             template <typename, typename, typename, typename, typename>
-            friend struct tinycoro::AsyncCallbackAwaiter_CStyle2;
+            friend struct tinycoro::AsyncCallbackAwaiter_CStyle;
 
             void Notify() const
             {
@@ -156,137 +150,9 @@ namespace tinycoro {
         EventT         _event;
     };
 
-    namespace detail {
-
-        struct UserData
-        {
-            constexpr UserData(void* d)
-            : data{d}
-            {
-            }
-
-            void* data;
-        };
-
-        template <typename CallbackT, typename EventT = detail::AsyncCallbackEvent>
-        struct UserDataWrapper : private UserData
-        {
-            template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
-            friend struct tinycoro::AsyncCallbackAwaiter_CStyle;
-
-            UserDataWrapper(CallbackT cb, void* data)
-            : UserData{data}
-            , userCallback{cb}
-            {
-            }
-
-            using UserData::data;
-
-            EventT    event{};
-            CallbackT userCallback;
-        };
-
-    } // namespace detail
-
-    template <std::integral auto Nth,
-              typename AsyncFunctionT,
-              typename CallbackT,
-              concepts::AsyncCallbackEvent EventT = detail::AsyncCallbackEvent,
-              typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
-    struct AsyncCallbackAwaiter_CStyle
+    struct UserData
     {
-        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
-        : _asyncFunction{asyncFunc}
-        , _userData{cb, userData.data}
-        {
-        }
-
-        // disable copy and move
-        AsyncCallbackAwaiter_CStyle(AsyncCallbackAwaiter_CStyle&&) = delete;
-
-        [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
-
-        void await_suspend(auto hdl) noexcept
-        {
-            // put tast on pause
-            _userData.event.Set(PauseHandler::PauseTask(hdl));
-
-            // invoke callback
-            _result = _asyncFunction(
-                []<typename... Ts>(Ts... ts) {
-                    auto forwardAsTuple = std::forward_as_tuple(ts...);
-
-                    auto ptr = std::get<Nth>(forwardAsTuple);
-
-                    auto userDataPtr = static_cast<decltype(_userData)*>(ptr);
-
-                    auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
-
-                    auto tuple = ReplaceTupleElement<Nth>(forwardAsTuple, userDataPtr->data);
-
-                    return std::apply(
-                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
-                },
-                std::addressof(_userData));
-        }
-
-        [[nodiscard]] auto&& await_resume() noexcept { return std::move(_result.value()); }
-
-    private:
-        AsyncFunctionT                             _asyncFunction;
-        detail::UserDataWrapper<CallbackT, EventT> _userData;
-
-        std::optional<ReturnT> _result;
-    };
-
-    template <std::integral auto Nth, typename AsyncFunctionT, typename CallbackT, concepts::AsyncCallbackEvent EventT>
-    struct AsyncCallbackAwaiter_CStyle<Nth, AsyncFunctionT, CallbackT, EventT, void>
-    {
-        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
-        : _asyncFunction{asyncFunc}
-        , _userData{cb, userData.data}
-        {
-        }
-
-        // disable copy and move
-        AsyncCallbackAwaiter_CStyle(AsyncCallbackAwaiter_CStyle&&) = delete;
-
-        [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
-
-        void await_suspend(auto hdl) noexcept
-        {
-            // put tast on pause
-            _userData.event.Set(PauseHandler::PauseTask(hdl));
-
-            // invoke callback
-            _asyncFunction(
-                []<typename... Ts>(Ts... ts) {
-                    auto forwardAsTuple = std::forward_as_tuple(ts...);
-
-                    auto ptr = std::get<Nth>(forwardAsTuple);
-
-                    auto userDataPtr = static_cast<decltype(_userData)*>(ptr);
-
-                    auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
-
-                    auto tuple = ReplaceTupleElement<Nth>(forwardAsTuple, userDataPtr->data);
-
-                    return std::apply(
-                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
-                },
-                std::addressof(_userData));
-        }
-
-        constexpr void await_resume() const noexcept { }
-
-    private:
-        AsyncFunctionT                             _asyncFunction;
-        detail::UserDataWrapper<CallbackT, EventT> _userData;
-    };
-
-    struct CustomUserData
-    {
-        CustomUserData(void* ptr)
+        UserData(void* ptr)
         : value{ptr}
         {
         }
@@ -308,6 +174,24 @@ namespace tinycoro {
 
     namespace detail {
 
+        template <typename CallbackT, typename EventT = detail::AsyncCallbackEvent>
+        struct UserDataWrapper
+        {
+            UserDataWrapper(CallbackT cb, void* d)
+            : data{d}
+            , userCallback{cb}
+            {
+            }
+
+            void*     data;
+            EventT    event{};
+            CallbackT userCallback;
+        };
+
+    } // namespace detail
+
+    namespace detail {
+
         template <typename T>
         struct TypeGetter
         {
@@ -315,30 +199,30 @@ namespace tinycoro {
         };
 
         template <>
-        struct TypeGetter<CustomUserData>
+        struct TypeGetter<tinycoro::UserData>
         {
-            using value_type = decltype(std::declval<CustomUserData>().value);
+            using value_type = decltype(std::declval<tinycoro::UserData>().value);
             using is_data    = void;
         };
 
         template <>
-        struct TypeGetter<const CustomUserData>
+        struct TypeGetter<const tinycoro::UserData>
         {
-            using value_type = decltype(std::declval<CustomUserData>().value);
+            using value_type = decltype(std::declval<tinycoro::UserData>().value);
             using is_data    = void;
         };
 
         template <>
-        struct TypeGetter<volatile CustomUserData>
+        struct TypeGetter<volatile tinycoro::UserData>
         {
-            using value_type = decltype(std::declval<CustomUserData>().value);
+            using value_type = decltype(std::declval<tinycoro::UserData>().value);
             using is_data    = void;
         };
 
         template <>
-        struct TypeGetter<const volatile CustomUserData>
+        struct TypeGetter<const volatile tinycoro::UserData>
         {
-            using value_type = decltype(std::declval<CustomUserData>().value);
+            using value_type = decltype(std::declval<tinycoro::UserData>().value);
             using is_data    = void;
         };
 
@@ -394,10 +278,10 @@ namespace tinycoro {
               typename TupleT,
               typename UserDataT,
               typename ReturnT = FunctionSignature<AsyncFunctionT>::ReturnT>
-    struct AsyncCallbackAwaiter_CStyle2
+    struct AsyncCallbackAwaiter_CStyle
     {
     public:
-        AsyncCallbackAwaiter_CStyle2(AsyncFunctionT asyncFunc, CallbackT wrappedCb, UserDataT userData, TupleT&& tuple)
+        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT wrappedCb, UserDataT userData, TupleT&& tuple)
         : _asyncFunction{std::move(asyncFunc)}
         , _wrappedCallback{std::move(wrappedCb)}
         , _userData{std::move(userData)}
@@ -406,7 +290,7 @@ namespace tinycoro {
         }
 
         // disable copy and move
-        AsyncCallbackAwaiter_CStyle2(AsyncCallbackAwaiter_CStyle2&&) = delete;
+        AsyncCallbackAwaiter_CStyle(AsyncCallbackAwaiter_CStyle&&) = delete;
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
@@ -447,10 +331,10 @@ namespace tinycoro {
     };
 
     template <typename AsyncFunctionT, typename CallbackT, typename TupleT, typename UserDataT>
-    struct AsyncCallbackAwaiter_CStyle2<AsyncFunctionT, CallbackT, TupleT, UserDataT, void>
+    struct AsyncCallbackAwaiter_CStyle<AsyncFunctionT, CallbackT, TupleT, UserDataT, void>
     {
     public:
-        AsyncCallbackAwaiter_CStyle2(AsyncFunctionT asyncFunc, CallbackT wrappedCb, UserDataT userData, TupleT&& tuple)
+        AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT wrappedCb, UserDataT userData, TupleT&& tuple)
         : _asyncFunction{std::move(asyncFunc)}
         , _wrappedCallback{std::move(wrappedCb)}
         , _userData{std::move(userData)}
@@ -459,7 +343,7 @@ namespace tinycoro {
         }
 
         // disable copy and move
-        AsyncCallbackAwaiter_CStyle2(AsyncCallbackAwaiter_CStyle2&&) = delete;
+        AsyncCallbackAwaiter_CStyle(AsyncCallbackAwaiter_CStyle&&) = delete;
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
@@ -505,12 +389,12 @@ namespace tinycoro {
 
         auto& callback = std::get<CallbackNth>(tempTuple).value;
 
-        detail::UserDataWrapper userData{std::move(callback), std::get<CustomUserData&>(tempTuple).value};
+        detail::UserDataWrapper userData{std::move(callback), std::get<UserData&>(tempTuple).value};
 
         // gets the callback signature
         using callbackSignature = FunctionSignature<decltype(callback)>;
 
-        [[maybe_unused]] constexpr auto CustomDataNth = GetIndexFromTuple<CustomUserData, typename callbackSignature::ArgListT>::value;
+        [[maybe_unused]] constexpr auto CustomDataNth = GetIndexFromTuple<UserData, typename callbackSignature::ArgListT>::value;
 
         auto cb = []<typename... Ts>(Ts... ts) {
             auto ptr = std::get<CustomDataNth>(std::forward_as_tuple(ts...));
@@ -519,12 +403,12 @@ namespace tinycoro {
 
             auto finalAction = Finally([userDataPtr] { userDataPtr->event.Notify(); });
 
-            auto tuple = ReplaceTupleElement<CustomDataNth>(std::forward_as_tuple(ts...), userDataPtr->data);
+            auto tuple = ReplaceTupleElement<CustomDataNth>(std::forward_as_tuple(ts...), tinycoro::UserData{userDataPtr->data});
 
             return std::apply([userDataPtr]<typename... Tss>(Tss&&... ts) { return userDataPtr->userCallback(std::forward<Tss>(ts)...); }, tuple);
         };
 
-        return AsyncCallbackAwaiter_CStyle2{async, cb, userData, std::move(tempTuple)};
+        return AsyncCallbackAwaiter_CStyle{async, cb, userData, std::move(tempTuple)};
     }
 
     template <typename AsnyCallbackT, typename... Args>

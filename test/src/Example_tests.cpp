@@ -343,13 +343,13 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter)
             std::this_thread::sleep_for(100ms);
         };
 
-        // wait with return value
-        auto val = co_await tinycoro::AsyncCallbackAwaiter(
-            [](auto wrappedCallback) {
+        auto async = [](std::function<void(void*, int)> wrappedCallback) {
                 AsyncCallbackAPIvoid(wrappedCallback, nullptr);
                 return 44;
-            },
-            cb);
+            };
+
+        // wait with return value
+        auto val = co_await tinycoro::MakeAsyncCallbackAwaiter(async, tinycoro::UserCallback{cb});
 
         EXPECT_EQ(val, 44);
 
@@ -363,19 +363,20 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter)
 TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
-        auto cb = [](void* userData, [[maybe_unused]] int i) {
-            auto d = static_cast<int32_t*>(userData);
-            *d     = 21;
+
+        auto cb = [](tinycoro::UserData userData, [[maybe_unused]] int i) {
+            auto& d = userData.Get<int32_t>();
+            d = 21;
         };
 
-        auto async = [](auto wrappedCallback, void* wrappedUserData) {
+        auto async = [](std::function<void(void*, int)> wrappedCallback, void* wrappedUserData) {
             AsyncCallbackAPIvoid(wrappedCallback, wrappedUserData);
             return 21;
         };
 
         int userData{0};
 
-        auto res = co_await tinycoro::AsyncCallbackAwaiter_CStyle(async, cb, tinycoro::IndexedUserData<0>(&userData));
+        auto res = co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(async, tinycoro::UserCallback{cb}, tinycoro::UserData{&userData});
 
         EXPECT_EQ(userData, 21);
         EXPECT_EQ(res, 21);
@@ -391,13 +392,12 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyleVoid)
 {
     auto task1 = []() -> tinycoro::Task<void> {
         auto task2 = []() -> tinycoro::Task<void> {
-            auto cb = [](void* userData, [[maybe_unused]] int i) {
-                auto null = static_cast<std::nullptr_t*>(userData);
+            auto cb = [](tinycoro::UserData userData, [[maybe_unused]] int i) {
+                auto null = static_cast<std::nullptr_t*>(userData.value);
                 EXPECT_EQ(null, nullptr);
             };
 
-            co_await tinycoro::AsyncCallbackAwaiter_CStyle(
-                [](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::IndexedUserData<0>(nullptr));
+            co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::UserData{nullptr});
         };
 
         co_await task2();
@@ -415,9 +415,9 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiterWithReturnValue)
             int i{41};
         };
 
-        auto cb = [](void* userData, [[maybe_unused]] int i, [[maybe_unused]] int j) {
-            auto* s = static_cast<S*>(userData);
-            s->i++;
+        auto cb = [](tinycoro::UserData userData, [[maybe_unused]] int i, [[maybe_unused]] int j) {
+            auto& s = userData.Get<S>(); //static_cast<S*>(userData);
+            s.i++;
 
             // do some work
             std::this_thread::sleep_for(100ms);
@@ -425,10 +425,7 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiterWithReturnValue)
 
         S s;
 
-        auto asyncCb = [](auto cb, auto userData) { return AsyncCallbackAPI(userData, cb); };
-
-        // wait with return value
-        auto jthread = co_await tinycoro::AsyncCallbackAwaiter_CStyle(asyncCb, cb, tinycoro::IndexedUserData<0>(&s));
+        auto jthread = co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPI, tinycoro::UserData{&s}, tinycoro::UserCallback{cb}, 43);
 
         EXPECT_TRUE((std::same_as<std::jthread, decltype(jthread)>));
 

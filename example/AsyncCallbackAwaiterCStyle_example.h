@@ -13,7 +13,7 @@ void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
 
         SyncOut() << "  AsyncCallback... Thread id: " << std::this_thread::get_id() << '\n';
 
-        auto cb = [](tinycoro::CustomUserData userData, int i) {
+        auto cb = [](tinycoro::UserData userData, int i) {
             SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
 
             auto& d = userData.Get<int>(); 
@@ -21,7 +21,7 @@ void Example_asyncCallbackAwaiter_CStyle(auto& scheduler)
         };
         
         int userData{21};
-        co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::CustomUserData{&userData});
+        co_await tinycoro::MakeAsyncCallbackAwaiter_CStyle(AsyncCallbackAPIvoid, tinycoro::UserCallback{cb}, tinycoro::UserData{&userData});
         
         co_return userData;
     };
