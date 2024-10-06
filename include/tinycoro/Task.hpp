@@ -17,7 +17,49 @@
 
 namespace tinycoro {
 
-    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = TaskResumer, typename StopSourceT = std::stop_source>
+    struct DestroyNofifier
+    {
+        DestroyNofifier() = default;
+
+        template<std::regular_invocable T>
+        DestroyNofifier(T&& callback)
+        : _notifier{std::forward<T>(callback)}
+        {
+        }
+
+        DestroyNofifier(DestroyNofifier&& other) noexcept
+        : _notifier{std::exchange(other._notifier, nullptr)}
+        {
+        }
+
+        DestroyNofifier& operator=(DestroyNofifier&& other) noexcept
+        {
+            if(std::addressof(other) != this)
+            {
+                _notifier = std::exchange(other._notifier, nullptr);
+            }
+            return *this;
+        }
+
+        template<std::regular_invocable T>
+        void Set(T&& callback)
+        {
+            _notifier = std::forward<T>(callback);
+        }
+
+        void Notify() const noexcept
+        {
+            if(_notifier)
+            {
+                std::invoke(_notifier);
+            }
+        }
+
+    private:
+        std::function<void()> _notifier;
+    };
+
+    template <typename PromiseT, typename AwaiterT, typename CoroResumerT = TaskResumer, typename StopSourceT = std::stop_source, typename DestroyNotifierT = DestroyNofifier>
     struct CoroTaskView : private AwaiterT
     {
         using promise_type  = PromiseT;
@@ -36,6 +78,7 @@ namespace tinycoro {
         CoroTaskView(CoroTaskView&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
         , _source{std::exchange(other._source, StopSourceT{std::nostopstate})}
+        , _destroyNotifier{std::move(other._destroyNotifier)}
         {
         }
 
@@ -46,6 +89,7 @@ namespace tinycoro {
                 destroy();
                 _hdl    = std::exchange(other._hdl, nullptr);
                 _source = std::exchange(other._source, StopSourceT{std::nostopstate});
+                _destroyNotifier = std::move(other._destroyNotifier);
             }
             return *this;
         }
@@ -83,12 +127,22 @@ namespace tinycoro {
             _hdl.promise().stopSource = _source;
         }
 
+        template<std::regular_invocable T>
+        void SetDestroyNotifier(T&& cb)
+        {
+            _destroyNotifier.Set(std::forward<T>(cb));
+        }
+
     private:
-        void destroy() { _source.request_stop(); }
+        void destroy() { 
+            _source.request_stop();
+            _destroyNotifier.Notify();
+        }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
         StopSourceT                        _source{std::nostopstate};
+        DestroyNotifierT                   _destroyNotifier;
     };
 
     template <typename ReturnValueT,
@@ -96,7 +150,8 @@ namespace tinycoro {
               template <typename, typename>
               class AwaiterT,
               typename CoroResumerT = TaskResumer,
-              typename StopSourceT  = std::stop_source>
+              typename StopSourceT  = std::stop_source,
+              typename DestroyNotifierT = DestroyNofifier>
     struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
     {
         using SelfType = CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
@@ -123,6 +178,7 @@ namespace tinycoro {
         CoroTask(CoroTask&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
         , _source{std::exchange(other._source, StopSourceT{std::nostopstate})}
+        , _destroyNotifier{std::move(other._destroyNotifier)}
         {
         }
 
@@ -133,6 +189,7 @@ namespace tinycoro {
                 destroy();
                 _hdl    = std::exchange(other._hdl, nullptr);
                 _source = std::exchange(other._source, StopSourceT{std::nostopstate});
+                _destroyNotifier = std::move(other._destroyNotifier);
             }
             return *this;
         }
@@ -172,6 +229,12 @@ namespace tinycoro {
             _hdl.promise().stopSource = _source;
         }
 
+        template<std::regular_invocable T>
+        void SetDestroyNotifier(T&& cb)
+        {
+            _destroyNotifier.Set(std::forward<T>(cb));
+        }
+
     private:
         void destroy()
         {
@@ -180,12 +243,14 @@ namespace tinycoro {
                 _source.request_stop();
                 _hdl.destroy();
                 _hdl = nullptr;
+                _destroyNotifier.Notify();
             }
         }
 
         [[no_unique_address]] CoroResumerT _coroResumer{};
         coro_hdl_type                      _hdl;
         StopSourceT                        _source{std::nostopstate};
+        DestroyNotifierT                   _destroyNotifier;
     };
 
     template <typename ReturnValueT>

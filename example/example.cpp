@@ -23,7 +23,7 @@
 #include "MultiTasks_example.h"
 #include "MultiTasksDynamic_example.h"
 #include "NestedException_example.h"
- #include "NestedTask_example.h"
+#include "NestedTask_example.h"
 #include "ReturnValueTask_example.h"
 #include "Sleep_example.h"
 #include "TaskView_example.h"
@@ -31,11 +31,34 @@
 #include "VoidTask_example.h"
 
 #include "CustomAwaiter.h"
+#include "tinycoro/AsyncAwaiter.hpp"
+
+tinycoro::Task<std::string> Example_asyncAwaiter(auto& scheduler)
+{
+    auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+    auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
+    auto task3 = []() -> tinycoro::Task<std::string> { co_return "789"; };
+
+    auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+
+    co_return std::apply(
+        []<typename... Ts>(Ts&&... ts) {
+            std::string result;
+            (result.append(std::forward<Ts>(ts)), ...);
+            return result;
+        },
+        tupleResult);
+}
 
 int main()
 {
     tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
-    {
+
+
+    auto future = scheduler.Enqueue(Example_asyncAwaiter(scheduler));
+    std::cout << future.get() << '\n';
+
+    /*{
         Example_voidTask(scheduler);
 
         Example_taskView(scheduler);
@@ -89,7 +112,7 @@ int main()
         Example_AnyOfException(scheduler);
 
         Example_CustomAwaiter(scheduler);
-    }
+    }*/
 
     return 0;
 }
