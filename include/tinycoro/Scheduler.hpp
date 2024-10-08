@@ -41,6 +41,7 @@ namespace tinycoro {
                     it.join();
                 }
             });
+            _tasksCount.store(0, std::memory_order::release);
         }
 
         // Disable copy and move
@@ -58,17 +59,20 @@ namespace tinycoro {
 
             auto future = futureState.get_future();
 
-            _tasksCount.fetch_add(1, std::memory_order_acquire);
-
-            static size_t s_id{0};
-
+            if (_stopSource.stop_requested() == false)
             {
-                std::scoped_lock lock{_mtx};
-                coro.SetPauseHandler(GeneratePauseResume(s_id));
-                _tasks.emplace(std::move(coro), std::move(futureState), s_id++);
-            }
+                _tasksCount.fetch_add(1, std::memory_order_acquire);
 
-            _cv.notify_all();
+                static size_t s_id{0};
+
+                {
+                    std::scoped_lock lock{_mtx};
+                    coro.SetPauseHandler(GeneratePauseResume(s_id));
+                    _tasks.emplace(std::move(coro), std::move(futureState), s_id++);
+                }
+
+                _cv.notify_all();
+            }
 
             return future;
         }
@@ -116,13 +120,16 @@ namespace tinycoro {
         PauseHandlerCallbackT GeneratePauseResume(size_t id)
         {
             return [this, i = id]() {
-                std::scoped_lock lock{_mtx};
-                if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
+                if (_stopSource.stop_requested() == false)
                 {
-                    _tasks.emplace(std::move(it->second));
-                    _pausedTasks.erase(i);
+                    std::scoped_lock lock{_mtx};
+                    if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
+                    {
+                        _tasks.emplace(std::move(it->second));
+                        _pausedTasks.erase(i);
 
-                    _cv.notify_all();
+                        _cv.notify_all();
+                    }
                 }
             };
         }
@@ -212,11 +219,7 @@ namespace tinycoro {
         std::condition_variable_any _cv;
     };
 
-    // #if defined(__clang__)
-    //     using CoroScheduler = CoroThreadPool<PackagedTask<>, FutureState>;
-    // #else
     using CoroScheduler = CoroThreadPool<PackagedTask<>, std::promise>;
-    // #endif
 
 } // namespace tinycoro
 
