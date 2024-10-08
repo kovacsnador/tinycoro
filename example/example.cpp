@@ -126,7 +126,7 @@ int main()
     scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
     scheduler.Enqueue(Example_AnyOfCoAwait2(scheduler)).get();
 
-    /*{
+    {
         Example_voidTask(scheduler);
 
         Example_taskView(scheduler);
@@ -180,7 +180,7 @@ int main()
         Example_AnyOfException(scheduler);
 
         Example_CustomAwaiter(scheduler);
-    }*/
+    }
 
     return 0;
 }

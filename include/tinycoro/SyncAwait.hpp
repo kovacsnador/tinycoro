@@ -87,7 +87,7 @@ namespace tinycoro {
             this->_futures = std::apply(
                 [destroyNotifier, this]<typename... Ts>(Ts&&... ts) {
                     (ts.SetDestroyNotifier(destroyNotifier), ...);
-                    return this->_scheduler.EnqueueTasks(std::forward<Ts>(ts)...);
+                    return this->_scheduler.Enqueue(std::forward<Ts>(ts)...);
                 },
                 std::move(this->_coroutineTasks));
         }
@@ -118,7 +118,7 @@ namespace tinycoro {
             this->_futures = std::apply(
                 [destroyNotifier, this]<typename... Ts>(Ts&&... ts) {
                     ((ts.SetDestroyNotifier(destroyNotifier), ts.SetStopSource(_stopSource)), ...);
-                    return this->_scheduler.EnqueueTasks(std::forward<Ts>(ts)...);
+                    return this->_scheduler.Enqueue(std::forward<Ts>(ts)...);
                 },
                 std::move(this->_coroutineTasks));
         }
@@ -130,14 +130,14 @@ namespace tinycoro {
     template <typename SchedulerT, typename... Args>
     [[nodiscard]] auto SyncAwait(SchedulerT& scheduler, Args&&... args)
     {
-        using FutureTupleType = decltype(std::declval<SchedulerT>().EnqueueTasks(std::forward<Args>(args)...));
+        using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
         return AsyncAwaiterT<SchedulerT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
     template <typename SchedulerT, typename StopSourceT, typename... Args>
     [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
-        using FutureTupleType = decltype(std::declval<SchedulerT>().EnqueueTasks(std::forward<Args>(args)...));
+        using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
         return AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 

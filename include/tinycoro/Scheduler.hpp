@@ -48,12 +48,59 @@ namespace tinycoro {
         CoroThreadPool(const CoroThreadPool&) = delete;
         CoroThreadPool(CoroThreadPool&&)      = delete;
 
+        template <concepts::NonIterable... CoroTasksT>
+        [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
+        {
+            if constexpr (sizeof...(CoroTasksT) == 1)
+            {
+                return EnqueueImpl(std::forward<CoroTasksT>(tasks)...);
+            }
+            else
+            {
+                return std::make_tuple(EnqueueImpl(std::forward<CoroTasksT>(tasks))...);
+            }
+        }
+
+        template <concepts::Iterable ContainerT>
+        [[nodiscard]] auto Enqueue(ContainerT&& tasks)
+        {
+            using FutureStateType = FutureStateT<typename std::decay_t<ContainerT>::value_type::promise_type::value_type>;
+
+            std::vector<decltype(std::declval<FutureStateType>().get_future())> futures;
+            futures.reserve(std::size(tasks));
+
+            for (auto&& task : tasks)
+            {
+                if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
+                {
+                    futures.emplace_back(EnqueueImpl(std::move(task)));
+                }
+                else
+                {
+                    futures.emplace_back(EnqueueImpl(task.TaskView()));
+                }
+            }
+
+            return futures;
+        }
+
+        void Wait()
+        {
+            auto count = _tasksCount.load(std::memory_order_acquire);
+            while (count > 0)
+            {
+                _tasksCount.wait(count, std::memory_order_acquire);
+                count = _tasksCount.load(std::memory_order_acquire);
+            }
+        }
+
+    private:
         template <typename CoroTaksT>
             requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
                 typename CoroTaksT::promise_type::value_type;
                 { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             }
-        [[nodiscard]] auto Enqueue(CoroTaksT&& coro)
+        [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
         {
             FutureStateT<typename CoroTaksT::promise_type::value_type> futureState;
 
@@ -77,46 +124,6 @@ namespace tinycoro {
             return future;
         }
 
-        template <concepts::NonIterable... CoroTasksT>
-        [[nodiscard]] auto EnqueueTasks(CoroTasksT&&... tasks)
-        {
-            return std::make_tuple(Enqueue(std::forward<CoroTasksT>(tasks))...);
-        }
-
-        template <concepts::Iterable ContainerT>
-        [[nodiscard]] auto EnqueueTasks(ContainerT&& tasks)
-        {
-            using FutureStateType = FutureStateT<typename std::decay_t<ContainerT>::value_type::promise_type::value_type>;
-
-            std::vector<decltype(std::declval<FutureStateType>().get_future())> futures;
-            futures.reserve(tasks.size());
-
-            for (auto&& task : tasks)
-            {
-                if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
-                {
-                    futures.emplace_back(Enqueue(std::move(task)));
-                }
-                else
-                {
-                    futures.emplace_back(Enqueue(task.TaskView()));
-                }
-            }
-
-            return futures;
-        }
-
-        void Wait()
-        {
-            auto count = _tasksCount.load(std::memory_order_acquire);
-            while (count > 0)
-            {
-                _tasksCount.wait(count, std::memory_order_acquire);
-                count = _tasksCount.load(std::memory_order_acquire);
-            }
-        }
-
-    private:
         PauseHandlerCallbackT GeneratePauseResume(size_t id)
         {
             return [this, i = id]() {

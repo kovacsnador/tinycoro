@@ -302,7 +302,7 @@ void Example_multiTasks(tinycoro::CoroScheduler& scheduler)
     };
 
     // enqueue more tasks at the same time.
-    auto futures = scheduler.EnqueueTasks(task(), task(), task());
+    auto futures = scheduler.Enqueue(task(), task(), task());
     
     // wait for all complition
     tinycoro::GetAll(futures);
@@ -335,7 +335,7 @@ void Example_multiMovedTasksDynamicVoid(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // std::move tasks vector into the scheduler (scheduler takes over ownership above tasks)
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
     tinycoro::GetAll(futures);
 }
 ```
@@ -367,7 +367,7 @@ void Example_multiMovedTasksDynamic(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // std::move tasks vector into the scheduler (scheduler takes over ownership above tasks)
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
 
     // Wait and collecting all results 
     auto results = tinycoro::GetAll(futures);
@@ -402,7 +402,7 @@ void Example_multiTasksDynamic(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // scheduler is using TaskView to refer to the task
-    auto futures = scheduler.EnqueueTasks(tasks);
+    auto futures = scheduler.Enqueue(tasks);
     auto results = tinycoro::GetAll(futures);
 
     std::cout << "GetAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
@@ -438,7 +438,7 @@ void Example_multiTaskDifferentValues(tinycoro::CoroScheduler& scheduler)
         co_return 43;
     };
 
-    auto futures = scheduler.EnqueueTasks(task1(), task2(), task3());
+    auto futures = scheduler.Enqueue(task1(), task2(), task3());
 
     try
     {
@@ -731,7 +731,7 @@ void Example_usageWithStopToken(tinycoro::CoroScheduler& scheduler)
 
     std::stop_source source;
 
-    auto futures = scheduler.EnqueueTasks(task1(1s, source), task2(source.get_token()));
+    auto futures = scheduler.Enqueue(task1(1s, source), task2(source.get_token()));
 
     auto results = tinycoro::GetAll(futures);
 

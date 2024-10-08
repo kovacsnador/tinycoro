@@ -91,7 +91,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock3, await_resume).Times(0);
     EXPECT_CALL(mock3, IsPaused).Times(0);
 
-    auto futures = scheduler.EnqueueTasks(std::move(task1), std::move(task2), std::move(task3));
+    auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 
     EXPECT_EQ(std::get<0>(futures).get(), 42);
     EXPECT_EQ(std::get<1>(futures).get(), 41);
@@ -129,7 +129,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
 
     std::vector<decltype(task1)> tasks{std::move(task1), std::move(task2), std::move(task3)};
 
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
 
     EXPECT_EQ(futures[0].get(), 42);
     EXPECT_EQ(futures[1].get(), 41);
@@ -165,7 +165,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock3, await_resume).Times(0);
     EXPECT_CALL(mock3, IsPaused).Times(0);
 
-    auto futures = scheduler.EnqueueTasks(std::move(task1), std::move(task2), std::move(task3));
+    auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 
     scheduler.Wait();
 }

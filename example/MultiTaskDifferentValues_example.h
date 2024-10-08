@@ -34,7 +34,7 @@ void Example_multiTaskDifferentValues(auto& scheduler)
         co_return 43;
     };
 
-    auto futures = scheduler.EnqueueTasks(task1(), task2(), task3());
+    auto futures = scheduler.Enqueue(task1(), task2(), task3());
 
     try
     {
