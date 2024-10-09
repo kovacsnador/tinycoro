@@ -46,7 +46,7 @@ TEST(StaticStorageTest, StaticStorage_MoveConstructor)
     EXPECT_FALSE(storage);
     EXPECT_TRUE(storage == nullptr);
 
-    EXPECT_THROW(storage->b, tinycoro::StaticStorageException);
+    EXPECT_THROW(storage.operator->(), tinycoro::StaticStorageException);
 
     EXPECT_TRUE(storage2);
     EXPECT_TRUE(storage2 != nullptr);
@@ -72,7 +72,7 @@ TEST(StaticStorageTest, StaticStorage_MoveOperator)
     EXPECT_FALSE(storage);
     EXPECT_TRUE(storage == nullptr);
 
-    EXPECT_THROW(storage->b, tinycoro::StaticStorageException);
+    EXPECT_THROW(storage.operator->(), tinycoro::StaticStorageException);
 
     EXPECT_TRUE(storage2);
     EXPECT_TRUE(storage2 != nullptr);
@@ -83,5 +83,5 @@ TEST(StaticStorageTest, StaticStorage_MoveOperator)
 TEST(StaticStorageTest, StaticStorage_Exception)
 {
     tinycoro::detail::StaticStorage<Base, sizeof(Derived), Derived> storage{};
-    EXPECT_THROW(storage->b, tinycoro::StaticStorageException);
+    EXPECT_THROW(storage.operator->(), tinycoro::StaticStorageException);
 }

@@ -22,11 +22,11 @@ using namespace std::chrono_literals;
 
 namespace tinycoro {
 
-    template <std::move_constructible TaskT, template <typename> class FutureStateT>
+    template <std::move_constructible TaskT>
         requires requires (TaskT t) {
             { std::invoke(t) } -> std::same_as<ETaskResumeState>;
             { t.IsPaused() } -> std::same_as<bool>;
-        } && concepts::FutureState<FutureStateT<void>>
+        }
     class CoroThreadPool
     {
     public:
@@ -48,20 +48,22 @@ namespace tinycoro {
         CoroThreadPool(const CoroThreadPool&) = delete;
         CoroThreadPool(CoroThreadPool&&)      = delete;
 
-        template <concepts::NonIterable... CoroTasksT>
+        template <template <typename> class FutureStateT = std::promise, concepts::NonIterable... CoroTasksT>
+            requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
         [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
         {
             if constexpr (sizeof...(CoroTasksT) == 1)
             {
-                return EnqueueImpl(std::forward<CoroTasksT>(tasks)...);
+                return EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks)...);
             }
             else
             {
-                return std::make_tuple(EnqueueImpl(std::forward<CoroTasksT>(tasks))...);
+                return std::make_tuple(EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...);
             }
         }
 
-        template <concepts::Iterable ContainerT>
+        template <template <typename> class FutureStateT = std::promise, concepts::Iterable ContainerT>
+            requires concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto Enqueue(ContainerT&& tasks)
         {
             using FutureStateType = FutureStateT<typename std::decay_t<ContainerT>::value_type::promise_type::value_type>;
@@ -73,11 +75,11 @@ namespace tinycoro {
             {
                 if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
                 {
-                    futures.emplace_back(EnqueueImpl(std::move(task)));
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
                 }
                 else
                 {
-                    futures.emplace_back(EnqueueImpl(task.TaskView()));
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(task.TaskView()));
                 }
             }
 
@@ -95,11 +97,11 @@ namespace tinycoro {
         }
 
     private:
-        template <typename CoroTaksT>
+        template <template<typename> class FutureStateT, typename CoroTaksT>
             requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
                 typename CoroTaksT::promise_type::value_type;
                 { c.SetPauseHandler(PauseHandlerCallbackT{}) };
-            }
+            } &&  concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
         {
             FutureStateT<typename CoroTaksT::promise_type::value_type> futureState;
@@ -226,7 +228,7 @@ namespace tinycoro {
         std::condition_variable_any _cv;
     };
 
-    using CoroScheduler = CoroThreadPool<PackagedTask<>, std::promise>;
+    using CoroScheduler = CoroThreadPool<PackagedTask<>>;
 
 } // namespace tinycoro
 

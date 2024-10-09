@@ -13,7 +13,7 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; } && requires(T f) { f.set_exception(std::exception_ptr{}); });
+		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
         template <typename T>
         concept CoroTask = requires (T c) {

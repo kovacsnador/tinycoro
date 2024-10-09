@@ -59,7 +59,7 @@ TEST_F(ExampleTest, Example_moveOnlyValue)
 
 TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
 {
-    tinycoro::CoroThreadPool<tinycoro::PackagedTask<>, tinycoro::FutureState> scheduler{4};
+    tinycoro::CoroScheduler scheduler{4};
 
     struct OnlyMoveable
     {
@@ -76,7 +76,7 @@ TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
 
     auto task = []() -> tinycoro::Task<OnlyMoveable> { co_return 42; };
 
-    auto future = scheduler.Enqueue(task());
+    auto future = scheduler.Enqueue<tinycoro::FutureState>(task());
     auto val    = future.get();
 
     EXPECT_EQ(val.i, 42);
@@ -276,7 +276,7 @@ TEST_F(ExampleTest, Example_multiTaskDifferentValuesExpection)
     auto task3 = []() -> tinycoro::Task<S> { co_return 43; };
 
     auto futures = scheduler.Enqueue(task1(), task2(), task3());
-    EXPECT_THROW(tinycoro::GetAll(futures), std::runtime_error);
+    EXPECT_THROW([&futures]{ std::ignore = tinycoro::GetAll(futures); }(), std::runtime_error);
 }
 
 TEST_F(ExampleTest, Example_sleep)
@@ -578,7 +578,8 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
         co_return 42;
     };
 
-    EXPECT_THROW(tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s), task2(5s)), std::runtime_error);
+    auto f = [this, task1, task2]{ [[maybe_unused]] auto ret = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s), task2(5s)); };
+    EXPECT_THROW(f(), std::runtime_error);
 }
 
 struct CustomAwaiter

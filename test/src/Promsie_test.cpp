@@ -66,7 +66,7 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
 struct FinalAwaiterMock
 {
     [[nodiscard]] bool                    await_ready() const noexcept { return false; }
-    [[nodiscard]] std::coroutine_handle<> await_suspend(auto hdl) noexcept { return std::noop_coroutine(); }
+    [[nodiscard]] std::coroutine_handle<> await_suspend([[maybe_unused]] auto hdl) noexcept { return std::noop_coroutine(); }
     void                                  await_resume() const noexcept { }
 };
 
