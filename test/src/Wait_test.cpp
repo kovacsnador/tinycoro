@@ -221,7 +221,7 @@ TYPED_TEST(GetAllTestWithTupleMixedFutureState, GetAllTest_tuple_mixedTypes_std_
 template <typename ReturnT>
 struct SchedulerTestMock
 {
-    MOCK_METHOD(ReturnT, EnqueueTasks, ());
+    MOCK_METHOD(ReturnT, Enqueue, ());
 };
 
 template <typename T>
@@ -265,7 +265,7 @@ TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, EnqueueTasks).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
 
 
     if constexpr (requires { std::ignore = tinycoro::AnyOfWithStopSource(scheduler, stopSource); })
@@ -291,7 +291,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_exception)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, EnqueueTasks).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
     EXPECT_THROW(tinycoro::AnyOf(scheduler), std::runtime_error);
 }
 
@@ -305,7 +305,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, EnqueueTasks).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
 
     auto result = tinycoro::AnyOf(scheduler);
 
@@ -323,7 +323,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t_exception)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, EnqueueTasks).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
 
     EXPECT_THROW([&scheduler]{std::ignore = tinycoro::AnyOf(scheduler);}(), std::runtime_error);
 }
@@ -345,7 +345,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, EnqueueTasks).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
 
     auto results = tinycoro::AnyOf(scheduler);
 

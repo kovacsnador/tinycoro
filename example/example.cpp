@@ -23,7 +23,7 @@
 #include "MultiTasks_example.h"
 #include "MultiTasksDynamic_example.h"
 #include "NestedException_example.h"
- #include "NestedTask_example.h"
+#include "NestedTask_example.h"
 #include "ReturnValueTask_example.h"
 #include "Sleep_example.h"
 #include "TaskView_example.h"
@@ -31,6 +31,9 @@
 #include "VoidTask_example.h"
 
 #include "CustomAwaiter.h"
+
+#include "AnyOfCoAwait_example.h"
+#include "SyncAwait_example.h"
 
 int main()
 {
@@ -89,6 +92,11 @@ int main()
         Example_AnyOfException(scheduler);
 
         Example_CustomAwaiter(scheduler);
+
+        auto future = scheduler.Enqueue(Example_SyncAwait(scheduler));
+        SyncOut() << future.get() << '\n';
+
+        scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
     }
 
     return 0;

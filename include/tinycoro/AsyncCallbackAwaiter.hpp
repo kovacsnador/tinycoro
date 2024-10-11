@@ -106,7 +106,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             _event.Set(PauseHandler::PauseTask(hdl));
@@ -118,7 +118,7 @@ namespace tinycoro {
             });
         }
 
-        [[nodiscard]] auto&& await_resume() noexcept { return std::move(_result.value()); }
+        [[nodiscard]] auto&& await_resume() { return std::move(_result.value()); }
 
     private:
         AsyncFunctionT _asyncFunction;
@@ -142,7 +142,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             _event.Set(PauseHandler::PauseTask(hdl));
@@ -219,7 +219,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             _userData.event.Set(PauseHandler::PauseTask(hdl));
@@ -243,7 +243,7 @@ namespace tinycoro {
                 std::addressof(_userData));
         }
 
-        [[nodiscard]] auto&& await_resume() noexcept { return std::move(_result.value()); }
+        [[nodiscard]] auto&& await_resume() { return std::move(_result.value()); }
 
     private:
         AsyncFunctionT                             _asyncFunction;
@@ -266,7 +266,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             _userData.event.Set(PauseHandler::PauseTask(hdl));

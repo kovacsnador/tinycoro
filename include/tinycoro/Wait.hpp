@@ -217,7 +217,7 @@ namespace tinycoro {
     {
         (tasks.SetStopSource(source), ...);
 
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroTasksT>(tasks)...);
+        auto futures = scheduler.Enqueue(std::forward<CoroTasksT>(tasks)...);
         return GetAll(futures);
     }
 
@@ -226,7 +226,7 @@ namespace tinycoro {
     {
         std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
 
-        auto futures = scheduler.EnqueueTasks(std::forward<CoroContainerT>(tasks));
+        auto futures = scheduler.Enqueue(std::forward<CoroContainerT>(tasks));
         return GetAll(futures);
     }
 

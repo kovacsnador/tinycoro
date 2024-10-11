@@ -40,6 +40,8 @@ This library combines the C++ coroutine API with the familiar promise/future-bas
     - [AnyOf with dynamic void tasks](#example24)
     - [AnyOf with exception](#example25)
     - [Custom Awaiter](#example26)
+    - [SyncAwaiter](#example27)
+    - [AnyOfAwait](#example28)
 * [Contributing](#contributing)
 * [Support](#support)
 
@@ -302,7 +304,7 @@ void Example_multiTasks(tinycoro::CoroScheduler& scheduler)
     };
 
     // enqueue more tasks at the same time.
-    auto futures = scheduler.EnqueueTasks(task(), task(), task());
+    auto futures = scheduler.Enqueue(task(), task(), task());
     
     // wait for all complition
     tinycoro::GetAll(futures);
@@ -335,7 +337,7 @@ void Example_multiMovedTasksDynamicVoid(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // std::move tasks vector into the scheduler (scheduler takes over ownership above tasks)
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
     tinycoro::GetAll(futures);
 }
 ```
@@ -367,7 +369,7 @@ void Example_multiMovedTasksDynamic(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // std::move tasks vector into the scheduler (scheduler takes over ownership above tasks)
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
 
     // Wait and collecting all results 
     auto results = tinycoro::GetAll(futures);
@@ -402,7 +404,7 @@ void Example_multiTasksDynamic(tinycoro::CoroScheduler& scheduler)
     tasks.push_back(task3());
 
     // scheduler is using TaskView to refer to the task
-    auto futures = scheduler.EnqueueTasks(tasks);
+    auto futures = scheduler.Enqueue(tasks);
     auto results = tinycoro::GetAll(futures);
 
     std::cout << "GetAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
@@ -438,7 +440,7 @@ void Example_multiTaskDifferentValues(tinycoro::CoroScheduler& scheduler)
         co_return 43;
     };
 
-    auto futures = scheduler.EnqueueTasks(task1(), task2(), task3());
+    auto futures = scheduler.Enqueue(task1(), task2(), task3());
 
     try
     {
@@ -731,7 +733,7 @@ void Example_usageWithStopToken(tinycoro::CoroScheduler& scheduler)
 
     std::stop_source source;
 
-    auto futures = scheduler.EnqueueTasks(task1(1s, source), task2(source.get_token()));
+    auto futures = scheduler.Enqueue(task1(1s, source), task2(source.get_token()));
 
     auto results = tinycoro::GetAll(futures);
 
@@ -938,6 +940,56 @@ void Example_CustomAwaiter(auto& scheduler)
     auto val    = tinycoro::GetAll(future);
 
     std::cout << "co_return => " << val << '\n'; 
+}
+```
+
+### Example27
+SyncAwait. Waiting other tasks to complete without blocking any thread.
+
+
+```cpp
+tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
+{
+    auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+    auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
+    auto task3 = []() -> tinycoro::Task<std::string> { co_return "789"; };
+
+    // waiting to finish all other tasks. (non blocking)
+    auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+
+    // tuple accumulate
+    co_return std::apply(
+        []<typename... Ts>(Ts&&... ts) {
+            std::string result;
+            (result.append(std::forward<Ts>(ts)), ...);
+            return result;
+        },
+        tupleResult);
+}
+```
+
+### Example28
+AnyOfAwait. Waiting for the first task to complete. Others are cancelled if possible.
+
+```cpp
+tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
+{
+    auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
+        int32_t count{0};
+
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await tinycoro::CancellableSuspend{++count};
+        }
+        co_return count;
+    };
+
+    // Nonblocking wait for other tasks
+    auto results = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
+
+    auto t1 = std::get<0>(results);
+    auto t2 = std::get<1>(results);
+    auto t3 = std::get<2>(results);
 }
 ```
 

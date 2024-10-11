@@ -31,7 +31,7 @@ void Example_multiMovedTasksDynamic(auto& scheduler)
     tasks.push_back(task2());
     tasks.push_back(task3());
 
-    auto futures = scheduler.EnqueueTasks(std::move(tasks));
+    auto futures = scheduler.Enqueue(std::move(tasks));
     auto results = tinycoro::GetAll(futures);
 
     SyncOut() << "GetAll co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
