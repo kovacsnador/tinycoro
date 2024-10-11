@@ -276,7 +276,7 @@ TEST_F(ExampleTest, Example_multiTaskDifferentValuesExpection)
     auto task3 = []() -> tinycoro::Task<S> { co_return 43; };
 
     auto futures = scheduler.Enqueue(task1(), task2(), task3());
-    EXPECT_THROW([&futures]{ std::ignore = tinycoro::GetAll(futures); }(), std::runtime_error);
+    EXPECT_THROW([&futures] { std::ignore = tinycoro::GetAll(futures); }(), std::runtime_error);
 }
 
 TEST_F(ExampleTest, Example_sleep)
@@ -578,7 +578,7 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
         co_return 42;
     };
 
-    auto f = [this, task1, task2]{ [[maybe_unused]] auto ret = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s), task2(5s)); };
+    auto f = [this, task1, task2] { [[maybe_unused]] auto ret = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s), task2(5s)); };
     EXPECT_THROW(f(), std::runtime_error);
 }
 
@@ -627,4 +627,82 @@ TEST_F(ExampleTest, ExampleOwnAwaiter)
     auto val    = tinycoro::GetAll(future);
 
     EXPECT_EQ(val, 42);
+}
+
+TEST_F(ExampleTest, ExampleSyncAwait)
+{
+    auto syncAwait = [](auto& scheduler) -> tinycoro::Task<std::string> {
+        auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+        auto task2 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+        auto task3 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+
+        // waiting to finish all other tasks. (non blocking)
+        auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+
+        // tuple accumulate
+        co_return std::apply(
+            []<typename... Ts>(Ts&&... ts) {
+                std::string result;
+                (result.append(std::forward<Ts>(ts)), ...);
+                return result;
+            },
+            tupleResult);
+    };
+
+    auto future = scheduler.Enqueue(syncAwait(scheduler));
+    EXPECT_EQ(std::string{"123123123"}, future.get());
+}
+
+TEST_F(ExampleTest, ExampleSyncAwaitException)
+{
+    auto syncAwait = [](auto& scheduler) -> tinycoro::Task<std::string> {
+        auto task1 = []() -> tinycoro::Task<std::string> { throw std::runtime_error{"test error"}; co_return "123"; };
+        auto task2 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+        auto task3 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+
+        // waiting to finish all other tasks. (non blocking)
+        auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+
+        // tuple accumulate
+        co_return std::apply(
+            []<typename... Ts>(Ts&&... ts) {
+                std::string result;
+                (result.append(std::forward<Ts>(ts)), ...);
+                return result;
+            },
+            tupleResult);
+    };
+
+    auto future = scheduler.Enqueue(syncAwait(scheduler));
+    EXPECT_THROW(future.get(), std::runtime_error);
+}
+
+TEST_F(ExampleTest, ExampleAnyOfCoAwait)
+{
+    auto anyOfCoAwaitTest = [](auto& scheduler) -> tinycoro::Task<void> {
+        auto now = std::chrono::system_clock::now();
+
+        auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
+            int32_t count{0};
+
+            for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+            {
+                co_await tinycoro::CancellableSuspend{++count};
+            }
+            co_return count;
+        };
+
+        auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+
+        auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
+
+        EXPECT_TRUE(std::get<0>(results) > 0);
+        EXPECT_TRUE(std::get<1>(results) > 0);
+        EXPECT_TRUE(std::get<2>(results) > 0);
+
+        EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
+    };
+
+    auto future = scheduler.Enqueue(anyOfCoAwaitTest(scheduler));
+    EXPECT_NO_THROW(future.get());
 }

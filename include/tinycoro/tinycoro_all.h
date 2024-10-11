@@ -15,5 +15,6 @@
 #include "StopSourceAwaiter.hpp"
 #include "SleepAwaiter.hpp"
 #include "Wait.hpp"
+#include "SyncAwait.hpp"
 
 #endif //!__TINY_CORO_TINY_CORO_ALL_H__

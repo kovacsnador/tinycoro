@@ -4,6 +4,7 @@
 #include <cassert>
 #include <functional>
 #include <utility>
+#include <iostream>
 
 #include "PauseHandler.hpp"
 #include "Wait.hpp"
@@ -21,7 +22,7 @@ namespace tinycoro {
                     _notifyCallback();
                 }
             }
-        
+
             void Set(std::invocable auto cb)
             {
                 assert(_notifyCallback == nullptr);
@@ -52,7 +53,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        [[nodiscard]] auto await_resume() noexcept { return GetAll(this->_futures); }
+        [[nodiscard]] auto await_resume() { return GetAll(this->_futures); }
 
     protected:
         SchedulerT&           _scheduler;
@@ -71,7 +72,7 @@ namespace tinycoro {
         {
         }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             this->_event.Set(PauseHandler::PauseTask(hdl));
@@ -102,7 +103,7 @@ namespace tinycoro {
         {
         }
 
-        void await_suspend(auto hdl) noexcept
+        void await_suspend(auto hdl)
         {
             // put tast on pause
             this->_event.Set(PauseHandler::PauseTask(hdl));
@@ -138,7 +139,8 @@ namespace tinycoro {
     [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
-        return AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
+        return AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{
+            scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 
     template <typename SchedulerT, typename StopSourceT = std::stop_source, typename... Args>
