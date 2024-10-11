@@ -10,6 +10,83 @@
 
 This library combines the C++ coroutine API with the familiar promise/future-based concurrency model, making it intuitive and easy to use. It leverages well-known C++ constructs such as `std::promise`, `std::future`, and `std::stop_source`, allowing developers to work with familiar patterns.
 
+## Motivation
+Imagine you have two asynchronous API calls, and one needs to wait for the other to finish. A common example of this scenario might look like the following in traditional C++:
+
+```cpp
+void AsyncDownload(const std::string& url, std::function<void(std::string)> callback)
+{
+    // async callback call...
+}
+
+void AsyncPrepareData(const std::string& data, std::function<void(std::string)> callback)
+{
+    // async callback call...
+}
+```
+
+In a typical C++ solution, you would use nested callbacks and a `std::latch` to manage the waiting, as shown below:
+```cpp
+std::string CollectAllData()
+{
+    std::latch latch{1};
+    std::string result;
+
+    AsyncDownload("http://test.hu", [&latch, &result](std::string data) {
+        AsyncPrepareData(data, [&latch, &result] (std::string res) {
+            result = std::move(res);
+            latch.count_down();
+        });
+    });
+
+    latch.wait();
+    return result;
+}
+```
+While this works, the code quickly becomes messy with nested callbacks and explicit synchronization points (std::latch). This adds unnecessary complexity to what should be a simple sequence of operations.
+
+### Tinycoro to rescue
+
+With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, no explicit waiting with std::latch, and no blocking points:
+```cpp
+tinycoro::Task<std::string> WithCorouitne()
+{
+    std::string result;
+    co_await tinycoro::AsyncCallbackAwaiter{[](auto cb) { AsyncDownload("http://test.hu", cb); }, [&result](std::string data) { result = std::move(data);}}; 
+    co_await tinycoro::AsyncCallbackAwaiter{[&result](auto cb) { AsyncPrepareData(result, cb); }, [&result](std::string res) { result = std::move(res);}};
+    co_return result;
+}
+```
+### Further Simplification with Coroutine Wrappers
+
+You can make this even more readable by wrapping the asynchronous API calls in their own `tinycoro::Task`. This abstracts away the callback management entirely:
+```cpp
+tinycoro::Task<std::string> AsyncDownloadCoro(const std::string& url)
+{
+    std::string result;
+    co_await tinycoro::AsyncCallbackAwaiter{[&url](auto cb) { AsyncDownload(url, cb); }, [&result](std::string data) { result = std::move(data);}};
+    co_return result;
+}
+
+tinycoro::Task<std::string> AsyncPrepareCoro(std::string data)
+{
+    co_await tinycoro::AsyncCallbackAwaiter{[&data](auto cb) { AsyncPrepareData(data, cb); }, [&data](std::string res) { data = std::move(res);}};
+    co_return data;
+}
+```
+
+Now, the final coroutine looks even cleaner and more intuitive:
+```cpp
+tinycoro::Task<std::string> WithCorouitne()
+{
+    auto data = co_await AsyncDownloadCoro("http://test.hu");
+    auto result = co_await AsyncPrepareCoro(data);
+    co_return result;
+}
+```
+This approach removes all callback semantics, improves readability and maintainability, turning complex asynchronous workflows into simple, sequential code with the power of coroutines.
+
+
 ## Overview
 * [Usage](#usage)
 * [Examples](#examples)
