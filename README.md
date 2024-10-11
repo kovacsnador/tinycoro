@@ -40,6 +40,8 @@ This library combines the C++ coroutine API with the familiar promise/future-bas
     - [AnyOf with dynamic void tasks](#example24)
     - [AnyOf with exception](#example25)
     - [Custom Awaiter](#example26)
+    - [SyncAwaiter](#example27)
+    - [AnyOfAwait](#example28)
 * [Contributing](#contributing)
 * [Support](#support)
 
@@ -938,6 +940,56 @@ void Example_CustomAwaiter(auto& scheduler)
     auto val    = tinycoro::GetAll(future);
 
     std::cout << "co_return => " << val << '\n'; 
+}
+```
+
+### Example27
+SyncAwait. Waiting other tasks to complete without blocking any thread.
+
+
+```cpp
+tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
+{
+    auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
+    auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
+    auto task3 = []() -> tinycoro::Task<std::string> { co_return "789"; };
+
+    // waiting to finish all other tasks. (non blocking)
+    auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+
+    // tuple accumulate
+    co_return std::apply(
+        []<typename... Ts>(Ts&&... ts) {
+            std::string result;
+            (result.append(std::forward<Ts>(ts)), ...);
+            return result;
+        },
+        tupleResult);
+}
+```
+
+### Example28
+AnyOfAwait. Waiting for the first task to complete. Others are cancelled if possible.
+
+```cpp
+tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
+{
+    auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
+        int32_t count{0};
+
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await tinycoro::CancellableSuspend{++count};
+        }
+        co_return count;
+    };
+
+    // Nonblocking wait for other tasks
+    auto results = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
+
+    auto t1 = std::get<0>(results);
+    auto t2 = std::get<1>(results);
+    auto t3 = std::get<2>(results);
 }
 ```
 
