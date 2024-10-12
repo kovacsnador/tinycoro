@@ -110,7 +110,7 @@ tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
 ```
 This approach removes all callback semantics, improves readability and maintainability, turning complex asynchronous workflows into simple, sequential code with the power of coroutines.
 
-### `How you invoke the functions`
+### `How to invoke the functions`
 
 The function calls are pretty trivial. It's done with some error handling and that's it.
 
