@@ -90,21 +90,20 @@ This approach removes all callback semantics, improves readability and maintaina
 ## Overview
 * [Usage](#usage)
 * [Examples](#examples)
-    - [Scheduler](#scheduler)
-    - [Void Task](#example1)
-    - [Void TaskView](#example2)
-    - [Task with return value](#example3)
-    - [Task with exception](#example4)
-    - [Nested task](#example5)
-    - [Generator](#example6)
-    - [Multi Tasks](#example7)
-    - [AsyncCallbackAwaiter](#example8)
-    - [AsyncCallbackAwaiter_CStyle](#example9)
-    - [AsyncCallbackAwaiter_CStyle void](#example10)
-    - [AnyOf](#example11)
-    - [Custom Awaiter](#example12)
-    - [SyncAwaiter](#example13)
-    - [AnyOfAwait](#example14)
+    - [CoroScheduler](#coroscheduler)
+    - [Task](#task)
+    - [TaskView](#taskview)
+    - [Task with return value](#returnvaluetask)
+    - [Task with exception](#exceptiontask)
+    - [Nested task](#nestedtask)
+    - [Generator](#generator)
+    - [Multi Tasks](#multitasks)
+    - [AsyncCallbackAwaiter](#asynccallbackawaiter)
+    - [AsyncCallbackAwaiter_CStyle](#asynccallbackawaiter_cstyle)
+    - [AnyOf](#anyof)
+    - [Custom Awaiter](#customawaiter)
+    - [SyncAwaiter](#syncawaiter)
+    - [AnyOfAwait](#anyofawait)
 * [Contributing](#contributing)
 * [Support](#support)
 
@@ -118,7 +117,7 @@ Simply copy the `include` folder into your C++20 (or greater) project. If necess
 ## Examples
 The following examples demonstrate various use cases of the `tinycoro` library:
 
-### Scheduler
+### `CoroScheduler`
 The `tinycoro::CoroScheduler` is responsible for managing and executing coroutines across multiple threads.
 When creating a scheduler, you can specify the number of worker threads it should use.
 The constructor accepts the number of threads, allowing you to utilize hardware concurrency efficiently.
@@ -130,7 +129,7 @@ The constructor accepts the number of threads, allowing you to utilize hardware 
 tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
 ```
 
-### Example1
+### `Task`
 This example demonstrates how to create a basic coroutine task that returns void and schedule it using the tinycoro::CoroScheduler. The scheduler takes complete ownership of the coroutine, managing its lifecycle.
 
 The `Enqueue` function in the `tinycoro::CoroScheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
@@ -152,7 +151,7 @@ void Example_voidTask()
 }
 ```
 
-### Example2
+### `TaskView`
 If you don't want to give full ownership of a coroutine to the scheduler, you can use TaskView, which allows you to retain control over the coroutine's lifecycle while still scheduling it for execution.
 
 ```cpp
@@ -171,7 +170,7 @@ void Example_taskView(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example3
+### `ReturnValueTask`
 When you schedule a task using the `tinycoro::CoroScheduler`, you can use the `std::future` returned by the scheduler to retrieve the result of the coroutine, just like with any other asynchronous task.
 
 ```cpp
@@ -188,7 +187,7 @@ void Example_returnValueTask(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example4
+### `ExceptionTask`
 When scheduling tasks using tinycoro::CoroScheduler, exceptions thrown within a coroutine are propagated through the `std::future`. You can handle these exceptions using the traditional way with the `try-catch` approach when calling `future.get()`.
 
 ```cpp
@@ -217,7 +216,7 @@ void Example_exception(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example5
+### `NestedTask`
 Tinycoro allows you to nest coroutine tasks because a `tinycoro::Task` is an awaitable object. This means that you can co_await on another coroutine task within your task, making it possible to structure tasks hierarchically.
 
 Additionally, exceptions thrown in nested tasks are propagated up to the caller, making error handling straightforward.
@@ -246,7 +245,7 @@ void Example_nestedTask(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example6
+### `Generator`
 Tinycoro provides support for coroutine generators via `tinycoro::Generator`, allowing you to yield values lazily. This can be useful for iterating over sequences of data without needing to create them all at once.
 
 ```cpp
@@ -275,7 +274,7 @@ void Example_generator()
 }
 ```
 
-### Example7
+### `MultiTasks`
 The tinycoro library allows you to enqueue multiple coroutine tasks simultaneously and manage their completion efficiently. The `GetAll` functionality can be used to wait for all enqueued tasks to finish.
 
 ```cpp
@@ -295,7 +294,7 @@ void Example_multiTasks(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example8
+### `AsyncCallbackAwaiter`
 `tinycoro::AsyncCallbackAwaiter` is an awaiter interface that requires an asynchronous callback function or lambda with one parameter, which is the wrapped user callback. The wrapped user callback mimics the same parameters and return value as the original user callback, but it also includes the necessary tools to notify the scheduler to resume the coroutine on the CPU.
 
 ```cpp
@@ -331,10 +330,14 @@ void Example_asyncCallbackAwaiter(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example9
+### `AsyncCallbackAwaiter_CStyle`
 Async callback awaiter and usage with a C-style API with return value.
 
 `tinycoro::AsyncCallbackAwaiter_CStyle` is an awaiter interface that requires an asynchronous callback function or lambda with two parameters: the first is the `wrappedCallback`, and the second is the `userData` (usually a void*). The wrapped user callback mimics the same parameters and return value as the original user callback, but it also includes the necessary tools to notify the scheduler to resume the coroutine on the CPU.
+
+This example demonstrates how to use the tinycoro library to handle asynchronous operations that utilize C-style callbacks. The code simulates a third-party asynchronous API that accepts a callback and allows you to await its completion, including the usage of user data passed to the callback.
+
+It highlights the use of `tinycoro::IndexedUserData<0>` to ensure that the correct argument is used in the callback argument list for custom user data. In our case this is the first one `<0>`.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -375,49 +378,7 @@ void Example_asyncCallbackAwaiter_CStyle(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example10
-This example demonstrates how to use the tinycoro library to handle asynchronous operations that utilize C-style callbacks. The code simulates a third-party asynchronous API that accepts a callback and allows you to await its completion, including the usage of user data passed to the callback.
-
-It highlights the use of `tinycoro::IndexedUserData<0>` to ensure that the correct argument is used in the callback argument list for custom user data. In our case this is the first one `<0>`.
-
-```cpp
-#include <tinycoro/tinycoro_all.h>
-
-// Simulate a third party async call
-int32_t AsyncCallbackAPI(std::regular_invocable<void*, int> auto cb, void* userData)
-{
-    std::jthread t{[cb, userData] {
-        std::this_thread::sleep_for(1s);
-        cb(userData, 42);
-    }};
-    t.detach();
-    return 42;
-}
-
-void Example_asyncCallbackAwaiter_CStyleVoid(tinycoro::CoroScheduler& scheduler)
-{
-    auto task1 = []() -> tinycoro::Task<void> {
-        
-        auto task2 = []() -> tinycoro::Task<void> {
-
-            auto cb = [](void* userData, int i) {
-                auto* fourtyFour = static_cast<int32_t*>(userData);
-                assert(*fourtyFour == 44);
-            };
-
-            int32_t userData{44};
-
-            int32_t fourtyTwo = co_await tinycoro::AsyncCallbackAwaiter_CStyle([](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::IndexedUserData<0>(&userData));
-        };
-        co_await task2();
-    };
-
-    auto future = scheduler.Enqueue(task1());
-    future.get();
-}
-```
-
-### Example11
+### `AnyOf`
 This example demonstrates how to use the tinycoro library to run multiple coroutine tasks concurrently and cancel all but the first one that completes. It utilizes tinycoro::AnyOfWithStopSource in combination with a std::stop_source to manage task cancellation effectively.
 
 ```cpp
@@ -440,7 +401,7 @@ void Example_AnyOfVoid(tinycoro::CoroScheduler& scheduler)
 }
 ```
 
-### Example12
+### `CustomAwaiter`
 This example demonstrates how to create and use a custom awaiter in conjunction with the tinycoro library. The custom awaiter allows for asynchronous behavior similar to the provided [AsyncCallbackAwaiter](#example17).
 
 
@@ -495,7 +456,7 @@ void Example_CustomAwaiter(auto& scheduler)
 }
 ```
 
-### Example13
+### `SyncAwaiter`
 This example demonstrates how to use the tinycoro library's SyncAwait function to concurrently wait for multiple coroutine tasks to finish and then accumulate their results into a single string.
 
 This example effectively showcases the power of the tinycoro library in managing asynchronous tasks and demonstrates how to efficiently synchronize multiple tasks while accumulating their results in a clean and non-blocking manner.
@@ -522,7 +483,7 @@ tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
 }
 ```
 
-### Example14
+### `AnyOfAwait`
 This example demonstrates how to use the tinycoro library's `AnyOfAwait` function to concurrently wait for the completion of multiple asynchronous tasks, allowing for non-blocking execution.
 
 Waiting for the first task to complete. Others are cancelled if possible.
