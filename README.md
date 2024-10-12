@@ -21,33 +21,57 @@ void AsyncDownload(const std::string& url, std::function<void(std::string)> call
 
 void AsyncPrepareData(const std::string& data, std::function<void(std::string)> callback)
 {
+    if(data.empty())
+    {
+        // Maybe throwing an exception here....
+        throw std::runtime_error{"Invalid data input."};
+    }
+
     // async callback call...
 }
 ```
+In a typical C++ solution, you would use nested (lambda) callbacks, a `std::latch` to manage the waiting and some error handling for possible exceptions.
 
-In a typical C++ solution, you would use nested callbacks and a `std::latch` to manage the waiting, as shown below:
 ```cpp
-std::string CollectAllData()
+std::string CollectAllDataWithErrorHandling()
 {
     std::latch latch{1};
     std::string result;
 
-    AsyncDownload("http://test.hu", [&latch, &result](std::string data) {
-        AsyncPrepareData(data, [&latch, &result] (std::string res) {
-            result = std::move(res);
+    std::exception_ptr exceptionPtr{};
+
+    AsyncDownload("http://test.hu", [&latch, &result, &exceptionPtr](std::string data) {
+        try
+        {
+            AsyncPrepareData(data, [&latch, &result] (std::string res) {
+                result = std::move(res);
+                latch.count_down();
+            });
+        }
+        catch(...)
+        {
+            // saving the exception to rethrow to the caller.
+            exceptionPtr = std::current_exception();
             latch.count_down();
-        });
+        }
     });
 
     latch.wait();
+
+    if(exceptionPtr)
+    {
+        // return the exception
+        std::rethrow_exception(exceptionPtr);
+    }
+
     return result;
 }
 ```
-While this works, the code quickly becomes messy with nested callbacks and explicit synchronization points (std::latch). This adds unnecessary complexity to what should be a simple sequence of operations.
+While this works, the code quickly becomes messy with nested callbacks exception handling and explicit `thread blocking` synchronization point. This adds unnecessary complexity to what should be a simple sequence of operations.
 
 ### Tinycoro to rescue
 
-With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, no explicit waiting with std::latch, and no blocking points:
+With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, exception handling and no thread blocker waiting points:
 ```cpp
 tinycoro::Task<std::string> WithCorouitne()
 {
@@ -59,7 +83,7 @@ tinycoro::Task<std::string> WithCorouitne()
 ```
 ### Further Simplification with Coroutine Wrappers
 
-You can make this even more readable by wrapping the asynchronous API calls in their own `tinycoro::Task`. This abstracts away the callback management entirely:
+You can make this even more readable by wrapping the asynchronous API calls in their own `tinycoro::Task`. This abstracts away the callback entirely (still with included exception handling):
 ```cpp
 tinycoro::Task<std::string> AsyncDownloadCoro(const std::string& url)
 {
