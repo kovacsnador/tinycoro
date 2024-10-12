@@ -69,11 +69,11 @@ std::string CollectAllDataWithErrorHandling()
 ```
 While this works, the code quickly becomes messy with nested callbacks exception handling and explicit `thread blocking` synchronization point. This adds unnecessary complexity to what should be a simple sequence of operations.
 
-### Tinycoro to rescue
+### `Tinycoro to rescue`
 
 With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, exception handling and no thread blocker waiting points:
 ```cpp
-tinycoro::Task<std::string> WithCorouitne()
+tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
 {
     std::string result;
     co_await tinycoro::AsyncCallbackAwaiter{[](auto cb) { AsyncDownload("http://test.hu", cb); }, [&result](std::string data) { result = std::move(data);}}; 
@@ -81,7 +81,7 @@ tinycoro::Task<std::string> WithCorouitne()
     co_return result;
 }
 ```
-### Further Simplification with Coroutine Wrappers
+### `Further Simplification with Coroutine Wrappers`
 
 You can make this even more readable by wrapping the asynchronous API calls in their own `tinycoro::Task`. This abstracts away the callback entirely (still with included exception handling):
 ```cpp
@@ -98,18 +98,47 @@ tinycoro::Task<std::string> AsyncPrepareCoro(std::string data)
     co_return data;
 }
 ```
-
+### `Final coroutine Task`
 Now, the final coroutine looks even cleaner and more intuitive:
 ```cpp
-tinycoro::Task<std::string> WithCorouitne()
+tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
 {
     auto data = co_await AsyncDownloadCoro("http://test.hu");
-    auto result = co_await AsyncPrepareCoro(data);
+    auto result = co_await AsyncPrepareCoro(data); // implicit exception handling here...
     co_return result;
 }
 ```
 This approach removes all callback semantics, improves readability and maintainability, turning complex asynchronous workflows into simple, sequential code with the power of coroutines.
 
+### `How you invoke the functions`
+
+The function calls are pretty trivial. It's done with some error handling and that's it.
+
+CollectAllDataWithErrorHandling:
+```cpp
+try
+{
+    auto result = CollectAllDataWithErrorHandling();
+    std::cout << result << '\n';
+}
+catch(const std::exception& e)
+{
+    std::cerr << e.what() << '\n'; // Exception: "Invalid data input."
+}
+```
+CollectAllDataWithErrorHandlingCorouitne:
+```cpp
+auto future = scheduler.Enqueue(CollectAllDataWithErrorHandlingCorouitne());
+try
+{
+    auto result = tinycoro::GetAll(future);
+    std::cout << result << '\n';
+}
+catch(const std::exception& e)
+{
+    std::cerr << e.what() << '\n';  // Exception: "Invalid data input."
+}
+```
 
 ## Overview
 * [Usage](#usage)
