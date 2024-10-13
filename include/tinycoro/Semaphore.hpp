@@ -3,15 +3,9 @@
 
 #include <mutex>
 #include <coroutine>
-#include <syncstream>
 
 #include "PauseHandler.hpp"
 #include "Finally.hpp"
-
-auto SyncOut2(std::ostream& stream = std::cout)
-{
-    return std::osyncstream{stream};
-}
 
 namespace tinycoro {
 
@@ -71,8 +65,6 @@ namespace tinycoro {
 
             if (auto topAwaiter = _waiters.pop())
             {
-                lock.unlock();
-
                 topAwaiter->Notify();
             }
             else
