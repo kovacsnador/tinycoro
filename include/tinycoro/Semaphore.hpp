@@ -3,9 +3,15 @@
 
 #include <mutex>
 #include <coroutine>
+#include <syncstream>
 
 #include "PauseHandler.hpp"
 #include "Finally.hpp"
+
+auto SyncOut2(std::ostream& stream = std::cout)
+{
+    return std::osyncstream{stream};
+}
 
 namespace tinycoro {
 
@@ -61,24 +67,31 @@ namespace tinycoro {
     private:
         void Release()
         {
-            std::scoped_lock lock{_mtx};
-            _counter++;
+            std::unique_lock lock{_mtx};
 
             if (auto topAwaiter = _waiters.pop())
             {
+                lock.unlock();
+
                 topAwaiter->Notify();
+            }
+            else
+            {
+                ++_counter;
             }
         }
 
-        auto TryAcquire(awaitable_type* awaiter)
+        auto TryAcquire(awaitable_type* awaiter, auto parentCoro)
         {
             std::scoped_lock lock{_mtx};
+
             if (_counter > 0)
             {
                 --_counter;
                 return true;
             }
 
+            awaiter->PutOnPause(parentCoro);
             _waiters.push(awaiter);
             return false;
         }
@@ -124,16 +137,20 @@ namespace tinycoro {
 
         constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
         {
-            if (_semaphore.TryAcquire(this))
+            if (_semaphore.TryAcquire(this, parentCoro))
             {
                 return parentCoro;
             }
 
-            _event.Set(PauseHandler::PauseTask(parentCoro));
             return std::noop_coroutine();
         }
 
         void Notify() const { _event.Notify(); }
+
+        void PutOnPause(auto parentCoro)
+        { 
+            _event.Set(PauseHandler::PauseTask(parentCoro));
+        }
 
         [[nodiscard]] constexpr auto await_resume() noexcept
         {
