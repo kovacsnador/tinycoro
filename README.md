@@ -11,7 +11,7 @@
 This library combines the C++ coroutine API with the familiar promise/future-based concurrency model, making it intuitive and easy to use. It leverages well-known C++ constructs such as `std::promise`, `std::future`, and `std::stop_source`, allowing developers to work with familiar patterns.
 
 ## Acknowledgement
-I would like to extend my heartfelt thanks to my brother, `László Kovács`, for his unwavering support and invaluable advice throughout the development of this project. His guidance and encouragement have been a tremendous help. Thank you, Bro! :)
+I would like to extend my heartfelt thanks to my brother, [`László Kovács`](https://www.linkedin.com/in/mz-per-x/), for his unwavering support and invaluable advice throughout the development of this project. His guidance and encouragement have been a tremendous help. Thank you, Bro! :)
 
 ## Motivation
 Imagine you have two asynchronous API calls, and one needs to wait for the other to finish. A common example of this scenario might look like the following in traditional C++:
