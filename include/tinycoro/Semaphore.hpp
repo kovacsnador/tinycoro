@@ -65,6 +65,7 @@ namespace tinycoro {
 
             if (auto topAwaiter = _waiters.pop())
             {
+                lock.unlock();
                 topAwaiter->Notify();
             }
             else
@@ -137,16 +138,16 @@ namespace tinycoro {
             return std::noop_coroutine();
         }
 
-        void Notify() const { _event.Notify(); }
-
-        void PutOnPause(auto parentCoro)
-        { 
-            _event.Set(PauseHandler::PauseTask(parentCoro));
-        }
-
         [[nodiscard]] constexpr auto await_resume() noexcept
         {
             return Finally([this] { _semaphore.Release(); });
+        }
+
+        void Notify() const { _event.Notify(); }
+
+        void PutOnPause(auto parentCoro)
+        {
+            _event.Set(PauseHandler::PauseTask(parentCoro));
         }
 
         SemaphoreAwaiter* next{nullptr};

@@ -10,6 +10,9 @@ namespace tinycoro
     {
         ETaskResumeState operator()(auto coroHdl, const auto& stopSource)
         {
+            // Resets the pause flag if necessary so the task is running.
+            coroHdl.promise().pauseHandler->Resume();
+
             if (stopSource.stop_requested() && coroHdl.promise().cancellable)
             {
                 return ETaskResumeState::STOPPED;

@@ -12,6 +12,7 @@
 #include <assert.h>
 #include <ranges>
 #include <algorithm>
+#include <variant>
 
 #include "Future.hpp"
 #include "Common.hpp"
@@ -29,6 +30,13 @@ namespace tinycoro {
         }
     class CoroThreadPool
     {
+        // Placeholder task type for to notify that the task should not be put on pause.
+        struct DoNotPauseTask
+        {
+        };
+
+        using TaskVariantT = std::variant<DoNotPauseTask, TaskT>;
+
     public:
         CoroThreadPool(size_t workerThreadCount) { _AddWorkers(workerThreadCount); }
 
@@ -112,7 +120,7 @@ namespace tinycoro {
             {
                 _tasksCount.fetch_add(1, std::memory_order_acquire);
 
-                static size_t s_id{0};
+                static uint64_t s_id{0};
 
                 {
                     std::scoped_lock lock{_mtx};
@@ -126,18 +134,25 @@ namespace tinycoro {
             return future;
         }
 
-        PauseHandlerCallbackT GeneratePauseResume(size_t id)
+        PauseHandlerCallbackT GeneratePauseResume(uint64_t id)
         {
             return [this, i = id]() {
                 if (_stopSource.stop_requested() == false)
                 {
-                    std::scoped_lock lock{_mtx};
+                    std::unique_lock lock{_mtx};
                     if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
                     {
-                        _tasks.emplace(std::move(it->second));
+                        _tasks.emplace(std::move(std::get<TaskT>(it->second)));
                         _pausedTasks.erase(i);
 
+                        lock.unlock();
+
                         _cv.notify_all();
+                    }
+                    else
+                    {
+                        // notify task that it should be wakeup and put into tasks queue.
+                        _pausedTasks.emplace(i, DoNotPauseTask{});
                     }
                 }
             };
@@ -185,15 +200,17 @@ namespace tinycoro {
 
                                     lock.lock();
 
-                                    if (task.IsPaused())
+                                    auto id = task.id;
+                                    if (auto it = _pausedTasks.find(id); it != _pausedTasks.end())
                                     {
-                                        auto id = task.id;
-                                        _pausedTasks.emplace(id, std::move(task));
+                                        // need to wakeup the task.
+                                        _pausedTasks.erase(it);
+                                        _tasks.emplace(std::move(task));
                                     }
                                     else
                                     {
-                                        _tasks.emplace(std::move(task));
-                                        _cv.notify_all();
+                                        // put on pause the task.
+                                        _pausedTasks.emplace(id, std::move(task));
                                     }
 
                                     lock.unlock();
@@ -217,9 +234,9 @@ namespace tinycoro {
             }
         }
 
-        std::queue<TaskT>                 _tasks;
-        std::unordered_map<size_t, TaskT> _pausedTasks;
-        std::atomic<size_t>               _tasksCount{0};
+        std::queue<TaskT>                           _tasks;
+        std::unordered_map<uint64_t, TaskVariantT>  _pausedTasks;
+        std::atomic<size_t>                         _tasksCount{0};
 
         std::vector<std::jthread> _workerThreads;
         std::stop_source          _stopSource;
