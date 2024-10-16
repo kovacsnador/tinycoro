@@ -14,8 +14,7 @@ void Example_voidTask(auto& scheduler)
         co_return;
     };
 
-    auto future = scheduler.Enqueue(task());
-    future.get();
+    tinycoro::GetAll(scheduler, task());
 
     SyncOut() << "co_return => void" << '\n';
 }

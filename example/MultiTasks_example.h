@@ -14,8 +14,7 @@ void Example_multiTasks(auto& scheduler)
         co_return;
     };
 
-    auto futures = scheduler.Enqueue(task(), task(), task());
-    tinycoro::GetAll(futures);
+    tinycoro::GetAll(scheduler, task(), task(), task());
 
     SyncOut() << "GetAll co_return => void" << '\n';
 }

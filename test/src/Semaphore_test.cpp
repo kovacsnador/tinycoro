@@ -175,6 +175,23 @@ struct SemapthoreFunctionalTest : public testing::TestWithParam<int32_t>
 
 INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000, 10000));
 
+TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
+{
+    tinycoro::Semaphore semaphore{1};
+
+    int32_t count{0};
+
+    auto task = [&semaphore, &count]() -> tinycoro::Task<int32_t> {
+        auto lock = co_await semaphore;
+        co_return ++count;
+    };
+
+    auto [c1, c2, c3] = tinycoro::GetAll(scheduler, task(), task(), task());
+
+    EXPECT_TRUE(c1 != c2 && c2 != c3 && c3 != c1);
+    EXPECT_EQ(count, 3);
+}
+
 TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
 {
     const auto param = GetParam();
@@ -234,7 +251,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
     tinycoro::Semaphore semaphore{4};
 
     std::atomic_int32_t currentAllowed{0};
-    int32_t max{0};
+    int32_t             max{0};
 
     auto task = [&semaphore, &max, &currentAllowed]() -> tinycoro::Task<void> {
         {

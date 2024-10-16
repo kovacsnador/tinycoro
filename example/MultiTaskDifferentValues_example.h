@@ -34,15 +34,9 @@ void Example_multiTaskDifferentValues(auto& scheduler)
         co_return 43;
     };
 
-    auto futures = scheduler.Enqueue(task1(), task2(), task3());
-
     try
     {
-        auto results = tinycoro::GetAll(futures);
-
-        auto voidType = std::get<0>(results);
-        auto val      = std::get<1>(results);
-        auto s        = std::get<2>(results);
+        auto [voidType, val, s] = tinycoro::GetAll(scheduler, task1(), task2(), task3());
 
         SyncOut() << std::boolalpha << "GetAll task1 co_return => void " << std::is_same_v<tinycoro::VoidType, std::decay_t<decltype(voidType)>>
                   << '\n';

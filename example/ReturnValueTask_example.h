@@ -15,8 +15,7 @@ void Example_returnValueTask(auto& scheduler)
         co_return 42;
     };
 
-    auto future = scheduler.Enqueue(task());
-    auto val    = future.get();
+    auto val = tinycoro::GetAll(scheduler, task());
 
     SyncOut() << "co_return => " << val << '\n';
 }

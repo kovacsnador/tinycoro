@@ -161,6 +161,8 @@ catch(const std::exception& e)
     - [Custom Awaiter](#customawaiter)
     - [SyncAwaiter](#syncawaiter)
     - [AnyOfAwait](#anyofawait)
+    - [Semaphore](#semaphore)
+* [Warning](#warning)
 * [Contributing](#contributing)
 * [Support](#support)
 
@@ -483,7 +485,7 @@ struct CustomAwaiter
     std::function<void()> _resumeTask;
 };
 
-void Example_CustomAwaiter(auto& scheduler)
+void Example_CustomAwaiter(tinycoro::Scheduler& scheduler)
 {
     auto asyncTask = []() -> tinycoro::Task<int32_t> {
         // do some work before
@@ -505,7 +507,7 @@ This example effectively showcases the power of the tinycoro library in managing
 
 
 ```cpp
-tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
+tinycoro::Task<std::string> Example_SyncAwait(tinycoro::Scheduler& scheduler)
 {
     auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
     auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
@@ -531,7 +533,7 @@ This example demonstrates how to use the tinycoro library's `AnyOfAwait` functio
 Waiting for the first task to complete. Others are cancelled if possible.
 
 ```cpp
-tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
+tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
 {
     auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
         int32_t count{0};
@@ -545,9 +547,41 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
 
     // Nonblocking wait for other tasks
     auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
-    ...
 }
 ```
+
+### `Semaphore`
+
+The tinycoro::Semaphore is a counting semaphore designed for controlling concurrent access to shared resources in a coroutine-friendly manner. It ensures that only a limited number of tasks can acquire the semaphore at any given time, and the remaining tasks will be suspended until the semaphore becomes available.
+
+In the example below, a semaphore with an initial count of 1 is created, ensuring that only one task can access the shared resource (in this case, incrementing a counter) at a time. The example demonstrates the use of a semaphore to synchronize multiple coroutines, where each task acquires the semaphore, increments the counter, and then releases it.
+
+```cpp
+    void Example_Semaphore(tinycoro::Scheduler& scheduler)
+    {
+        tinycoro::Semaphore semaphore{1};
+
+        int32_t count{0};
+
+        auto task = [&semaphore, &count]() -> tinycoro::Task<int32_t> {
+            auto lock = co_await semaphore;
+            co_return ++count;
+        };
+
+        auto [ c1, c2, c3] = tinycoro::GetAll(scheduler, task(), task(), task());
+
+        // Every varaible should have unique value (on intel processor for sure :) ).
+        // So (c1 != c2 && c2 != c3 && c3 != c1)
+        // possible output: c1 == 1, c2 == 2, c3 == 3
+    }
+```
+
+In this case, the semaphore ensures that even though the tasks are running concurrently, only one can increment the counter at a time. As a result, c1, c2, and c3 will have unique values, verifying that the synchronization mechanism works as expected.
+
+## Warning
+
+⚠️ Warning: Avoid `thread_local` Variables in Coroutines
+In a coroutine-based environment, it is not recommended to use thread_local variables. Coroutines may be suspended and resumed on different threads, which means that the coroutine's execution could continue in a context where the thread_local variable is no longer valid or has different values. This can lead to unpredictable behavior, data races, or subtle bugs that are difficult to diagnose.
 
 ## Contributing
 

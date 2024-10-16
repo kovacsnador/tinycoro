@@ -15,9 +15,7 @@ void Example_taskView(auto& scheduler)
     };
 
     auto coro   = task();
-    auto future = scheduler.Enqueue(coro.TaskView());
-
-    future.get();
+    tinycoro::GetAll(scheduler, coro.TaskView());
 
     SyncOut() << "co_return => void" << '\n';
 }

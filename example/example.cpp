@@ -35,6 +35,8 @@
 #include "AnyOfCoAwait_example.h"
 #include "SyncAwait_example.h"
 
+#include "Semaphore_example.h"
+
 int main()
 {
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
@@ -97,6 +99,8 @@ int main()
         SyncOut() << future.get() << '\n';
 
         scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
+
+        Example_Semaphore(scheduler);
     }
 
     return 0;
