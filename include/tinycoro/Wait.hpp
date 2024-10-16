@@ -204,6 +204,14 @@ namespace tinycoro {
         }
     }
 
+    template <typename SchedulerT, typename... Args>
+        requires requires(SchedulerT s, Args... a) { { s.Enqueue(std::forward<Args>(a)...)}; }
+    [[nodiscard]] auto GetAll(SchedulerT& scheduler, Args&&... args)
+    {
+        auto future = scheduler.Enqueue(std::forward<Args>(args)...);
+        return GetAll(future);
+    }
+
     template <typename... FutureT>
         requires concepts::AllFuture<FutureT...>
     [[nodiscard]] auto GetAll(FutureT&&... futures)

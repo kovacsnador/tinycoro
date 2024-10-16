@@ -3,11 +3,15 @@
 
 #include <coroutine>
 #include <ranges>
+#include <algorithm>
 
 #include "mock/CoroutineHandleMock.h"
 
 #include <tinycoro/Semaphore.hpp>
 #include <tinycoro/Promise.hpp>
+#include <tinycoro/Scheduler.hpp>
+#include <tinycoro/Task.hpp>
+#include <tinycoro/Wait.hpp>
 
 template <typename T>
 struct SemaphoreMock
@@ -77,10 +81,7 @@ struct AwaiterMock
 
     auto TestTryAcquire(auto parentCoro) { return semaphore.TryAcquire(this, parentCoro); }
 
-    auto TestRelease()
-    {
-        return semaphore.Release();
-    }
+    auto TestRelease() { return semaphore.Release(); }
 
     AwaiterMock* next;
     SemaphoreT&  semaphore;
@@ -92,7 +93,7 @@ struct EventMock
 
 struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
-    using semaphore_type = tinycoro::detail::SemaphoreType<AwaiterMock, EventMock, tinycoro::detail::LinkedPtrStack>;
+    using semaphore_type  = tinycoro::detail::SemaphoreType<AwaiterMock, EventMock, tinycoro::detail::LinkedPtrStack>;
     using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
 
     void SetUp() override
@@ -103,11 +104,7 @@ struct SemaphoreTest : public testing::TestWithParam<size_t>
     corohandle_type hdl;
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    SemaphoreTest,
-    SemaphoreTest,
-    testing::Values(1, 5, 10, 100)
-);
+INSTANTIATE_TEST_SUITE_P(SemaphoreTest, SemaphoreTest, testing::Values(1, 5, 10, 100));
 
 TEST_F(SemaphoreTest, SemaphoreTest_constructorTest)
 {
@@ -146,27 +143,122 @@ TEST_P(SemaphoreTest, SemaphoreTest_counter_param)
 
     auto mock = semaphore.operator co_await();
 
-    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
-        EXPECT_TRUE(mock.TestTryAcquire(hdl));    
+        EXPECT_TRUE(mock.TestTryAcquire(hdl));
     }
 
-    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
-        mock.TestRelease();    
+        mock.TestRelease();
     }
 
-    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
         EXPECT_TRUE(mock.TestTryAcquire(hdl));
     }
 
     EXPECT_CALL(mock, PutOnPause).Times(1);
     EXPECT_CALL(mock, Notify()).Times(1);
-    
+
     EXPECT_FALSE(mock.TestTryAcquire(hdl));
     mock.TestRelease();
     mock.TestRelease();
 
     EXPECT_TRUE(mock.TestTryAcquire(hdl));
+}
+
+struct SemapthoreFunctionalTest : public testing::TestWithParam<int32_t>
+{
+    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+};
+
+INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000, 10000));
+
+TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
+{
+    const auto param = GetParam();
+
+    tinycoro::Semaphore semaphore{1};
+
+    int32_t count{0};
+
+    auto task = [&semaphore, &count]() -> tinycoro::Task<void> {
+        auto lock1 = co_await semaphore;
+        count++;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for ([[maybe_unused]] int32_t i = 0; i < param; ++i)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+    EXPECT_EQ(count, param);
+}
+
+TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_double)
+{
+    const auto param = GetParam();
+
+    tinycoro::Semaphore semaphore{1};
+
+    int32_t count{0};
+
+    auto task = [&semaphore, &count]() -> tinycoro::Task<void> {
+        {
+            auto lock = co_await semaphore;
+            count++;
+        }
+        {
+            auto lock = co_await semaphore;
+            count++;
+        }
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for ([[maybe_unused]] int32_t i = 0; i < param; ++i)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+    EXPECT_EQ(count, param * 2);
+}
+
+TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
+{
+    const auto param = GetParam();
+
+    tinycoro::Semaphore semaphore{4};
+
+    std::atomic_int32_t currentAllowed{0};
+    int32_t max{0};
+
+    auto task = [&semaphore, &max, &currentAllowed]() -> tinycoro::Task<void> {
+        {
+            auto lock = co_await semaphore;
+
+            currentAllowed++;
+            max = std::max(max, currentAllowed.load());
+            currentAllowed--;
+        }
+        {
+            auto lock = co_await semaphore;
+
+            currentAllowed++;
+            max = std::max(max, currentAllowed.load());
+            currentAllowed--;
+        }
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for ([[maybe_unused]] int32_t i = 0; i < param; ++i)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+    EXPECT_TRUE(max <= 4);
 }
