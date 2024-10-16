@@ -131,10 +131,9 @@ catch(const std::exception& e)
 ```
 CollectAllDataWithErrorHandlingCorouitne:
 ```cpp
-auto future = scheduler.Enqueue(CollectAllDataWithErrorHandlingCorouitne());
 try
 {
-    auto result = tinycoro::GetAll(future);
+    auto result = tinycoro::GetAll(scheduler, CollectAllDataWithErrorHandlingCorouitne());
     std::cout << result << '\n';
 }
 catch(const std::exception& e)
@@ -148,7 +147,7 @@ catch(const std::exception& e)
 * [Motivation](#motivation)
 * [Usage](#usage)
 * [Examples](#examples)
-    - [CoroScheduler](#coroscheduler)
+    - [Scheduler](#scheduler)
     - [Task](#task)
     - [TaskView](#taskview)
     - [Task with return value](#returnvaluetask)
@@ -175,8 +174,8 @@ Simply copy the `include` folder into your C++20 (or greater) project. If necess
 ## Examples
 The following examples demonstrate various use cases of the `tinycoro` library:
 
-### `CoroScheduler`
-The `tinycoro::CoroScheduler` is responsible for managing and executing coroutines across multiple threads.
+### `Scheduler`
+The `tinycoro::Scheduler` is responsible for managing and executing coroutines across multiple threads.
 When creating a scheduler, you can specify the number of worker threads it should use.
 The constructor accepts the number of threads, allowing you to utilize hardware concurrency efficiently.
 
@@ -184,13 +183,13 @@ The constructor accepts the number of threads, allowing you to utilize hardware 
 #include <tinycoro/tinycoro_all.h>
 
 // create a scheduler
-tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 ```
 
 ### `Task`
-This example demonstrates how to create a basic coroutine task that returns void and schedule it using the tinycoro::CoroScheduler. The scheduler takes complete ownership of the coroutine, managing its lifecycle.
+This example demonstrates how to create a basic coroutine task that returns void and schedule it using the tinycoro::Scheduler. The scheduler takes complete ownership of the coroutine, managing its lifecycle.
 
-The `Enqueue` function in the `tinycoro::CoroScheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
+The `Enqueue` function in the `tinycoro::Scheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -198,14 +197,13 @@ The `Enqueue` function in the `tinycoro::CoroScheduler` is designed to schedule 
 void Example_voidTask()
 {
     // create a scheduler
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto task = []() -> tinycoro::Task<void> {
         co_return;
     };
 
-    std::future<void> future = scheduler.Enqueue(task());
-    future.get();
+    tinycoro::GetAll(scheduler, task())
 }
 ```
 
@@ -215,43 +213,40 @@ If you don't want to give full ownership of a coroutine to the scheduler, you ca
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_taskView(tinycoro::CoroScheduler& scheduler)
+void Example_taskView(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<void> {
         co_return;
     };
 
     auto coro   = task();
-    std::future<void> future = scheduler.Enqueue(coro.TaskView());
-
-    future.get();
+    tinycoro::GetAll(scheduler, coro.TaskView());
 }
 ```
 
 ### `ReturnValueTask`
-When you schedule a task using the `tinycoro::CoroScheduler`, you can use the `std::future` returned by the scheduler to retrieve the result of the coroutine, just like with any other asynchronous task.
+When you schedule a task using the `tinycoro::Scheduler`, you can use the `std::future` returned by the scheduler to retrieve the result of the coroutine, just like with any other asynchronous task.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_returnValueTask(tinycoro::CoroScheduler& scheduler)
+void Example_returnValueTask(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
         co_return 42;
     };
 
-    std::future<int32_t> future = scheduler.Enqueue(task());
-    auto val    = future.get();
+    int32_t val42 = tinycoro::GetAll(scheduler, task());
 }
 ```
 
 ### `ExceptionTask`
-When scheduling tasks using tinycoro::CoroScheduler, exceptions thrown within a coroutine are propagated through the `std::future`. You can handle these exceptions using the traditional way with the `try-catch` approach when calling `future.get()`.
+When scheduling tasks using tinycoro::Scheduler, exceptions thrown within a coroutine are propagated through the `std::future`. You can handle these exceptions using the traditional way with the `try-catch` approach when calling `future.get()`.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_exception(tinycoro::CoroScheduler& scheduler)
+void Example_exception(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<void> {
         // throw an exception from task
@@ -259,12 +254,10 @@ void Example_exception(tinycoro::CoroScheduler& scheduler)
         co_return;
     };
 
-    std::future<void> future = scheduler.Enqueue(task());
-
     try
     {
-        // calling get rethrows the exception 
-        future.get();
+        // calling GetAll throws the exception
+        tinycoro::GetAll(scheduler, task());
     }
     catch (const std::exception& e)
     {
@@ -282,7 +275,7 @@ Additionally, exceptions thrown in nested tasks are propagated up to the caller,
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_nestedTask(tinycoro::CoroScheduler& scheduler)
+void Example_nestedTask(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
 
@@ -298,8 +291,7 @@ void Example_nestedTask(tinycoro::CoroScheduler& scheduler)
         co_return val;
     };
 
-    std::future<int32_t> future = scheduler.Enqueue(task());
-    int32_t val42 = future.get();
+    int32_t val42 = tinycoro::GetAll(scheduler, task());
 }
 ```
 
@@ -338,17 +330,14 @@ The tinycoro library allows you to enqueue multiple coroutine tasks simultaneous
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_multiTasks(tinycoro::CoroScheduler& scheduler)
+void Example_multiTasks(tinycoro::Scheduler& scheduler)
 {
-    auto task = []() -> tinycoro::Task<void> {
-        co_return;
+    auto task = []() -> tinycoro::Task<int32_t> {
+        co_return 42;
     };
-
-    // enqueue more tasks at the same time.
-    auto futures = scheduler.Enqueue(task(), task(), task());
     
     // wait for all complition
-    tinycoro::GetAll(futures);
+    auto [result1, result2, result3] = tinycoro::GetAll(scheduler, task(), task(), task());
 }
 ```
 
@@ -368,7 +357,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
     t.detach();
 }
 
-void Example_asyncCallbackAwaiter(tinycoro::CoroScheduler& scheduler)
+void Example_asyncCallbackAwaiter(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
         
@@ -383,8 +372,7 @@ void Example_asyncCallbackAwaiter(tinycoro::CoroScheduler& scheduler)
         co_return 42;
     };
 
-    auto future = scheduler.Enqueue(task());
-    std::cout << "co_return => " << future.get() << '\n';
+    auto val = tinycoro::GetAll(scheduler, task());
 }
 ```
 
@@ -410,7 +398,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
     t.detach();
 }
 
-void Example_asyncCallbackAwaiter_CStyle(tinycoro::CoroScheduler& scheduler)
+void Example_asyncCallbackAwaiter_CStyle(tinycoro::Scheduler& scheduler)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
 
@@ -431,8 +419,7 @@ void Example_asyncCallbackAwaiter_CStyle(tinycoro::CoroScheduler& scheduler)
         co_return userData + res;
     };
 
-    auto future = scheduler.Enqueue(task());
-    std::cout << "co_return => " << future.get() << '\n';
+    auto val = tinycoro::GetAll(scheduler, task());
 }
 ```
 
@@ -442,7 +429,7 @@ This example demonstrates how to use the tinycoro library to run multiple corout
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_AnyOfVoid(tinycoro::CoroScheduler& scheduler)
+void Example_AnyOfVoid(tinycoro::Scheduler& scheduler)
 {
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
@@ -507,10 +494,7 @@ void Example_CustomAwaiter(auto& scheduler)
         co_return val;
     };
 
-    auto future = scheduler.Enqueue(asyncTask());
-    auto val    = tinycoro::GetAll(future);
-
-    std::cout << "co_return => " << val << '\n'; 
+    auto val = tinycoro::GetAll(scheduler, asyncTask()); 
 }
 ```
 
@@ -560,11 +544,8 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
     };
 
     // Nonblocking wait for other tasks
-    auto results = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
-
-    auto t1 = std::get<0>(results);
-    auto t2 = std::get<1>(results);
-    auto t3 = std::get<2>(results);
+    auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
+    ...
 }
 ```
 

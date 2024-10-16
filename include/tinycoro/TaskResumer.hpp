@@ -4,12 +4,20 @@
 #include "Common.hpp"
 #include "PackedCoroHandle.hpp"
 
-namespace tinycoro
-{
+namespace tinycoro {
     struct TaskResumer
     {
         ETaskResumeState operator()(auto coroHdl, const auto& stopSource)
         {
+            if constexpr (requires { coroHdl.promise().pauseHandler; })
+            {
+                if (coroHdl.promise().pauseHandler)
+                {
+                    // Resets the pause flag if necessary so the task is running.
+                    coroHdl.promise().pauseHandler->Resume();
+                }
+            }
+
             if (stopSource.stop_requested() && coroHdl.promise().cancellable)
             {
                 return ETaskResumeState::STOPPED;
@@ -32,6 +40,5 @@ namespace tinycoro
         }
     };
 } // namespace tinycoro
-
 
 #endif //!__TINY_CORO_TASK_RESUMER_HPP__

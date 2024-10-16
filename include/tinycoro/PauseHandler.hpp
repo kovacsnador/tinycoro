@@ -32,15 +32,21 @@ namespace tinycoro {
         {
         }
 
+        void Resume()
+        {
+            _pause.store(false, std::memory_order::relaxed);
+        }
+
         [[nodiscard]] static auto PauseTask(auto coroHdl)
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);
 
+            assert(pauseHandlerPtr->_pause.load() == false);
+         
             pauseHandlerPtr->_pause.store(true);
 
             return [pauseHandlerPtr] {
-                pauseHandlerPtr->_pause.store(false);
                 pauseHandlerPtr->_pauseResume();
             };
         }

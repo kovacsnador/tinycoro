@@ -7,7 +7,7 @@
 
 struct SleepAwaiterTest : testing::Test
 {
-    tinycoro::CoroScheduler scheduler{4};
+    tinycoro::Scheduler scheduler{4};
 };
 
 tinycoro::Task<void> SleepTestTask(auto duration) { co_await tinycoro::Sleep(duration); };

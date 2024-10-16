@@ -35,9 +35,16 @@ namespace tinycoro { namespace test {
         }
 
         tinycoro::ETaskResumeState Resume() { return mock->Resume(); }
-        T                          await_resume() { return mock->await_resume(); }
-        bool                       IsPaused() const noexcept { return mock->IsPaused(); }
-        void                       SetPauseHandler(tinycoro::PauseHandlerCallbackT func) { mock->SetPauseHandler(func); mock->pauseCallback = func; }
+
+        T await_resume() { return mock->await_resume(); }
+
+        bool IsPaused() const noexcept { return mock->IsPaused(); }
+
+        void SetPauseHandler(tinycoro::PauseHandlerCallbackT func)
+        {
+            mock->SetPauseHandler(func);
+            mock->pauseCallback = func;
+        }
 
         std::shared_ptr<TaskMockImpl<T>> mock;
     };

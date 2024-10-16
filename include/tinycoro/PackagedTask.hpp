@@ -105,7 +105,7 @@ namespace tinycoro {
     public:
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
             requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedTask>)
-        PackagedTask(CoroT&& coro, FutureStateT futureState, size_t pauseId)
+        PackagedTask(CoroT&& coro, FutureStateT futureState, uint64_t pauseId)
         : id{pauseId}
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
@@ -130,7 +130,7 @@ namespace tinycoro {
             return std::visit([](auto& bridge) { return bridge->IsPaused(); }, _bridge);
         }
 
-        const size_t id;
+        const uint64_t id;
 
     private:
         std::variant<StaticStorageType, DynamicStorageType> _bridge;

@@ -5,7 +5,7 @@
 
 struct ExampleTest : public testing::Test
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 };
 
 TEST_F(ExampleTest, Example_voidTaskTest)
@@ -21,9 +21,8 @@ TEST_F(ExampleTest, Example_taskView)
     auto task = []() -> tinycoro::Task<void> { co_return; };
 
     auto coro   = task();
-    auto future = scheduler.Enqueue(coro.TaskView());
 
-    EXPECT_NO_THROW(future.get());
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, coro.TaskView()));
 }
 
 TEST_F(ExampleTest, Example_returnValueTask)
@@ -59,7 +58,7 @@ TEST_F(ExampleTest, Example_moveOnlyValue)
 
 TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
 {
-    tinycoro::CoroScheduler scheduler{4};
+    tinycoro::Scheduler scheduler{4};
 
     struct OnlyMoveable
     {
@@ -248,9 +247,7 @@ TEST_F(ExampleTest, Example_multiTaskDifferentValues)
 
     auto task3 = []() -> tinycoro::Task<S> { co_return 43; };
 
-    auto futures = scheduler.Enqueue(task1(), task2(), task3());
-
-    auto results = tinycoro::GetAll(futures);
+    auto results = tinycoro::GetAll(scheduler, task1(), task2(), task3());
 
     auto voidType = std::get<0>(results);
 
@@ -694,15 +691,14 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
         auto stopSource = co_await tinycoro::StopSourceAwaiter{};
 
-        auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
+        auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
-        EXPECT_TRUE(std::get<0>(results) > 0);
-        EXPECT_TRUE(std::get<1>(results) > 0);
-        EXPECT_TRUE(std::get<2>(results) > 0);
+        EXPECT_TRUE(t1 > 0);
+        EXPECT_TRUE(t2 > 0);
+        EXPECT_TRUE(t3 > 0);
 
         EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
     };
 
-    auto future = scheduler.Enqueue(anyOfCoAwaitTest(scheduler));
-    EXPECT_NO_THROW(future.get());
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, anyOfCoAwaitTest(scheduler)));
 }
