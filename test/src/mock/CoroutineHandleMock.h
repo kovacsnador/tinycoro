@@ -3,6 +3,7 @@
 
 #include <gmock/gmock.h>
 
+#include <coroutine>
 #include <memory>
 
 namespace tinycoro { namespace test {
@@ -16,6 +17,13 @@ namespace tinycoro { namespace test {
         }
 
         PromiseT& promise() { return *_promise; }
+
+        operator std::coroutine_handle<>() const
+        {
+            return std::noop_coroutine();
+        }
+
+        auto operator<=>(const CoroutineHandleMock&) const = default; 
 
     private:
         std::shared_ptr<PromiseT> _promise;
