@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include <coroutine>
+#include <ranges>
 
 #include "mock/CoroutineHandleMock.h"
 
@@ -89,19 +90,37 @@ struct EventMock
 {
 };
 
-struct SemaphoreTest : public testing::Test
+struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
+    using semaphore_type = tinycoro::detail::SemaphoreType<AwaiterMock, EventMock, tinycoro::detail::LinkedPtrStack>;
+    using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
+
     void SetUp() override
     {
         hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([]() { /* resumer callback */ });
     }
 
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
+    corohandle_type hdl;
 };
+
+INSTANTIATE_TEST_SUITE_P(
+    SemaphoreTest,
+    SemaphoreTest,
+    testing::Values(1, 5, 10, 100)
+);
+
+TEST_F(SemaphoreTest, SemaphoreTest_constructorTest)
+{
+    EXPECT_THROW(semaphore_type{0}, tinycoro::SemaphoreException);
+
+    EXPECT_NO_THROW(semaphore_type{1});
+    EXPECT_NO_THROW(semaphore_type{10});
+    EXPECT_NO_THROW(semaphore_type{100});
+}
 
 TEST_F(SemaphoreTest, SemaphoreTest_counter_1)
 {
-    tinycoro::detail::SemaphoreType<AwaiterMock, EventMock, tinycoro::detail::LinkedPtrStack> semaphore{1};
+    semaphore_type semaphore{1};
 
     auto mock = semaphore.operator co_await();
 
@@ -112,6 +131,39 @@ TEST_F(SemaphoreTest, SemaphoreTest_counter_1)
     EXPECT_CALL(mock, Notify()).Times(2);
     mock.TestRelease();
 
+    EXPECT_FALSE(mock.TestTryAcquire(hdl));
+    mock.TestRelease();
+    mock.TestRelease();
+
+    EXPECT_TRUE(mock.TestTryAcquire(hdl));
+}
+
+TEST_P(SemaphoreTest, SemaphoreTest_counter_param)
+{
+    const auto count = GetParam();
+
+    semaphore_type semaphore{count};
+
+    auto mock = semaphore.operator co_await();
+
+    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    {
+        EXPECT_TRUE(mock.TestTryAcquire(hdl));    
+    }
+
+    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    {
+        mock.TestRelease();    
+    }
+
+    for([[maybe_unused]] auto it : std::views::iota(0u, count))
+    {
+        EXPECT_TRUE(mock.TestTryAcquire(hdl));
+    }
+
+    EXPECT_CALL(mock, PutOnPause).Times(1);
+    EXPECT_CALL(mock, Notify()).Times(1);
+    
     EXPECT_FALSE(mock.TestTryAcquire(hdl));
     mock.TestRelease();
     mock.TestRelease();
