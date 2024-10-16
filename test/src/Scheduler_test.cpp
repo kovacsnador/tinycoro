@@ -7,7 +7,7 @@
 
 struct SchedulerTest : public testing::Test
 {
-    tinycoro::CoroScheduler scheduler{4};
+    tinycoro::Scheduler scheduler{4};
 };
 
 TEST_F(SchedulerTest, SchedulerTest_done)

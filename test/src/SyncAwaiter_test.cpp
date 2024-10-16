@@ -165,7 +165,7 @@ tinycoro::Task<std::string> AsyncAwaiterTest1(auto& scheduler)
 
 TEST(AsyncAwaiterTest1, AsyncAwaiterTest1)
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto future = scheduler.Enqueue(AsyncAwaiterTest1(scheduler));
     EXPECT_EQ(std::string{"123456789"}, future.get());
@@ -182,7 +182,7 @@ tinycoro::Task<void> AsyncAwaiterTest2(auto& scheduler)
 
 TEST(AsyncAwaiterTest2, AsyncAwaiterTest2)
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto future = scheduler.Enqueue(AsyncAwaiterTest2(scheduler));
     EXPECT_NO_THROW(future.get());
@@ -214,7 +214,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest1(auto& scheduler)
 
 TEST(AnyOfCoAwaitTest1, AnyOfCoAwaitTest1)
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto future = scheduler.Enqueue(AnyOfCoAwaitTest1(scheduler));
     EXPECT_NO_THROW(tinycoro::GetAll(future));
@@ -247,7 +247,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
 
 TEST(AnyOfCoAwaitTest2, AnyOfCoAwaitTest2)
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto future = scheduler.Enqueue(AnyOfCoAwaitTest2(scheduler));
     EXPECT_NO_THROW(tinycoro::GetAll(future));

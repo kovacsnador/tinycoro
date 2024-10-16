@@ -245,7 +245,7 @@ namespace tinycoro {
         std::condition_variable_any _cv;
     };
 
-    using CoroScheduler = CoroThreadPool<PackagedTask<>>;
+    using Scheduler = CoroThreadPool<PackagedTask<>>;
 
 } // namespace tinycoro
 
