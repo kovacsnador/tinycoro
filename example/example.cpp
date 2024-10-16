@@ -37,7 +37,7 @@
 
 int main()
 {
-    tinycoro::CoroScheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
     {
         Example_voidTask(scheduler);
 

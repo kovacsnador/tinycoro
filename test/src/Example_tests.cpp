@@ -691,11 +691,11 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
         auto stopSource = co_await tinycoro::StopSourceAwaiter{};
 
-        auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
+        auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
-        EXPECT_TRUE(std::get<0>(results) > 0);
-        EXPECT_TRUE(std::get<1>(results) > 0);
-        EXPECT_TRUE(std::get<2>(results) > 0);
+        EXPECT_TRUE(t1 > 0);
+        EXPECT_TRUE(t2 > 0);
+        EXPECT_TRUE(t3 > 0);
 
         EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
     };

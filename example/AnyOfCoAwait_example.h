@@ -24,11 +24,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
     };
 
     // Nonblocking wait for other tasks
-    auto results = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
-
-    auto t1 = std::get<0>(results);
-    auto t2 = std::get<1>(results);
-    auto t3 = std::get<2>(results);
+    auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
 
     SyncOut() << "co_return => " << t1 << ", " << t2 << ", " << t3 << '\n';
 }
