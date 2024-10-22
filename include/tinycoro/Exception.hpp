@@ -34,6 +34,12 @@ namespace tinycoro
         using BaseT = std::runtime_error;
         using BaseT::BaseT;
     };
+
+    struct SingleEventException : std::runtime_error
+    {
+        using BaseT = std::runtime_error;
+        using BaseT::BaseT;
+    };
     
 } // namespace tinycoro
 

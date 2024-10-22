@@ -25,6 +25,26 @@ namespace tinycoro {
 
     } // namespace concepts
 
+    struct PauseCallbackEvent
+    {
+        void Notify() const
+        {
+            if (_notifyCallback)
+            {
+                _notifyCallback();
+            }
+        }
+
+        void Set(std::invocable auto cb)
+        {
+            assert(_notifyCallback == nullptr);
+
+            _notifyCallback = cb;
+        }
+
+        std::function<void()> _notifyCallback;
+    };
+
     struct PauseHandler
     {
         PauseHandler(concepts::PauseHandlerCb auto pr)
@@ -32,10 +52,7 @@ namespace tinycoro {
         {
         }
 
-        void Resume()
-        {
-            _pause.store(false, std::memory_order::relaxed);
-        }
+        void Resume() { _pause.store(false, std::memory_order::relaxed); }
 
         [[nodiscard]] static auto PauseTask(auto coroHdl)
         {
@@ -43,13 +60,19 @@ namespace tinycoro {
             assert(pauseHandlerPtr);
 
             assert(pauseHandlerPtr->_pause.load() == false);
-         
+
             pauseHandlerPtr->_pause.store(true);
 
-            return [pauseHandlerPtr] {
-                pauseHandlerPtr->_pauseResume();
-            };
+            return pauseHandlerPtr->_pauseResume;
         }
+
+        [[nodiscard]] static auto* GetHandler(auto coroHdl)
+        {
+            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
+            assert(pauseHandlerPtr);
+            
+            return pauseHandlerPtr;
+        } 
 
         [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(); }
 
