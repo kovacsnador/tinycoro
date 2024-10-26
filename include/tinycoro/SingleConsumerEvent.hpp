@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SINGLE_EVENT_HPP__
-#define __TINY_CORO_SINGLE_EVENT_HPP__
+#ifndef __TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__
+#define __TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__
 
 #include <optional>
 #include <atomic>
@@ -104,11 +104,15 @@ namespace tinycoro {
 
             void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
 
+            void ResumeFromPause(auto parentCoro)
+            {
+                _event.Set(nullptr);
+                PauseHandler::UnpauseTask(parentCoro);
+            }
+
         private:
             SingleEventT&  _singleEvent;
             CallbackEventT _event;
-
-            PauseHandler* _handlerPtr;
         };
 
     } // namespace detail
@@ -118,4 +122,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SINGLE_EVENT_HPP__
+#endif //!__TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__

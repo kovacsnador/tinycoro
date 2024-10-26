@@ -27,6 +27,10 @@ namespace tinycoro {
 
     struct PauseCallbackEvent
     {
+    private:
+        std::function<void()> _notifyCallback;
+
+    public:
         void Notify() const
         {
             if (_notifyCallback)
@@ -35,14 +39,14 @@ namespace tinycoro {
             }
         }
 
-        void Set(std::invocable auto cb)
+        template <typename T>
+            requires requires (T&& t) {
+                { _notifyCallback = std::forward<T>(t) };
+            }
+        void Set(T&& cb)
         {
-            assert(_notifyCallback == nullptr);
-
-            _notifyCallback = cb;
+            _notifyCallback = std::forward<T>(cb);
         }
-
-        std::function<void()> _notifyCallback;
     };
 
     struct PauseHandler
@@ -66,13 +70,21 @@ namespace tinycoro {
             return pauseHandlerPtr->_pauseResume;
         }
 
+        static void UnpauseTask(auto coroHdl)
+        {
+            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
+            assert(pauseHandlerPtr);
+
+            pauseHandlerPtr->_pause.store(false);
+        }
+
         [[nodiscard]] static auto* GetHandler(auto coroHdl)
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);
-            
+
             return pauseHandlerPtr;
-        } 
+        }
 
         [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(); }
 
