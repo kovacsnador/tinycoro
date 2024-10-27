@@ -41,6 +41,13 @@ namespace tinycoro {
                 }
             }
 
+            void Reset()
+            {
+                std::scoped_lock lock{_mtx};
+                _value.reset();
+                _waiter = nullptr;
+            }
+
             [[nodiscard]] bool IsSet() const noexcept
             {
                 std::scoped_lock lock{_mtx};
