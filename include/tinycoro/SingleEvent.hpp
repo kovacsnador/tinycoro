@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__
-#define __TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__
+#ifndef __TINY_CORO_SINGLE_EVENT_HPP__
+#define __TINY_CORO_SINGLE_EVENT_HPP__
 
 #include <optional>
 #include <atomic>
@@ -21,17 +21,16 @@ namespace tinycoro {
 
         [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
 
-        template <typename T>
-        void SetValue(T&& val)
+        void SetValue(ValueT val)
         {
-            if (_state.load())
+            std::unique_lock lock{_mtx};
+
+            if (_value.has_value())
             {
-                throw SingleEventException{"Value is already set!"};
+                throw SingleEventException{"SingleEvent: Value is already set!"};
             }
 
-            std::unique_lock lock{_mtx};
-            _value = std::forward<T>(val);
-            _state.store(true, std::memory_order::release);
+            _value = std::move(val);
 
             if (_waiter)
             {
@@ -40,23 +39,43 @@ namespace tinycoro {
             }
         }
 
+        [[nodiscard]] bool IsSet() const noexcept
+        {
+            std::scoped_lock lock{_mtx};
+            return _value.has_value();
+        }
+
     private:
-        [[nodiscard]] bool HasValue() const noexcept { return _state.load(); }
+        [[nodiscard]] bool HasValue(const awaiter_type* awaiter) noexcept { 
+            std::scoped_lock lock{_mtx};
+
+            if(_value.has_value() && _waiter == nullptr)
+            {
+                // save the first awaiter
+                _waiter = awaiter;
+
+                // coroutine is ready, we can continue
+                return true;
+            }
+            
+            return false;
+        }
 
         bool Add(awaiter_type* awaiter, auto parentCoro)
         {
-            std::unique_lock lock{_mtx};
+            std::scoped_lock lock{_mtx};
             if (_waiter)
             {
-                throw SingleEventException{"Only 1 consumer allowed."};
+                throw SingleEventException{"SingleEvent: Only 1 consumer allowed."};
             }
 
-            if (_state.load() == false)
-            {
-                // value is not set, save awaiter for later notify
-                awaiter->PutOnPause(parentCoro);
-                _waiter = awaiter;
+            // save the first awaiter
+            _waiter = awaiter;
 
+            if (_value.has_value() == false)
+            {
+                // value is not set, put coroutine on pause
+                awaiter->PutOnPause(parentCoro);
                 return true;
             }
 
@@ -65,9 +84,8 @@ namespace tinycoro {
         }
 
         std::optional<ValueT> _value;
-        std::atomic<bool>     _state{false};
 
-        awaiter_type* _waiter{nullptr};
+        const awaiter_type* _waiter{nullptr};
         std::mutex    _mtx;
     };
 
@@ -85,13 +103,14 @@ namespace tinycoro {
             [[nodiscard]] constexpr bool await_ready() const noexcept
             {
                 // check if already set the event.
-                return _singleEvent.HasValue();
+                return _singleEvent.HasValue(this);
             }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
                 if (_singleEvent.Add(this, parentCoro) == false)
                 {
+                    // coroutine is not paused, we can continue immediately
                     return parentCoro;
                 }
                 return std::noop_coroutine();
@@ -122,4 +141,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SINGLE_CONSUMER_EVENT_HPP__
+#endif //!__TINY_CORO_SINGLE_EVENT_HPP__
