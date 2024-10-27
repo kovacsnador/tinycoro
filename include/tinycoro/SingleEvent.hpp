@@ -12,84 +12,85 @@
 
 namespace tinycoro {
 
-    template <typename ValueT, template <typename, typename> class AwaiterT>
-    struct SingleEventT
-    {
-        friend struct AwaiterT<SingleEventT, PauseCallbackEvent>;
+    namespace detail {
 
-        using awaiter_type = AwaiterT<SingleEventT, PauseCallbackEvent>;
-
-        [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
-
-        void SetValue(ValueT val)
+        template <typename ValueT, template <typename, typename> class AwaiterT>
+        struct SingleEvent
         {
-            std::unique_lock lock{_mtx};
+            friend struct AwaiterT<SingleEvent, PauseCallbackEvent>;
 
-            if (_value.has_value())
+            using awaiter_type = AwaiterT<SingleEvent, PauseCallbackEvent>;
+
+            [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
+
+            void SetValue(ValueT val)
             {
-                throw SingleEventException{"SingleEvent: Value is already set!"};
+                std::unique_lock lock{_mtx};
+
+                if (_value.has_value())
+                {
+                    throw SingleEventException{"SingleEvent: Value is already set!"};
+                }
+
+                _value = std::move(val);
+
+                if (_waiter)
+                {
+                    lock.unlock();
+                    _waiter->Notify();
+                }
             }
 
-            _value = std::move(val);
-
-            if (_waiter)
+            [[nodiscard]] bool IsSet() const noexcept
             {
-                lock.unlock();
-                _waiter->Notify();
+                std::scoped_lock lock{_mtx};
+                return _value.has_value();
             }
-        }
 
-        [[nodiscard]] bool IsSet() const noexcept
-        {
-            std::scoped_lock lock{_mtx};
-            return _value.has_value();
-        }
-
-    private:
-        [[nodiscard]] bool HasValue(const awaiter_type* awaiter) noexcept { 
-            std::scoped_lock lock{_mtx};
-
-            if(_value.has_value() && _waiter == nullptr)
+        private:
+            [[nodiscard]] bool HasValue(const awaiter_type* awaiter) noexcept
             {
+                std::scoped_lock lock{_mtx};
+
+                if (_value.has_value() && _waiter == nullptr)
+                {
+                    // save the first awaiter
+                    _waiter = awaiter;
+
+                    // coroutine is ready, we can continue
+                    return true;
+                }
+
+                return false;
+            }
+
+            bool Add(awaiter_type* awaiter, auto parentCoro)
+            {
+                std::scoped_lock lock{_mtx};
+                if (_waiter)
+                {
+                    throw SingleEventException{"SingleEvent: Only 1 consumer allowed."};
+                }
+
                 // save the first awaiter
                 _waiter = awaiter;
 
-                // coroutine is ready, we can continue
-                return true;
-            }
-            
-            return false;
-        }
+                if (_value.has_value() == false)
+                {
+                    // value is not set, put coroutine on pause
+                    awaiter->PutOnPause(parentCoro);
+                    return true;
+                }
 
-        bool Add(awaiter_type* awaiter, auto parentCoro)
-        {
-            std::scoped_lock lock{_mtx};
-            if (_waiter)
-            {
-                throw SingleEventException{"SingleEvent: Only 1 consumer allowed."};
+                // state is already set, we can continue with the coroutine.
+                return false;
             }
 
-            // save the first awaiter
-            _waiter = awaiter;
+            std::optional<ValueT> _value;
 
-            if (_value.has_value() == false)
-            {
-                // value is not set, put coroutine on pause
-                awaiter->PutOnPause(parentCoro);
-                return true;
-            }
-
-            // state is already set, we can continue with the coroutine.
-            return false;
-        }
-
-        std::optional<ValueT> _value;
-
-        const awaiter_type* _waiter{nullptr};
-        std::mutex    _mtx;
-    };
-
-    namespace detail {
+            const awaiter_type* _waiter{nullptr};
+            std::mutex          _mtx;
+        };
 
         template <typename SingleEventT, typename CallbackEventT>
         struct SingleEventAwaiter
@@ -116,7 +117,7 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            // Moving out the value. 
+            // Moving out the value.
             [[nodiscard]] constexpr auto&& await_resume() noexcept { return std::move(_singleEvent._value.value()); }
 
             void Notify() const { _event.Notify(); }
@@ -137,7 +138,7 @@ namespace tinycoro {
     } // namespace detail
 
     template <typename ValueT>
-    using SingleEvent = SingleEventT<ValueT, detail::SingleEventAwaiter>;
+    using SingleEvent = detail::SingleEvent<ValueT, detail::SingleEventAwaiter>;
 
 } // namespace tinycoro
 

@@ -9,11 +9,11 @@ namespace tinycoro {
     namespace detail {
 
         template <template <typename, typename> class AwaiterT>
-        struct ManualEventT
+        struct ManualEvent
         {
-            using awaiter_type = AwaiterT<ManualEventT, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<ManualEvent, PauseCallbackEvent>;
 
-            friend struct AwaiterT<ManualEventT, PauseCallbackEvent>;
+            friend struct AwaiterT<ManualEvent, PauseCallbackEvent>;
 
             void Set() noexcept
             {
@@ -67,10 +67,10 @@ namespace tinycoro {
             std::atomic<void*> _state{nullptr};
         };
 
-        template <typename ManualEventType, typename CallbackEventT>
+        template <typename ManualEventT, typename CallbackEventT>
         struct ManualEventAwaiter
         {
-            ManualEventAwaiter(ManualEventType& manualEvent, CallbackEventT event)
+            ManualEventAwaiter(ManualEventT& manualEvent, CallbackEventT event)
             : _manualEvent{manualEvent}
             , _event{std::move(event)}
             {
@@ -109,13 +109,13 @@ namespace tinycoro {
             ManualEventAwaiter* next{nullptr};
 
         private:
-            ManualEventType& _manualEvent;
+            ManualEventT& _manualEvent;
             CallbackEventT   _event;
         };
 
     } // namespace detail
 
-    using ManualEvent = detail::ManualEventT<detail::ManualEventAwaiter>;
+    using ManualEvent = detail::ManualEvent<detail::ManualEventAwaiter>;
 
 } // namespace tinycoro
 
