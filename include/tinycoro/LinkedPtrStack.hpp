@@ -11,7 +11,9 @@ namespace tinycoro { namespace detail {
         }
     struct LinkedPtrStack
     {
-        void push(NodeT* newNode)
+        using value_type = std::remove_pointer_t<NodeT>;
+
+        void push(value_type* newNode)
         {
             assert(newNode);
 
@@ -20,7 +22,7 @@ namespace tinycoro { namespace detail {
         }
 
         // Pops and return the poped node.
-        NodeT* pop()
+        value_type* pop()
         {
             auto top = _top;
             if (top)
@@ -30,12 +32,12 @@ namespace tinycoro { namespace detail {
             return top;
         }
 
-        [[nodiscard]] constexpr NodeT* top() noexcept { return _top; }
+        [[nodiscard]] constexpr value_type* top() noexcept { return _top; }
 
         [[nodiscard]] constexpr bool empty() const noexcept { return !_top; }
 
     private:
-        NodeT* _top{nullptr};
+        value_type* _top{nullptr};
     };
 }} // namespace tinycoro::detail
 

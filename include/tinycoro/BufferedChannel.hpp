@@ -11,14 +11,20 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename ValueT, template <typename, typename> class AwaiterT, template <typename> class ContainerT>
+        enum class EOpStatus
+        {
+            SUCCESS,
+            CLOSED
+        };
+
+        template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename> class ContainerT>
         struct BufferedChannel
         {
-            friend struct AwaiterT<BufferedChannel, PauseCallbackEvent>;
+            friend struct AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
-            using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
-            [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{*this, PauseCallbackEvent{}, val}; }
 
             template <typename T>
             void Push(T&& t)
@@ -30,109 +36,104 @@ namespace tinycoro {
                     throw BufferedChannelException{"BufferedChannel: channel is already closed."};
                 }
 
-                _container.emplace(std::forward<T>(t));
-
-                if (auto w = _waiter)
+                // Is there any awaiter
+                if (auto* top = _waiters.pop())
                 {
-                    _waiter = nullptr;
+                    top->SetValue(std::forward<T>(t));
                     lock.unlock();
 
-                    w->Notify();
+                    top->Notify();
+                    return;
                 }
+
+                // No awaiters
+                _container.emplace(std::forward<T>(t));
             }
 
-            template <typename T>
-            void Close(T&& t)
+            [[nodiscard]] bool Empty() const noexcept
             {
                 std::unique_lock lock{_mtx};
+                return _container.empty();
+            }
 
-                if (_closed)
-                {
-                    throw BufferedChannelException{"BufferedChannel: channel is already closed."};
-                }
-
+            void Close()
+            {
+                std::unique_lock lock{_mtx};
                 _closed = true;
 
-                _container.emplace(std::forward<T>(t));
-
-                if (auto w = _waiter)
+                // NOtify all waiters
+                while (auto* waiter = _waiters.pop())
                 {
-                    _waiter = nullptr;
-                    lock.unlock();
-
-                    w->Notify();
+                    waiter->Notify();
                 }
             }
 
-            [[nodiscard]] bool IsOpen() noexcept
+            [[nodiscard]] bool IsOpen() const noexcept
             {
                 std::scoped_lock lock{_mtx};
-                return !_closed || !_container.empty();
+                return !_closed;
             }
 
         private:
-            [[nodiscard]] auto Pop()
-            {
-                std::unique_lock lock{_mtx};
+            [[nodiscard]] EOpStatus Resume() const noexcept { return _closed ? EOpStatus::CLOSED : EOpStatus::SUCCESS; }
 
-                ValueT value{std::move(_container.front())};
-                _container.pop();
-
-                lock.unlock();
-
-                return value;
-            }
-
-            [[nodiscard]] bool IsReady(const awaiter_type* waiter)
+            [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
-                if (_waiter && _waiter != waiter)
+                if(_closed)
                 {
-                    throw BufferedChannelException{"BufferedChannel: Only 1 consumer is allowed at the time."};
-                }
-
-                _waiter = waiter;
-
-                return !_container.empty();
-            }
-
-            [[nodiscard]] bool Add(const awaiter_type* waiter)
-            {
-                std::scoped_lock lock{_mtx};
-
-                if (_waiter && _waiter != waiter)
-                {
-                    throw BufferedChannelException{"BufferedChannel: Only 1 consumer is allowed at the time."};
-                }
-
-                return _container.empty();
-
-                /*if (_container.empty())
-                {
-                    _waiter = waiter;
                     return true;
                 }
 
-                return false;*/
+                if (_container.empty() == false)
+                {
+                    waiter->SetValue(std::move(_container.front()));
+                    _container.pop();
+                    return true;
+                }
+
+                return false;
             }
 
-            const awaiter_type* _waiter{nullptr};
-            ContainerT<ValueT>  _container;
-            bool                _closed{false};
-            std::mutex          _mtx;
+            [[nodiscard]] bool Add(awaiter_type* waiter)
+            {
+                std::scoped_lock lock{_mtx};
+
+                if(_closed)
+                {
+                    // channel is closed nothing to do
+                    return false;
+                }
+
+                if (_container.empty() == false)
+                {
+                    waiter->SetValue(std::move(_container.front()));
+                    _container.pop();
+                    return false;
+                }
+
+                _waiters.push(waiter);
+                return true;
+            }
+
+            LinkedPtrStack<awaiter_type> _waiters;
+            ContainerT<ValueT>           _container;
+            bool                         _closed{false};
+            mutable std::mutex           _mtx;
         };
 
-        template <typename ChannelT, typename EventT>
+        template <typename ChannelT, typename EventT, typename ValueT>
         struct BufferedChannelAwaiter
         {
-            BufferedChannelAwaiter(ChannelT& channel, EventT event)
+            BufferedChannelAwaiter(ChannelT& channel, EventT event, ValueT& v)
             : _channel{channel}
+            , _value{v}
             , _event{std::move(event)}
             {
             }
 
-            [[nodiscard]] constexpr bool await_ready() const { return _channel.IsReady(this); }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
@@ -146,10 +147,17 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            // Moving out the value.
-            [[nodiscard]] constexpr auto await_resume() const noexcept { return _channel.Pop(); }
+            [[nodiscard]] constexpr auto await_resume() const noexcept { return _channel.Resume(); }
 
             void Notify() const { _event.Notify(); }
+
+            template <typename T>
+            void SetValue(T&& value)
+            {
+                _value = std::forward<T>(value);
+            }
+
+            BufferedChannelAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
@@ -161,6 +169,7 @@ namespace tinycoro {
             }
 
             ChannelT& _channel;
+            ValueT&   _value;
             EventT    _event;
         };
 
@@ -168,6 +177,8 @@ namespace tinycoro {
 
     template <typename ValueT>
     using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, std::queue>;
+
+    using BufferedChannel_OpStatus = detail::EOpStatus;
 
 } // namespace tinycoro
 
