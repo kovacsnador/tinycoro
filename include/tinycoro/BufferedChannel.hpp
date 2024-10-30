@@ -24,6 +24,11 @@ namespace tinycoro {
 
             using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
+            ~BufferedChannel()
+            {
+                Close();
+            }
+
             [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{*this, PauseCallbackEvent{}, val}; }
 
             template <typename T>

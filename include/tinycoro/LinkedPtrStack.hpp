@@ -6,8 +6,8 @@
 namespace tinycoro { namespace detail {
 
     template <typename NodeT>
-        requires requires (NodeT n) {
-            { n.next } -> std::same_as<NodeT*&>;
+        requires requires (std::remove_pointer_t<NodeT> n) {
+            { n.next } -> std::same_as<std::remove_pointer_t<NodeT>*&>;
         }
     struct LinkedPtrStack
     {
@@ -22,7 +22,7 @@ namespace tinycoro { namespace detail {
         }
 
         // Pops and return the poped node.
-        value_type* pop()
+        [[nodiscard]] value_type* pop()
         {
             auto top = _top;
             if (top)
@@ -35,6 +35,11 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] constexpr value_type* top() noexcept { return _top; }
 
         [[nodiscard]] constexpr bool empty() const noexcept { return !_top; }
+
+        [[nodiscard]] value_type* steal() noexcept
+        {
+            return std::exchange(_top, nullptr);
+        }
 
     private:
         value_type* _top{nullptr};
