@@ -66,10 +66,14 @@ namespace tinycoro {
                 std::unique_lock lock{_mtx};
                 _closed = true;
 
-                // NOtify all waiters
-                while (auto* waiter = _waiters.pop())
+                auto top = _waiters.steal();
+                lock.unlock();
+
+                // Notify all waiters
+                while (top)
                 {
-                    waiter->Notify();
+                    top->Notify();
+                    top = top->next;
                 }
             }
 

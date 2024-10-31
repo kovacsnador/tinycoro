@@ -14,9 +14,12 @@ namespace tinycoro {
 
     namespace detail {
 
+        // This is an auto reset event, with one consumer and one producer.
         template <typename ValueT, template <typename, typename> class AwaiterT>
         struct SingleEvent
         {
+            using value_type = ValueT;
+
             friend struct AwaiterT<SingleEvent, PauseCallbackEvent>;
 
             using awaiter_type = AwaiterT<SingleEvent, PauseCallbackEvent>;
@@ -41,13 +44,6 @@ namespace tinycoro {
                 }
             }
 
-            void Reset()
-            {
-                std::scoped_lock lock{_mtx};
-                _value.reset();
-                _waiter = nullptr;
-            }
-
             [[nodiscard]] bool IsSet() const noexcept
             {
                 std::scoped_lock lock{_mtx};
@@ -55,6 +51,13 @@ namespace tinycoro {
             }
 
         private:
+            void Reset()
+            {
+                std::scoped_lock lock{_mtx};
+                _value.reset();
+                _waiter = nullptr;
+            }
+
             [[nodiscard]] bool HasValue(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
@@ -96,7 +99,7 @@ namespace tinycoro {
             std::optional<ValueT> _value;
 
             const awaiter_type* _waiter{nullptr};
-            std::mutex          _mtx;
+            mutable std::mutex  _mtx;
         };
 
         template <typename SingleEventT, typename CallbackEventT>
@@ -125,7 +128,12 @@ namespace tinycoro {
             }
 
             // Moving out the value.
-            [[nodiscard]] constexpr auto&& await_resume() noexcept { return std::move(_singleEvent._value.value()); }
+            [[nodiscard]] constexpr auto await_resume() noexcept {
+
+                typename SingleEventT::value_type temp{std::move(_singleEvent._value.value())};    
+                _singleEvent.Reset();
+                return temp;
+            }
 
             void Notify() const { _event.Notify(); }
 

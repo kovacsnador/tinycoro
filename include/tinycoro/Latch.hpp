@@ -29,7 +29,12 @@ namespace tinycoro {
             // disabe move and copy
             Latch(Latch&&) = delete;
 
-            [[nodiscard]] auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
+
+            [[nodiscard]] auto Wait() noexcept
+            {
+                return awaiter_type{*this, PauseCallbackEvent{}};
+            }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {
@@ -37,14 +42,19 @@ namespace tinycoro {
                 --_count;
                 lock.unlock();
 
-                return awaiter_type{*this, PauseCallbackEvent{}};
+                return Wait();
             }
 
             void CountDown() noexcept
             {
                 std::unique_lock lock{_mtx};
 
-                if (_count > 0 ? --_count : _count)
+                if(_count > 0)
+                {
+                    --_count;
+                }
+
+                if (_count == 0)
                 {
                     auto top = _waiters.steal();
                     lock.unlock();

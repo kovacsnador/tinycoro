@@ -17,5 +17,10 @@
 #include "Wait.hpp"
 #include "SyncAwait.hpp"
 #include "Semaphore.hpp"
+#include "SingleEvent.hpp"
+#include "Latch.hpp"
+#include "ManualEvent.hpp"
+#include "AutoEvent.hpp"
+#include "BufferedChannel.hpp"
 
 #endif //!__TINY_CORO_TINY_CORO_ALL_H__
