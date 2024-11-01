@@ -21,6 +21,8 @@ namespace tinycoro {
             {
             }
 
+            AutoEvent(AutoEvent&&) = delete;
+
             void Set() noexcept
             {
                 std::unique_lock lock{_mtx};
@@ -38,7 +40,7 @@ namespace tinycoro {
                 _state = true;
             }
 
-            auto operator co_await() noexcept { return AwaiterT{*this, PauseCallbackEvent{}}; };
+            auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
 
         private:
             bool IsReady() noexcept
