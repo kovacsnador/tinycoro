@@ -92,7 +92,7 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_TRUE(singleEvent.IsSet());
 }
 
-TEST(SingleEventTest, SingleEventFunctionalTest)
+TEST(SingleEventTest, SingleEventFunctionalTest_1)
 {
     tinycoro::Scheduler scheduler{4};
     tinycoro::SingleEvent<int32_t> singleEvent;
@@ -107,6 +107,44 @@ TEST(SingleEventTest, SingleEventFunctionalTest)
     {
         auto val = co_await singleEvent;
         EXPECT_EQ(val, 42);
+    };
+
+    tinycoro::GetAll(scheduler, producer(), consumer());
+}
+
+TEST(SingleEventTest, SingleEventFunctionalTest_2)
+{
+    // single threaded mode
+    tinycoro::Scheduler scheduler{4};
+    tinycoro::SingleEvent<int32_t> singleEvent1;
+    tinycoro::SingleEvent<int32_t> singleEvent2;
+
+    auto producer = [&]() -> tinycoro::Task<void>
+    {
+        int32_t val{};
+        while(val < 10)
+        {
+            auto lastValue = val;
+
+            singleEvent1.SetValue(val + 1);
+            val = co_await singleEvent2;
+            
+            EXPECT_EQ(lastValue + 2, val);
+        }
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<void>
+    {
+        int32_t val{-1};
+        while(val < 9)
+        {
+            auto lastValue = val;
+
+            val = co_await singleEvent1;
+            singleEvent2.SetValue(val + 1);
+
+            EXPECT_EQ(lastValue + 2, val);
+        }
     };
 
     tinycoro::GetAll(scheduler, producer(), consumer());
