@@ -6,6 +6,7 @@
 #include "PauseHandler.hpp"
 
 namespace tinycoro {
+
     namespace detail {
 
         template <template <typename, typename> class AwaiterT>
@@ -14,6 +15,11 @@ namespace tinycoro {
             using awaiter_type = AwaiterT<ManualEvent, PauseCallbackEvent>;
 
             friend struct AwaiterT<ManualEvent, PauseCallbackEvent>;
+
+            ManualEvent() = default;
+
+            // disable move and copy
+            ManualEvent(ManualEvent&&) = delete;
 
             void Set() noexcept
             {
@@ -36,7 +42,7 @@ namespace tinycoro {
                 _state.compare_exchange_strong(expected, nullptr);
             }
 
-            auto operator co_await() noexcept { return AwaiterT{*this, PauseCallbackEvent{}}; };
+            auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
 
         private:
             bool Add(awaiter_type* awaiter)
@@ -109,8 +115,8 @@ namespace tinycoro {
             ManualEventAwaiter* next{nullptr};
 
         private:
-            ManualEventT& _manualEvent;
-            CallbackEventT   _event;
+            ManualEventT&  _manualEvent;
+            CallbackEventT _event;
         };
 
     } // namespace detail
