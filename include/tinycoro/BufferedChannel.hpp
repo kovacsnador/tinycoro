@@ -24,6 +24,12 @@ namespace tinycoro {
 
             using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
+            // default constructor
+            BufferedChannel() {};
+
+            // disable copy and move
+            BufferedChannel(BufferedChannel&&) = delete;
+
             ~BufferedChannel()
             {
                 Close();
