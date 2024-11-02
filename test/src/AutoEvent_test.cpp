@@ -42,7 +42,7 @@ TEST(AutoEventTest, AutoEventTest_coawaitReturn)
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
-TEST(AutoEventTest, SingleEventTest_await_ready)
+TEST(AutoEventTest, AutoEventTest_await_ready)
 {
     tinycoro::AutoEvent event;
 
@@ -61,7 +61,7 @@ TEST(AutoEventTest, SingleEventTest_await_ready)
     EXPECT_FALSE(awaiter.await_ready());
 }
 
-TEST(AutoEventTest, SingleEventTest_await_suspend)
+TEST(AutoEventTest, AutoEventTest_await_suspend)
 {
     tinycoro::AutoEvent event;
 
@@ -85,7 +85,7 @@ TEST(AutoEventTest, SingleEventTest_await_suspend)
     EXPECT_TRUE(pauseCalled);
 }
 
-TEST(AutoEventTest, SingleEventTest_await_suspend_preset)
+TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
 {
     tinycoro::AutoEvent event;
 

@@ -31,17 +31,11 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-            [[nodiscard]] auto Wait() noexcept
-            {
-                return awaiter_type{*this, PauseCallbackEvent{}};
-            }
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {
-                std::unique_lock lock{_mtx};
-                --_count;
-                lock.unlock();
-
+                CountDown();
                 return Wait();
             }
 
@@ -49,7 +43,7 @@ namespace tinycoro {
             {
                 std::unique_lock lock{_mtx};
 
-                if(_count > 0)
+                if (_count > 0)
                 {
                     --_count;
                 }
@@ -85,8 +79,9 @@ namespace tinycoro {
                 return _count;
             }
 
-            size_t                               _count;
-            mutable std::mutex                   _mtx;
+            size_t             _count;
+            mutable std::mutex _mtx;
+
             detail::LinkedPtrStack<awaiter_type> _waiters;
         };
 
