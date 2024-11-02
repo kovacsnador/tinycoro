@@ -30,10 +30,7 @@ namespace tinycoro {
             // disable copy and move
             BufferedChannel(BufferedChannel&&) = delete;
 
-            ~BufferedChannel()
-            {
-                Close();
-            }
+            ~BufferedChannel() { Close(); }
 
             [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{*this, PauseCallbackEvent{}, val}; }
 
@@ -50,9 +47,9 @@ namespace tinycoro {
                 // Is there any awaiter
                 if (auto* top = _waiters.pop())
                 {
-                    top->SetValue(std::forward<T>(t));
                     lock.unlock();
 
+                    top->SetValue(std::forward<T>(t));
                     top->Notify();
                     return;
                 }
@@ -78,8 +75,9 @@ namespace tinycoro {
                 // Notify all waiters
                 while (top)
                 {
+                    auto next = top->next;
                     top->Notify();
-                    top = top->next;
+                    top = next;
                 }
             }
 
@@ -90,13 +88,17 @@ namespace tinycoro {
             }
 
         private:
-            [[nodiscard]] EOpStatus Resume() const noexcept { return _closed ? EOpStatus::CLOSED : EOpStatus::SUCCESS; }
+            [[nodiscard]] EOpStatus Resume() const noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _closed ? EOpStatus::CLOSED : EOpStatus::SUCCESS;
+            }
 
             [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
-                if(_closed)
+                if (_closed)
                 {
                     return true;
                 }
@@ -115,7 +117,7 @@ namespace tinycoro {
             {
                 std::scoped_lock lock{_mtx};
 
-                if(_closed)
+                if (_closed)
                 {
                     // channel is closed nothing to do
                     return false;

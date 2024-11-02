@@ -27,9 +27,11 @@ namespace tinycoro {
                 if (oldValue != this && oldValue)
                 {
                     // handle awaiters
-                    for (auto* top = static_cast<awaiter_type*>(oldValue); top; top = top->next)
+                    for (auto* top = static_cast<awaiter_type*>(oldValue); top;)
                     {
+                        auto next = top->next;
                         top->Notify();
+                        top = next;
                     }
                 }
             }

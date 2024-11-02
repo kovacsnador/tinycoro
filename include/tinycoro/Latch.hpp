@@ -29,14 +29,14 @@ namespace tinycoro {
             // disabe move and copy
             Latch(Latch&&) = delete;
 
-            [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
+            [[nodiscard]] auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
 
             [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {
                 CountDown();
-                return Wait();
+                return awaiter_type{*this, PauseCallbackEvent{}};
             }
 
             void CountDown() noexcept
@@ -55,8 +55,9 @@ namespace tinycoro {
 
                     while (top)
                     {
+                        auto next = top->next;
                         top->Notify();
-                        top = top->next;
+                        top = next;
                     }
                 }
             }

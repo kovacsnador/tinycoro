@@ -123,7 +123,6 @@ INSTANTIATE_TEST_SUITE_P(
     testing::Values(1, 10, 100, 1000, 10000)
 );
 
-
 TEST_P(AutoEventTest, AutoEventFunctionalTest)
 {
     tinycoro::Scheduler scheduler{8};
