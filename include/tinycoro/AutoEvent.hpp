@@ -40,12 +40,18 @@ namespace tinycoro {
                 _state = true;
             }
 
+            bool IsSet() const noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _state;
+            }
+
             auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
 
         private:
             bool IsReady() noexcept
             {
-                std::unique_lock lock{_mtx};
+                std::scoped_lock lock{_mtx};
 
                 if (_state)
                 {
@@ -71,9 +77,12 @@ namespace tinycoro {
                 return true;
             }
 
-            bool                         _state;
+            // true -> SET
+            // false -> NOT SET
+            bool _state;
+
             LinkedPtrStack<awaiter_type> _waiters;
-            std::mutex                   _mtx;
+            mutable std::mutex           _mtx;
         };
 
         template <typename AutoEventT, typename CallbackEventT>
