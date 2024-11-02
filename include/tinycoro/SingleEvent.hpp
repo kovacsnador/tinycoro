@@ -58,7 +58,7 @@ namespace tinycoro {
                 _waiter = nullptr;
             }
 
-            [[nodiscard]] bool HasValue(const awaiter_type* awaiter) noexcept
+            [[nodiscard]] bool IsReady(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -74,7 +74,7 @@ namespace tinycoro {
                 return false;
             }
 
-            bool Add(awaiter_type* awaiter, auto parentCoro)
+            bool Add(awaiter_type* awaiter)
             {
                 std::scoped_lock lock{_mtx};
                 if (_waiter)
@@ -84,16 +84,7 @@ namespace tinycoro {
 
                 // save the first awaiter
                 _waiter = awaiter;
-
-                if (_value.has_value() == false)
-                {
-                    // value is not set, put coroutine on pause
-                    awaiter->PutOnPause(parentCoro);
-                    return true;
-                }
-
-                // state is already set, we can continue with the coroutine.
-                return false;
+                return !_value.has_value();
             }
 
             std::optional<ValueT> _value;
@@ -114,14 +105,16 @@ namespace tinycoro {
             [[nodiscard]] constexpr bool await_ready() const noexcept
             {
                 // check if already set the event.
-                return _singleEvent.HasValue(this);
+                return _singleEvent.IsReady(this);
             }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
-                if (_singleEvent.Add(this, parentCoro) == false)
+                PutOnPause(parentCoro);
+                if (_singleEvent.Add(this) == false)
                 {
                     // coroutine is not paused, we can continue immediately
+                    ResumeFromPause(parentCoro);
                     return parentCoro;
                 }
                 return std::noop_coroutine();

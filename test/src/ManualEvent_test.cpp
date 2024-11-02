@@ -139,7 +139,7 @@ struct ManualEventTest : testing::TestWithParam<size_t>
 INSTANTIATE_TEST_SUITE_P(
     ManualEventTest,
     ManualEventTest,
-    testing::Values(1, 10, 100)
+    testing::Values(1, 10, 100, 1000)
 );
 
 TEST_P(ManualEventTest, ManualEventFunctionalTest)
@@ -150,7 +150,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest)
 
     tinycoro::ManualEvent event;
 
-    size_t globalCount{};
+    std::atomic<size_t> globalCount{};
 
     auto trigger = [&]() -> tinycoro::Task<void> {
         event.Set();
@@ -182,7 +182,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest_preSet)
 
     tinycoro::ManualEvent event;
 
-    size_t globalCount{};
+    std::atomic<size_t> globalCount{};
 
     auto listener = [&]() -> tinycoro::Task<void> {
         co_await event;

@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <vector>
+
 #include "mock/CoroutineHandleMock.h"
 
 #include <tinycoro/tinycoro_all.h>
@@ -7,7 +9,7 @@
 TEST(AutoEventTest, AutoEventTest_set)
 {
     tinycoro::AutoEvent event;
-    
+
     EXPECT_FALSE(event.IsSet());
     event.Set();
     EXPECT_TRUE(event.IsSet());
@@ -16,16 +18,16 @@ TEST(AutoEventTest, AutoEventTest_set)
 TEST(AutoEventTest, AutoEventTest_constructor)
 {
     tinycoro::AutoEvent event{true};
-    
+
     EXPECT_TRUE(event.IsSet());
     event.Set();
     EXPECT_TRUE(event.IsSet());
 }
 
-template<typename, typename>
+template <typename, typename>
 struct AwaiterMock
 {
-    AwaiterMock(auto&, auto) {}
+    AwaiterMock(auto&, auto) { }
 
     AwaiterMock* next{nullptr};
 };
@@ -53,7 +55,7 @@ TEST(AutoEventTest, SingleEventTest_await_ready)
     EXPECT_TRUE(event.IsSet());
 
     EXPECT_TRUE(awaiter.await_ready());
-    
+
     // auto reset
     EXPECT_FALSE(event.IsSet());
     EXPECT_FALSE(awaiter.await_ready());
@@ -67,7 +69,7 @@ TEST(AutoEventTest, SingleEventTest_await_suspend)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    bool pauseCalled = false;
+    bool                                                            pauseCalled = false;
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
 
@@ -93,7 +95,7 @@ TEST(AutoEventTest, SingleEventTest_await_suspend_preset)
 
     event.Set();
 
-    bool pauseCalled = false;
+    bool                                                            pauseCalled = false;
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
 
@@ -109,4 +111,72 @@ TEST(AutoEventTest, SingleEventTest_await_suspend_preset)
 
     // no pause pauseCalled, immediately resumed coroutine
     EXPECT_FALSE(pauseCalled);
+}
+
+struct AutoEventTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    AutoEventTest,
+    AutoEventTest,
+    testing::Values(1, 10, 100, 1000, 10000)
+);
+
+
+TEST_P(AutoEventTest, AutoEventFunctionalTest)
+{
+    tinycoro::Scheduler scheduler{8};
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent;
+    size_t              autoCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::Task<void> {
+        co_await autoEvent;
+        autoCount++;
+
+        autoEvent.Set();
+    };
+
+    auto autoEventProducer = [&]() -> tinycoro::Task<void> {
+        // notify manual event
+        autoEvent.Set();
+        co_return;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for(size_t i = 0; i < count; ++i)
+    {   
+        tasks.push_back(autoEventConsumer());
+    }
+    tasks.push_back(autoEventProducer());
+
+    tinycoro::GetAll(scheduler, tasks);
+}
+
+TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
+{
+    tinycoro::Scheduler scheduler{8};
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent{true};
+    size_t              autoCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::Task<void> {
+        co_await autoEvent;
+        autoCount++;
+
+        autoEvent.Set();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for(size_t i = 0; i < count; ++i)
+    {   
+        tasks.push_back(autoEventConsumer());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
 }

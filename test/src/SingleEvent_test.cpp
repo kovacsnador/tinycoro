@@ -77,14 +77,17 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseCalled]() { pauseCalled = true; });
 
     awaiter.await_suspend(hdl);
     EXPECT_FALSE(pauseCalled);
 
+    auto awaiter2 = singleEvent.operator co_await();
+
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([]{});
+
     // allow only 1 consumer
-    EXPECT_THROW(awaiter.await_suspend(hdl), tinycoro::SingleEventException);
+    EXPECT_THROW(awaiter2.await_suspend(hdl2), tinycoro::SingleEventException);
 
     EXPECT_FALSE(singleEvent.IsSet());
     singleEvent.SetValue(42);
