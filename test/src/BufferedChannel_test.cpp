@@ -212,7 +212,7 @@ struct BufferedChannelTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(BufferedChannelTest, BufferedChannelTest, testing::Values(1, 10, 100, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(BufferedChannelTest, BufferedChannelTest, testing::Values(1, 10, 100, 1000, 10000));
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
 {
@@ -277,7 +277,6 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
                 EXPECT_TRUE(inserted);
             }
 
-            // latch.CountDown();
             latch.CountDown();
         }
     };
@@ -296,6 +295,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
     };
 
     tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+
     EXPECT_EQ(allValues.size(), count);
 }
 
@@ -305,7 +305,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
 
     tinycoro::Scheduler scheduler{8};
 
-    tinycoro::AutoEvent event;
+    tinycoro::AutoEvent                event;
     tinycoro::BufferedChannel<int32_t> channel;
 
     std::mutex        mtx;
@@ -340,5 +340,6 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
     };
 
     tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+
     EXPECT_EQ(allValues.size(), count);
 }
