@@ -212,506 +212,7 @@ struct BufferedChannelTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(BufferedChannelTest,
-                         BufferedChannelTest,
-                         testing::Values(10,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,                                  
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         1,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500,
-                                         10,
-                                         100,
-                                         100,
-                                         100,
-                                         500));
+INSTANTIATE_TEST_SUITE_P(BufferedChannelTest, BufferedChannelTest, testing::Values(1, 10, 100, 100, 1000, 10000));
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
 {
@@ -720,7 +221,6 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
     tinycoro::Scheduler scheduler{8};
 
     tinycoro::Latch                    latch{count};
-    std::atomic<size_t> counter{};
     tinycoro::BufferedChannel<int32_t> channel;
 
     std::set<int32_t> allValues;
@@ -733,8 +233,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
             auto [iter, inserted] = allValues.insert(val);
             EXPECT_TRUE(inserted);
 
-            //latch.CountDown();
-            counter++;
+            latch.CountDown();
         }
     };
 
@@ -745,14 +244,101 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
         }
 
         // waiting for the latch
-        //co_await latch;
-        while(counter < count){}
+        co_await latch;
 
         // closing the channel after latch is done
         channel.Close();
-        co_return;
     };
 
     tinycoro::GetAll(scheduler, producer(), consumer());
+    EXPECT_EQ(allValues.size(), count);
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{8};
+
+    tinycoro::Latch                    latch{count};
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    std::mutex        mtx;
+    std::set<int32_t> allValues;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        int32_t val;
+        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+        {
+            {
+                // lock needed here multi consumer
+                std::scoped_lock lock{mtx};
+                auto [iter, inserted] = allValues.insert(val);
+                EXPECT_TRUE(inserted);
+            }
+
+            // latch.CountDown();
+            latch.CountDown();
+        }
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            channel.Push(i);
+        }
+
+        // waiting for the latch
+        co_await latch;
+
+        // closing the channel after latch is done
+        channel.Close();
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+    EXPECT_EQ(allValues.size(), count);
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{8};
+
+    tinycoro::AutoEvent event;
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    std::mutex        mtx;
+    std::set<int32_t> allValues;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        int32_t val;
+        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+        {
+            {
+                // lock needed here multi consumer
+                std::scoped_lock lock{mtx};
+                auto [iter, inserted] = allValues.insert(val);
+                EXPECT_TRUE(inserted);
+            }
+
+            event.Set();
+        }
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            channel.Push(i);
+
+            // waiting for the event
+            co_await event;
+        }
+
+        // closing the channel after latch is done
+        channel.Close();
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
     EXPECT_EQ(allValues.size(), count);
 }
