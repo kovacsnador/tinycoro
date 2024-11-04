@@ -52,8 +52,9 @@ TEST(BufferedChannelTest, BufferedChannelTest_moveOnlyValue)
 }
 
 template <typename, typename, typename>
-struct AwaiterMock
+class AwaiterMock
 {
+public:
     AwaiterMock(auto&, auto, auto) { }
 
     void Notify() const noexcept {};

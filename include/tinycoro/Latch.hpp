@@ -11,9 +11,10 @@ namespace tinycoro {
     namespace detail {
 
         template <template <typename, typename> class AwaiterT>
-        struct Latch
+        class Latch
         {
-            friend struct AwaiterT<Latch, PauseCallbackEvent>;
+        public:
+            friend class AwaiterT<Latch, PauseCallbackEvent>;
 
             using awaiter_type = AwaiterT<Latch, PauseCallbackEvent>;
 
@@ -87,8 +88,9 @@ namespace tinycoro {
         };
 
         template <typename LatchT, typename CallbackEventT>
-        struct LatchAwaiter
+        class LatchAwaiter
         {
+        public:
             LatchAwaiter(LatchT& latch, CallbackEventT event)
             : _latch{latch}
             , _event{std::move(event)}

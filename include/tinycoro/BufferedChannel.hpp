@@ -18,9 +18,10 @@ namespace tinycoro {
         };
 
         template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename> class ContainerT>
-        struct BufferedChannel
+        class BufferedChannel
         {
-            friend struct AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
+        public:
+            friend class AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
             using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
@@ -141,8 +142,9 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        struct BufferedChannelAwaiter
+        class BufferedChannelAwaiter
         {
+        public:
             BufferedChannelAwaiter(ChannelT& channel, EventT event, ValueT& v)
             : _channel{channel}
             , _value{v}

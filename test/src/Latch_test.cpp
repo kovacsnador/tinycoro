@@ -60,8 +60,9 @@ TEST(LatchTest, LatchTest_constructor)
 }
 
 template <typename, typename>
-struct AwaiterMock
+class AwaiterMock
 {
+public:
     AwaiterMock(auto&, auto) { }
 
     AwaiterMock* next{nullptr};

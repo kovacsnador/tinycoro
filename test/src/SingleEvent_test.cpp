@@ -16,8 +16,9 @@ TEST(SingleEventTest, SingleEventTest_Set)
 }
 
 template<typename, typename>
-struct AwaiterMock
+class AwaiterMock
 {
+public:
     AwaiterMock(auto&, auto) {}
 };
 

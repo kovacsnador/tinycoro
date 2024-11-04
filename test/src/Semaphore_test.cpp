@@ -69,8 +69,9 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
 }
 
 template <typename, typename SemaphoreT>
-struct AwaiterMock
+class AwaiterMock
 {
+public:
     AwaiterMock(SemaphoreT& s)
     : semaphore{s}
     {
@@ -83,7 +84,7 @@ struct AwaiterMock
 
     auto TestRelease() { return semaphore.Release(); }
 
-    AwaiterMock* next;
+    AwaiterMock* next{nullptr};
     SemaphoreT&  semaphore;
 };
 

@@ -20,11 +20,12 @@ namespace tinycoro {
     namespace detail {
 
         template <template <typename, typename> class AwaitableT, typename EventT, template <typename> class StackT>
-        struct SemaphoreType
+        class SemaphoreType
         {
+        public:
             using awaitable_type = AwaitableT<EventT, SemaphoreType>;
 
-            friend struct AwaitableT<EventT, SemaphoreType>;
+            friend class AwaitableT<EventT, SemaphoreType>;
 
             SemaphoreType(size_t initCount)
             : _counter{initCount}
@@ -79,7 +80,7 @@ namespace tinycoro {
         struct SemaphoreAwaiterEvent
         {
             template <typename, typename>
-            friend struct SemaphoreAwaiter;
+            friend class SemaphoreAwaiter;
 
             void Notify() const
             {
@@ -101,8 +102,9 @@ namespace tinycoro {
         };
 
         template <typename EventT, typename SemaphoreT>
-        struct SemaphoreAwaiter
+        class SemaphoreAwaiter
         {
+        public:
             SemaphoreAwaiter(SemaphoreT& semaphore)
             : _semaphore{semaphore}
             {

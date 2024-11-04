@@ -10,11 +10,12 @@ namespace tinycoro {
     namespace detail {
 
         template <template <typename, typename> class AwaiterT>
-        struct AutoEvent
+        class AutoEvent
         {
+        public:
             using awaiter_type = AwaiterT<AutoEvent, PauseCallbackEvent>;
 
-            friend struct AwaiterT<AutoEvent, PauseCallbackEvent>;
+            friend class AwaiterT<AutoEvent, PauseCallbackEvent>;
 
             AutoEvent(bool initialySet = false)
             : _state{initialySet}
@@ -86,8 +87,9 @@ namespace tinycoro {
         };
 
         template <typename AutoEventT, typename CallbackEventT>
-        struct AutoEventAwaiter
+        class AutoEventAwaiter
         {
+        public:
             AutoEventAwaiter(AutoEventT& autoEvent, CallbackEventT event)
             : _autoEvent{autoEvent}
             , _event{std::move(event)}

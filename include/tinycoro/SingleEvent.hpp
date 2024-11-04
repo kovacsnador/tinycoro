@@ -16,11 +16,12 @@ namespace tinycoro {
 
         // This is an auto reset event, with one consumer and one producer.
         template <typename ValueT, template <typename, typename> class AwaiterT>
-        struct SingleEvent
+        class SingleEvent
         {
+        public:
             using value_type = ValueT;
 
-            friend struct AwaiterT<SingleEvent, PauseCallbackEvent>;
+            friend class AwaiterT<SingleEvent, PauseCallbackEvent>;
 
             using awaiter_type = AwaiterT<SingleEvent, PauseCallbackEvent>;
 
@@ -94,8 +95,9 @@ namespace tinycoro {
         };
 
         template <typename SingleEventT, typename CallbackEventT>
-        struct SingleEventAwaiter
+        class SingleEventAwaiter
         {
+        public:
             SingleEventAwaiter(SingleEventT& singleEvent, CallbackEventT event)
             : _singleEvent{singleEvent}
             , _event{std::move(event)}

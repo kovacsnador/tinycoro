@@ -20,8 +20,9 @@ TEST(ManualEventTest, ManualEventTest_set_reset)
 }
 
 template<typename, typename>
-struct AwaiterMock
+class AwaiterMock
 {
+public:
     AwaiterMock(auto&, auto) {}
 };
 
