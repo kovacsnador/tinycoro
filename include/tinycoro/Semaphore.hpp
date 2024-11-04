@@ -19,14 +19,15 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <template <typename, typename> class AwaitableT, typename EventT, template <typename> class StackT>
-        struct SemaphoreType
+        template <template <typename, typename> class AwaitableT, template <typename> class StackT>
+        class Semaphore
         {
-            using awaitable_type = AwaitableT<EventT, SemaphoreType>;
+        public:
+            using awaitable_type = AwaitableT<Semaphore, PauseCallbackEvent>;
 
-            friend struct AwaitableT<EventT, SemaphoreType>;
+            friend class AwaitableT<Semaphore, PauseCallbackEvent>;
 
-            SemaphoreType(size_t initCount)
+            Semaphore(size_t initCount)
             : _counter{initCount}
             {
                 if (_counter == 0)
@@ -36,9 +37,9 @@ namespace tinycoro {
             }
 
             // disable move and copy
-            SemaphoreType(SemaphoreType&&) = delete;
+            Semaphore(Semaphore&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaitable_type{*this}; }
+            [[nodiscard]] auto operator co_await() { return awaitable_type{*this, PauseCallbackEvent{}}; }
 
         private:
             void Release()
@@ -76,35 +77,13 @@ namespace tinycoro {
             std::mutex             _mtx;
         };
 
-        struct SemaphoreAwaiterEvent
+        template <typename SemaphoreT, typename EventT>
+        class SemaphoreAwaiter
         {
-            template <typename, typename>
-            friend struct SemaphoreAwaiter;
-
-            void Notify() const
-            {
-                if (_notifyCallback)
-                {
-                    _notifyCallback();
-                }
-            }
-
-        private:
-            void Set(std::invocable auto cb)
-            {
-                assert(_notifyCallback == nullptr);
-
-                _notifyCallback = cb;
-            }
-
-            std::function<void()> _notifyCallback;
-        };
-
-        template <typename EventT, typename SemaphoreT>
-        struct SemaphoreAwaiter
-        {
-            SemaphoreAwaiter(SemaphoreT& semaphore)
+        public:
+            SemaphoreAwaiter(SemaphoreT& semaphore, EventT event)
             : _semaphore{semaphore}
+            , _event{std::move(event)}
             {
             }
 
@@ -132,13 +111,13 @@ namespace tinycoro {
             SemaphoreAwaiter* next{nullptr};
 
         private:
-            EventT      _event;
             SemaphoreT& _semaphore;
+            EventT      _event;
         };
 
     } // namespace detail
 
-    using Semaphore = detail::SemaphoreType<detail::SemaphoreAwaiter, detail::SemaphoreAwaiterEvent, detail::LinkedPtrStack>;
+    using Semaphore = detail::Semaphore<detail::SemaphoreAwaiter, detail::LinkedPtrStack>;
 
 } // namespace tinycoro
 

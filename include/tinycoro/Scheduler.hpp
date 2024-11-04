@@ -139,14 +139,11 @@ namespace tinycoro {
             return [this, i = id]() {
                 if (_stopSource.stop_requested() == false)
                 {
-                    std::unique_lock lock{_mtx};
+                    std::scoped_lock lock{_mtx};
                     if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
                     {
                         _tasks.emplace(std::move(std::get<TaskT>(it->second)));
                         _pausedTasks.erase(i);
-
-                        lock.unlock();
-
                         _cv.notify_all();
                     }
                     else

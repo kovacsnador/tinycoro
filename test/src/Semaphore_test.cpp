@@ -25,7 +25,7 @@ struct SemaphoreAwaiterTest : public testing::Test
     using value_type = int32_t;
 
     SemaphoreAwaiterTest()
-    : awaiter{mock}
+    : awaiter{mock, tinycoro::PauseCallbackEvent{}}
     {
     }
 
@@ -37,7 +37,7 @@ struct SemaphoreAwaiterTest : public testing::Test
     SemaphoreMock<value_type>                                          mock;
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<value_type>> hdl;
 
-    tinycoro::detail::SemaphoreAwaiter<tinycoro::detail::SemaphoreAwaiterEvent, decltype(mock)> awaiter;
+    tinycoro::detail::SemaphoreAwaiter<decltype(mock), tinycoro::PauseCallbackEvent> awaiter;
 };
 
 TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)
@@ -68,11 +68,13 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
     }
 }
 
-template <typename, typename SemaphoreT>
-struct AwaiterMock
+template <typename SemaphoreT, typename EventT>
+class AwaiterMock
 {
-    AwaiterMock(SemaphoreT& s)
+public:
+    AwaiterMock(SemaphoreT& s, EventT e)
     : semaphore{s}
+    , event{std::move(e)}
     {
     }
 
@@ -83,8 +85,9 @@ struct AwaiterMock
 
     auto TestRelease() { return semaphore.Release(); }
 
-    AwaiterMock* next;
+    AwaiterMock* next{nullptr};
     SemaphoreT&  semaphore;
+    EventT event;
 };
 
 struct EventMock
@@ -93,7 +96,7 @@ struct EventMock
 
 struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
-    using semaphore_type  = tinycoro::detail::SemaphoreType<AwaiterMock, EventMock, tinycoro::detail::LinkedPtrStack>;
+    using semaphore_type  = tinycoro::detail::Semaphore<AwaiterMock, tinycoro::detail::LinkedPtrStack>;
     using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
 
     void SetUp() override
