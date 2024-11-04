@@ -587,6 +587,7 @@ In the example below, a semaphore with an initial count of 1 is created, ensurin
 In this case, the semaphore ensures that even though the tasks are running concurrently, only one can increment the counter at a time. As a result, c1, c2, and c3 will have unique values, verifying that the synchronization mechanism works as expected.
 
 ### `ManualEvent`
+
 The `tinycoro::ManualEvent` is a synchronization primitive in tinycoro that supports multiple consumers waiting on a single event. Unlike `SingleEvent`, `ManualEvent` can be set to allow multiple coroutines to continue concurrently and provides a manual reset capability, making it suitable for cases where multiple awaiters need to be notified of an update.
 ```cpp
 tinycoro::ManualEvent event;
@@ -610,6 +611,7 @@ void Producer()
 }
 ```
 ### `AutoEvent`
+
 The `tinycoro::AutoEvent` is a synchronization primitive in tinycoro that supports multiple consumers waiting on a single event but releases only one awaiter at a time. It features an automatic reset mechanism: once an awaiter is released, the event automatically resets, requiring a new `Set()` call to release the next awaiter.
 ```cpp
 tinycoro::AutoEvent event{true};    // already preset the event
@@ -647,6 +649,7 @@ void Producer()
 ```
 
 ### `Latch`
+
 The `tinycoro::Latch` is a countdown-based synchronization primitive in tinycoro. It allows one or more consumers to wait until the latch count reaches zero, at which point all awaiting coroutines are released. This is ideal for coordinating tasks where multiple steps or actions must complete before proceeding.
 ```cpp
 tinycoro::Latch latch{8};
@@ -667,6 +670,7 @@ void Producer()
 };
 ```
 ### `BufferedChannel`
+
 The tinycoro::BufferedChannel<T> is an asynchronous communication primitive in tinycoro designed for passing messages between producers and consumers. It supports a buffer that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way. The channel can also be closed to signal that no more items will be produced.
 ```cpp
 tinycoro::BufferedChannel<int32_t> channel;
