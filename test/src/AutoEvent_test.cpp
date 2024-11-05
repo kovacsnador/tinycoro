@@ -141,7 +141,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest)
     };
 
     auto autoEventProducer = [&]() -> tinycoro::Task<void> {
-        // notify manual event
+        // Set manually the event
         autoEvent.Set();
         co_return;
     };
@@ -179,4 +179,74 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
     }
 
     tinycoro::GetAll(scheduler, tasks);
+}
+
+/*TEST(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
+{
+    tinycoro::Scheduler scheduler{8};
+    tinycoro::AutoEvent event;
+    int counter = 0;
+
+    auto waiterTask = [&]() -> tinycoro::Task<void> {
+        co_await event;
+        ++counter;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (int i = 0; i < 3; ++i) {
+        tasks.push_back(waiterTask());
+    }
+
+    // Signal the event
+    event.Set();
+    tinycoro::AnyOf(scheduler, tasks);
+
+    // Only one waiter should have been resumed
+    EXPECT_EQ(counter, 1);
+}*/
+
+TEST(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
+{
+    tinycoro::Scheduler scheduler{8};
+    tinycoro::AutoEvent event;
+    int counter = 0;
+
+    auto waiterTask = [&]() -> tinycoro::Task<void> {
+        co_await event;
+        ++counter;
+    };
+
+    auto setTask = [&]() -> tinycoro::Task<void> {
+        event.Set();
+        co_return;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (int i = 0; i < 10; ++i) {
+        tasks.push_back(waiterTask());
+        tasks.push_back(setTask());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+
+    // Since event is auto-resetting, each Set should trigger only one waiter
+    EXPECT_EQ(counter, 10);
+}
+
+TEST(AutoEventTest, AutoEventFunctionalTest_setBeforeAwait)
+{
+    tinycoro::Scheduler scheduler{8};
+    tinycoro::AutoEvent event;
+    bool waited = false;
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        event.Set();
+        co_await event;
+        waited = true;
+    };
+
+    tinycoro::GetAll(scheduler, task());
+
+    // Since the event was set before co_await, waited should be true
+    EXPECT_TRUE(waited);
 }
