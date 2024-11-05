@@ -614,17 +614,46 @@ void Producer()
 
 The `tinycoro::AutoEvent` is a synchronization primitive in tinycoro that supports multiple consumers waiting on a single event but releases only one awaiter at a time. It features an automatic reset mechanism: once an awaiter is released, the event automatically resets, requiring a new `Set()` call to release the next awaiter.
 ```cpp
-tinycoro::AutoEvent event{true};    // already preset the event
+struct MyStruct
+{
+    void increment()
+    {
+        count++;
+    }
 
+    size_t count{};
+};
+
+tinycoro::AutoEvent event;
+std::unique_ptr<MyStruct> ptr;
+ 
 tinycoro::Task<void> Consumer()
 {
     // waiting for event.
     co_await event;
 
-    // do something...
+    // This is thread safe, only 1 consumer can increase the count at the time.
+    ptr->increment();
 
     // trigger the event for other waiters.
     event.Set();
+}
+
+void AllocateAndSet()
+{
+    // allocate for ptr
+    ptr = std::make_unique<MyStruct>();
+
+    // set the event, struct is allocated 
+    event.Set();
+}
+
+void Run(auto& scheduler)
+{
+    tinycoro::GetAll(scheduler, Consumer(), Consumer(), Consumer());
+
+    // After finishing With 3 consumers at the same time, the ptr->count should be also 3
+    assert(ptr->count == 3);
 }
 ```
 ### `SingleEvent`
