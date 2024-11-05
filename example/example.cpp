@@ -37,6 +37,8 @@
 
 #include "Semaphore_example.h"
 
+#include "BufferedChannel_example.h"
+
 int main()
 {
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
@@ -101,6 +103,8 @@ int main()
         scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
 
         Example_Semaphore(scheduler);
+
+        Example_bufferedChannel(scheduler);
     }
 
     return 0;
