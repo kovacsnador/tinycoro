@@ -3,6 +3,8 @@
 
 #include <mutex>
 #include <queue>
+#include <cassert>
+#include <bitset>
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
@@ -14,12 +16,19 @@ namespace tinycoro {
         enum class EOpStatus
         {
             SUCCESS,
+            LAST,
             CLOSED
         };
 
         template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename> class ContainerT>
         class BufferedChannel
         {
+            struct Element
+            {
+                ValueT value;
+                bool   lastElement{false};
+            };
+
         public:
             friend class AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
 
@@ -35,28 +44,20 @@ namespace tinycoro {
 
             [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{*this, PauseCallbackEvent{}, val}; }
 
+            void Push(ValueT t) { _Emplace(std::move(t), false); }
+
+            void PushAndClose(ValueT t) { _Emplace(std::move(t), true); }
+
             template <typename T>
-            void Push(T&& t)
+            void Emplace(T&& t)
             {
-                std::unique_lock lock{_mtx};
+                _Emplace(std::forward<T>(t), false);
+            }
 
-                if (_closed)
-                {
-                    throw BufferedChannelException{"BufferedChannel: channel is already closed."};
-                }
-
-                // Is there any awaiter
-                if (auto* top = _waiters.pop())
-                {
-                    lock.unlock();
-
-                    top->SetValue(std::forward<T>(t));
-                    top->Notify();
-                    return;
-                }
-
-                // No awaiters
-                _container.emplace(std::forward<T>(t));
+            template <typename T>
+            void EmplaceAndClose(T&& t)
+            {
+                _Emplace(std::forward<T>(t), true);
             }
 
             [[nodiscard]] bool Empty() const noexcept
@@ -74,12 +75,7 @@ namespace tinycoro {
                 lock.unlock();
 
                 // Notify all waiters
-                while (top)
-                {
-                    auto next = top->next;
-                    top->Notify();
-                    top = next;
-                }
+                NotifyAll(top);
             }
 
             [[nodiscard]] bool IsOpen() const noexcept
@@ -89,54 +85,143 @@ namespace tinycoro {
             }
 
         private:
-            [[nodiscard]] EOpStatus Resume() const noexcept
+            template <typename T>
+            void _Emplace(T&& t, bool close)
             {
+                std::unique_lock lock{_mtx};
+
+                if (_closed)
+                {
+                    throw BufferedChannelException{"BufferedChannel: channel is already closed."};
+                }
+
+                // Is there any awaiter
+                if (auto* top = _waiters.pop())
+                {
+                    awaiter_type* others{nullptr};
+
+                    if (close)
+                    {
+                        others = _waiters.steal();
+                    }
+
+                    _closed = close;
+
+                    lock.unlock();
+
+                    top->SetValue(std::forward<T>(t), close);
+                    top->Notify();
+
+                    // Notify all waiters
+                    NotifyAll(others);
+
+                    return;
+                }
+
+                // No awaiters
+                _container.emplace(Element{std::forward<T>(t), close});
+            }
+
+            [[nodiscard]] EOpStatus Resume(bool lastElement, bool alreadySet) const noexcept
+            {
+                if (lastElement)
+                {
+                    return EOpStatus::LAST;
+                }
+
+                if (alreadySet)
+                {
+                    return EOpStatus::SUCCESS;
+                }
+
                 std::scoped_lock lock{_mtx};
                 return _closed ? EOpStatus::CLOSED : EOpStatus::SUCCESS;
             }
 
             [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
             {
-                std::scoped_lock lock{_mtx};
+                std::unique_lock lock{_mtx};
+                auto [ready, lastElement] = _SetValue(waiter);
 
-                if (_closed)
+                if (lastElement)
                 {
-                    return true;
+                    auto waiters = _waiters.steal();
+                    lock.unlock();
+
+                    NotifyAll(waiters);
                 }
 
-                if (_container.empty() == false)
-                {
-                    waiter->SetValue(std::move(_container.front()));
-                    _container.pop();
-                    return true;
-                }
-
-                return false;
+                return ready;
             }
 
             [[nodiscard]] bool Add(awaiter_type* waiter)
             {
-                std::scoped_lock lock{_mtx};
+                std::unique_lock lock{_mtx};
 
+                auto [ready, lastElement] = _SetValue(waiter);
+                auto suspend              = !ready;
+
+                if (lastElement)
+                {
+                    auto waiters = _waiters.steal();
+                    lock.unlock();
+
+                    NotifyAll(waiters);
+                    return suspend;
+                }
+
+                if (suspend)
+                {
+                    _waiters.push(waiter);
+                }
+
+                // susend coroutine
+                return suspend;
+            }
+
+            // auto [ready, lastElement] = std::tuple<bool, bool>
+            std::tuple<bool, bool> _SetValue(awaiter_type* waiter)
+            {
                 if (_closed)
                 {
-                    // channel is closed nothing to do
-                    return false;
+                    // channel is closed, no suspend
+                    return {true, false};
                 }
 
                 if (_container.empty() == false)
                 {
-                    waiter->SetValue(std::move(_container.front()));
+                    auto& [value, lastElement] = _container.front();
+
+                    if (lastElement)
+                    {
+                        // close the channel, last element reached
+                        _closed = true;
+                    }
+
+                    waiter->SetValue(std::move(value), lastElement);
                     _container.pop();
-                    return false;
+
+                    // we have a value from the channel, no suspend
+                    return {true, lastElement};
                 }
 
-                _waiters.push(waiter);
-                return true;
+                // channel is empty, suspend coroutine
+                return {false, false};
+            }
+
+            void NotifyAll(awaiter_type* awaiter)
+            {
+                // Notify all waiters
+                while (awaiter)
+                {
+                    auto next = awaiter->next;
+                    awaiter->Notify();
+                    awaiter = next;
+                }
             }
 
             LinkedPtrStack<awaiter_type> _waiters;
-            ContainerT<ValueT>           _container;
+            ContainerT<Element>          _container;
             bool                         _closed{false};
             mutable std::mutex           _mtx;
         };
@@ -166,14 +251,18 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            [[nodiscard]] constexpr auto await_resume() const noexcept { return _channel.Resume(); }
+            [[nodiscard]] constexpr auto await_resume() const noexcept { return _channel.Resume(_lastElement, _set); }
 
             void Notify() const { _event.Notify(); }
 
             template <typename T>
-            void SetValue(T&& value)
+            void SetValue(T&& value, bool lastElement)
             {
-                _value = std::forward<T>(value);
+                assert(_set == false);
+
+                _value       = std::forward<T>(value);
+                _lastElement = lastElement;
+                _set         = true;
             }
 
             BufferedChannelAwaiter* next{nullptr};
@@ -190,6 +279,12 @@ namespace tinycoro {
             ChannelT& _channel;
             ValueT&   _value;
             EventT    _event;
+
+            // Flag to check if this is the last element in the channel. (The channel is already in closed state)
+            bool _lastElement{false};
+
+            // Flag which is true if the value is set
+            bool _set{false};
         };
 
     } // namespace detail

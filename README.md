@@ -679,7 +679,7 @@ tinycoro::Task<void> Consumer()
 {
     int32_t val;
     // Pop values from channel
-    while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+    while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(val))
     {
         // 'val' holds the received value here
     }
@@ -688,8 +688,15 @@ tinycoro::Task<void> Consumer()
 void Producer()
 {
     channel.Push(42);
+    channel.Push(33);
     ...
+
+    // Close the channel when finished (this also happens in the BufferedChannel destructor)
     channel.Close();
+
+    // Alternatively, if this will be the last entry, use PushAndClose/EmplaceAndClose
+    // This guarantees that all entries before 44 will be consumed.
+    channel.PushAndClose(44);
 }
 ```
 
