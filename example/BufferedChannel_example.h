@@ -1,8 +1,6 @@
 #ifndef __TINY_CORO_EXAMPLE_BUFFERED_CHANNEL_H__
 #define __TINY_CORO_EXAMPLE_BUFFERED_CHANNEL_H__
 
-#include <format>
-
 #include <tinycoro/tinycoro_all.h>
 
 #include "Common.h"
