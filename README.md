@@ -667,7 +667,9 @@ tinycoro::Task<void> Consumer()
 {
     // waiting for the value to be set
     auto value = co_await singleEvent;
-    ...
+
+    // value is 42
+    assert(value == 42);
 }
 
 void Producer()
@@ -690,6 +692,7 @@ tinycoro::Task<void> Waiter()
 
     //Latch is done do something...
 };
+
 void Producer()
 {
     // do some work here...
