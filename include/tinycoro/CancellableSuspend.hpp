@@ -3,6 +3,8 @@
 
 #include <coroutine>
 
+#include "CancellationHandler.hpp"
+
 namespace tinycoro {
 
     template <typename ReturnT>
@@ -17,8 +19,7 @@ namespace tinycoro {
 
         constexpr void await_suspend(auto parentCoro) const noexcept
         { 
-            parentCoro.promise().cancellable = true;
-            parentCoro.promise().return_value(std::move(_returnValue));
+            CancellationHandler::MakeCancellable(parentCoro, std::move(_returnValue));
         }
 
         constexpr void await_resume() const noexcept { }
@@ -34,7 +35,7 @@ namespace tinycoro {
 
         constexpr void await_suspend(auto parentCoro) const noexcept
         { 
-            parentCoro.promise().cancellable = true;
+            CancellationHandler::MakeCancellable(parentCoro);
         }
 
         constexpr void await_resume() const noexcept { }
