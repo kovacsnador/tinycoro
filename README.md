@@ -635,7 +635,7 @@ tinycoro::Task<void> Consumer()
     // This is thread safe, only 1 consumer can increase the count at the time.
     ptr->increment();
 
-    // trigger the event for other waiters.
+    // trigger the event for the next waiter.
     event.Set();
 }
 
