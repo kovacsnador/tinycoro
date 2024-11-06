@@ -650,6 +650,8 @@ void AllocateAndSet()
 
 void Run(auto& scheduler)
 {
+    AllocateAndSet();
+
     tinycoro::GetAll(scheduler, Consumer(), Consumer(), Consumer());
 
     // After finishing With 3 consumers at the same time, the ptr->count should be also 3
