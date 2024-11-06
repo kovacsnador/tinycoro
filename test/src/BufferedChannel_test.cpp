@@ -189,7 +189,7 @@ public:
 
 TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)
 {
-    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, std::queue> channel;
+    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, tinycoro::detail::Queue> channel;
 
     int32_t val;
     auto    awaiter = channel.PopWait(val);

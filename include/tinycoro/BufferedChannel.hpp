@@ -287,10 +287,13 @@ namespace tinycoro {
             bool _set{false};
         };
 
+        template<typename ValueT>
+        using Queue = std::queue<ValueT>;
+
     } // namespace detail
 
     template <typename ValueT>
-    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, std::queue>;
+    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, detail::Queue>;
 
     using BufferedChannel_OpStatus = detail::EOpStatus;
 
