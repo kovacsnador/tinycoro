@@ -198,11 +198,13 @@ namespace tinycoro {
                         _closed = true;
                     }
 
+                    auto last = lastElement;
+
                     waiter->SetValue(std::move(value), lastElement);
                     _container.pop();
 
                     // we have a value from the channel, no suspend
-                    return {true, lastElement};
+                    return {true, last};
                 }
 
                 // channel is empty, suspend coroutine
