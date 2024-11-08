@@ -27,7 +27,7 @@ jobs:
       working-directory: ${{ github.workspace }}
     
     - name: Configure with coverage flags
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Release -D CMAKE_CXX_FLAGS="--coverage"
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_FLAGS="--coverage"
       working-directory: ${{ github.workspace }}
 
     - name: Build
