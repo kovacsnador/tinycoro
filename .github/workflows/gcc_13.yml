@@ -19,9 +19,6 @@ jobs:
           apt update -y
           apt install -y cmake lcov
 
-    - name: Install libasan
-      run: apt install -y libasan8
-
     - name: Add safe repo directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
