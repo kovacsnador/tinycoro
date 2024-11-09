@@ -8,6 +8,9 @@ project(tinycoro_example)
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Option to enable ASAN
+option(WithASAN "Build with AddressSanitizer" OFF)
+
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
   set(CMAKE_CXX_FLAGS                     "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -pthread -femulated-tls")
@@ -20,13 +23,13 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   set(CMAKE_CXX_FLAGS_RELEASE             "${CMAKE_CXX_FLAGS} -O2")
 endif()
 
-if (UNIX)
+if (WithASAN)
     message("Setting sanitizers...")
     add_compile_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
     add_link_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
 
     set(ENV{LSAN_OPTIONS} "verbosity=2:log_threads=1")
-endif (UNIX)
+endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("CMAKE_CXX_FLAGS_DEBUG -> ${CMAKE_CXX_FLAGS_DEBUG}")

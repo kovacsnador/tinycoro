@@ -216,32 +216,34 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
     EXPECT_EQ(counter, 1);
 }
 
-TEST(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
+TEST_P(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
 {
     tinycoro::Scheduler scheduler{8};
-    tinycoro::AutoEvent event;
+    tinycoro::AutoEvent event{true};    // preset
     int counter = 0;
-
-    auto waiterTask = [&]() -> tinycoro::Task<void> {
-        co_await event;
-        ++counter;
-    };
 
     auto setTask = [&]() -> tinycoro::Task<void> {
         event.Set();
         co_return;
     };
 
+    auto task = [&]() -> tinycoro::Task<void> {
+        co_await event;
+        ++counter;
+
+        // nested coroutine
+        co_await setTask();
+    };
+
     std::vector<tinycoro::Task<void>> tasks;
-    for (int i = 0; i < 10; ++i) {
-        tasks.push_back(waiterTask());
-        tasks.push_back(setTask());
+    for (size_t i = 0; i < GetParam(); ++i) {
+        tasks.push_back(task());
     }
 
     tinycoro::GetAll(scheduler, tasks);
 
     // Since event is auto-resetting, each Set should trigger only one waiter
-    EXPECT_EQ(counter, 10);
+    EXPECT_EQ(counter, GetParam());
 }
 
 TEST(AutoEventTest, AutoEventFunctionalTest_setBeforeAwait)
