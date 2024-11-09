@@ -52,6 +52,12 @@ namespace tinycoro
         using BaseT = std::runtime_error;
         using BaseT::BaseT;
     };
+
+    struct StopSourceAwaiterException : std::runtime_error
+    {
+        using BaseT = std::runtime_error;
+        using BaseT::BaseT;
+    };
     
 } // namespace tinycoro
 

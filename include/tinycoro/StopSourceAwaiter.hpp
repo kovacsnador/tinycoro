@@ -3,6 +3,8 @@
 
 #include <stop_token>
 
+#include "Exception.hpp"
+
 namespace tinycoro
 {
     template<typename StopSourceT = std::stop_source>
@@ -12,9 +14,15 @@ namespace tinycoro
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr auto await_suspend(auto parentCoro) noexcept
+        constexpr auto await_suspend(auto parentCoro)
         { 
             stopSource = std::addressof(parentCoro.promise().stopSource);
+
+            if(stopSource->stop_possible() == false)
+            {
+                throw StopSourceAwaiterException{"No stop state. Need AnyOf context"};
+            }
+
             return parentCoro;
         }
 
@@ -30,9 +38,15 @@ namespace tinycoro
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr auto await_suspend(auto parentCoro) noexcept
+        constexpr auto await_suspend(auto parentCoro)
         { 
             stopSource = std::addressof(parentCoro.promise().stopSource);
+
+            if(stopSource->stop_possible() == false)
+            {
+                throw StopSourceAwaiterException{"No stop state. Need AnyOf context"};
+            }
+
             return parentCoro;
         }
 
