@@ -181,19 +181,30 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
     tinycoro::GetAll(scheduler, tasks);
 }
 
-/*TEST(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
+TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
 {
     tinycoro::Scheduler scheduler{8};
     tinycoro::AutoEvent event;
     int counter = 0;
 
     auto waiterTask = [&]() -> tinycoro::Task<void> {
+        auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+
         co_await event;
+
+        if(stopSource.stop_requested())
+        {
+            event.Set();
+            co_return;
+        }
+        
+        stopSource.request_stop();
         ++counter;
+        event.Set();
     };
 
     std::vector<tinycoro::Task<void>> tasks;
-    for (int i = 0; i < 3; ++i) {
+    for (size_t i = 0; i < GetParam(); ++i) {
         tasks.push_back(waiterTask());
     }
 
@@ -203,7 +214,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
 
     // Only one waiter should have been resumed
     EXPECT_EQ(counter, 1);
-}*/
+}
 
 TEST(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
 {
