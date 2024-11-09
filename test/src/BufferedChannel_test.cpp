@@ -180,7 +180,7 @@ template <typename, typename, typename>
 class AwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto, auto) { }
+    AwaiterMock(auto, auto, auto) { }
 
     void Notify() const noexcept {};
 
@@ -459,6 +459,60 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
     };
 
     tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+
+    EXPECT_EQ(allValues.size(), count);
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorClose)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{8};
+
+    tinycoro::Latch                    latch{count};
+    
+    
+    auto channel = std::make_unique<tinycoro::BufferedChannel<int32_t>>(); 
+
+    std::mutex        mtx;
+    std::set<int32_t> allValues;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        int32_t val;
+        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel->PopWait(val))
+        {
+            {
+                // lock needed here multi consumer
+                std::scoped_lock lock{mtx};
+                auto [iter, inserted] = allValues.insert(val);
+                EXPECT_TRUE(inserted);
+            }
+
+            latch.CountDown();
+        }
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            channel->Push(i);
+        }
+
+        // waiting for the latch
+        co_await latch;
+
+        // closing the channel after latch is done with destructor
+        channel.reset();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(consumer());
+    }
+    tasks.push_back(producer());
+
+    tinycoro::GetAll(scheduler, tasks);
 
     EXPECT_EQ(allValues.size(), count);
 }

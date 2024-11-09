@@ -42,7 +42,7 @@ namespace tinycoro {
 
             ~BufferedChannel() { Close(); }
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{*this, PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, PauseCallbackEvent{}, val}; }
 
             void Push(ValueT t) { _Emplace(std::move(t), false); }
 
@@ -63,7 +63,7 @@ namespace tinycoro {
             [[nodiscard]] bool Empty() const noexcept
             {
                 std::unique_lock lock{_mtx};
-                return _container.empty();
+                return _valueCollection.empty();
             }
 
             void Close()
@@ -74,7 +74,7 @@ namespace tinycoro {
                 auto top = _waiters.steal();
                 lock.unlock();
 
-                // Notify all waiters
+                // notify all waiters
                 NotifyAll(top);
             }
 
@@ -112,30 +112,17 @@ namespace tinycoro {
                     top->SetValue(std::forward<T>(t), close);
                     top->Notify();
 
-                    // Notify all waiters
-                    NotifyAll(others);
+                    if(_closed)
+                    {
+                        // notify all waiters
+                        NotifyAll(others);
+                    }
 
                     return;
                 }
 
                 // No awaiters
-                _container.emplace(Element{std::forward<T>(t), close});
-            }
-
-            [[nodiscard]] EOpStatus Resume(bool lastElement, bool alreadySet) const noexcept
-            {
-                if (lastElement)
-                {
-                    return EOpStatus::LAST;
-                }
-
-                if (alreadySet)
-                {
-                    return EOpStatus::SUCCESS;
-                }
-
-                std::scoped_lock lock{_mtx};
-                return _closed ? EOpStatus::CLOSED : EOpStatus::SUCCESS;
+                _valueCollection.emplace(Element{std::forward<T>(t), close});
             }
 
             [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
@@ -188,9 +175,9 @@ namespace tinycoro {
                     return {true, false};
                 }
 
-                if (_container.empty() == false)
+                if (_valueCollection.empty() == false)
                 {
-                    auto& [value, lastElement] = _container.front();
+                    auto& [value, lastElement] = _valueCollection.front();
 
                     if (lastElement)
                     {
@@ -201,7 +188,7 @@ namespace tinycoro {
                     auto last = lastElement;
 
                     waiter->SetValue(std::move(value), lastElement);
-                    _container.pop();
+                    _valueCollection.pop();
 
                     // we have a value from the channel, no suspend
                     return {true, last};
@@ -223,7 +210,7 @@ namespace tinycoro {
             }
 
             LinkedPtrStack<awaiter_type> _waiters;
-            ContainerT<Element>          _container;
+            ContainerT<Element>          _valueCollection;
             bool                         _closed{false};
             mutable std::mutex           _mtx;
         };
@@ -232,30 +219,61 @@ namespace tinycoro {
         class BufferedChannelAwaiter
         {
         public:
-            BufferedChannelAwaiter(ChannelT& channel, EventT event, ValueT& v)
+            BufferedChannelAwaiter(ChannelT* channel, EventT event, ValueT& v)
             : _channel{channel}
             , _value{v}
             , _event{std::move(event)}
             {
             }
 
-            [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
+            [[nodiscard]] constexpr bool await_ready() noexcept
+            {
+                if (_channel)
+                {
+                    return _channel->IsReady(this);
+                }
+                return true;
+            }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
-                PutOnPause(parentCoro);
-                if (_channel.Add(this) == false)
+                if (_channel)
                 {
-                    // resume immediately
-                    ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    PutOnPause(parentCoro);
+                    if (_channel->Add(this) == false)
+                    {
+                        // resume immediately
+                        ResumeFromPause(parentCoro);
+                        return parentCoro;
+                    }
+                    return std::noop_coroutine();
                 }
-                return std::noop_coroutine();
+                return parentCoro;
             }
 
-            [[nodiscard]] constexpr auto await_resume() const noexcept { return _channel.Resume(_lastElement, _set); }
+            [[nodiscard]] constexpr auto await_resume() const noexcept
+            {
+                if (_lastElement)
+                {
+                    return EOpStatus::LAST;
+                }
 
-            void Notify() const { _event.Notify(); }
+                if (_set)
+                {
+                    return EOpStatus::SUCCESS;
+                }
+
+                return EOpStatus::CLOSED;
+            }
+
+            void Notify()
+            {
+                // detach from the channel
+                _channel = nullptr; 
+
+                // Notify scheduler to put coroutine back on CPU
+                _event.Notify();
+            }
 
             template <typename T>
             void SetValue(T&& value, bool lastElement)
@@ -278,7 +296,7 @@ namespace tinycoro {
                 PauseHandler::UnpauseTask(parentCoro);
             }
 
-            ChannelT& _channel;
+            ChannelT* _channel;
             ValueT&   _value;
             EventT    _event;
 
@@ -289,7 +307,7 @@ namespace tinycoro {
             bool _set{false};
         };
 
-        template<typename ValueT>
+        template <typename ValueT>
         using Queue = std::queue<ValueT>;
 
     } // namespace detail
