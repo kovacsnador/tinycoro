@@ -385,12 +385,12 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
     tinycoro::Scheduler scheduler{8};
 
     tinycoro::Latch                    latch{count};
-    tinycoro::BufferedChannel<int32_t> channel;
+    tinycoro::BufferedChannel<size_t> channel;
 
-    std::set<int32_t> allValues;
+    std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        int32_t val;
+        size_t val;
         while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             // no lock needed here only one consumer
@@ -425,13 +425,13 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
     tinycoro::Scheduler scheduler{8};
 
     tinycoro::Latch                    latch{count};
-    tinycoro::BufferedChannel<int32_t> channel;
+    tinycoro::BufferedChannel<size_t> channel;
 
     std::mutex        mtx;
-    std::set<int32_t> allValues;
+    std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        int32_t val;
+        size_t val;
         while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             {
@@ -472,13 +472,13 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorC
     tinycoro::Latch                    latch{count};
     
     
-    auto channel = std::make_unique<tinycoro::BufferedChannel<int32_t>>(); 
+    auto channel = std::make_unique<tinycoro::BufferedChannel<size_t>>(); 
 
     std::mutex        mtx;
-    std::set<int32_t> allValues;
+    std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        int32_t val;
+        size_t val;
         while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel->PopWait(val))
         {
             {
@@ -524,13 +524,13 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
     tinycoro::Scheduler scheduler{8};
 
     tinycoro::AutoEvent                event;
-    tinycoro::BufferedChannel<int32_t> channel;
+    tinycoro::BufferedChannel<size_t> channel;
 
     std::mutex        mtx;
-    std::set<int32_t> allValues;
+    std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        int32_t val;
+        size_t val;
         while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             {

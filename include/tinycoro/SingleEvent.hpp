@@ -25,6 +25,11 @@ namespace tinycoro {
 
             using awaiter_type = AwaiterT<SingleEvent, PauseCallbackEvent>;
 
+            SingleEvent() = default;
+
+            // disable move and copy
+            SingleEvent(SingleEvent&&) = delete;
+
             [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
 
             void SetValue(ValueT val)
@@ -103,6 +108,9 @@ namespace tinycoro {
             , _event{std::move(event)}
             {
             }
+
+            // disable move and copy
+            SingleEventAwaiter(SingleEventAwaiter&&) = delete;
 
             [[nodiscard]] constexpr bool await_ready() const noexcept
             {

@@ -86,6 +86,9 @@ namespace tinycoro {
             {
             }
 
+            // disable move and copy
+            ManualEventAwaiter(ManualEventAwaiter&&) = delete;
+
             [[nodiscard]] constexpr bool await_ready() const noexcept
             {
                 // check if already set the event.

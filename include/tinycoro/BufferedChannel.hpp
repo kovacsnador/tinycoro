@@ -226,6 +226,9 @@ namespace tinycoro {
             {
             }
 
+            // disable move and copy
+            BufferedChannelAwaiter(BufferedChannelAwaiter&&) = delete;
+
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
                 if (_channel)

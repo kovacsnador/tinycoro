@@ -87,6 +87,9 @@ namespace tinycoro {
             {
             }
 
+            // disable move and copy
+            SemaphoreAwaiter(SemaphoreAwaiter&&) = delete;
+
             [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)

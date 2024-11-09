@@ -30,14 +30,14 @@ namespace tinycoro {
             // disabe move and copy
             Latch(Latch&&) = delete;
 
-            [[nodiscard]] auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
             [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {
                 CountDown();
-                return awaiter_type{*this, PauseCallbackEvent{}};
+                return Wait();
             }
 
             void CountDown() noexcept
@@ -96,6 +96,9 @@ namespace tinycoro {
             , _event{std::move(event)}
             {
             }
+
+            // disabe move and copy
+            LatchAwaiter(LatchAwaiter&&) = delete;
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _latch.IsReady(); }
 

@@ -96,6 +96,8 @@ namespace tinycoro {
             {
             }
 
+            AutoEventAwaiter(AutoEventAwaiter&&) = delete;
+
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
                 // check if already set the event.
