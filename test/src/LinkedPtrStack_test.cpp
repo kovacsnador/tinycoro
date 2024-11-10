@@ -13,6 +13,14 @@ protected:
     MockNode node1, node2, node3;
 };
 
+TEST_F(LinkedPtrStackTest, LinkedPtrStackTest_typeTest) 
+{
+    using NodeType = decltype(stack)::value_type;
+    using NodeTypePtr = tinycoro::detail::LinkedPtrStack<MockNode*>::value_type;
+
+    EXPECT_TRUE((std::same_as<NodeType, NodeTypePtr>));
+}
+
 // Test: Initially, the stack should be empty
 TEST_F(LinkedPtrStackTest, StackIsInitiallyEmpty) {
     EXPECT_TRUE(stack.empty());
