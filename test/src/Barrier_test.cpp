@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include <tinycoro/Barrier.hpp>
 
@@ -66,11 +67,70 @@ TEST_P(BarrierTest, BarrierTest_arriveAndDrop)
 
 TEST(BarrierTest, BarrierTest_constructor)
 {
-    tinycoro::Barrier barrier{10};
+    EXPECT_NO_THROW(tinycoro::Barrier{10});
+    EXPECT_THROW(tinycoro::Barrier{0}, tinycoro::BarrierException);
 
-    /*EXPECT_NO_THROW(tinycoro::Barrier(10));
-    EXPECT_THROW(tinycoro::Barrier barrier(0));
+    EXPECT_NO_THROW((tinycoro::Barrier{10, []{}}));
+    EXPECT_THROW((tinycoro::Barrier{0, []{}}), tinycoro::BarrierException);
+}
 
-    EXPECT_NO_THROW(tinycoro::Barrier barrier(10, []{}));
-    EXPECT_THROW(tinycoro::Barrier barrier(0, []{}));*/
+using DecrementData = std::tuple<int32_t, int32_t,int32_t>;
+
+struct DecrementTest : testing::TestWithParam<DecrementData>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    DecrementTest,
+    DecrementTest,
+    testing::Values(
+        DecrementData{3, 10, 2},
+        DecrementData{2, 10, 1},
+        DecrementData{1, 10, 10},
+        DecrementData{0, 10, 10},
+        DecrementData{0, 0, 0},
+        DecrementData{10, 0, 9},
+        DecrementData{1, 0, 0}
+    )
+);
+
+TEST_P(DecrementTest, BarrierTest_Decrement)
+{
+    auto [val, reset, expected] = GetParam();
+    EXPECT_EQ(tinycoro::detail::local::Decrement(val, reset), expected);
+}
+
+template <typename>
+class AwaiterMock
+{
+public:
+    AwaiterMock(auto, auto) { }
+
+    //MOCK_METHOD(void, Notify, ());
+
+    void Notify() { notifyCalled=true; }
+
+    AwaiterMock* next{nullptr};
+
+    bool notifyCalled{false};
+};
+
+TEST(BarrierTest, BarrierTest_coawaitReturn)
+{
+    tinycoro::Barrier<tinycoro::detail::NoopComplitionCallback, AwaiterMock> barrier{10};
+
+    auto awaiter = barrier.operator co_await();
+
+    using expectedAwaiterType = AwaiterMock<tinycoro::PauseCallbackEvent>;
+    EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
+}
+
+TEST(BarrierTest, BarrierTest_arriveAndWait)
+{
+    tinycoro::Barrier<tinycoro::detail::NoopComplitionCallback, AwaiterMock> barrier{2};
+
+    auto awaiter = barrier.ArriveAndWait();
+    barrier.Arrive();
+
+    EXPECT_TRUE(awaiter.notifyCalled);
 }

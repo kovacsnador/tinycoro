@@ -98,12 +98,7 @@ namespace tinycoro {
 
         auto Wait()
         {
-            bool ready  = false;
-            auto waiter = _Wait(ready);
-
-            std::scoped_lock lock{_mtx};
-            _waiters.push(std::addressof(waiter));
-            return waiter;
+            return _Wait(false);
         }
 
         bool Arrive()
@@ -156,7 +151,17 @@ namespace tinycoro {
         }
 
     private:
-        auto _Wait(bool ready) { return awaiter_type{PauseCallbackEvent{}, ready}; }
+        awaiter_type _Wait(bool ready)
+        {
+            auto waiter = awaiter_type{PauseCallbackEvent{}, ready};
+
+            if (std::scoped_lock lock{_mtx}; ready == false)
+            {
+                _waiters.push(std::addressof(waiter));
+            }
+
+            return waiter;
+        }
 
         void CompleteAndNotifyAll(awaiter_type* top)
         {
