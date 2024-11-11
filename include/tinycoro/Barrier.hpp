@@ -33,10 +33,15 @@ namespace tinycoro {
         class BarrierAwaiter
         {
         public:
-            BarrierAwaiter(EventT event, bool ready)
+            template<typename BarrierT>
+            BarrierAwaiter(BarrierT& barrier, EventT event, bool ready)
             : _event{std::move(event)}
             , _ready{ready}
             {
+                if(_ready == false)
+                {
+                    barrier.Add(this);
+                }
             }
 
             BarrierAwaiter(BarrierAwaiter&&) = delete;
@@ -78,6 +83,7 @@ namespace tinycoro {
     class Barrier
     {
         using awaiter_type = AwaiterT<PauseCallbackEvent>;
+        friend class AwaiterT<PauseCallbackEvent>;
 
     public:
         Barrier(size_t initCount, CompletionCallbackT callback = {})
@@ -94,9 +100,9 @@ namespace tinycoro {
         // disable move and copy
         Barrier(Barrier&&) = delete;
 
-        auto operator co_await() noexcept { return Wait(); };
+        [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-        auto Wait()
+        [[nodiscard]] auto Wait()
         {
             return _Wait(false);
         }
@@ -120,7 +126,7 @@ namespace tinycoro {
             return false;
         }
 
-        auto ArriveAndWait()
+        [[nodiscard]] auto ArriveAndWait()
         {
             auto ready = Arrive();
             return _Wait(ready);
@@ -151,16 +157,15 @@ namespace tinycoro {
         }
 
     private:
-        awaiter_type _Wait(bool ready)
+        [[nodiscard]] auto _Wait(bool ready)
         {
-            auto waiter = awaiter_type{PauseCallbackEvent{}, ready};
+            return awaiter_type{*this, PauseCallbackEvent{}, ready};
+        }
 
-            if (std::scoped_lock lock{_mtx}; ready == false)
-            {
-                _waiters.push(std::addressof(waiter));
-            }
-
-            return waiter;
+        void Add(awaiter_type* waiter)
+        {
+            std::scoped_lock lock{_mtx};
+            _waiters.push(waiter);
         }
 
         void CompleteAndNotifyAll(awaiter_type* top)
