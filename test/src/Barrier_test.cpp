@@ -1,7 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <tinycoro/Barrier.hpp>
+#include <tinycoro/tinycoro_all.h>
 
 #include "mock/CoroutineHandleMock.h"
 
@@ -191,6 +191,20 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend)
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 }
 
+TEST(BarrierTest, BarrierTest_await_ready_and_suspend_ready)
+{
+    tinycoro::Barrier barrier{2};
+
+    barrier.Arrive();
+
+    auto awaiter = barrier.ArriveAndWait();
+
+    EXPECT_TRUE(awaiter.await_ready());
+
+    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    EXPECT_FALSE(awaiter.await_suspend(hdl));
+}
+
 TEST(BarrierTest, BarrierTest_notifyAndComplition)
 {
     BarrierComplitionMock complitionMock;
@@ -206,4 +220,41 @@ TEST(BarrierTest, BarrierTest_notifyAndComplition)
     barrier.Arrive();
     barrier.Arrive();
     barrier.Arrive();
+}
+
+TEST_P(BarrierTest, BarrierFunctionalTest)
+{
+    const size_t count = GetParam();
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    BarrierComplitionMock complitionMock;
+    tinycoro::Barrier barrier{count, complitionMock};
+
+    EXPECT_CALL(*complitionMock.mock, Invoke()).Times(3);
+
+    std::atomic<size_t> number{};
+
+    auto task = [&]() -> tinycoro::Task<void>
+    {
+        number++;
+        co_await barrier.ArriveAndWait();
+        EXPECT_EQ(count, number);
+
+        co_await barrier.ArriveAndWait();
+        number--;
+        
+        co_await barrier.ArriveAndWait();
+        EXPECT_EQ(0, number);
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for(size_t i=0; i < count; ++i)
+    {
+        tasks.push_back(task());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+
+    EXPECT_EQ(number, 0);
 }
