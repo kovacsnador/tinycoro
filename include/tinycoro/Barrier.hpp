@@ -10,11 +10,19 @@
 #include "Exception.hpp"
 
 namespace tinycoro {
+
+    namespace concepts
+    {
+        template<typename T>
+        concept Integral = std::integral<T> || std::unsigned_integral<T>;
+    }
+
     namespace detail {
 
         namespace local {
-
-            auto Decrement(auto value, auto reset)
+            
+            template<concepts::Integral T>
+            T Decrement(T value, T reset)
             {
                 if (value > 0)
                 {
@@ -33,12 +41,12 @@ namespace tinycoro {
         class BarrierAwaiter
         {
         public:
-            template<typename BarrierT>
+            template <typename BarrierT>
             BarrierAwaiter(BarrierT& barrier, EventT event, bool ready)
             : _event{std::move(event)}
             , _ready{ready}
             {
-                if(_ready == false)
+                if (_ready == false)
                 {
                     barrier.Add(this);
                 }
@@ -46,7 +54,11 @@ namespace tinycoro {
 
             BarrierAwaiter(BarrierAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept { return _ready; }
+            [[nodiscard]] bool await_ready() noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _ready;
+            }
 
             bool await_suspend(auto parentCoro)
             {
@@ -104,83 +116,82 @@ namespace tinycoro {
 
         [[nodiscard]] auto Wait()
         {
+            std::scoped_lock lock{_mtx};
             return _Wait(false);
         }
 
         bool Arrive()
         {
             std::unique_lock lock{_mtx};
+            return _Arrive(lock);
+        }
 
+        [[nodiscard]] auto ArriveAndWait()
+        {
+            std::unique_lock lock{_mtx};
+
+            auto ready = _Arrive(lock);
+            return _Wait(ready);
+        }
+
+        bool ArriveAndDrop()
+        {
+            std::unique_lock lock{_mtx};
+
+            // drop the total count
+            if (_total > 1)
+            {
+                --_total;
+            }
+
+            return _Arrive(lock);
+        }
+
+    private:
+        template <typename MutexT>
+        [[nodiscard]] bool _Arrive(std::unique_lock<MutexT>& lock)
+        {
+            auto before = _current;
             _current = detail::local::Decrement(_current, _total);
 
-            if (_current == _total)
+            if (before == 1)
             {
                 auto waiters = _waiters.steal();
+
+                // call complition callback
+                Complete();
+
+                // unlock
                 lock.unlock();
 
                 // notify all waiters
-                CompleteAndNotifyAll(waiters);
+                NotifyAll(waiters);
 
                 return true;
             }
             return false;
         }
 
-        [[nodiscard]] auto ArriveAndWait()
+        [[nodiscard]] auto _Wait(bool ready) { return awaiter_type{*this, PauseCallbackEvent{}, ready}; }
+
+        void Add(awaiter_type* waiter) { _waiters.push(waiter); }
+
+        void NotifyAll(awaiter_type* top)
         {
-            auto ready = Arrive();
-            return _Wait(ready);
-        }
-
-        void ArriveAndDrop()
-        {
-            std::unique_lock lock{_mtx};
-
-            // drop the total count
-            if (_total > 0)
-            {
-                --_total;
-            }
-
-            // decrement to _current count
-            auto before = _current;
-            _current    = detail::local::Decrement(_current, _total);
-
-            if (before == 1)
-            {
-                auto waiters = _waiters.steal();
-                lock.unlock();
-
-                // notify all waiters
-                CompleteAndNotifyAll(waiters);
-            }
-        }
-
-    private:
-        [[nodiscard]] auto _Wait(bool ready)
-        {
-            return awaiter_type{*this, PauseCallbackEvent{}, ready};
-        }
-
-        void Add(awaiter_type* waiter)
-        {
-            std::scoped_lock lock{_mtx};
-            _waiters.push(waiter);
-        }
-
-        void CompleteAndNotifyAll(awaiter_type* top)
-        {
-            if constexpr (std::invocable<CompletionCallbackT>)
-            {
-                // invoke the complition callback
-                std::invoke(_complitionCallback);
-            }
-
             while (top)
             {
                 auto next = top->next;
                 top->Notify();
                 top = next;
+            }
+        }
+
+        void Complete()
+        {
+            if constexpr (std::invocable<CompletionCallbackT>)
+            {
+                // invoke the complition callback
+                std::invoke(_complitionCallback);
             }
         }
 

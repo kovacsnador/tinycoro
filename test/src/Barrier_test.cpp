@@ -249,7 +249,7 @@ TEST_P(BarrierTest, BarrierFunctionalTest)
     };
 
     std::vector<tinycoro::Task<void>> tasks;
-    for(size_t i=0; i < count; ++i)
+    for(size_t i = 0; i < count; ++i)
     {
         tasks.push_back(task());
     }
@@ -257,4 +257,61 @@ TEST_P(BarrierTest, BarrierFunctionalTest)
     tinycoro::GetAll(scheduler, tasks);
 
     EXPECT_EQ(number, 0);
+}
+
+struct BarrierTest3 : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(BarrierTest3, BarrierTest3, testing::Values(1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1));
+
+TEST_P(BarrierTest3, BarrierFunctionalTest2)
+{
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    std::vector<std::string> workers = {"Anil", "Busara", "Carl"};
+
+    size_t completionCount{};
+ 
+    auto on_completion = [&]() noexcept
+    {
+        // locking not needed here
+        if(completionCount == 0)
+        {
+            for(const auto& it : workers)
+            {
+                EXPECT_NE(it.find("worked"), std::string::npos);
+            }
+        }
+        else if(completionCount == 1)
+        {
+            for(const auto& it : workers)
+            {
+                EXPECT_NE(it.find("cleand"), std::string::npos);
+            }
+        }
+
+        ++completionCount;
+    };
+ 
+    tinycoro::Barrier sync_point(std::ssize(workers), on_completion);
+ 
+    auto work = [&sync_point](std::string& name) -> tinycoro::Task<std::string>
+    {
+        name += " worked";
+        co_await sync_point.ArriveAndWait();
+ 
+        name += " cleand";
+        co_await sync_point.ArriveAndWait();
+
+        co_return name;
+    };
+ 
+    auto [anil, busara, carl] = tinycoro::GetAll(scheduler, work(workers[0]), work(workers[1]), work(workers[2]));
+
+    EXPECT_EQ(anil, workers[0]);
+    EXPECT_EQ(busara, workers[1]);
+    EXPECT_EQ(carl, workers[2]);
+
+    EXPECT_EQ(completionCount, 2);
 }
