@@ -9,7 +9,7 @@ struct BarrierTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(BarrierTest, BarrierTest, testing::Values(1, 5, 10, 100, 1000));
+INSTANTIATE_TEST_SUITE_P(BarrierTest, BarrierTest, testing::Values(1, 5, 10, 100, 1000, 10000));
 
 TEST_P(BarrierTest, BarrierTest_arrive)
 {
@@ -135,15 +135,33 @@ struct BarrierComplitionMock
 {
     struct ImplMock
     {
-        MOCK_METHOD(void, Invoke, ());
+        MOCK_METHOD(void, Invoke, (), (const));
     };
 
     BarrierComplitionMock() { mock = std::make_shared<ImplMock>(); }
 
-    void operator()() { mock->Invoke(); }
+    void operator()() const { mock->Invoke(); }
 
     std::shared_ptr<ImplMock> mock;
 };
+
+TEST(BarrierTest, BarrierTest_safeInvoke)
+{
+    // callable mock
+    BarrierComplitionMock mock;
+
+    EXPECT_CALL(*mock.mock, Invoke()).Times(2);
+
+    EXPECT_TRUE(tinycoro::detail::local::SafeRegularInvoke(mock));
+    EXPECT_TRUE(tinycoro::detail::local::SafeRegularInvoke(mock));
+
+    struct NotCallable
+    {
+    };
+
+    EXPECT_FALSE(tinycoro::detail::local::SafeRegularInvoke(NotCallable{}));
+    EXPECT_FALSE(tinycoro::detail::local::SafeRegularInvoke(int32_t{}));
+}
 
 TEST(BarrierTest, BarrierTest_arriveAndWait_after)
 {
@@ -158,7 +176,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait_after)
 
     EXPECT_TRUE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -172,7 +190,7 @@ TEST_P(BarrierTest, BarrierTest_complitionCallback_arrive)
 
     EXPECT_CALL(*complitionMock.mock, Invoke()).Times(2);
 
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         barrier.Arrive();
         barrier.Arrive();
@@ -187,7 +205,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 }
 
@@ -201,7 +219,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend_ready)
 
     EXPECT_TRUE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -222,34 +240,33 @@ TEST(BarrierTest, BarrierTest_notifyAndComplition)
     barrier.Arrive();
 }
 
-TEST_P(BarrierTest, BarrierFunctionalTest)
+TEST_P(BarrierTest, BarrierFunctionalTest_1)
 {
     const size_t count = GetParam();
 
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     BarrierComplitionMock complitionMock;
-    tinycoro::Barrier barrier{count, complitionMock};
+    tinycoro::Barrier     barrier{count, complitionMock};
 
     EXPECT_CALL(*complitionMock.mock, Invoke()).Times(3);
 
     std::atomic<size_t> number{};
 
-    auto task = [&]() -> tinycoro::Task<void>
-    {
+    auto task = [&]() -> tinycoro::Task<void> {
         number++;
         co_await barrier.ArriveAndWait();
         EXPECT_EQ(count, number);
 
         co_await barrier.ArriveAndWait();
         number--;
-        
+
         co_await barrier.ArriveAndWait();
         EXPECT_EQ(0, number);
     };
 
     std::vector<tinycoro::Task<void>> tasks;
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         tasks.push_back(task());
     }
@@ -259,33 +276,26 @@ TEST_P(BarrierTest, BarrierFunctionalTest)
     EXPECT_EQ(number, 0);
 }
 
-struct BarrierTest3 : testing::TestWithParam<size_t>
-{
-};
-
-INSTANTIATE_TEST_SUITE_P(BarrierTest3, BarrierTest3, testing::Values(1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1));
-
-TEST_P(BarrierTest3, BarrierFunctionalTest2)
+TEST(BarrierTest, BarrierFunctionalTest_2)
 {
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     std::vector<std::string> workers = {"Anil", "Busara", "Carl"};
 
     size_t completionCount{};
- 
-    auto on_completion = [&]() noexcept
-    {
+
+    auto on_completion = [&]() noexcept {
         // locking not needed here
-        if(completionCount == 0)
+        if (completionCount == 0)
         {
-            for(const auto& it : workers)
+            for (const auto& it : workers)
             {
                 EXPECT_NE(it.find("worked"), std::string::npos);
             }
         }
-        else if(completionCount == 1)
+        else if (completionCount == 1)
         {
-            for(const auto& it : workers)
+            for (const auto& it : workers)
             {
                 EXPECT_NE(it.find("cleand"), std::string::npos);
             }
@@ -293,20 +303,19 @@ TEST_P(BarrierTest3, BarrierFunctionalTest2)
 
         ++completionCount;
     };
- 
+
     tinycoro::Barrier sync_point(std::ssize(workers), on_completion);
- 
-    auto work = [&sync_point](std::string& name) -> tinycoro::Task<std::string>
-    {
+
+    auto work = [&sync_point](std::string& name) -> tinycoro::Task<std::string> {
         name += " worked";
         co_await sync_point.ArriveAndWait();
- 
+
         name += " cleand";
         co_await sync_point.ArriveAndWait();
 
         co_return name;
     };
- 
+
     auto [anil, busara, carl] = tinycoro::GetAll(scheduler, work(workers[0]), work(workers[1]), work(workers[2]));
 
     EXPECT_EQ(anil, workers[0]);
@@ -314,4 +323,210 @@ TEST_P(BarrierTest3, BarrierFunctionalTest2)
     EXPECT_EQ(carl, workers[2]);
 
     EXPECT_EQ(completionCount, 2);
+}
+
+TEST(BarrierTest, BarrierFewerTasksThanCount)
+{
+    // Set up a scheduler for the tasks
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    // Barrier that requires 3 arrivals to complete
+    constexpr size_t barrier_count    = 3;
+    size_t           completion_count = 0;
+
+    std::atomic<bool> waiter{false};
+
+    // Completion function for the barrier
+    auto on_completion = [&]() noexcept { ++completion_count; };
+
+    // Create a barrier with 4 as the count
+    tinycoro::Barrier barrier{barrier_count, on_completion};
+    tinycoro::Barrier control{2};
+
+    // Atomic variable to track state between tasks
+    std::atomic<size_t> number = 0;
+
+    // Define a task that uses the barrier
+    auto task = [&]() -> tinycoro::Task<void> {
+        number++;
+        control.Arrive();
+        co_await barrier.ArriveAndWait(); // Task will wait here as the barrier needs 4 arrivals
+        // This line should not be executed as there are fewer tasks than needed
+        number += 100;
+        control.Arrive();
+    };
+
+    // Define a task that uses the barrier
+    auto controlTask = [&]() -> tinycoro::Task<void> {
+        // wait for controll barrier
+        co_await control;
+
+        // Validate expectations
+        EXPECT_EQ(number, 2); // Number should remain 2 as tasks can't proceed past the barrier
+        EXPECT_EQ(completion_count, 0); // Completion function should not be called as the barrier was never satisfied
+
+        // decrement barrier
+        barrier.ArriveAndDrop();
+
+        // wait to
+        co_await control;
+
+        // Validate expectations
+        EXPECT_EQ(number, 202);
+        EXPECT_EQ(completion_count, 1);
+    };
+
+    // Run all tasks
+    tinycoro::GetAll(scheduler, task(), task(), controlTask());
+
+    EXPECT_EQ(number, 202);
+    EXPECT_EQ(completion_count, 1);
+}
+
+TEST(BarrierTest, BarrierFewerTasksThanCount_withControlComplitionCallback)
+{
+    // Set up a scheduler for the tasks
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    // Barrier that requires 3 arrivals to complete
+    constexpr size_t barrier_count    = 3;
+    size_t           completion_count = 0;
+
+    std::atomic<bool> waiter{false};
+
+    // Completion function for the barrier
+    auto on_completion = [&]() noexcept { ++completion_count; };
+
+    // Create a barrier with 4 as the count
+    tinycoro::Barrier barrier{barrier_count, on_completion};
+
+    // Atomic variable to track state between tasks
+    std::atomic<size_t> number = 0;
+
+    auto controllComplition = [&]() noexcept {
+        EXPECT_EQ((completion_count * 200 + 2), number);
+
+        // drop the 3. count
+        barrier.ArriveAndDrop();
+    };
+
+    tinycoro::Barrier control{2, controllComplition};
+
+    // Define a task that uses the barrier
+    auto task = [&]() -> tinycoro::Task<void> {
+        number++;
+        control.Arrive();
+        co_await barrier.ArriveAndWait(); // Task will wait here as the barrier needs 4 arrivals
+        // This line should not be executed as there are fewer tasks than needed
+        number += 100;
+        control.Arrive();
+    };
+
+    // Run all tasks
+    tinycoro::GetAll(scheduler, task(), task());
+
+    EXPECT_EQ(number, 202);
+    EXPECT_EQ(completion_count, 1);
+}
+
+/*TEST(BarrierTest, BarrierTest_completionException)
+{
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    auto onComplition = [] { throw std::runtime_error{"Test Error"}; };
+
+    size_t fullyCompleted{0};
+
+    tinycoro::Barrier barrier{2, onComplition};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        co_await barrier.ArriveAndWait();
+        fullyCompleted++;
+    };
+
+    EXPECT_THROW(tinycoro::GetAll(scheduler, task(), task()), std::runtime_error);
+    EXPECT_EQ(fullyCompleted, 1);
+}*/
+
+TEST_P(BarrierTest, BarrierTest_functionalTest_3)
+{
+    auto count = GetParam();
+
+    count = std::max(count, size_t{2});
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    std::atomic<size_t> controlCount{0};
+
+    size_t c{1};
+
+    auto onComplition = [&] {
+        EXPECT_EQ(controlCount, count * c);
+        c++;
+    };
+
+    tinycoro::Barrier barrier{count, onComplition};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        controlCount++;
+        co_await barrier.ArriveAndWait();
+        controlCount++;
+        co_await barrier.ArriveAndWait();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(task());
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+}
+
+struct BarrierFunctionalTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(BarrierFunctionalTest, BarrierFunctionalTest, testing::Values(2, 5, 10, 100, 200, 300));
+
+TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
+{
+    auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    size_t controlCount{0};
+
+    size_t c{1};
+
+    auto onComplition = [&] {
+        EXPECT_EQ(controlCount, c);
+        c++;
+    };
+
+    tinycoro::Barrier barrier{count, onComplition};
+
+    auto arrivel = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            co_await barrier.ArriveAndWait();
+        }
+    };
+
+    auto worker = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            controlCount++;
+            co_await barrier.ArriveAndWait();
+        }
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count - 1; ++i)
+    {
+        tasks.push_back(arrivel());
+    }
+    tasks.push_back(worker());
+
+    tinycoro::GetAll(scheduler, tasks);
 }

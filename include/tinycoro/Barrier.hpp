@@ -8,20 +8,20 @@
 #include "LinkedPtrStack.hpp"
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
+#include "Finally.hpp"
 
 namespace tinycoro {
 
-    namespace concepts
-    {
-        template<typename T>
+    namespace concepts {
+        template <typename T>
         concept Integral = std::integral<T> || std::unsigned_integral<T>;
     }
 
     namespace detail {
 
         namespace local {
-            
-            template<concepts::Integral T>
+
+            template <concepts::Integral T>
             T Decrement(T value, T reset)
             {
                 if (value > 0)
@@ -29,6 +29,18 @@ namespace tinycoro {
                     return --value ? value : reset;
                 }
                 return reset;
+            }
+
+            template <typename PossibleCallableT>
+            bool SafeRegularInvoke(const PossibleCallableT& maybeCallable)
+            {
+                if constexpr (std::regular_invocable<PossibleCallableT>)
+                {
+                    // invoke the complition callback
+                    std::invoke(maybeCallable);
+                    return true;
+                }
+                return false;
             }
 
         } // namespace local
@@ -152,20 +164,25 @@ namespace tinycoro {
         [[nodiscard]] bool _Arrive(std::unique_lock<MutexT>& lock)
         {
             auto before = _current;
-            _current = detail::local::Decrement(_current, _total);
+            _current    = detail::local::Decrement(_current, _total);
 
             if (before == 1)
             {
                 auto waiters = _waiters.steal();
 
+                // to support exceptions in complition handler
+                auto finalAction = Finally([this, waiters] { 
+                    // notify all waiters
+                    NotifyAll(waiters);
+                });
+
                 // call complition callback
-                Complete();
+                detail::local::SafeRegularInvoke(_complitionCallback);
 
                 // unlock
                 lock.unlock();
 
-                // notify all waiters
-                NotifyAll(waiters);
+                //NotifyAll(waiters);
 
                 return true;
             }
@@ -183,15 +200,6 @@ namespace tinycoro {
                 auto next = top->next;
                 top->Notify();
                 top = next;
-            }
-        }
-
-        void Complete()
-        {
-            if constexpr (std::invocable<CompletionCallbackT>)
-            {
-                // invoke the complition callback
-                std::invoke(_complitionCallback);
             }
         }
 

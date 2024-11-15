@@ -24,7 +24,7 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    template <std::unsigned_integral auto BUFFER_SIZE = 48u>
+    template <std::unsigned_integral auto BUFFER_SIZE = 256u>
     struct PackagedTask
     {
         using PauseCallbackType = std::function<void()>;
