@@ -4,7 +4,6 @@
 #include <concepts>
 #include <variant>
 
-#include "StaticStorage.hpp"
 #include "Common.hpp"
 #include "Exception.hpp"
 
@@ -24,7 +23,6 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    template <std::unsigned_integral auto BUFFER_SIZE = 48u>
     struct PackagedTask
     {
         using PauseCallbackType = std::function<void()>;
@@ -99,9 +97,6 @@ namespace tinycoro {
             FutureStateT _futureState;
         };
 
-        using StaticStorageType  = detail::StaticStorage<ISchedulableBridged, BUFFER_SIZE>;
-        using DynamicStorageType = std::unique_ptr<ISchedulableBridged>;
-
     public:
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
             requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedTask>)
@@ -109,31 +104,23 @@ namespace tinycoro {
         : id{pauseId}
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
-
-            if constexpr (sizeof(BridgeType) <= BUFFER_SIZE)
-            {
-                _bridge = StaticStorageType{std::type_identity<BridgeType>{}, std::move(coro), std::move(futureState)};
-            }
-            else
-            {
-                _bridge = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
-            }
+            _pimpl = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
         }
 
         ETaskResumeState operator()()
         {
-            return std::visit([](auto& bridge) { return bridge->Resume(); }, _bridge);
+            return _pimpl->Resume();
         }
 
         bool IsPaused() const noexcept
         {
-            return std::visit([](auto& bridge) { return bridge->IsPaused(); }, _bridge);
+            return _pimpl->IsPaused();
         }
 
         const uint64_t id;
 
     private:
-        std::variant<StaticStorageType, DynamicStorageType> _bridge;
+        std::unique_ptr<ISchedulableBridged> _pimpl{};
     };
 
 } // namespace tinycoro

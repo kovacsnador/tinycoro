@@ -11,7 +11,6 @@
 #include "Generator.hpp"
 #include "PackagedTask.hpp"
 #include "Scheduler.hpp"
-#include "StaticStorage.hpp"
 #include "StopSourceAwaiter.hpp"
 #include "SleepAwaiter.hpp"
 #include "Wait.hpp"
