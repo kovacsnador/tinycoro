@@ -7,7 +7,6 @@
 #include "Common.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
-#include "StaticStorage.hpp"
 
 namespace tinycoro {
 
@@ -103,7 +102,7 @@ namespace tinycoro {
         template <typename PromiseT, template <typename> class HandleT>
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle(HandleT<PromiseT> hdl)
-        : _bridge{std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl}
+        : _pimpl{std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl)}
         {
         }
 
@@ -111,7 +110,7 @@ namespace tinycoro {
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
-            _bridge = decltype(_bridge){std::type_identity<detail::CoroHandleBridgeImpl<PromiseT>>{}, hdl};
+            _pimpl = std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
             return *this;
         }
 
@@ -119,51 +118,51 @@ namespace tinycoro {
 
         PackedCoroHandle& operator=(std::nullptr_t)
         {
-            _bridge.reset();
+            _pimpl.reset();
             return *this;
         }
 
         [[nodiscard]] PackedCoroHandle& Child()
         {
-            if (_bridge == nullptr)
+            if (_pimpl == nullptr)
             {
                 throw CoroHandleException("No Child coroutine");
             }
-            return _bridge->Child();
+            return _pimpl->Child();
         }
 
         [[nodiscard]] PackedCoroHandle& Parent()
         {
-            if (_bridge == nullptr)
+            if (_pimpl == nullptr)
             {
                 throw CoroHandleException("No Parent coroutine");
             }
-            return _bridge->Parent();
+            return _pimpl->Parent();
         }
 
         [[nodiscard]] std::coroutine_handle<> Handle()
         {
-            if (_bridge)
+            if (_pimpl)
             {
-                return _bridge->Handle();
+                return _pimpl->Handle();
             }
             return std::noop_coroutine();
         }
 
         [[nodiscard]] bool Done() const
         {
-            if (_bridge)
+            if (_pimpl)
             {
-                return _bridge->Done();
+                return _pimpl->Done();
             }
             return true;
         }
 
         [[nodiscard]] auto ResumeState() const
         {
-            if (_bridge)
+            if (_pimpl)
             {
-                return _bridge->ResumeState();
+                return _pimpl->ResumeState();
             }
 
             return ETaskResumeState::DONE;
@@ -171,9 +170,9 @@ namespace tinycoro {
 
         [[nodiscard]] ETaskResumeState Resume()
         {
-            if (_bridge)
+            if (_pimpl)
             {
-                if (auto hdl = _bridge->Handle(); hdl)
+                if (auto hdl = _pimpl->Handle(); hdl)
                 {
                     hdl.resume();
                 }
@@ -184,16 +183,16 @@ namespace tinycoro {
 
         void ReleaseHandle()
         {
-            if (_bridge)
+            if (_pimpl)
             {
-                return _bridge->ReleaseHandle();
+                return _pimpl->ReleaseHandle();
             }
         }
 
-        operator bool() const noexcept { return _bridge != nullptr && _bridge->Handle(); }
+        operator bool() const noexcept { return _pimpl != nullptr && _pimpl->Handle(); }
 
     private:
-        detail::StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _bridge;
+        std::unique_ptr<detail::ICoroHandleBridge> _pimpl;
     };
 
 } // namespace tinycoro

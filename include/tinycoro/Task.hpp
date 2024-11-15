@@ -8,7 +8,6 @@
 #include <stop_token>
 
 #include "Common.hpp"
-#include "StaticStorage.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
 #include "Promise.hpp"

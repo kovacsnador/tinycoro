@@ -29,12 +29,6 @@ namespace tinycoro
         using BaseT::BaseT;
     };
 
-    struct StaticStorageException : std::runtime_error
-    {
-        using BaseT = std::runtime_error;
-        using BaseT::BaseT;
-    };
-
     struct SingleEventException : std::runtime_error
     {
         using BaseT = std::runtime_error;
