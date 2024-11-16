@@ -22,7 +22,7 @@ namespace tinycoro {
         namespace local {
 
             template <concepts::Integral T>
-            T Decrement(T value, T reset)
+            constexpr T Decrement(T value, T reset)
             {
                 if (value > 0)
                 {
@@ -43,71 +43,82 @@ namespace tinycoro {
                 return false;
             }
 
+            void NotifyAll(auto* awaiter)
+            {
+                while (awaiter)
+                {
+                    auto next = awaiter->next;
+                    awaiter->Notify();
+                    awaiter = next;
+                }
+            }
+
         } // namespace local
 
         struct NoopComplitionCallback
         {
         };
 
-        template <typename EventT>
+        enum class EBarrierAwaiterState
+        {
+            WAIT,
+            ARRIVE_AND_WAIT,
+            ARRIVE_AND_DROP
+        };
+
+        template <typename BarrierT, typename EventT>
         class BarrierAwaiter
         {
         public:
-            template <typename BarrierT>
-            BarrierAwaiter(BarrierT& barrier, EventT event, bool ready)
-            : _event{std::move(event)}
-            , _ready{ready}
+            BarrierAwaiter(BarrierT& barrier, EventT event, EBarrierAwaiterState policy)
+            : _barrier{barrier}
+            , _event{std::move(event)}
+            , _policy{policy}
             {
-                if (_ready == false)
-                {
-                    barrier.Add(this);
-                }
             }
 
             BarrierAwaiter(BarrierAwaiter&&) = delete;
 
-            [[nodiscard]] bool await_ready() noexcept
-            {
-                std::scoped_lock lock{_mtx};
-                return _ready;
-            }
+            [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-            bool await_suspend(auto parentCoro)
+            [[nodiscard]] bool await_suspend(auto parentCoro)
             {
-                std::scoped_lock lock{_mtx};
-                if (_ready == false)
+                PutOnPause(parentCoro);
+                if (_barrier.Add(this, _policy) == false)
                 {
-                    // Put on pause
-                    _event.Set(PauseHandler::PauseTask(parentCoro));
-                    return true;
+                    ResumeFromPause(parentCoro);
+                    return false;
                 }
-                return false;
+                return true;
             }
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify()
+            void Notify() const { _event.Notify(); }
+
+            void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
+
+            void ResumeFromPause(auto parentCoro)
             {
-                std::scoped_lock lock{_mtx};
-                _ready = true;
-                _event.Notify();
+                _event.Set(nullptr);
+                PauseHandler::UnpauseTask(parentCoro);
             }
 
             BarrierAwaiter* next{nullptr};
 
         private:
-            EventT _event;
-            bool   _ready;
+            BarrierT& _barrier;
+            EventT    _event;
 
-            std::mutex _mtx;
+            EBarrierAwaiterState _policy;
         };
     } // namespace detail
 
-    template <typename CompletionCallbackT = detail::NoopComplitionCallback, template <typename> class AwaiterT = detail::BarrierAwaiter>
+    template <typename CompletionCallbackT = detail::NoopComplitionCallback, template <typename, typename> class AwaiterT = detail::BarrierAwaiter>
     class Barrier
     {
-        using awaiter_type = AwaiterT<PauseCallbackEvent>;
-        friend class AwaiterT<PauseCallbackEvent>;
+        using awaiter_type = AwaiterT<Barrier, PauseCallbackEvent>;
+        friend class AwaiterT<Barrier, PauseCallbackEvent>;
 
     public:
         Barrier(size_t initCount, CompletionCallbackT callback = {})
@@ -126,11 +137,7 @@ namespace tinycoro {
 
         [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-        [[nodiscard]] auto Wait()
-        {
-            std::scoped_lock lock{_mtx};
-            return _Wait(false);
-        }
+        [[nodiscard]] auto Wait() { return MakeAwaiter(detail::EBarrierAwaiterState::WAIT); }
 
         bool Arrive()
         {
@@ -138,31 +145,26 @@ namespace tinycoro {
             return _Arrive(lock);
         }
 
-        [[nodiscard]] auto ArriveAndWait()
-        {
-            std::unique_lock lock{_mtx};
-
-            auto ready = _Arrive(lock);
-            return _Wait(ready);
-        }
+        [[nodiscard]] auto ArriveAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_WAIT); }
 
         bool ArriveAndDrop()
         {
             std::unique_lock lock{_mtx};
 
             // drop the total count
-            if (_total > 1)
-            {
-                --_total;
-            }
+            DecrementTotal();
 
             return _Arrive(lock);
         }
+
+        [[nodiscard]] auto ArriveDropAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_DROP); }
 
     private:
         template <typename MutexT>
         [[nodiscard]] bool _Arrive(std::unique_lock<MutexT>& lock)
         {
+            assert(lock.owns_lock());
+
             auto before = _current;
             _current    = detail::local::Decrement(_current, _total);
 
@@ -171,35 +173,60 @@ namespace tinycoro {
                 auto waiters = _waiters.steal();
 
                 // to support exceptions in complition handler
-                auto finalAction = Finally([this, waiters] { 
+                auto finalAction = Finally([waiters] {
                     // notify all waiters
-                    NotifyAll(waiters);
+                    detail::local::NotifyAll(waiters);
                 });
 
                 // call complition callback
                 detail::local::SafeRegularInvoke(_complitionCallback);
 
-                // unlock
+                // unlock the mutex
                 lock.unlock();
-
-                //NotifyAll(waiters);
 
                 return true;
             }
             return false;
         }
 
-        [[nodiscard]] auto _Wait(bool ready) { return awaiter_type{*this, PauseCallbackEvent{}, ready}; }
+        [[nodiscard]] auto MakeAwaiter(detail::EBarrierAwaiterState policy) { return awaiter_type{*this, PauseCallbackEvent{}, policy}; }
 
-        void Add(awaiter_type* waiter) { _waiters.push(waiter); }
-
-        void NotifyAll(awaiter_type* top)
+        [[nodiscard]] bool Add(awaiter_type* waiter, detail::EBarrierAwaiterState policy)
         {
-            while (top)
+            std::unique_lock lock{_mtx};
+
+            using enum detail::EBarrierAwaiterState;
+
+            bool ready = false;
+
+            if (policy == ARRIVE_AND_WAIT)
             {
-                auto next = top->next;
-                top->Notify();
-                top = next;
+                ready = _Arrive(lock);
+            }
+            else if (policy == ARRIVE_AND_DROP)
+            {
+                // drop the total count
+                DecrementTotal();
+
+                ready = _Arrive(lock);
+            }
+
+            if (ready == false)
+            {
+                // _mtx still holds the lock
+                assert(lock.owns_lock());
+
+                _waiters.push(waiter);
+            }
+
+            return !ready;
+        }
+
+        void DecrementTotal() noexcept
+        {
+            if (_total > 1)
+            {
+                --_total;
             }
         }
 
