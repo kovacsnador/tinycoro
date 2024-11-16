@@ -48,10 +48,12 @@ jobs:
           lcov --remove coverage.info '/usr/*' '*/test/*' '*/example/*' --output-file coverage.info
           lcov --list coverage.info
       working-directory: ${{ github.workspace }}
-
+      
     - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
-        file: coverage.info
+        files: coverage.info
+        token: ${{secrets.CODECOV_TOKEN}}
+        verbose: true
         flags: unittests
         name: codecov-coverage
