@@ -21,5 +21,6 @@
 #include "ManualEvent.hpp"
 #include "AutoEvent.hpp"
 #include "BufferedChannel.hpp"
+#include "Barrier.hpp"
 
 #endif //!__TINY_CORO_TINY_CORO_ALL_H__

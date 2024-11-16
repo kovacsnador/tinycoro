@@ -167,6 +167,7 @@ catch(const std::exception& e)
     - [AutoEvent](#autoevent)
     - [SingleEvent](#singleevent)
     - [Latch](#latch)
+    - [Barrier](#barrier)
     - [BufferedChannel](#bufferedchannel)
 * [Warning](#warning)
 * [Contributing](#contributing)
@@ -701,6 +702,31 @@ void Producer()
     
     // count down latch.
     latch.CountDown();
+};
+```
+
+### `Barrier`
+
+`tinycoro::Barrier` is a robust synchronization primitive designed to coordinate a group of coroutines, ensuring they all reach a common synchronization point before proceeding. It supports phased synchronization, auto-resets, and provides the flexibility of a completion handler, which can be invoked when all participants have arrived. This enables efficient multi-stage coordination across asynchronous tasks.
+
+You can use the built-in awaiters, such as `Wait()`, `ArriveAndWait()`, and `ArriveWaitAndDrop()`, to achieve flexible and efficient synchronization.
+```cpp
+
+auto onCompletion = []{ std::cout << "phrase completed\n"; };
+
+tinycoro::Barrier barrier{8, onCompletion};
+
+tinycoro::Task<void> Waiter()
+{
+    // decrements the count and waits for the next phrase
+    co_await barrier.ArriveAndWait();
+
+    // do something...
+
+    // again, decrements the count and waits for the next phrase
+    co_await barrier.ArriveAndWait();
+
+    // do something...
 };
 ```
 ### `BufferedChannel`
