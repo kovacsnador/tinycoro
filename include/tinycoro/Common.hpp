@@ -20,6 +20,9 @@ namespace tinycoro {
         template <typename T>
         concept NonIterable = !Iterable<T>;
 
+        template<typename T>
+        concept HasVirtualDestructor = std::has_virtual_destructor_v<T>;
+
     } // namespace concepts
 
     enum class ETaskResumeState

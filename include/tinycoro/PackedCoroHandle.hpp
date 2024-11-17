@@ -7,6 +7,7 @@
 #include "Common.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
+#include "StaticStorage.hpp"
 
 namespace tinycoro {
 
@@ -102,17 +103,23 @@ namespace tinycoro {
         template <typename PromiseT, template <typename> class HandleT>
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle(HandleT<PromiseT> hdl)
-        : _pimpl{std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl)}
         {
+            _pimpl.Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
         }
 
         template <typename PromiseT, template <typename> class HandleT>
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
-            _pimpl = std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
+            // possible PromiseT type changes. reset required
+            _pimpl.reset();
+            _pimpl.Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
+
             return *this;
         }
+
+        // disable copy and move
+        PackedCoroHandle(PackedCoroHandle&&) = delete;
 
         PackedCoroHandle(std::nullptr_t) { }
 
@@ -192,7 +199,9 @@ namespace tinycoro {
         operator bool() const noexcept { return _pimpl != nullptr && _pimpl->Handle(); }
 
     private:
-        std::unique_ptr<detail::ICoroHandleBridge> _pimpl;
+        detail::StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _pimpl;
+
+        //std::unique_ptr<detail::ICoroHandleBridge> _pimpl;
     };
 
 } // namespace tinycoro
