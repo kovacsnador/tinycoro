@@ -21,6 +21,9 @@ namespace tinycoro { namespace detail {
             reset();
         }
 
+        // disable copy and move
+        StaticStorage(StaticStorage&&) = delete;
+
         template <typename ClassT, typename... Args>
             requires std::constructible_from<ClassT, Args...> &&
                      (SIZE >= sizeof(ClassT)) && (alignof(AlignmentT) >= alignof(ClassT)) &&

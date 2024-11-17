@@ -1,90 +1,15 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
-#include <string>
-
-#include "tinycoro/StaticStorage.hpp"
+#include <tinycoro/DynamicStorage.hpp>
 
 #include "mock/StorageTracer.h"
 
-struct Base
-{
-    Base(int bb, std::function<void()> f = []{}) 
-    : b{bb}
-    , func(f)
-    {}
-
-    virtual ~Base()
-    {
-        if(func)
-        {
-            func();
-        }
-    }
-
-    int b{41};
-    std::function<void()> func;
-};
-
-struct Derived : Base
-{
-    Derived(int bb, int dd, std::function<void()> f = []{}) 
-    : Base{bb, f}
-    , d{dd}
-    , func{f}
-    {}
-
-    ~Derived()
-    {
-        if(func)
-        {
-            func();
-        }
-    }
-
-    int d{42};
-    std::function<void()> func;
-};
-
-TEST(StaticStorageTest, StaticStorage_defaultConstructor)
-{
-    tinycoro::detail::StaticStorage<Base, sizeof(Derived), Derived> storage{};
-
-    EXPECT_FALSE(storage);
-    EXPECT_TRUE(storage == nullptr);
-}
-
-TEST(StaticStorageTest, StaticStorage_Construct)
-{
-    tinycoro::detail::StaticStorage<Base, sizeof(Derived), Derived> storage{};
-
-    storage.Construct<Derived>(41, 42);
-
-    EXPECT_TRUE(storage);
-    EXPECT_TRUE(storage != nullptr);
-}
-
-TEST(StaticStorageTest, StaticStorage_Destroy)
-{
-    tinycoro::detail::StaticStorage<Base, sizeof(Derived), Derived> storage{};
-
-    size_t destructorCalled{};
-
-    storage.Construct<Derived>(41, 42, [&destructorCalled] { destructorCalled++; });
-
-    EXPECT_TRUE(storage);
-    EXPECT_TRUE(storage != nullptr);
-
-    storage.reset();
-
-    EXPECT_EQ(destructorCalled, 2);
-}
-
 using namespace tinycoro::test;
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_defaultConstructor)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_defaultConstructor)
 {
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call default constructor
     auto* tracer = storage.Construct<StorageTracer>();
@@ -98,12 +23,12 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_defaultConstructor)
 
     EXPECT_TRUE(tracer->str == "");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_constructor)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_constructor)
 {
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call constructor
     auto* tracer = storage.Construct<StorageTracer>("testString");
@@ -117,15 +42,15 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_constructor)
 
     EXPECT_TRUE(tracer->str == "testString");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_copyConstructor)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_copyConstructor)
 {
     StorageTracer copy{"123"};
     EXPECT_CALL(copy, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call copy constructor
     auto* tracer = storage.Construct<StorageTracer>(copy);
@@ -139,15 +64,15 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_copyConstructor)
 
     EXPECT_TRUE(tracer->str == "123");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_moveConstructor)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_moveConstructor)
 {
     StorageTracer other{"123"};
     EXPECT_CALL(other, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call copy constructor
     auto* tracer = storage.Construct<StorageTracer>(std::move(other));
@@ -161,15 +86,15 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_moveConstructor)
 
     EXPECT_TRUE(tracer->str == "123");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_copyAssign)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_copyAssign)
 {
     StorageTracer other{"123"};
     EXPECT_CALL(other, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call default constructor
     auto* tracer = storage.Construct<StorageTracer>();
@@ -185,15 +110,15 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_copyAssign)
 
     EXPECT_TRUE(tracer->str == "123");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_moveAssign)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_moveAssign)
 {
     StorageTracer other{"123"};
     EXPECT_CALL(other, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call default constructor
     auto* tracer = storage.Construct<StorageTracer>();
@@ -209,10 +134,10 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_moveAssign)
 
     EXPECT_TRUE(tracer->str == "123");
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_all)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_all)
 {
     StorageTracer other1{"123"};
     EXPECT_CALL(other1, Destructor).Times(1);
@@ -226,7 +151,7 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_all)
     StorageTracer other4{"65535"};
     EXPECT_CALL(other4, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     auto tracer = storage.Construct<StorageTracer>(std::move(other1));
     EXPECT_TRUE(tracer->str == "123");
@@ -247,21 +172,21 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_all)
     EXPECT_EQ(tracer->moveConstructor, 1);  // called
     EXPECT_EQ(tracer->moveAssign, 1);           // called
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_constructException)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_constructException)
 {
     StorageTracer other{"123"};
     EXPECT_CALL(other, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // call default constructor
     auto* tracer = storage.Construct<StorageTracer>();
 
     // calling construct 2. time
-    EXPECT_THROW(storage.Construct<StorageTracer>(other), tinycoro::StaticStorageException);
+    EXPECT_THROW(storage.Construct<StorageTracer>(other), tinycoro::DynamicStorageException);
     
     EXPECT_EQ(tracer->defaultConstructor, 1);   // called
     EXPECT_EQ(tracer->constructor, 0);
@@ -270,16 +195,16 @@ TEST(StaticStorageTest, StaticStorageTest_tracer_constructException)
     EXPECT_EQ(tracer->moveConstructor, 0);
     EXPECT_EQ(tracer->moveAssign, 0);
 
-    EXPECT_CALL(*storage.GetAs<StorageTracer>(), Destructor).Times(1);
+    EXPECT_CALL(*tracer, Destructor).Times(1);
 }
 
-TEST(StaticStorageTest, StaticStorageTest_tracer_assignException)
+TEST(DynamicStorageTest, DynamicStorageTest_tracer_assignException)
 {
     StorageTracer other{"123"};
     EXPECT_CALL(other, Destructor).Times(1);
 
-    tinycoro::detail::StaticStorage<StorageTracer, sizeof(StorageTracer), StorageTracer> storage;
+    tinycoro::detail::DynamicStorage<StorageTracer> storage;
 
     // calling assign on a uninitialized object
-    EXPECT_THROW(storage.Assign<StorageTracer>(other), tinycoro::StaticStorageException);
+    EXPECT_THROW(storage.Assign<StorageTracer>(other), tinycoro::DynamicStorageException);
 }
