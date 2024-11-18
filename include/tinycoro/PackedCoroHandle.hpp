@@ -3,11 +3,13 @@
 
 #include <coroutine>
 #include <concepts>
+#include <variant>
 
 #include "Common.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
 #include "StaticStorage.hpp"
+#include "DynamicStorage.hpp"
 
 namespace tinycoro {
 
@@ -97,6 +99,9 @@ namespace tinycoro {
     private:
         using UniversalBridgeT = detail::CoroHandleBridgeImpl<void>;
 
+        using StaticStorageT = detail::StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), detail::ICoroHandleBridge>;
+        using DynamicStorageT = detail::DynamicStorage<detail::ICoroHandleBridge>;
+
     public:
         PackedCoroHandle() = default;
 
@@ -104,17 +109,17 @@ namespace tinycoro {
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle(HandleT<PromiseT> hdl)
         {
-            _pimpl.Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
+            PimplConstruct<PromiseT>(hdl);
         }
 
         template <typename PromiseT, template <typename> class HandleT>
             requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
-            // possible PromiseT type changes. reset required
-            _pimpl.reset();
-            _pimpl.Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
+            // possible PromiseT type change. reset required
+            PimplReset();
 
+            PimplConstruct<PromiseT>(hdl);
             return *this;
         }
 
@@ -125,51 +130,51 @@ namespace tinycoro {
 
         PackedCoroHandle& operator=(std::nullptr_t)
         {
-            _pimpl.reset();
+            PimplReset();
             return *this;
         }
 
         [[nodiscard]] PackedCoroHandle& Child()
         {
-            if (_pimpl == nullptr)
+            if (Empty())
             {
                 throw CoroHandleException("No Child coroutine");
             }
-            return _pimpl->Child();
+            return PimplChild();
         }
 
         [[nodiscard]] PackedCoroHandle& Parent()
         {
-            if (_pimpl == nullptr)
+            if (Empty())
             {
                 throw CoroHandleException("No Parent coroutine");
             }
-            return _pimpl->Parent();
+            return PimplParent();
         }
 
         [[nodiscard]] std::coroutine_handle<> Handle()
         {
-            if (_pimpl)
+            if (Empty() == false)
             {
-                return _pimpl->Handle();
+                return PimplHandle();
             }
             return std::noop_coroutine();
         }
 
         [[nodiscard]] bool Done() const
         {
-            if (_pimpl)
+            if (Empty() == false)
             {
-                return _pimpl->Done();
+                return PimplDone();
             }
             return true;
         }
 
         [[nodiscard]] auto ResumeState() const
         {
-            if (_pimpl)
+            if (Empty() == false)
             {
-                return _pimpl->ResumeState();
+                return PimplResumeState();
             }
 
             return ETaskResumeState::DONE;
@@ -177,9 +182,9 @@ namespace tinycoro {
 
         [[nodiscard]] ETaskResumeState Resume()
         {
-            if (_pimpl)
+            if (Empty() == false)
             {
-                if (auto hdl = _pimpl->Handle(); hdl)
+                if (auto hdl = PimplHandle(); hdl)
                 {
                     hdl.resume();
                 }
@@ -190,18 +195,85 @@ namespace tinycoro {
 
         void ReleaseHandle()
         {
-            if (_pimpl)
+            if (Empty() == false)
             {
-                return _pimpl->ReleaseHandle();
+                return std::visit([](auto& p) { return p->ReleaseHandle(); }, _pimpl);
             }
         }
 
-        operator bool() const noexcept { return _pimpl != nullptr && _pimpl->Handle(); }
+        operator bool() const noexcept { return Empty() == false && PimplHandle(); }
 
     private:
-        detail::StaticStorage<detail::ICoroHandleBridge, sizeof(UniversalBridgeT), UniversalBridgeT> _pimpl;
 
-        //std::unique_ptr<detail::ICoroHandleBridge> _pimpl;
+        [[nodiscard]] constexpr bool Empty() const noexcept
+        {
+            return std::visit([](const auto& p) { return p == nullptr; }, _pimpl);
+        }
+
+        template<typename PromiseT, typename HandleT>
+        void PimplConstruct(HandleT hdl)
+        {
+            using BridgeImplT = detail::CoroHandleBridgeImpl<PromiseT>;
+
+            if constexpr (sizeof(BridgeImplT) <= StaticStorageT::size)
+            {
+                if(std::holds_alternative<StaticStorageT>(_pimpl) == false)
+                {
+                    _pimpl = StaticStorageT{};
+                }
+            }
+            else
+            {
+                if(std::holds_alternative<DynamicStorageT>(_pimpl) == false)
+                {
+                    _pimpl = DynamicStorageT{};
+                }
+            }
+
+            std::visit([&hdl]<typename T>(T& p) { 
+                
+                if constexpr (std::same_as<T, StaticStorageT> && sizeof(BridgeImplT) <= StaticStorageT::size)
+                {
+                    p.template Construct<BridgeImplT>(hdl);
+                }
+                else if constexpr(std::same_as<T, DynamicStorageT>)
+                {
+                    p.template Construct<BridgeImplT>(hdl);
+                }
+            }, _pimpl);
+        }
+
+        void PimplReset()
+        {
+            std::visit([](auto& p) { p.reset(); }, _pimpl);
+        }
+
+        bool PimplDone() const
+        {
+            return std::visit([](auto& p) { return p->Done(); }, _pimpl);
+        }
+
+        ETaskResumeState PimplResumeState() const
+        {
+            return std::visit([](auto& p) { return p->ResumeState(); }, _pimpl);
+        }
+
+        std::coroutine_handle<> PimplHandle() const
+        {
+            return std::visit([](auto& p) { return p->Handle(); }, _pimpl);
+        }
+
+        PackedCoroHandle& PimplChild()
+        {
+            return std::visit([](auto& p) -> decltype(auto) { return p->Child(); }, _pimpl);
+        }
+
+        PackedCoroHandle& PimplParent()
+        {
+            return std::visit([](auto& p) -> decltype(auto) { return p->Parent(); }, _pimpl);
+        }
+
+        std::variant<StaticStorageT, DynamicStorageT> _pimpl;
     };
 
 } // namespace tinycoro

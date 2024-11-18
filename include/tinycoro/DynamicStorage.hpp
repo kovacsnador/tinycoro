@@ -13,8 +13,6 @@ namespace tinycoro { namespace detail {
     {
         DynamicStorage() = default;
 
-        DynamicStorage(DynamicStorage&&) = delete;
-
         template <typename ClassT, typename... Args>
             requires std::constructible_from<ClassT, Args...>
             && (std::derived_from<ClassT, InterpreterClassT> || std::same_as<ClassT, InterpreterClassT>)
@@ -53,7 +51,7 @@ namespace tinycoro { namespace detail {
 
         const auto* operator->() const { return _smartPtr.get(); }
 
-        operator bool() const noexcept { return _smartPtr; }
+        operator bool() const noexcept { return _smartPtr != nullptr; }
 
         [[nodiscard]] bool operator==(std::nullptr_t) const noexcept { return !this->operator bool(); }
 

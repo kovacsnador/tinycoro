@@ -5,6 +5,7 @@
 #include <memory>
 #include <type_traits>
 #include <cassert>
+#include <cstring>
 
 #include "Common.hpp"
 #include "Exception.hpp"
@@ -14,6 +15,8 @@ namespace tinycoro { namespace detail {
     template <typename InterpreterClassT, std::unsigned_integral auto SIZE, typename AlignmentT = void*>
     struct StaticStorage
     {
+        constexpr static size_t size = SIZE;
+
         StaticStorage() = default;
 
         ~StaticStorage()
@@ -21,8 +24,8 @@ namespace tinycoro { namespace detail {
             reset();
         }
 
-        // disable copy and move
-        StaticStorage(StaticStorage&&) = delete;
+        StaticStorage(StaticStorage&&) = default;
+        StaticStorage& operator=(StaticStorage&&) = default;
 
         template <typename ClassT, typename... Args>
             requires std::constructible_from<ClassT, Args...> &&
@@ -65,6 +68,7 @@ namespace tinycoro { namespace detail {
             if(_initialized)
             {
                 std::destroy_at(GetAs<ClassT>());
+                std::memset(_buffer, 0, SIZE);
                 _initialized = false;
             }
         }
