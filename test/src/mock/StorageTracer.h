@@ -43,7 +43,9 @@ namespace tinycoro { namespace test {
             return *this;
         }
 
-        ~StorageTracer() { Destructor(); }
+        ~StorageTracer() {
+             Destructor();
+        }
 
         size_t defaultConstructor{};
         size_t constructor{};

@@ -19,23 +19,22 @@ namespace tinycoro { namespace detail {
 
         StaticStorage() = default;
 
-        ~StaticStorage()
-        {
+        ~StaticStorage() { 
             reset();
         }
 
-        StaticStorage(StaticStorage&&) = default;
-        StaticStorage& operator=(StaticStorage&&) = default;
+        StaticStorage(StaticStorage&& other) = delete;
+        StaticStorage& operator=(StaticStorage&& other) = delete;
 
         template <typename ClassT, typename... Args>
-            requires std::constructible_from<ClassT, Args...> &&
-                     (SIZE >= sizeof(ClassT)) && (alignof(AlignmentT) >= alignof(ClassT)) &&
-                     ((std::derived_from<ClassT, InterpreterClassT> && concepts::HasVirtualDestructor<InterpreterClassT>) || std::same_as<ClassT, InterpreterClassT>)
+            requires std::constructible_from<ClassT, Args...> && (SIZE >= sizeof(ClassT)) && (alignof(AlignmentT) >= alignof(ClassT))
+            && ((std::derived_from<ClassT, InterpreterClassT> && concepts::HasVirtualDestructor<InterpreterClassT>)
+                || std::same_as<ClassT, InterpreterClassT>)
         ClassT* Construct(Args&&... args)
         {
-            if(_initialized)
+            if (_initialized)
             {
-                throw StaticStorageException{"Storage object is already constructed. Use Assign(...)"}; 
+                throw StaticStorageException{"Storage object is already constructed. Use Assign(...)"};
             }
 
             _initialized = true;
@@ -46,28 +45,29 @@ namespace tinycoro { namespace detail {
         }
 
         template <typename ClassT, typename Arg>
-            requires std::assignable_from<ClassT&, Arg&&> &&
-                     (SIZE >= sizeof(ClassT)) && (alignof(AlignmentT) >= alignof(ClassT)) &&
-                     ((std::derived_from<ClassT, InterpreterClassT> && concepts::HasVirtualDestructor<InterpreterClassT>) || std::same_as<ClassT, InterpreterClassT>)
+            requires std::assignable_from<ClassT&, Arg&&> && (SIZE >= sizeof(ClassT)) && (alignof(AlignmentT) >= alignof(ClassT))
+            && ((std::derived_from<ClassT, InterpreterClassT> && concepts::HasVirtualDestructor<InterpreterClassT>)
+                || std::same_as<ClassT, InterpreterClassT>)
         ClassT* Assign(Arg&& arg)
         {
-            if(_initialized == false)
+            if (_initialized == false)
             {
-                throw StaticStorageException{"Storage object is NOT constructed yet. Use Construct(...) first."}; 
+                throw StaticStorageException{"Storage object is NOT constructed yet. Use Construct(...) first."};
             }
-            
+
             auto* self = GetAs<ClassT>();
-            *self = std::forward<Arg>(arg);
+            *self      = std::forward<Arg>(arg);
             return self;
         }
 
-        template<typename ClassT>
+        template <typename ClassT>
             requires std::derived_from<ClassT, InterpreterClassT>
         void Destroy()
         {
-            if(_initialized)
+            if (_initialized)
             {
                 std::destroy_at(GetAs<ClassT>());
+                _buffer      = {};
                 _initialized = false;
             }
         }
@@ -76,13 +76,13 @@ namespace tinycoro { namespace detail {
             requires (sizeof(T) <= SIZE)
         T* GetAs()
         {
-            return std::launder(reinterpret_cast<T*>(_buffer));
+            return std::launder(reinterpret_cast<T*>(_buffer.data()));
         }
         template <typename T>
             requires (sizeof(T) <= SIZE)
         const T* GetAs() const
         {
-            return std::launder(reinterpret_cast<const T*>(_buffer));
+            return std::launder(reinterpret_cast<const T*>(_buffer.data()));
         }
 
         void reset() { Destroy<InterpreterClassT>(); }
@@ -98,8 +98,8 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] bool Empty() const noexcept { return !_initialized; }
 
     private:
-        alignas(AlignmentT) uint8_t _buffer[SIZE];
         bool _initialized{false};
+        alignas(AlignmentT) std::array<std::byte, SIZE> _buffer{};
     };
 
 }} // namespace tinycoro::detail
