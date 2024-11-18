@@ -68,7 +68,6 @@ namespace tinycoro { namespace detail {
             if(_initialized)
             {
                 std::destroy_at(GetAs<ClassT>());
-                std::memset(_buffer, 0, SIZE);
                 _initialized = false;
             }
         }
@@ -96,8 +95,10 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] bool operator==(std::nullptr_t) const noexcept { return !this->operator bool(); }
 
+        [[nodiscard]] bool Empty() const noexcept { return !_initialized; }
+
     private:
-        alignas(AlignmentT) uint8_t _buffer[SIZE]{};
+        alignas(AlignmentT) uint8_t _buffer[SIZE];
         bool _initialized{false};
     };
 
