@@ -39,7 +39,7 @@ namespace tinycoro { namespace detail {
 
             *_smartPtr = std::forward<Arg>(arg);
 
-            // debug check for type
+            // debug check for type safety
             assert(dynamic_cast<ClassT*>(_smartPtr.get()) != nullptr);
 
             return static_cast<ClassT*>(_smartPtr.get());
