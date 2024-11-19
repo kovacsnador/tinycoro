@@ -21,7 +21,7 @@ jobs:
           # Add repository for Clang 16
           wget https://apt.llvm.org/llvm.sh
           chmod +x llvm.sh
-          sudo ./llvm.sh 16
+          ./llvm.sh 16
           apt install -y clang-16 lld-16 cmake
 
     - name: Add safe repo directory
