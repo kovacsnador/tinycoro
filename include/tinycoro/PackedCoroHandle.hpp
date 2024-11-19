@@ -3,10 +3,12 @@
 
 #include <coroutine>
 #include <concepts>
+#include <variant>
 
 #include "Common.hpp"
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
+#include "StaticStorage.hpp"
 
 namespace tinycoro {
 
@@ -84,35 +86,52 @@ namespace tinycoro {
 
     namespace concepts {
 
-        template <typename PromiseT, template <typename> class HandleT, typename UniversalBridgeT>
+        template <size_t SIZE, typename PromiseT, template <typename> class HandleT>
         concept CoroHandle = std::constructible_from<detail::CoroHandleBridgeImpl<PromiseT>, HandleT<PromiseT>>
-            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<UniversalBridgeT>)
-            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) == sizeof(UniversalBridgeT));
+            && (std::alignment_of_v<detail::CoroHandleBridgeImpl<PromiseT>> == std::alignment_of_v<detail::ICoroHandleBridge>)
+            && (sizeof(detail::CoroHandleBridgeImpl<PromiseT>) <= SIZE);
 
     } // namespace concepts
 
     struct [[nodiscard]] PackedCoroHandle
     {
     private:
-        using UniversalBridgeT = detail::CoroHandleBridgeImpl<void>;
+        // Use TINYCORO_PACKED_CORO_HANDLE_SIZE to define the memory size used for the PackedCoroHandle implementation.
+        // This size determines the storage allocation for coroutine handle bridges, which may need adjustment based on
+        // specific system requirements or optimizations.
+        // By default, it is set to the size of CoroHandleBridgeImpl<void>, aiming for the minimal memory necessary.
+        // You can override it to increase the memory allocation as necessary by setting TINYCORO_PACKED_CORO_HANDLE_SIZE
+        // as a compile-time configuration in your source file or project settings to accommodate larger or custom handles.
+#ifdef TINYCORO_PACKED_CORO_HANDLE_SIZE
+        constexpr static size_t SIZE = TINYCORO_PACKED_CORO_HANDLE_SIZE;
+#else
+        constexpr static size_t SIZE = sizeof(detail::CoroHandleBridgeImpl<void>);
+#endif
+        using StaticStorageT = detail::StaticStorage<detail::ICoroHandleBridge, SIZE, detail::ICoroHandleBridge>;
 
     public:
         PackedCoroHandle() = default;
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
+            requires concepts::CoroHandle<SIZE, PromiseT, HandleT>
         PackedCoroHandle(HandleT<PromiseT> hdl)
-        : _pimpl{std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl)}
         {
+            _pimpl.template Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
         }
 
         template <typename PromiseT, template <typename> class HandleT>
-            requires concepts::CoroHandle<PromiseT, HandleT, UniversalBridgeT>
+            requires concepts::CoroHandle<SIZE, PromiseT, HandleT>
         PackedCoroHandle& operator=(HandleT<PromiseT> hdl)
         {
-            _pimpl = std::make_unique<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
+            // possible PromiseT type change. reset required
+            _pimpl.reset();
+
+            _pimpl.template Construct<detail::CoroHandleBridgeImpl<PromiseT>>(hdl);
             return *this;
         }
+
+        // disable copy and move
+        PackedCoroHandle(PackedCoroHandle&&) = delete;
 
         PackedCoroHandle(std::nullptr_t) { }
 
@@ -124,7 +143,7 @@ namespace tinycoro {
 
         [[nodiscard]] PackedCoroHandle& Child()
         {
-            if (_pimpl == nullptr)
+            if (_pimpl.Empty())
             {
                 throw CoroHandleException("No Child coroutine");
             }
@@ -133,7 +152,7 @@ namespace tinycoro {
 
         [[nodiscard]] PackedCoroHandle& Parent()
         {
-            if (_pimpl == nullptr)
+            if (_pimpl.Empty())
             {
                 throw CoroHandleException("No Parent coroutine");
             }
@@ -185,14 +204,14 @@ namespace tinycoro {
         {
             if (_pimpl)
             {
-                return _pimpl->ReleaseHandle();
+                _pimpl->ReleaseHandle();
             }
         }
 
-        operator bool() const noexcept { return _pimpl != nullptr && _pimpl->Handle(); }
+        operator bool() const noexcept { return _pimpl && _pimpl->Handle(); }
 
     private:
-        std::unique_ptr<detail::ICoroHandleBridge> _pimpl;
+        StaticStorageT _pimpl;
     };
 
 } // namespace tinycoro

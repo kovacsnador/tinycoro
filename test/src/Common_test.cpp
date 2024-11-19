@@ -26,7 +26,7 @@ using IterableTypes = testing::Types<std::tuple<std::vector<int>, std::true_type
 
 TYPED_TEST_SUITE(Concepts_IterableTest, IterableTypes);
 
-TYPED_TEST(Concepts_IterableTest, Concepts_IterableTest_Positive)
+TYPED_TEST(Concepts_IterableTest, Concepts_IterableTest)
 {
     using T = typename TestFixture::value_type;
 
@@ -45,4 +45,63 @@ TYPED_TEST(Concepts_IterableTest, Concepts_IterableTest_Positive)
             EXPECT_FALSE(true)  << "Type is iterable but should be not!";  
         }
     }
+}
+
+struct NoVirtualDestructor
+{
+};
+
+struct VirtualDestructor1
+{
+    virtual ~VirtualDestructor1() {}
+};
+
+struct VirtualDestructor2
+{
+    virtual ~VirtualDestructor2() = 0;
+};
+
+struct NoVirtualDestructorAbstract
+{
+    virtual void foo() = 0;
+};
+
+
+template<typename T>
+struct Concepts_HasVirtualDestructor : public testing::Test
+{
+    using value_type = T;
+};
+
+using HasVirtualDestructor_types = testing::Types<std::tuple<std::string, std::false_type>,
+                                                    std::tuple<NoVirtualDestructor, std::false_type>,
+                                                    std::tuple<VirtualDestructor1, std::true_type>>;
+
+TYPED_TEST_SUITE(Concepts_HasVirtualDestructor, HasVirtualDestructor_types);
+
+TYPED_TEST(Concepts_HasVirtualDestructor, Concepts_HasVirtualDestructor)
+{
+    using T = typename TestFixture::value_type;
+
+    using firstParamT = std::decay_t<decltype(std::get<0>(std::declval<T>()))>;
+    using secondParamT = std::decay_t<decltype(std::get<1>(std::declval<T>()))>;
+
+    if constexpr (std::same_as<secondParamT, std::true_type>)
+    {
+        EXPECT_TRUE((tinycoro::concepts::HasVirtualDestructor<firstParamT>)) << "Type has no virtual destructor!";
+    }
+    else
+    {
+        EXPECT_FALSE((tinycoro::concepts::HasVirtualDestructor<firstParamT>)) << "Type has virtual destructor!";
+    }
+}
+
+TEST(Concepts_HasVirtualDestructor, Concepts_HasVirtualDestructor_abstractClass_true)
+{
+    EXPECT_TRUE((tinycoro::concepts::HasVirtualDestructor<VirtualDestructor2>)) << "Type has no virtual destructor!";
+}
+
+TEST(Concepts_HasVirtualDestructor, Concepts_HasVirtualDestructor_abstractClass_false)
+{
+    EXPECT_FALSE((tinycoro::concepts::HasVirtualDestructor<NoVirtualDestructorAbstract>)) << "Type has virtual destructor!";
 }
