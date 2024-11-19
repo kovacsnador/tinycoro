@@ -1,0 +1,48 @@
+name: clang_16
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: ubuntu:latest  # Using Ubuntu base image, you could use a specific version if necessary
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install Clang 16, CMake
+      run: |
+          apt update -y
+          apt install -y wget lsb-release software-properties-common
+          # Add repository for Clang 16
+          wget https://apt.llvm.org/llvm.sh
+          chmod +x llvm.sh
+          sudo ./llvm.sh 16
+          apt install -y clang-16 lld-16 cmake
+
+    - name: Add safe repo directory
+      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+
+    - name: Initialize Git submodules
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+    
+    - name: Configure with coverage flags using Clang
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON
+      working-directory: ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build build
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Unit Tests
+      run: ./build/test/tinycoro_tests
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Examples
+      run: ./build/tinycoro_example
+      working-directory: ${{ github.workspace }}
