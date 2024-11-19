@@ -9,7 +9,6 @@
 #include "Exception.hpp"
 #include "PauseHandler.hpp"
 #include "StaticStorage.hpp"
-#include "DynamicStorage.hpp"
 
 namespace tinycoro {
 
