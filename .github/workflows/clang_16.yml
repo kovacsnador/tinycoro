@@ -8,8 +8,8 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest
-    container: ubuntu:latest  # Using Ubuntu base image, you could use a specific version if necessary
+    runs-on: debian-latest
+    container: debian:latest  # Using debian base image, you could use a specific version if necessary
 
     steps:
     - uses: actions/checkout@v3
