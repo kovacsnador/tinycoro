@@ -17,7 +17,7 @@ jobs:
     - name: Install Clang 16, CMake
       run: |
            apt update -y
-           sudo apt-get upgrade -y
+           apt-get upgrade -y
            apt install -y wget lsb-release software-properties-common
            wget https://apt.llvm.org/llvm-snapshot.gpg.key
            apt-key add llvm-snapshot.gpg.key
