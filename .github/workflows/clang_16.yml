@@ -16,13 +16,15 @@ jobs:
 
     - name: Install Clang 16, CMake
       run: |
-          apt update -y
-          apt install -y wget lsb-release software-properties-common
-          # Add repository for Clang 16
-          wget https://apt.llvm.org/llvm.sh
-          chmod +x llvm.sh
-          ./llvm.sh 16
-          apt install -y clang-16 lld-16 cmake
+           apt update -y
+           apt install -y wget lsb-release software-properties-common
+           # Detect codename for proper repository configuration
+           CODENAME=$(lsb_release -cs)
+           # Add the LLVM repository
+           echo "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME-16 main" | sudo tee /etc/apt/sources.list.d/llvm.list
+           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+           apt update -y
+           apt install -y clang-16 lld-16 cmake
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
