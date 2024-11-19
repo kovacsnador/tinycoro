@@ -19,11 +19,9 @@ namespace tinycoro { namespace detail {
 
         StaticStorage() = default;
 
-        ~StaticStorage() { 
-            reset();
-        }
+        ~StaticStorage() { reset(); }
 
-        StaticStorage(StaticStorage&& other) = delete;
+        StaticStorage(StaticStorage&& other)            = delete;
         StaticStorage& operator=(StaticStorage&& other) = delete;
 
         template <typename ClassT, typename... Args>
@@ -67,7 +65,6 @@ namespace tinycoro { namespace detail {
             if (_initialized)
             {
                 std::destroy_at(GetAs<ClassT>());
-                _buffer      = {};
                 _initialized = false;
             }
         }
@@ -76,13 +73,13 @@ namespace tinycoro { namespace detail {
             requires (sizeof(T) <= SIZE)
         T* GetAs()
         {
-            return std::launder(reinterpret_cast<T*>(_buffer.data()));
+            return std::launder(reinterpret_cast<T*>(_buffer));
         }
         template <typename T>
             requires (sizeof(T) <= SIZE)
         const T* GetAs() const
         {
-            return std::launder(reinterpret_cast<const T*>(_buffer.data()));
+            return std::launder(reinterpret_cast<const T*>(_buffer));
         }
 
         void reset() { Destroy<InterpreterClassT>(); }
@@ -99,7 +96,7 @@ namespace tinycoro { namespace detail {
 
     private:
         bool _initialized{false};
-        alignas(AlignmentT) std::array<std::byte, SIZE> _buffer{};
+        alignas(AlignmentT) uint8_t _buffer[SIZE];
     };
 
 }} // namespace tinycoro::detail

@@ -299,15 +299,15 @@ namespace tinycoro {
                 PauseHandler::UnpauseTask(parentCoro);
             }
 
-            ChannelT* _channel;
-            ValueT&   _value;
-            EventT    _event;
-
             // Flag to check if this is the last element in the channel. (The channel is already in closed state)
             bool _lastElement{false};
 
             // Flag which is true if the value is set
             bool _set{false};
+
+            ChannelT* _channel;
+            ValueT&   _value;
+            EventT    _event;
         };
 
         template <typename ValueT>
