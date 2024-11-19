@@ -21,8 +21,8 @@ jobs:
            # Detect codename for proper repository configuration
            CODENAME=$(lsb_release -cs)
            # Add the LLVM repository
-           echo "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME-16 main" | sudo tee /etc/apt/sources.list.d/llvm.list
-           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | sudo apt-key add -
+           echo "deb http://apt.llvm.org/$CODENAME/ llvm-toolchain-$CODENAME-16 main" | tee /etc/apt/sources.list.d/llvm.list
+           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | apt-key add -
            apt update -y
            apt install -y clang-16 lld-16 cmake
 
