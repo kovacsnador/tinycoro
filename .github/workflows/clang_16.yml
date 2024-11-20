@@ -33,7 +33,9 @@ jobs:
       run: git config --global --add safe.directory '*'
 
     - name: Initialize Git submodules
-      run: git submodule update --init --recursive
+      run: |
+            export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+            git submodule update --init --recursive
       working-directory: ${{ github.workspace }}
 
     - name: Configure with coverage flags using Clang
