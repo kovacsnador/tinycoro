@@ -19,11 +19,12 @@ jobs:
       run: |
            apt update -y
            apt-get upgrade -y
-           apt install -y wget lsb-release software-properties-common
+           apt install -y wget lsb-release software-properties-common git
            wget https://apt.llvm.org/llvm-snapshot.gpg.key
            apt-key add llvm-snapshot.gpg.key
-           echo "deb http://apt.llvm.org/debian/ llvm-toolchain-debian main" | tee -a /etc/apt/sources.list.d/llvm.list
            apt update -y
+           echo "deb http://apt.llvm.org/debian/ llvm-toolchain-debian main" | tee -a /etc/apt/sources.list.d/llvm.list
+           apt-get update -y
            apt install -y clang-16 lld-16 cmake
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
