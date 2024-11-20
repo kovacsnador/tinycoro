@@ -13,15 +13,21 @@ jobs:
       image: debian:latest  # The container image to use
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Install Git
+      run: apt update && apt install -y git
+
+    - name: Verify Git Installation
+      run: git --version
+      
+    - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Install Clang 16, CMake, Git
+    - name: Install Clang 16, CMake
       run: |
            apt update -y
            apt-get upgrade -y
-           apt install -y wget lsb-release software-properties-common git
+           apt install -y wget lsb-release software-properties-common
            wget https://apt.llvm.org/llvm-snapshot.gpg.key
            apt-key add llvm-snapshot.gpg.key
            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
