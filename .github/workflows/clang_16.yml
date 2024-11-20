@@ -8,8 +8,9 @@ on:
 
 jobs:
   build:
-    runs-on: debian-latest
-    container: debian:latest  # Using debian base image, you could use a specific version if necessary
+    runs-on: ubuntu-latest  # Or any supported runner, used to set up the container environment
+    container:
+      image: debian:latest  # The container image to use
 
     steps:
     - uses: actions/checkout@v3
