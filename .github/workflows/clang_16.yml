@@ -30,12 +30,11 @@ jobs:
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Add safe repo directory
-      run: git config --global --add safe.directory $GITHUB_WORKSPACE
+      run: git config --global --add safe.directory '*'
 
     - name: Initialize Git submodules
-      run: |
-        export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
-        git submodule update --init --recursive
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
 
     - name: Configure with coverage flags using Clang
       run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON
