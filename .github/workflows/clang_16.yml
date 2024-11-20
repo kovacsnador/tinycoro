@@ -13,7 +13,7 @@ jobs:
       image: debian:latest  # The container image to use
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
 
     - name: Install Clang 16, CMake, Git
       run: |
@@ -30,12 +30,10 @@ jobs:
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Add safe repo directory
-      run: git config --global --add safe.directory '*'
+      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
 
     - name: Initialize Git submodules
-      run: |
-            export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
-            git submodule update --init --recursive
+      run: git submodule update --init --recursive
       working-directory: ${{ github.workspace }}
 
     - name: Configure with coverage flags using Clang
