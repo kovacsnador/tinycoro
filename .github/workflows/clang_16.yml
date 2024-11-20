@@ -22,7 +22,8 @@ jobs:
            apt install -y wget lsb-release software-properties-common
            wget https://apt.llvm.org/llvm-snapshot.gpg.key
            apt-key add llvm-snapshot.gpg.key
-           echo "deb http://apt.llvm.org/debian/ llvm-toolchain-debian main" | tee -a /etc/apt/sources.list.d/llvm.list
+           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
+           echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-16 main" | tee /etc/apt/sources.list.d/llvm.list
            apt update -y
            apt install -y clang-16 lld-16 cmake
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
