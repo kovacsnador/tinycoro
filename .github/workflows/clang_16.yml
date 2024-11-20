@@ -8,29 +8,24 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Or any supported runner, used to set up the container environment
-    container:
-      image: debian:latest  # The container image to use
+    runs-on: ubuntu-latest
 
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install Clang 16, CMake, Git
+    - name: Install Clang 16, CMake, and other dependencies
       run: |
            apt update -y
-           apt-get upgrade -y
-           apt install -y wget lsb-release software-properties-common git
-           wget https://apt.llvm.org/llvm-snapshot.gpg.key
-           apt-key add llvm-snapshot.gpg.key
+           apt install -y wget lsb-release software-properties-common gnupg git
            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
-           echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-16 main" | tee /etc/apt/sources.list.d/llvm.list
+           echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/focal/ llvm-toolchain-focal-16 main" | tee /etc/apt/sources.list.d/llvm.list
            apt update -y
            apt install -y clang-16 lld-16 cmake
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Add safe repo directory
-      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+      run: git config --global --add safe.directory ${{ github.workspace }}
 
     - name: Initialize Git submodules
       run: git submodule update --init --recursive
