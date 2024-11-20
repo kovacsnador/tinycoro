@@ -30,7 +30,9 @@ jobs:
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Add safe repo directory
-      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+      run: |
+           git init
+           git config --global --add safe.directory /__w/tinycoro/tinycoro
 
     - name: Initialize Git submodules
       run: git submodule update --init --recursive
