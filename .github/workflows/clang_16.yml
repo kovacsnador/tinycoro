@@ -33,8 +33,9 @@ jobs:
       run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
     - name: Initialize Git submodules
-      run: git submodule update --init --recursive
-      working-directory: ${{ github.workspace }}
+      run: |
+        export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
+        git submodule update --init --recursive
 
     - name: Configure with coverage flags using Clang
       run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON
