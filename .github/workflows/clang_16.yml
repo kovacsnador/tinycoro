@@ -28,8 +28,9 @@ jobs:
            apt install -y clang-16 lld-16 cmake
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
+
     - name: Add safe repo directory
-      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+      run: git config --global --add safe.directory $GITHUB_WORKSPACE
 
     - name: Initialize Git submodules
       run: git submodule update --init --recursive
