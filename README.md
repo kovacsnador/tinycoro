@@ -113,23 +113,24 @@ tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
 ```
 This approach removes all callback semantics, improves readability and maintainability, turning complex asynchronous workflows into simple, sequential code with the power of coroutines.
 
-### `How to invoke the functions`
+### `How to invoke the coroutine functions`
 
-The function calls are pretty trivial. It's done with some error handling and that's it.
-
-CollectAllDataWithErrorHandling:
+All you need is a `tinycoro::Scheduler`. In most cases, you'll only need a single instance of the scheduler, but you can use multiple instances if necessary. The Scheduler's `Enqueue(..)` function returns a traditional `std::future`, allowing you to call the `get()` method as you normally would. In this example, the type of the returned future is `std::future<std::string>`.
 ```cpp
 try
 {
-    auto result = CollectAllDataWithErrorHandling();
-    std::cout << result << '\n';
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    std::future<std::string> future = scheduler.Enqueue(CollectAllDataWithErrorHandlingCorouitne());
+    std::cout << future.get() << '\n';
 }
 catch(const std::exception& e)
 {
-    std::cerr << e.what() << '\n'; // Exception: "Invalid data input."
+    std::cerr << e.what() << '\n';  // Exception: "Invalid data input."
 }
 ```
-CollectAllDataWithErrorHandlingCorouitne:
+
+Alternatively, you can use helper functions to aggregate the value or values of multiple futures. For instance, the `tinycoro::GetAll` function simplifies this process:
 ```cpp
 try
 {
