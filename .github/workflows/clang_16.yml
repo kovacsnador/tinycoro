@@ -13,7 +13,7 @@ jobs:
       image: debian:latest  # The container image to use
 
     steps:
-    - uses: actions/checkout@v4
+    - uses: actions/checkout@v3
       with:
           submodules: 'recursive'
 
