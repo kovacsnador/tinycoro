@@ -42,6 +42,10 @@ jobs:
       run: cat .git/config
       working-directory: ${{ github.workspace }}
 
+    - name: Debug Submodules
+      run: git submodule status
+      working-directory: ${{ github.workspace }}
+
     - name: Configure with coverage flags using Clang
       run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON
       working-directory: ${{ github.workspace }}
