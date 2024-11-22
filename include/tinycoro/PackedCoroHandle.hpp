@@ -3,7 +3,6 @@
 
 #include <coroutine>
 #include <concepts>
-#include <variant>
 
 #include "Common.hpp"
 #include "Exception.hpp"
@@ -21,7 +20,6 @@ namespace tinycoro {
             virtual ~ICoroHandleBridge() = default;
 
             virtual PackedCoroHandle&       Child()             = 0;
-            virtual PackedCoroHandle&       Parent()            = 0;
             virtual bool                    Done() const        = 0;
             virtual ETaskResumeState        ResumeState() const = 0;
             virtual std::coroutine_handle<> Handle()            = 0;
@@ -38,8 +36,6 @@ namespace tinycoro {
             }
 
             PackedCoroHandle& Child() override { return _hdl.promise().child; }
-
-            PackedCoroHandle& Parent() override { return _hdl.promise().parent; }
 
             std::coroutine_handle<> Handle() override { return _hdl; }
 
@@ -148,15 +144,6 @@ namespace tinycoro {
                 throw CoroHandleException("No Child coroutine");
             }
             return _pimpl->Child();
-        }
-
-        [[nodiscard]] PackedCoroHandle& Parent()
-        {
-            if (_pimpl.Empty())
-            {
-                throw CoroHandleException("No Parent coroutine");
-            }
-            return _pimpl->Parent();
         }
 
         [[nodiscard]] std::coroutine_handle<> Handle()
