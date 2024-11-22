@@ -125,6 +125,39 @@ TYPED_TEST(GetAllTest, GetAllTest_tuple_exception)
     }
 }
 
+TYPED_TEST(GetAllTest, GetAllTest_vector_exception)
+{
+    using PromiseT = TestFixture::value_type;
+    using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
+
+    PromiseT p1;
+    PromiseT p2;
+    PromiseT p3;
+
+    std::vector<decltype(p1.get_future())> tasks;
+    tasks.emplace_back(p1.get_future());
+    tasks.emplace_back(p2.get_future());
+    tasks.emplace_back(p3.get_future());
+
+    if constexpr (std::same_as<int32_t, ValueT>)
+    {
+        p1.set_value(40);
+        p2.set_value(41);
+        p3.set_exception(std::make_exception_ptr(std::runtime_error{"error"}));
+
+        auto getAll = [&tasks] { std::ignore = tinycoro::GetAll(tasks); };
+        EXPECT_THROW(getAll(), std::runtime_error);
+    }
+    else
+    {
+        p1.set_exception(std::make_exception_ptr(std::runtime_error{"error"}));
+        p2.set_value();
+        p3.set_value();
+
+        EXPECT_THROW(tinycoro::GetAll(tasks), std::runtime_error);
+    }
+}
+
 template <typename T>
 struct GetAllTestWithTupleMixed : testing::Test
 {
