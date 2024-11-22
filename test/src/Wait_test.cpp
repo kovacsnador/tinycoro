@@ -158,6 +158,22 @@ TYPED_TEST(GetAllTest, GetAllTest_vector_exception)
     }
 }
 
+TEST(GetAllTest, GetAllTest_mixedValues_exception)
+{
+    std::promise<void> p1;
+    std::promise<int32_t> p2;
+    std::promise<bool> p3;
+
+    auto tuple = std::make_tuple(p1.get_future(), p2.get_future(), p3.get_future());
+
+    p1.set_exception(std::make_exception_ptr(std::runtime_error{"error"}));
+    p2.set_value(41);
+    p3.set_value(true);
+
+    auto getAll = [&tuple] { std::ignore = tinycoro::GetAll(tuple); };
+    EXPECT_THROW(getAll(), std::runtime_error);
+}
+
 template <typename T>
 struct GetAllTestWithTupleMixed : testing::Test
 {
