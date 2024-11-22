@@ -66,7 +66,7 @@ namespace tinycoro {
         private:
             [[nodiscard]] bool IsReady() const noexcept
             {
-                std::unique_lock lock{_mtx};
+                std::scoped_lock lock{_mtx};
                 return _count == 0;
             }
 
