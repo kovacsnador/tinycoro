@@ -13,13 +13,21 @@ jobs:
       image: debian:latest  # The container image to use
 
     steps:
-    - uses: actions/checkout@v3
+    - name: Install Git
+      run: apt update && apt install -y git
 
-    - name: Install Clang 16, CMake, Git
+    - name: Verify Git Installation
+      run: git --version
+      
+    - uses: actions/checkout@v4
+      with:
+        submodules: recursive
+
+    - name: Install Clang 16, CMake
       run: |
            apt update -y
            apt-get upgrade -y
-           apt install -y wget lsb-release software-properties-common git
+           apt install -y wget lsb-release software-properties-common
            wget https://apt.llvm.org/llvm-snapshot.gpg.key
            apt-key add llvm-snapshot.gpg.key
            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
@@ -30,12 +38,20 @@ jobs:
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Add safe repo directory
-      run: git config --global --add safe.directory '*'
+      run: |
+           git init
+           git config --global --add safe.directory /__w/tinycoro/tinycoro
 
     - name: Initialize Git submodules
-      run: |
-            export GIT_DISCOVERY_ACROSS_FILESYSTEM=1
-            git submodule update --init --recursive
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+
+    - name: Debug Git Config
+      run: cat .git/config
+      working-directory: ${{ github.workspace }}
+
+    - name: Debug Submodules
+      run: git submodule status
       working-directory: ${{ github.workspace }}
 
     - name: Configure with coverage flags using Clang
