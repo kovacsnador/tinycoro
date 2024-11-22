@@ -144,6 +144,10 @@ namespace tinycoro {
                     {
                         _tasks.emplace(std::move(std::get<TaskT>(it->second)));
                         _pausedTasks.erase(i);
+
+                        // if we notify, we still need to hold the lock.
+                        // otherwise other threads can steal the task and finish up before we invoke notify_all.
+                        // Note: notify_once would also work but notify_all performs better if there is a lot of tasks at once.
                         _cv.notify_all();
                     }
                     else

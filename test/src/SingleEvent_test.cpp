@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include <concepts>
 
@@ -94,6 +95,41 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     singleEvent.SetValue(42);
     EXPECT_TRUE(pauseCalled);
     EXPECT_TRUE(singleEvent.IsSet());
+}
+
+struct SingleNotifierMockImpl
+{
+    MOCK_METHOD(bool, Set, (std::function<void()>));
+    MOCK_METHOD(void, Notify, ());
+};
+
+struct SingleNotifierMock
+{
+    bool Set(auto func){ return mock->Set(func); } 
+    void Notify(){ mock->Notify(); } 
+
+    std::shared_ptr<SingleNotifierMockImpl> mock = std::make_shared<SingleNotifierMockImpl>();
+};
+
+struct SingleEventMock
+{
+    MOCK_METHOD(bool, Add, (void*));
+};
+
+TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
+{
+    SingleEventMock mock;
+    SingleNotifierMock notifier;
+
+    tinycoro::detail::SingleEventAwaiter awaiter{mock, notifier};
+
+    EXPECT_CALL(mock, Add(std::addressof(awaiter))).Times(1).WillOnce(testing::Return(false));
+    EXPECT_CALL(*notifier.mock, Notify()).Times(0); // no call
+    EXPECT_CALL(*notifier.mock, Set).Times(2);
+
+    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+
+    EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
 }
 
 TEST(SingleEventTest, SingleEventFunctionalTest_1)
