@@ -152,6 +152,8 @@ namespace tinycoro {
     {
         using value_type = ValueT;
 
+        Future() = default;
+
         Future(std::shared_ptr<AssociatedState<ValueT>> state)
         : _associatedState{std::move(state)}
         {
@@ -175,6 +177,8 @@ namespace tinycoro {
     struct Future<void>
     {
         using value_type = void;
+
+        Future() = default;
 
         Future(std::shared_ptr<AssociatedState<void>> state)
         : _associatedState{std::move(state)}

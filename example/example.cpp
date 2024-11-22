@@ -97,8 +97,8 @@ int main()
 
         Example_CustomAwaiter(scheduler);
 
-        auto future = scheduler.Enqueue(Example_SyncAwait(scheduler));
-        SyncOut() << future.get() << '\n';
+        //auto future = scheduler.Enqueue(Example_SyncAwait(scheduler));
+        //SyncOut() << future.get() << '\n';
 
         scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
 

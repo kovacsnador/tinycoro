@@ -141,7 +141,9 @@ TEST_F(ExampleTest, Example_nestedException)
     };
 
     auto future = scheduler.Enqueue(task());
-    EXPECT_THROW(future.get(), std::runtime_error);
+
+    auto func = [&future]{ std::ignore = future.get(); };
+    EXPECT_THROW(func(), std::runtime_error);
 }
 
 TEST(Example_generator, Example_generator)
@@ -671,7 +673,9 @@ TEST_F(ExampleTest, ExampleSyncAwaitException)
     };
 
     auto future = scheduler.Enqueue(syncAwait(scheduler));
-    EXPECT_THROW(future.get(), std::runtime_error);
+
+    auto func = [&future]{ std::ignore = future.get(); };
+    EXPECT_THROW(func(), std::runtime_error);
 }
 
 TEST_F(ExampleTest, ExampleAnyOfCoAwait)
