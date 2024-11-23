@@ -84,9 +84,9 @@ jobs:
       run: cmake --build .
 
     - name: Run Unit Tests
-      run: ./build/test/tinycoro_tests
-      working-directory: ${{ github.workspace }}
+      working-directory: ${{runner.workspace}}/build
+      run: ./test/tinycoro_tests
 
     - name: Run Examples
-      run: ./build/tinycoro_example
-      working-directory: ${{ github.workspace }}
+      working-directory: ${{runner.workspace}}/build
+      run: ./tinycoro_example
