@@ -52,12 +52,12 @@ namespace tinycoro {
             {
             }
 
-            SchedulableBridgeImpl(SchedulableBridgeImpl&&)            = default;
-            SchedulableBridgeImpl& operator=(SchedulableBridgeImpl&&) = default;
+            // disable copy and move
+            SchedulableBridgeImpl(SchedulableBridgeImpl&&) = delete;
 
             ~SchedulableBridgeImpl()
             {
-                if (_exceptionSet == false)
+                if (_needValueSet)
                 {
                     if constexpr (requires {
                                       { _coro.await_resume() } -> std::same_as<void>;
@@ -83,7 +83,7 @@ namespace tinycoro {
                 catch (...)
                 {
                     _futureState.set_exception(std::current_exception());
-                    _exceptionSet = true;
+                    _needValueSet = false;
                 }
 
                 return resumeState;
@@ -92,7 +92,7 @@ namespace tinycoro {
             bool IsPaused() const noexcept override { return _coro.IsPaused(); }
 
         private:
-            bool         _exceptionSet{false};
+            bool         _needValueSet{true};
             CoroT        _coro;
             FutureStateT _futureState;
         };
