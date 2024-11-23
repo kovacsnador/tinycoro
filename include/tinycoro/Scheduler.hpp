@@ -118,14 +118,14 @@ namespace tinycoro {
 
             if (_stopSource.stop_requested() == false)
             {
-                _tasksCount.fetch_add(1, std::memory_order_acquire);
+                _tasksCount.fetch_add(1, std::memory_order_relaxed);
 
-                static uint64_t s_id{0};
+                auto id = _coroutineIdCount.fetch_add(1, std::memory_order_relaxed);
+                coro.SetPauseHandler(GeneratePauseResume(id));
 
                 {
-                    std::scoped_lock lock{_mtx};
-                    coro.SetPauseHandler(GeneratePauseResume(s_id));
-                    _tasks.emplace(std::move(coro), std::move(futureState), s_id++);
+                    std::scoped_lock lock{_tasksQueueMtx};
+                    _tasks.emplace(std::move(coro), std::move(futureState), id);
                 }
 
                 _cv.notify_all();
@@ -134,16 +134,22 @@ namespace tinycoro {
             return future;
         }
 
-        PauseHandlerCallbackT GeneratePauseResume(uint64_t id)
+        PauseHandlerCallbackT GeneratePauseResume(cid_t id)
         {
             return [this, i = id]() {
                 if (_stopSource.stop_requested() == false)
                 {
-                    std::scoped_lock lock{_mtx};
+                    std::unique_lock pauseLock{_pausedTasksMtx};
+
                     if (auto it = _pausedTasks.find(i); it != _pausedTasks.end())
                     {
+                        std::scoped_lock queueLock{_tasksQueueMtx};
+
                         _tasks.emplace(std::move(std::get<TaskT>(it->second)));
                         _pausedTasks.erase(i);
+
+                        // pause lock can be released
+                        pauseLock.unlock();
 
                         // if we notify, we still need to hold the lock.
                         // otherwise other threads can steal the task and finish up before we invoke notify_all.
@@ -172,8 +178,8 @@ namespace tinycoro {
                             {
                                 using enum ETaskResumeState;
 
-                                std::unique_lock lock{_mtx};
-                                if (_cv.wait(lock, stopToken, [this] { return !_tasks.empty(); }) == false)
+                                std::unique_lock queueLock{_tasksQueueMtx};
+                                if (_cv.wait(queueLock, stopToken, [this] { return !_tasks.empty(); }) == false)
                                 {
                                     // stop was requested
                                     return;
@@ -182,7 +188,7 @@ namespace tinycoro {
                                 TaskT task{std::move(_tasks.front())};
                                 _tasks.pop();
 
-                                lock.unlock();
+                                queueLock.unlock();
 
                                 // resume the task
                                 auto resumeState = std::invoke(task);
@@ -190,23 +196,28 @@ namespace tinycoro {
                                 switch (resumeState)
                                 {
                                 case SUSPENDED: {
-                                    lock.lock();
+                                    queueLock.lock();
                                     _tasks.emplace(std::move(task));
-                                    lock.unlock();
+                                    queueLock.unlock();
 
                                     _cv.notify_all();
                                     break;
                                 }
                                 case PAUSED: {
 
-                                    lock.lock();
-
                                     auto id = task.id;
+
+                                    std::unique_lock pauseLock{_pausedTasksMtx};
+
                                     if (auto it = _pausedTasks.find(id); it != _pausedTasks.end())
                                     {
                                         // need to wakeup the task.
                                         _pausedTasks.erase(it);
+                                        pauseLock.unlock();
+
+                                        queueLock.lock();
                                         _tasks.emplace(std::move(task));
+                                        queueLock.unlock();
                                     }
                                     else
                                     {
@@ -214,7 +225,6 @@ namespace tinycoro {
                                         _pausedTasks.emplace(id, std::move(task));
                                     }
 
-                                    lock.unlock();
                                     break;
                                 }
                                 case STOPPED:
@@ -235,15 +245,19 @@ namespace tinycoro {
             }
         }
 
-        std::queue<TaskT>                           _tasks;
-        std::unordered_map<uint64_t, TaskVariantT>  _pausedTasks;
-        std::atomic<size_t>                         _tasksCount{0};
+        std::queue<TaskT>                       _tasks;
+        std::unordered_map<cid_t, TaskVariantT> _pausedTasks;
+        std::atomic<size_t>                     _tasksCount{0};
 
         std::vector<std::jthread> _workerThreads;
         std::stop_source          _stopSource;
 
-        std::mutex                  _mtx;
+        std::mutex _tasksQueueMtx;
+        std::mutex _pausedTasksMtx;
+
         std::condition_variable_any _cv;
+
+        std::atomic<cid_t> _coroutineIdCount{};
     };
 
     using Scheduler = CoroThreadPool<PackagedTask>;
