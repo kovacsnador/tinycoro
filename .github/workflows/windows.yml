@@ -1,0 +1,53 @@
+name: windows
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: windows-2022
+    strategy:
+      matrix:
+        platform: [x86, x64]
+        build_type: [Debug, Release]
+
+    steps:
+    - uses: actions/checkout@master
+      with:
+        submodules: true
+    - uses: seanmiddleditch/gha-setup-ninja@master
+    - uses: TheMrMilchmann/setup-msvc-dev@v3
+      with:
+        arch: ${{matrix.platform}}
+
+    - name: Create Build Environment
+      run: cmake -E make_directory ${{runner.workspace}}/build
+
+    - name: Configure
+      # Use a bash shell for $GITHUB_WORKSPACE.
+      shell: bash
+      working-directory: ${{runner.workspace}}/build
+      run: |
+        cmake -G Ninja \
+              -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
+              $GITHUB_WORKSPACE
+    - name: Build
+      working-directory: ${{runner.workspace}}/build
+      run: cmake --build . --config ${{matrix.build_type}}
+
+    - name: Test
+      working-directory: ${{runner.workspace}}/build
+      run: ctest -C ${{matrix.build_type}} -V
+      env:
+        CTEST_OUTPUT_ON_FAILURE: True
+        
+    - name: Run Unit Tests
+      working-directory: ${{runner.workspace}}/build
+      run: .\test\${{matrix.build_type}}\tinycoro_tests.exe
+
+    - name: Run Examples
+      working-directory: ${{runner.workspace}}/build
+      run: .\${{matrix.build_type}}\tinycoro_example.exe
