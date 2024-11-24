@@ -34,9 +34,10 @@ jobs:
         cmake -G Ninja \
               -DCMAKE_BUILD_TYPE=${{matrix.build_type}} \
               $GITHUB_WORKSPACE
+              
     - name: Build
-      working-directory: ${{runner.workspace}}/build
-      run: cmake --build . --config ${{matrix.build_type}}
+      working-directory: ${{runner.workspace}}/
+      run: cmake --build build --config ${{matrix.build_type}}
         
     - name: Run Unit Tests
       working-directory: ${{runner.workspace}}/build
