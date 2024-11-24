@@ -14,7 +14,7 @@ jobs:
     runs-on: macos-15
     strategy:
       matrix:
-        compiler: [LLVM-Clang-16, LLVM-Clang-17, LLVM-Clang-18, LLVM-Clang-19]
+        compiler: [LLVM-Clang-17, LLVM-Clang-18, LLVM-Clang-19]
         test_with: [Headers, Module]
         build_type: [Debug, Release]
 
@@ -23,10 +23,6 @@ jobs:
             test_with: Module
 
         include:
-          - compiler: LLVM-Clang-16
-            cxx: $(brew --prefix llvm@16)/bin/clang++
-            install: |
-              brew install llvm@16 ninja
           - compiler: LLVM-Clang-17
             cxx: $(brew --prefix llvm@17)/bin/clang++
             install: |
