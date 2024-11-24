@@ -37,12 +37,6 @@ jobs:
     - name: Build
       working-directory: ${{runner.workspace}}/build
       run: cmake --build . --config ${{matrix.build_type}}
-
-    - name: Test
-      working-directory: ${{runner.workspace}}/build
-      run: ctest -C ${{matrix.build_type}} -V
-      env:
-        CTEST_OUTPUT_ON_FAILURE: True
         
     - name: Run Unit Tests
       working-directory: ${{runner.workspace}}/build
