@@ -36,13 +36,17 @@ jobs:
               $GITHUB_WORKSPACE
               
     - name: Build
-      working-directory: ${{runner.workspace}}/
-      run: cmake --build build --config ${{matrix.build_type}}
-        
-    - name: Run Unit Tests
       working-directory: ${{runner.workspace}}/build
-      run: .\test\${{matrix.build_type}}\tinycoro_tests.exe
+      run: cmake --build . --config ${{matrix.build_type}}
+
+    - name: Debug Current Directory
+      working-directory: ${{runner.workspace}}/build
+      run: dir
 
     - name: Run Examples
       working-directory: ${{runner.workspace}}/build
-      run: .\${{matrix.build_type}}\tinycoro_example.exe
+      run: ./tinycoro_example.exe
+    
+    - name: Run Unit Tests
+      working-directory: ${{runner.workspace}}/build
+      run: .\test\${{matrix.build_type}}\tinycoro_tests.exe
