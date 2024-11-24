@@ -1,4 +1,4 @@
-name: clang_16
+name: asan_clang_16
 
 on:
   push:
