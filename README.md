@@ -13,6 +13,57 @@ This library combines the C++ coroutine API with the familiar promise/future-bas
 ## Acknowledgement
 I would like to extend my heartfelt thanks to my brother [`László Kovács`](https://www.linkedin.com/in/mz-per-x/), for his unwavering support and invaluable advice throughout the development of this project. His guidance and encouragement have been a tremendous help. Thank you, Bro! :)
 
+## Simple Breakfast
+This example shows how you can use tinycoro to execute multiple asynchronous tasks concurrently—in this case, to prepare breakfast.
+
+### Step 1: Define the Tasks
+First, we create two simple coroutine tasks: Toast and Coffee. These simulate the preparation of toast and coffee:
+```cpp
+tinycoro::Task<std::string> Toast()
+{
+    // make the toast ready...
+    std::this_thread::sleep_for(4s);
+    
+    co_return "toast";
+}
+
+tinycoro::Task<std::string> Coffee()
+{
+    // make the coffee ready...
+    std::this_thread::sleep_for(2s);
+
+    co_return "coffee";
+}
+```
+
+### Step 2: Combine the Tasks
+Next, we define the Breakfast coroutine, which combines Toast and Coffee preparation. The tinycoro::SyncAwait function allows both tasks to run concurrently, reducing the total preparation time. Notice the usage of the `co_await` operator here.
+```cpp
+tinycoro::Task<std::string> Breakfast(tinycoro::Scheduler& scheduler)
+{
+    // The `SyncAwait` ensures both `Toast()` and `Caffee()` are executed concurrently.
+    auto [toast, coffee] = co_await tinycoro::SyncAwait(scheduler, Toast(), Caffee());
+    co_return toast + " + " + coffee;
+}
+
+```
+### Step 3: Run the Scheduler
+Finally, we create a `tinycoro::Scheduler` to manage the execution of the Breakfast coroutine. The total time taken is measured and displayed.
+```cpp
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    auto start = std::chrono::system_clock::now();
+
+    // Start the asynchronous execution of the Breakfast task.
+    auto breakfast = tinycoro::GetAll(scheduler, Breakfast(scheduler));
+
+    auto sec = duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start);
+
+    // Breakfast is toast + coffee, Total time 4s
+    std::cout << "Breakfast is " << breakfast << ", Total time " << sec << '\n'; 
+```
+
 ## Motivation
 Imagine you have two asynchronous API calls, and one needs to wait for the other to finish. A common example of this scenario might look like the following in traditional C++:
 
