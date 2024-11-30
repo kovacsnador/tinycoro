@@ -65,6 +65,29 @@ namespace tinycoro
 
         return std::make_tuple(returnValueConverter(std::forward<TaskT>(tasks))...);
     }
+
+    template<concepts::Iterable ContainerT>
+    [[nodiscard]] auto RunOnThisThread(ContainerT&& container)
+    {
+        using returnType = typename std::decay_t<ContainerT>::value_type::promise_type::value_type;
+        if constexpr (std::same_as<void, returnType>)
+        {
+            for(auto& it : container)
+            {
+                RunOnThisThread(it);
+            }
+        }
+        else
+        {
+            std::vector<returnType> results;
+            for(auto& it : container)
+            {
+                results.push_back(RunOnThisThread(it));
+            }
+
+            return results;
+        }
+    } 
     
 } // namespace tinycoro
 
