@@ -29,10 +29,6 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    struct VoidType
-    {
-    };
-
     template <template <typename> class FutureT, typename... Ts>
         requires (!concepts::AllSame<void, Ts...>)
     [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>&...>& futures)
