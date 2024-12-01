@@ -14,6 +14,7 @@
 #include "StopSourceAwaiter.hpp"
 #include "SleepAwaiter.hpp"
 #include "Wait.hpp"
+#include "RunInline.hpp"
 #include "SyncAwait.hpp"
 #include "Semaphore.hpp"
 #include "SingleEvent.hpp"

@@ -56,7 +56,11 @@ namespace tinycoro {
         {
         }
 
-        void Resume() { _pause.store(false, std::memory_order::relaxed); }
+        void Resume()
+        {
+            _pause.store(false, std::memory_order::relaxed);
+            _pause.notify_all();
+        }
 
         [[nodiscard]] static auto PauseTask(auto coroHdl)
         {
@@ -87,6 +91,8 @@ namespace tinycoro {
         }
 
         [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(); }
+
+        void AtomicWait(bool flag) const noexcept { _pause.wait(flag); }
 
     private:
         PauseHandlerCallbackT _pauseResume;

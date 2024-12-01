@@ -252,3 +252,37 @@ TEST(AnyOfCoAwaitTest2, AnyOfCoAwaitTest2)
     auto future = scheduler.Enqueue(AnyOfCoAwaitTest2(scheduler));
     EXPECT_NO_THROW(tinycoro::GetAll(future));
 }
+
+TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
+{
+   tinycoro::Scheduler scheduler{1};
+
+
+    auto task = [](tinycoro::Scheduler& scheduler) -> tinycoro::Task<std::string>
+    {
+        uint32_t count{};
+
+        auto Toast = [&count]()->tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 0);  // Need to call first
+            co_return "toast";
+        };
+
+        auto Coffee = [&count]()->tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 1);  // Need to call second
+            co_return "coffee";
+        };
+
+        auto Tee = [&count]()->tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 2);  // Need to call third
+            co_return "tee";
+        };
+
+        // The `SyncAwait` ensures both `Toast()` and `Coffee()` are executed concurrently.
+        auto [toast, coffee, tee] = co_await tinycoro::SyncAwait(scheduler, Toast(), Coffee(), Tee());
+        co_return toast + " + " + coffee + " + " + tee;
+    };
+
+    // Start the asynchronous execution of the Breakfast task.
+    auto breakfast = tinycoro::GetAll(scheduler, task(scheduler));
+    EXPECT_TRUE(breakfast == "toast + coffee + tee");
+}

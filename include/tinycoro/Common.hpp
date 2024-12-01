@@ -25,6 +25,10 @@ namespace tinycoro {
 
     } // namespace concepts
 
+    struct VoidType
+    {
+    };
+
     enum class ETaskResumeState
     {
         SUSPENDED,
