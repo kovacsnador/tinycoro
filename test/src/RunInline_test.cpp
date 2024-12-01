@@ -333,3 +333,63 @@ TEST(RunInlineTest, RunInline_FunctionalTest_5)
 
     EXPECT_EQ(count, 3);
 }
+
+TEST(RunInlineTest, RunInline_FunctionalTest_exception)
+{
+    int32_t count{};
+
+    auto task1 = [&count]()->tinycoro::Task<bool>
+    {
+        EXPECT_EQ(count++, 0);
+
+        co_return true; 
+    };
+
+    auto task2 = [&count]()->tinycoro::Task<uint32_t>
+    {
+        EXPECT_EQ(count++, 1);
+
+        throw std::runtime_error("Error");  // this throws an exception
+
+        co_return 42u; 
+    };
+
+    auto task3 = [&count]()->tinycoro::Task<void>
+    {
+        EXPECT_EQ(count++, 2);
+
+        co_return; 
+    };
+
+    auto func = [&]{std::ignore = tinycoro::RunInline(task1(), task2(), task3()); };
+
+    EXPECT_THROW(func(), std::runtime_error);
+    EXPECT_EQ(count, 2);
+}
+
+TEST(RunInlineTest, RunInline_FunctionalTest_exception2)
+{
+    int32_t count{};
+
+    auto task = [&count]()->tinycoro::Task<int32_t>
+    {
+        if(count > 2)
+        {
+            throw std::runtime_error{"Error"}; // throw an exception
+        }
+
+        co_return ++count; 
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.push_back(task());
+    tasks.push_back(task());
+    tasks.push_back(task());
+    tasks.push_back(task());
+    tasks.push_back(task());
+
+    auto func = [&]{std::ignore = tinycoro::RunInline(tasks); };
+
+    EXPECT_THROW(func(), std::runtime_error);
+    EXPECT_EQ(3, count);
+}
