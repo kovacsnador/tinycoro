@@ -75,7 +75,7 @@ namespace tinycoro {
             }
         };
 
-        auto tupleResultOpt = std::apply([waiter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(waiter(args)...); }, futures);
+        auto tupleResultOpt = std::apply([waiter]<typename... TypesT>(TypesT&... args) { return std::tuple{waiter(args)...}; }, futures);
 
         if (exception)
         {
@@ -86,7 +86,7 @@ namespace tinycoro {
         auto optConverter = []<typename T>(std::optional<T>& o) { return std::move(o.value()); };
 
         auto resultTuple
-            = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::make_tuple(optConverter(args)...); }, tupleResultOpt);
+            = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::tuple{optConverter(args)...}; }, tupleResultOpt);
 
         if constexpr (sizeof...(Ts) == 1)
         {
@@ -204,7 +204,7 @@ namespace tinycoro {
         requires concepts::AllFuture<FutureT...>
     [[nodiscard]] auto GetAll(FutureT&&... futures)
     {
-        auto tuple = std::forward_as_tuple(std::forward<FutureT>(futures)...); // std::make_tuple(std::forward<FutureT<Ts>>(futures)...);
+        auto tuple = std::forward_as_tuple(std::forward<FutureT>(futures)...);
         return GetAll(tuple);
     }
 

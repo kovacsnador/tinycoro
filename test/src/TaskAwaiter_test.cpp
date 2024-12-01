@@ -6,11 +6,11 @@
 
 #include "mock/CoroutineHandleMock.h"
 
-struct PauseHandlerMock
+struct PauseHdlMock
 {
     static inline size_t count{0};
 
-    PauseHandlerMock()
+    PauseHdlMock()
     : val{count++}
     {
     }
@@ -54,7 +54,7 @@ struct HandleMock
     ValueT value;
 
     StopSourceMock stopSource;
-    PauseHandlerMock pauseHandler;
+    PauseHdlMock pauseHandler;
 };
 
 template<>
@@ -77,7 +77,7 @@ struct HandleMock<void>
     }
 
     StopSourceMock stopSource;
-    PauseHandlerMock pauseHandler;
+    PauseHdlMock pauseHandler;
 };
 
 template<typename ValueT>
@@ -86,7 +86,7 @@ struct PromiseMock
     HandleMock<ValueT> child;
     HandleMock<ValueT> parent;
     StopSourceMock stopSource;
-    PauseHandlerMock pauseHandler;
+    PauseHdlMock pauseHandler;
 
     ValueT&& ReturnValue() { return std::move(value); }
 
@@ -99,7 +99,7 @@ struct PromiseMock<void>
     HandleMock<void> child;
     HandleMock<void> parent;
     StopSourceMock stopSource;
-    PauseHandlerMock pauseHandler;
+    PauseHdlMock pauseHandler;
 };
 
 template<typename ValueT, template<typename, typename> class AwaiterT>

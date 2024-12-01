@@ -66,7 +66,7 @@ namespace tinycoro {
             }
             else
             {
-                return std::make_tuple(EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...);
+                return std::tuple{EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...};
             }
         }
 
