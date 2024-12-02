@@ -202,6 +202,7 @@ catch(const std::exception& e)
     - [Scheduler](#scheduler)
     - [Task](#task)
     - [TaskView](#taskview)
+    - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
     - [Nested task](#nestedtask)
@@ -282,6 +283,24 @@ void Example_taskView(tinycoro::Scheduler& scheduler)
 
     auto coro   = task();
     tinycoro::GetAll(scheduler, coro.TaskView());
+}
+```
+
+### `RunInline`
+The `RunInline` function in tinycoro provides a convenient way to synchronously execute one or multiple coroutines and obtain their results, even in non-coroutine environments. This is particularly useful for scenarios where tasks need to be awaited immediately without setting up an asynchronous runtime.
+
+When multiple coroutines are passed to `tinycoro::RunInline(task1(), task2(), task3(), ...)`, they are executed sequentially in the order they are provided (left to right). For example, `task1` will run first, followed by `task2`, and so on.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+void Example_voidTask()
+{
+    auto task = []() -> tinycoro::Task<int32_t> {
+        co_return 42;
+    };
+
+    int32_t val42 = tinycoro::RunInline(task())
 }
 ```
 
