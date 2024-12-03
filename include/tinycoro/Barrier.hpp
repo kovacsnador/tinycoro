@@ -117,8 +117,8 @@ namespace tinycoro {
     template <typename CompletionCallbackT = detail::NoopComplitionCallback, template <typename, typename> class AwaiterT = detail::BarrierAwaiter>
     class Barrier
     {
-        using awaiter_type = AwaiterT<Barrier, PauseCallbackEvent>;
-        friend class AwaiterT<Barrier, PauseCallbackEvent>;
+        using awaiter_type = AwaiterT<Barrier, detail::PauseCallbackEvent>;
+        friend class AwaiterT<Barrier, detail::PauseCallbackEvent>;
 
     public:
         Barrier(size_t initCount, CompletionCallbackT callback = {})
@@ -189,7 +189,7 @@ namespace tinycoro {
             return false;
         }
 
-        [[nodiscard]] auto MakeAwaiter(detail::EBarrierAwaiterState policy) { return awaiter_type{*this, PauseCallbackEvent{}, policy}; }
+        [[nodiscard]] auto MakeAwaiter(detail::EBarrierAwaiterState policy) { return awaiter_type{*this, detail::PauseCallbackEvent{}, policy}; }
 
         [[nodiscard]] bool Add(awaiter_type* waiter, detail::EBarrierAwaiterState policy)
         {

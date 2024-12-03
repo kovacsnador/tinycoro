@@ -23,9 +23,9 @@ namespace tinycoro {
         class Semaphore
         {
         public:
-            using awaitable_type = AwaitableT<Semaphore, PauseCallbackEvent>;
+            using awaitable_type = AwaitableT<Semaphore, detail::PauseCallbackEvent>;
 
-            friend class AwaitableT<Semaphore, PauseCallbackEvent>;
+            friend class AwaitableT<Semaphore, detail::PauseCallbackEvent>;
 
             Semaphore(size_t initCount)
             : _counter{initCount}
@@ -39,7 +39,7 @@ namespace tinycoro {
             // disable move and copy
             Semaphore(Semaphore&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaitable_type{*this, PauseCallbackEvent{}}; }
+            [[nodiscard]] auto operator co_await() { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
             void Release()

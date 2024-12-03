@@ -25,29 +25,33 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    struct PauseCallbackEvent
-    {
-    private:
-        std::function<void()> _notifyCallback;
+    namespace detail {
 
-    public:
-        void Notify() const
+        struct PauseCallbackEvent
         {
-            if (_notifyCallback)
+        private:
+            std::function<void()> _notifyCallback;
+
+        public:
+            void Notify() const
             {
-                _notifyCallback();
+                if (_notifyCallback)
+                {
+                    _notifyCallback();
+                }
             }
-        }
 
-        template <typename T>
-            requires requires (T&& t) {
-                { _notifyCallback = std::forward<T>(t) };
+            template <typename T>
+                requires requires (T&& t) {
+                    { _notifyCallback = std::forward<T>(t) };
+                }
+            void Set(T&& cb)
+            {
+                _notifyCallback = std::forward<T>(cb);
             }
-        void Set(T&& cb)
-        {
-            _notifyCallback = std::forward<T>(cb);
-        }
-    };
+        };
+
+    } // namespace detail
 
     struct PauseHandler
     {

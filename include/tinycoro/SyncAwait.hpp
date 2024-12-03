@@ -11,31 +11,6 @@
 
 namespace tinycoro {
 
-    namespace detail {
-
-        struct AsyncAwaiterEvent
-        {
-            void Notify() const
-            {
-                if (_notifyCallback)
-                {
-                    _notifyCallback();
-                }
-            }
-
-            void Set(std::invocable auto cb)
-            {
-                assert(_notifyCallback == nullptr);
-
-                _notifyCallback = cb;
-            }
-
-        private:
-            std::function<void()> _notifyCallback;
-        };
-
-    } // namespace detail
-
     template <typename SchedulerT, typename EventT, typename FuturesT, typename... Args>
     struct AsyncAwaiterBase
     {
@@ -132,14 +107,14 @@ namespace tinycoro {
     [[nodiscard]] auto SyncAwait(SchedulerT& scheduler, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
-        return AsyncAwaiterT<SchedulerT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
+        return AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
     template <typename SchedulerT, typename StopSourceT, typename... Args>
     [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
-        return AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::AsyncAwaiterEvent, FutureTupleType, Args...>{
+        return AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FutureTupleType, Args...>{
             scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 
