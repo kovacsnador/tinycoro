@@ -194,7 +194,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)
     int32_t val;
     auto    awaiter = channel.PopWait(val);
 
-    using expectedAwaiterType = AwaiterMock<decltype(channel), tinycoro::PauseCallbackEvent, int32_t>;
+    using expectedAwaiterType = AwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

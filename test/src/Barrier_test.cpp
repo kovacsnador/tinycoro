@@ -125,7 +125,7 @@ TEST(BarrierTest, BarrierTest_coawaitReturn)
 
     auto awaiter = barrier.operator co_await();
 
-    using expectedAwaiterType = BarrierAwaiterMock<decltype(barrier), tinycoro::PauseCallbackEvent>;
+    using expectedAwaiterType = BarrierAwaiterMock<decltype(barrier), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
