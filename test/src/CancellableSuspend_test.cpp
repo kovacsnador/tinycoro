@@ -11,11 +11,11 @@ TEST(CancellableSuspentTest, CancellableSuspentTest_value)
     int32_t val{42};
     tinycoro::CancellableSuspend suspend{val};
 
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([]{});
 
     suspend.await_suspend(hdl);
 
-    EXPECT_TRUE(hdl.promise().cancellable);
+    EXPECT_TRUE(hdl.promise().pauseHandler->IsCancellable());
     EXPECT_EQ(hdl.promise().ReturnValue(), 42);
 }
 
@@ -23,9 +23,9 @@ TEST(CancellableSuspentTest, CancellableSuspentTest_void)
 {
     tinycoro::CancellableSuspend<void> suspend{};
 
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
+    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
     
     suspend.await_suspend(hdl);
 
-    EXPECT_TRUE(hdl.promise().cancellable);
+    EXPECT_TRUE(hdl.promise().pauseHandler->IsCancellable());
 }

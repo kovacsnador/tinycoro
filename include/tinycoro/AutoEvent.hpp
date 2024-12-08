@@ -13,9 +13,9 @@ namespace tinycoro {
         class AutoEvent
         {
         public:
-            using awaiter_type = AwaiterT<AutoEvent, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<AutoEvent, detail::PauseCallbackEvent>;
 
-            friend class AwaiterT<AutoEvent, PauseCallbackEvent>;
+            friend class AwaiterT<AutoEvent, detail::PauseCallbackEvent>;
 
             AutoEvent(bool initialySet = false)
             : _state{initialySet}
@@ -47,7 +47,7 @@ namespace tinycoro {
                 return _state;
             }
 
-            auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
+            auto operator co_await() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
 
         private:
             bool IsReady() noexcept

@@ -13,9 +13,9 @@ namespace tinycoro {
         class ManualEvent
         {
         public:
-            using awaiter_type = AwaiterT<ManualEvent, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<ManualEvent, detail::PauseCallbackEvent>;
 
-            friend class AwaiterT<ManualEvent, PauseCallbackEvent>;
+            friend class AwaiterT<ManualEvent, detail::PauseCallbackEvent>;
 
             ManualEvent() = default;
 
@@ -45,7 +45,7 @@ namespace tinycoro {
                 _state.compare_exchange_strong(expected, nullptr);
             }
 
-            auto operator co_await() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; };
+            auto operator co_await() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
 
         private:
             bool Add(awaiter_type* awaiter)

@@ -42,7 +42,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
         else
         {
             // Setting up expectations for the mock methods
-            EXPECT_CALL(*task.mock, Resume()).Times(1).WillOnce(::testing::Return(tinycoro::ETaskResumeState::DONE));
+            EXPECT_CALL(*task.mock, Resume()).Times(1);
         }
 
         if constexpr (std::same_as<ValueT, int32_t>)
@@ -59,7 +59,8 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
         tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise), 0);
 
         EXPECT_FALSE(packagedTask.IsPaused());
-        EXPECT_EQ(packagedTask(), tinycoro::ETaskResumeState::DONE);
+
+        packagedTask();
     }
 
     if constexpr (std::same_as<ValueT, int32_t>)
@@ -107,7 +108,8 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
         tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise), 0);
 
         EXPECT_TRUE(packagedTask.IsPaused());
-        EXPECT_EQ(packagedTask(), tinycoro::ETaskResumeState::DONE);
+        
+        packagedTask();
     }
 
     EXPECT_THROW(future.get(), std::runtime_error);

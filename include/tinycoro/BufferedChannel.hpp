@@ -30,9 +30,9 @@ namespace tinycoro {
             };
 
         public:
-            friend class AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
+            friend class AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
-            using awaiter_type = AwaiterT<BufferedChannel, PauseCallbackEvent, ValueT>;
+            using awaiter_type = AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
             // default constructor
             BufferedChannel() {};
@@ -42,7 +42,7 @@ namespace tinycoro {
 
             ~BufferedChannel() { Close(); }
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
 
             void Push(ValueT t) { _Emplace(std::move(t), false); }
 

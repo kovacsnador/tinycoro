@@ -99,7 +99,9 @@ namespace tinycoro {
 
         ~CoroTaskView() { destroy(); }
 
-        [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        void Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+
+        [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
@@ -198,7 +200,9 @@ namespace tinycoro {
 
         ~CoroTask() { destroy(); }
 
-        [[nodiscard]] auto Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        void Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+
+        [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {

@@ -25,8 +25,9 @@ namespace tinycoro {
 
     template <std::move_constructible TaskT>
         requires requires (TaskT t) {
-            { std::invoke(t) } -> std::same_as<ETaskResumeState>;
+            { std::invoke(t) } -> std::same_as<void>;
             { t.IsPaused() } -> std::same_as<bool>;
+            { t.ResumeState() } -> std::same_as<ETaskResumeState>;
         }
     class CoroThreadPool
     {
@@ -191,7 +192,10 @@ namespace tinycoro {
                                 queueLock.unlock();
 
                                 // resume the task
-                                auto resumeState = std::invoke(task);
+                                std::invoke(task);
+
+                                // get the resume state from the coroutine or corouitne child
+                                auto resumeState = task.ResumeState();
 
                                 switch (resumeState)
                                 {

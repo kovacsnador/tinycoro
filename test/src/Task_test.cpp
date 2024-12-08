@@ -24,7 +24,10 @@ TEST(TaskTest, TaskTest_void)
     EXPECT_EQ(task.await_ready(), false);
     EXPECT_TRUE((std::same_as<void, decltype(task.await_resume())>));
     EXPECT_FALSE(task.IsPaused());
-    EXPECT_EQ(task.Resume(), tinycoro::ETaskResumeState::DONE);
+
+    task.Resume();
+
+    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
     EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
 
     auto pauseResumeCallback = []{};
@@ -41,7 +44,10 @@ TEST(TaskTest, TaskTest_int)
     EXPECT_EQ(task.await_ready(), false);
     EXPECT_TRUE((std::same_as<int32_t&&, decltype(task.await_resume())>));
     EXPECT_FALSE(task.IsPaused());
-    EXPECT_EQ(task.Resume(), tinycoro::ETaskResumeState::DONE);
+
+    task.Resume();
+
+    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
     EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
 
     auto pauseResumeCallback = []{};
@@ -82,7 +88,11 @@ struct PromiseMock
 
 struct CoroResumerMock
 {
-    tinycoro::ETaskResumeState operator()([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
+    void operator()([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
+    {
+    }
+
+    auto ResumeState([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
     {
         return tinycoro::ETaskResumeState::PAUSED;
     }
@@ -106,8 +116,10 @@ TEST(CoroTaskTest, CoroTaskTest)
     EXPECT_EQ(task.await_ready(), true);
     EXPECT_TRUE((std::same_as<void, decltype(task.await_suspend(std::coroutine_handle<>{}))>));
     EXPECT_TRUE((std::same_as<void, decltype(task.await_resume())>));
-    
-    EXPECT_EQ(task.Resume(), tinycoro::ETaskResumeState::PAUSED);
+
+    task.Resume();
+
+    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::PAUSED);
 
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);

@@ -14,9 +14,9 @@ namespace tinycoro {
         class Latch
         {
         public:
-            friend class AwaiterT<Latch, PauseCallbackEvent>;
+            friend class AwaiterT<Latch, detail::PauseCallbackEvent>;
 
-            using awaiter_type = AwaiterT<Latch, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<Latch, detail::PauseCallbackEvent>;
 
             Latch(size_t count)
             : _count{count}
@@ -32,7 +32,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {

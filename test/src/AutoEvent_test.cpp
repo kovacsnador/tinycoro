@@ -39,7 +39,7 @@ TEST(AutoEventTest, AutoEventTest_coawaitReturn)
 
     auto awaiter = event.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(event), tinycoro::PauseCallbackEvent>;
+    using expectedAwaiterType = AwaiterMock<decltype(event), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

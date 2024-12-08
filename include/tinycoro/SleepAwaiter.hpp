@@ -6,9 +6,10 @@
 #include <future>
 #include <condition_variable>
 
-#include "AsyncCallbackAwaiter.hpp"
 #include "Task.hpp"
+#include "AsyncCallbackAwaiter.hpp"
 #include "StopSourceAwaiter.hpp"
+#include "CancellableSuspend.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -73,6 +74,18 @@ namespace tinycoro {
         if (future.valid())
         {
             future.get();
+        }
+    }
+
+    template<concepts::IsDuration DurationT>
+    Task<void> SleepCancellable(DurationT duration)
+    {
+        co_await Sleep(duration);
+
+        auto stopToken = co_await StopTokenAwaiter{};
+        if(stopToken.stop_possible() && stopToken.stop_requested())
+        {
+            co_await CancellableSuspend<void>{};
         }
     }
 

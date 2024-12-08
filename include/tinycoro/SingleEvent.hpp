@@ -21,16 +21,16 @@ namespace tinycoro {
         public:
             using value_type = ValueT;
 
-            friend class AwaiterT<SingleEvent, PauseCallbackEvent>;
+            friend class AwaiterT<SingleEvent, detail::PauseCallbackEvent>;
 
-            using awaiter_type = AwaiterT<SingleEvent, PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<SingleEvent, detail::PauseCallbackEvent>;
 
             SingleEvent() = default;
 
             // disable move and copy
             SingleEvent(SingleEvent&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaiter_type{*this, PauseCallbackEvent{}}; }
+            [[nodiscard]] auto operator co_await() { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
 
             void SetValue(ValueT val)
             {

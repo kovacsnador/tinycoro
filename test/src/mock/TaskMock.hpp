@@ -10,7 +10,8 @@ namespace tinycoro { namespace test {
     template <typename T>
     struct TaskMockImpl
     {
-        MOCK_METHOD(tinycoro::ETaskResumeState, Resume, ());
+        MOCK_METHOD(void, Resume, ());
+        MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
         MOCK_METHOD(T, await_resume, ());
         MOCK_METHOD(bool, IsPaused, (), (const noexcept));
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
@@ -34,7 +35,9 @@ namespace tinycoro { namespace test {
         {
         }
 
-        tinycoro::ETaskResumeState Resume() { return mock->Resume(); }
+        void Resume() { mock->Resume(); }
+
+        tinycoro::ETaskResumeState ResumeState() { return mock->ResumeState(); }
 
         T await_resume() { return mock->await_resume(); }
 

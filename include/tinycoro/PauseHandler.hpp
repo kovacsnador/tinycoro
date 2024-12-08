@@ -25,29 +25,33 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    struct PauseCallbackEvent
-    {
-    private:
-        std::function<void()> _notifyCallback;
+    namespace detail {
 
-    public:
-        void Notify() const
+        struct PauseCallbackEvent
         {
-            if (_notifyCallback)
+        private:
+            std::function<void()> _notifyCallback;
+
+        public:
+            void Notify() const
             {
-                _notifyCallback();
+                if (_notifyCallback)
+                {
+                    _notifyCallback();
+                }
             }
-        }
 
-        template <typename T>
-            requires requires (T&& t) {
-                { _notifyCallback = std::forward<T>(t) };
+            template <typename T>
+                requires requires (T&& t) {
+                    { _notifyCallback = std::forward<T>(t) };
+                }
+            void Set(T&& cb)
+            {
+                _notifyCallback = std::forward<T>(cb);
             }
-        void Set(T&& cb)
-        {
-            _notifyCallback = std::forward<T>(cb);
-        }
-    };
+        };
+
+    } // namespace detail
 
     struct PauseHandler
     {
@@ -58,6 +62,7 @@ namespace tinycoro {
 
         void Resume()
         {
+            _cancellable.store(false, std::memory_order::relaxed);
             _pause.store(false, std::memory_order::relaxed);
             _pause.notify_all();
         }
@@ -72,6 +77,28 @@ namespace tinycoro {
             pauseHandlerPtr->_pause.store(true);
 
             return pauseHandlerPtr->_pauseResume;
+        }
+
+        static void MakeCancellable(auto coroHdl)
+        {
+            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
+            assert(pauseHandlerPtr);
+
+            assert(pauseHandlerPtr->_cancellable.load() == false);
+
+            pauseHandlerPtr->_cancellable.store(true, std::memory_order::relaxed);
+        }
+
+        template<typename T>
+        static void MakeCancellable(auto coroHdl, T&& returnValue)
+        {
+            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
+            assert(pauseHandlerPtr);
+
+            assert(pauseHandlerPtr->_cancellable.load() == false);
+
+            coroHdl.promise().return_value(std::forward<T>(returnValue));
+            pauseHandlerPtr->_cancellable.store(true, std::memory_order::relaxed);
         }
 
         static void UnpauseTask(auto coroHdl)
@@ -90,13 +117,17 @@ namespace tinycoro {
             return pauseHandlerPtr;
         }
 
-        [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(); }
+        [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(std::memory_order::relaxed); }
+
+        [[nodiscard]] bool IsCancellable() const noexcept { return _cancellable.load(std::memory_order::relaxed); }
 
         void AtomicWait(bool flag) const noexcept { _pause.wait(flag); }
 
     private:
         PauseHandlerCallbackT _pauseResume;
+
         std::atomic<bool>     _pause{false};
+        std::atomic<bool>     _cancellable{false};
     };
 
 } // namespace tinycoro

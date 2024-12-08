@@ -75,7 +75,7 @@ TEST(LatchTest, LatchTest_coawaitReturn)
 
     auto awaiter = latch.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(latch), tinycoro::PauseCallbackEvent>;
+    using expectedAwaiterType = AwaiterMock<decltype(latch), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
