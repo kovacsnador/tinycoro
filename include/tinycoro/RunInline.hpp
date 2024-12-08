@@ -13,7 +13,8 @@ namespace tinycoro
             {t.await_resume()};
             {t.GetPauseHandler()};
             {t.SetPauseHandler([]{})};
-            {t.Resume()} -> std::same_as<ETaskResumeState>;
+            {t.Resume()} -> std::same_as<void>;
+            {t.ResumeState()} -> std::same_as<ETaskResumeState>;
         };
     }
 
@@ -33,7 +34,10 @@ namespace tinycoro
 
         do
         {
-            state = task.Resume();
+            // resume the corouitne
+            task.Resume();
+            // after resumption getting the state
+            state = task.ResumeState();
 
             if(state == PAUSED)
             {

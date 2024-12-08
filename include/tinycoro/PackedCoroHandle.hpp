@@ -20,11 +20,8 @@ namespace tinycoro {
             virtual ~ICoroHandleBridge() = default;
 
             virtual PackedCoroHandle&       Child()             = 0;
-            virtual bool                    Done() const        = 0;
-            virtual ETaskResumeState        ResumeState() const = 0;
-            virtual std::coroutine_handle<> Handle()            = 0;
+            virtual void                    Resume() const      = 0;
             virtual std::coroutine_handle<> Handle() const      = 0;
-            virtual void                    ReleaseHandle()     = 0;
         };
 
         template <typename PromiseT>
@@ -37,33 +34,15 @@ namespace tinycoro {
 
             PackedCoroHandle& Child() override { return _hdl.promise().child; }
 
-            std::coroutine_handle<> Handle() override { return _hdl; }
-
             std::coroutine_handle<> Handle() const override { return _hdl; }
 
-            bool Done() const override
+            void Resume() const override
             {
-                if (_hdl)
+                if(_hdl)
                 {
-                    return _hdl.done();
+                    _hdl.resume();
                 }
-                return true;
             }
-
-            ETaskResumeState ResumeState() const override
-            {
-                if (Done() == false)
-                {
-                    if (_hdl.promise().pauseHandler && _hdl.promise().pauseHandler->IsPaused())
-                    {
-                        return ETaskResumeState::PAUSED;
-                    }
-                    return ETaskResumeState::SUSPENDED;
-                }
-                return ETaskResumeState::DONE;
-            }
-
-            void ReleaseHandle() override { _hdl = nullptr; }
 
         private:
             std::coroutine_handle<PromiseT> _hdl;
@@ -143,7 +122,7 @@ namespace tinycoro {
             return _pimpl->Child();
         }
 
-        [[nodiscard]] std::coroutine_handle<> Handle()
+        [[nodiscard]] std::coroutine_handle<> Handle() const
         {
             if (_pimpl)
             {
@@ -152,43 +131,11 @@ namespace tinycoro {
             return std::noop_coroutine();
         }
 
-        [[nodiscard]] bool Done() const
+        void Resume() const
         {
             if (_pimpl)
             {
-                return _pimpl->Done();
-            }
-            return true;
-        }
-
-        [[nodiscard]] auto ResumeState() const
-        {
-            if (_pimpl)
-            {
-                return _pimpl->ResumeState();
-            }
-
-            return ETaskResumeState::DONE;
-        }
-
-        [[nodiscard]] ETaskResumeState Resume()
-        {
-            if (_pimpl)
-            {
-                if (auto hdl = _pimpl->Handle(); hdl)
-                {
-                    hdl.resume();
-                }
-            }
-
-            return ResumeState();
-        }
-
-        void ReleaseHandle()
-        {
-            if (_pimpl)
-            {
-                _pimpl->ReleaseHandle();
+                _pimpl->Resume();
             }
         }
 

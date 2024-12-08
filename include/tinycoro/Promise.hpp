@@ -31,7 +31,6 @@ namespace tinycoro {
 
             if (promise.parent)
             {
-                promise.parent.Child().ReleaseHandle();
                 promise.parent.Child() = nullptr;
                 return promise.parent.Handle();
             }
@@ -118,7 +117,6 @@ namespace tinycoro {
         std::shared_ptr<PauseHandlerT> pauseHandler;
 
         StopSourceT stopSource;
-        bool        cancellable{false};
 
         auto initial_suspend() { return std::suspend_always{}; }
 

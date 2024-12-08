@@ -3,6 +3,7 @@
 #include <future>
 #include <tuple>
 #include <stop_token>
+#include <array>
 
 #include <tinycoro/tinycoro_all.h>
 

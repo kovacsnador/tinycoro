@@ -218,7 +218,7 @@ namespace tinycoro {
         return GetAll(future);
     }
 
-    template <typename SchedulerT, typename StopSourceT, typename... CoroTasksT>
+    template <typename SchedulerT, typename StopSourceT, concepts::NonIterable... CoroTasksT>
     [[nodiscard]] auto AnyOfWithStopSource(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
     {
         (tasks.SetStopSource(source), ...);
@@ -227,7 +227,7 @@ namespace tinycoro {
         return GetAll(futures);
     }
 
-    template <typename SchedulerT, typename StopSourceT, typename CoroContainerT>
+    template <typename SchedulerT, typename StopSourceT, concepts::Iterable CoroContainerT>
     [[nodiscard]] auto AnyOfWithStopSource(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
     {
         std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
@@ -236,13 +236,13 @@ namespace tinycoro {
         return GetAll(futures);
     }
 
-    template <typename StopSourceT = std::stop_source, typename SchedulerT, typename... CoroTasksT>
+    template <typename StopSourceT = std::stop_source, typename SchedulerT, concepts::NonIterable... CoroTasksT>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroTasksT&&... tasks)
     {
         return AnyOfWithStopSource(scheduler, StopSourceT{}, std::forward<CoroTasksT>(tasks)...);
     }
 
-    template <typename StopSourceT = std::stop_source, typename SchedulerT, typename CoroContainerT>
+    template <typename StopSourceT = std::stop_source, typename SchedulerT, concepts::Iterable CoroContainerT>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroContainerT&& tasks)
     {
         return AnyOfWithStopSource(scheduler, StopSourceT{}, std::forward<CoroContainerT>(tasks));

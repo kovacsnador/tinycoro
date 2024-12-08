@@ -30,7 +30,8 @@ struct RunInline_TaskMock
     MOCK_METHOD(ReturnT, await_resume, ());
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, GetPauseHandler, ());
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
-    MOCK_METHOD(tinycoro::ETaskResumeState, Resume, ());
+    MOCK_METHOD(void, Resume, ());
+    MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
 
     std::shared_ptr<PauseHandlerT> pauseHandlerMock;
 };
@@ -62,10 +63,14 @@ struct RunInline_TaskMockWrapper
 
     }
 
-    tinycoro::ETaskResumeState Resume()
+    void Resume()
     {
-        return mock->Resume();
+        mock->Resume();
+    }
 
+    tinycoro::ETaskResumeState ResumeState()
+    {
+        return mock->ResumeState();
     }
 
     std::shared_ptr<RunInline_TaskMock<ReturnT, PauseHandlerT>> mock;
@@ -82,7 +87,8 @@ TEST(RunInlineTest, RunInlineTest_void)
         }
     ));
 
-    EXPECT_CALL(mock, Resume()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+    EXPECT_CALL(mock, Resume()).Times(1);
+    EXPECT_CALL(mock, ResumeState()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
     EXPECT_CALL(mock, await_resume()).Times(1);
 
     tinycoro::RunInline(mock);
@@ -99,7 +105,8 @@ TEST(RunInlineTest, RunInlineTest_int32)
         }
     ));
 
-    EXPECT_CALL(mock, Resume()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+    EXPECT_CALL(mock, Resume()).Times(1);
+    EXPECT_CALL(mock, ResumeState()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
     EXPECT_CALL(mock, await_resume()).Times(1).WillOnce(testing::Return(42));
 
     auto val = tinycoro::RunInline(mock);
@@ -118,7 +125,8 @@ TEST(RunInlineTest, RunInlineTest_pause)
         }
     ));
 
-    EXPECT_CALL(mock, Resume())
+    EXPECT_CALL(mock, Resume()).Times(2);
+    EXPECT_CALL(mock, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::PAUSED))
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
@@ -142,7 +150,8 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
         }
     ));
 
-    EXPECT_CALL(mock1, Resume())
+    EXPECT_CALL(mock1, Resume()).Times(1);
+    EXPECT_CALL(mock1, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
     EXPECT_CALL(mock1, await_resume()).Times(1).WillOnce(testing::Return(42));
@@ -157,7 +166,8 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
         }
     ));
 
-    EXPECT_CALL(mock2, Resume())
+    EXPECT_CALL(mock2, Resume()).Times(2);
+    EXPECT_CALL(mock2, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::PAUSED))
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
 
@@ -186,7 +196,8 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
         }
         ));
 
-        EXPECT_CALL(*tasks[i].mock, Resume())
+        EXPECT_CALL(*tasks[i].mock, Resume()).Times(1);
+        EXPECT_CALL(*tasks[i].mock, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
         EXPECT_CALL(*tasks[i].mock, await_resume()).Times(1).WillOnce(testing::Return(42));

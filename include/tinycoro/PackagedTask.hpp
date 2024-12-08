@@ -15,10 +15,11 @@ namespace tinycoro {
 		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
         template <typename T>
-        concept CoroTask = requires (T c) {
-            { c.Resume() } -> std::same_as<ETaskResumeState>;
+        concept CoroTask = std::move_constructible<T> && requires (T c) {
+            { c.Resume() } -> std::same_as<void>;
             { c.await_resume() };
             { c.IsPaused() } -> std::same_as<bool>;
+            { c.ResumeState() } -> std::same_as<ETaskResumeState>;
         };
 
     } // namespace concepts
@@ -38,7 +39,8 @@ namespace tinycoro {
 
             virtual ~ISchedulableBridged() = default;
 
-            virtual ETaskResumeState Resume()                  = 0;
+            virtual void Resume()                  = 0;
+            virtual ETaskResumeState ResumeState() = 0;
             virtual bool             IsPaused() const noexcept = 0;
         };
 
@@ -72,21 +74,28 @@ namespace tinycoro {
                 }
             }
 
-            ETaskResumeState Resume() override
+            void Resume() override
             {
-                ETaskResumeState resumeState{ETaskResumeState::DONE};
-
                 try
                 {
-                    resumeState = _coro.Resume();
+                    _coro.Resume();
                 }
                 catch (...)
                 {
                     _futureState.set_exception(std::current_exception());
                     _needValueSet = false;
                 }
+            }
 
-                return resumeState;
+            ETaskResumeState ResumeState() override
+            {
+                // value already set, the coroutine should be done
+                if(_needValueSet == false)
+                {
+                    return ETaskResumeState::DONE;
+                }
+
+                return _coro.ResumeState();
             }
 
             bool IsPaused() const noexcept override { return _coro.IsPaused(); }
@@ -107,9 +116,14 @@ namespace tinycoro {
             _pimpl = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
         }
 
-        ETaskResumeState operator()()
+        void operator()()
         {
-            return _pimpl->Resume();
+            _pimpl->Resume();
+        }
+
+        ETaskResumeState ResumeState()
+        {
+            return _pimpl->ResumeState();
         }
 
         bool IsPaused() const noexcept

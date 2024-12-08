@@ -3,29 +3,29 @@
 
 #include <coroutine>
 
-#include "CancellationHandler.hpp"
+#include "PauseHandler.hpp"
 
 namespace tinycoro {
 
     template <typename ReturnT>
     struct CancellableSuspend
     {
-        CancellableSuspend(ReturnT& returnValue)
-        : _returnValue{returnValue}
+        CancellableSuspend(ReturnT returnValue)
+        : _returnValue{std::move(returnValue)}
         {
         }
 
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr void await_suspend(auto parentCoro) const noexcept
+        constexpr void await_suspend(auto coro) const noexcept
         { 
-            CancellationHandler::MakeCancellable(parentCoro, std::move(_returnValue));
+            PauseHandler::MakeCancellable(coro, std::move(_returnValue));
         }
 
         constexpr void await_resume() const noexcept { }
 
     private:
-        ReturnT& _returnValue;
+        ReturnT _returnValue;
     };
 
     template<>
@@ -33,12 +33,12 @@ namespace tinycoro {
     {
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr void await_suspend(auto parentCoro) const noexcept
+        constexpr void await_suspend(auto coro) const noexcept
         { 
-            CancellationHandler::MakeCancellable(parentCoro);
+            PauseHandler::MakeCancellable(coro);
         }
 
-        constexpr void await_resume() const noexcept { }
+        constexpr void await_resume() const noexcept {}
     };
     
 } // namespace tinycoro
