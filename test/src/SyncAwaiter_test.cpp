@@ -398,3 +398,70 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
 
     tinycoro::RunInline(coro());
 }
+
+TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
+{
+    tinycoro::Scheduler scheduler{16};
+
+    const auto size = GetParam();
+
+    std::atomic<size_t> count{};
+
+    auto task = [&count]()->tinycoro::Task<size_t> {
+        co_return ++count;
+    };
+
+    auto coro = [&]()-> tinycoro::Task<void>
+    {
+        std::vector<tinycoro::Task<size_t>> tasks;
+
+        for(size_t i = 0; i < size; ++i)
+        {
+            tasks.push_back(task());
+        }
+
+        auto results = co_await tinycoro::AnyOfAwait(scheduler, tasks);
+        
+        // check for unique values
+        std::set<size_t> set;
+        for(auto it : results)
+        {
+            // no lock needed here only one consumer
+            auto [_, inserted] = set.insert(it);
+            EXPECT_TRUE(inserted);
+        }
+    };
+
+    tinycoro::RunInline(coro());
+}
+
+TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
+{
+    tinycoro::Scheduler scheduler{8};
+
+    std::atomic<size_t> count{};
+
+    auto task = [&count](auto duration)->tinycoro::Task<void> {
+        co_await tinycoro::SleepCancellable(duration);
+        ++count;    // should never reach this code
+    };
+
+    auto coro = [&]()-> tinycoro::Task<void>
+    {
+        std::vector<tinycoro::Task<void>> tasks;
+
+        tasks.push_back([&]() -> tinycoro::Task<void> {
+            ++count;
+            co_return;
+        }());
+
+        tasks.push_back(task(1000ms));
+        tasks.push_back(task(2000ms));
+
+        co_await tinycoro::AnyOfAwait(scheduler, tasks);
+        
+        EXPECT_EQ(count, 1);
+    };
+
+    tinycoro::RunInline(coro());
+}
