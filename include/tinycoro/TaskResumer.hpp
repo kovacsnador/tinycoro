@@ -26,15 +26,12 @@ namespace tinycoro {
             PackedCoroHandle  hdl{coroHdl};
             PackedCoroHandle* hdlPtr = std::addressof(hdl);
 
-            while (*hdlPtr && hdlPtr->Child() /*&& hdlPtr->Child().Done() == false*/)
+            while (*hdlPtr && hdlPtr->Child())
             {
                 hdlPtr = std::addressof(hdlPtr->Child());
             }
 
-            //if (*hdlPtr && hdlPtr->Done() == false)
-            {
-                hdlPtr->Resume();
-            }
+            hdlPtr->Resume();
         }
 
         ETaskResumeState ResumeState(auto coroHdl, const auto& stopSource) const
