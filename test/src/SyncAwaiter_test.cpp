@@ -450,10 +450,18 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
     {
         std::vector<tinycoro::Task<void>> tasks;
 
-        tasks.push_back([&]() -> tinycoro::Task<void> {
+        auto t2 = [&]() -> tinycoro::Task<void> {
             ++count;
             co_return;
-        }());
+        };
+
+        // TODO this raises an exception....
+        /*tasks.push_back([&]() -> tinycoro::Task<void> {
+            ++count;
+            co_return;
+        }());*/
+
+        tasks.push_back(t2());
 
         tasks.push_back(task(1000ms));
         tasks.push_back(task(2000ms));
