@@ -455,7 +455,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
             co_return;
         };
 
-        // TODO this raises an exception....
+        // TODO this raises an UB....
         /*tasks.push_back([&]() -> tinycoro::Task<void> {
             ++count;
             co_return;
@@ -469,6 +469,45 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
         co_await tinycoro::AnyOfAwait(scheduler, tasks);
         
         EXPECT_EQ(count, 1);
+    };
+
+    tinycoro::RunInline(coro());
+}
+
+TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
+{
+    tinycoro::Scheduler scheduler{8};
+
+    std::atomic<size_t> count{};
+
+    auto task = [&count](auto duration)->tinycoro::Task<void> {
+        co_await tinycoro::SleepCancellable(duration);
+        ++count;    // should never reach this code
+    };
+
+    auto coro = [&]()-> tinycoro::Task<void>
+    {
+        std::vector<tinycoro::Task<void>> tasks;
+
+        auto t2 = [&]() -> tinycoro::Task<void> {
+            throw std::runtime_error{"exception"};
+            co_return;
+        };
+
+        // TODO this raises an UB....
+        /*tasks.push_back([&]() -> tinycoro::Task<void> {
+            ++count;
+            co_return;
+        }());*/
+
+        tasks.push_back(t2());
+
+        tasks.push_back(task(1000ms));
+        tasks.push_back(task(2000ms));
+
+        EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, tasks), std::runtime_error);
+        
+        EXPECT_EQ(count, 0);
     };
 
     tinycoro::RunInline(coro());
