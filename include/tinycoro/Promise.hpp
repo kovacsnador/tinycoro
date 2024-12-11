@@ -92,27 +92,16 @@ namespace tinycoro {
         std::optional<value_type> _value{};
     };
 
-    template <typename PackedCoroHandleT>
-    struct CoroHandleNode
-    {
-        PackedCoroHandleT parent;
-        PackedCoroHandleT child;
-    };
-
-    template <concepts::Awaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
-    struct PromiseBase : private CoroHandleNode<PackedCoroHandle>
+    template <concepts::Awaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT, typename NodeT = PackedCoroHandle>
+    struct PromiseBase
     {
         PromiseBase()          = default;
-        virtual ~PromiseBase() = default;
 
-        PromiseBase(const PromiseBase&) = default;
-        PromiseBase(PromiseBase&&)      = default;
+        // disable nove and copy
+        PromiseBase(PromiseBase&&)      = delete;
 
-        PromiseBase& operator=(const PromiseBase&) = default;
-        PromiseBase& operator=(PromiseBase&&)      = default;
-
-        using CoroHandleNode::child;
-        using CoroHandleNode::parent;
+        NodeT child;
+        NodeT parent;
 
         std::shared_ptr<PauseHandlerT> pauseHandler;
 
@@ -140,20 +129,20 @@ namespace tinycoro {
     template <typename... Types>
     struct PromiseT;
 
-    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT>
-    struct PromiseT<FinalAwaiterT, ReturnerT> : public PromiseBase<FinalAwaiterT>, public ReturnerT
+    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
+    struct PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
-    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT>
-    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT> : public PromiseBase<FinalAwaiterT>, public ReturnerT, public YielderT
+    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT, typename PauseHandlerT, typename StopSourceT>
+    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
-    template <typename ReturnValueT>
-    using Promise = PromiseT<FinalAwaiter, PromiseReturnValue<ReturnValueT>>;
+    template <typename ReturnValueT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
+    using Promise = PromiseT<FinalAwaiter, PromiseReturnValue<ReturnValueT>, PauseHandlerT, StopSourceT>;
 
 } // namespace tinycoro
 

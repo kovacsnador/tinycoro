@@ -72,7 +72,7 @@ struct FinalAwaiterMock
 
 TEST(PromiseTest, PromiseTest_FinalAwaiter)
 {
-    tinycoro::PromiseT<FinalAwaiterMock, tinycoro::PromiseReturnValue<int32_t>> promise;
+    tinycoro::PromiseT<FinalAwaiterMock, tinycoro::PromiseReturnValue<int32_t>, tinycoro::PauseHandler, std::stop_source> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
