@@ -96,13 +96,9 @@ namespace tinycoro {
     struct PromiseBase
     {
         PromiseBase()          = default;
-        virtual ~PromiseBase() = default;
 
-        PromiseBase(const PromiseBase&) = default;
-        PromiseBase(PromiseBase&&)      = default;
-
-        PromiseBase& operator=(const PromiseBase&) = default;
-        PromiseBase& operator=(PromiseBase&&)      = default;
+        // disable nove and copy
+        PromiseBase(PromiseBase&&)      = delete;
 
         NodeT child;
         NodeT parent;
