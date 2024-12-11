@@ -85,7 +85,7 @@ namespace tinycoro {
     {
         AsyncAwaiterT(SchedulerT& scheduler, EventT event, ContainerT&& container)
         : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
-        , _container{container}
+        , _container{std::forward<ContainerT>(container)}
         {
         }
 
@@ -150,7 +150,7 @@ namespace tinycoro {
         AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, ContainerT&& container)
         : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
         , _stopSource{std::move(stopSource)}
-        , _container{container}
+        , _container{std::forward<ContainerT>(container)}
         {
         }
 

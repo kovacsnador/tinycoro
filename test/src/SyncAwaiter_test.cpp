@@ -17,7 +17,7 @@ struct SchedulerMock
     template <tinycoro::concepts::NonIterable CoroTaskT>
     auto Enqueue([[maybe_unused]] CoroTaskT&& t)
     {
-        auto task = std::move(t);
+        auto task    = std::move(t);
         using ValueT = CoroTaskT::promise_type::value_type;
         std::promise<ValueT> promise;
 
@@ -39,7 +39,7 @@ struct SchedulerMock
 
         std::vector<std::future<ValueT>> futures;
 
-        for(auto&& it : c)
+        for (auto&& it : c)
         {
             [[maybe_unused]] auto task = std::move(it);
 
@@ -96,7 +96,7 @@ struct SyncAwaiterTest : testing::Test
     }
 
 protected:
-    bool resumerCalled{false};
+    bool                                                         resumerCalled{false};
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
 
     SchedulerMock schedulerMock;
@@ -116,7 +116,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_voidTask)
 
 TEST_F(SyncAwaiterTest, SyncAwaiterTest_vector_voidTask)
 {
-    auto task    = []() -> tinycoro::Task<void> { co_return; };
+    auto task = []() -> tinycoro::Task<void> { co_return; };
 
     std::vector<tinycoro::Task<void>> tasks;
     tasks.push_back(task());
@@ -150,7 +150,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_intTask)
 
 TEST_F(SyncAwaiterTest, SyncAwaiterTest_array_intTask)
 {
-    auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
+    auto task = []() -> tinycoro::Task<int32_t> { co_return 0; };
 
     std::array<tinycoro::Task<int32_t>, 3> tasks;
     tasks[0] = task();
@@ -257,7 +257,6 @@ tinycoro::Task<void> AnyOfCoAwaitTest1(auto& scheduler)
     auto now = std::chrono::system_clock::now();
 
     auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
-
         int32_t count{0};
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
@@ -319,25 +318,23 @@ TEST(AnyOfCoAwaitTest2, AnyOfCoAwaitTest2)
 
 TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
 {
-   tinycoro::Scheduler scheduler{1};
+    tinycoro::Scheduler scheduler{1};
 
-
-    auto task = [](tinycoro::Scheduler& scheduler) -> tinycoro::Task<std::string>
-    {
+    auto task = [](tinycoro::Scheduler& scheduler) -> tinycoro::Task<std::string> {
         uint32_t count{};
 
-        auto Toast = [&count]()->tinycoro::Task<std::string> {
-            EXPECT_EQ(count++, 0);  // Need to call first
+        auto Toast = [&count]() -> tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 0); // Need to call first
             co_return "toast";
         };
 
-        auto Coffee = [&count]()->tinycoro::Task<std::string> {
-            EXPECT_EQ(count++, 1);  // Need to call second
+        auto Coffee = [&count]() -> tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 1); // Need to call second
             co_return "coffee";
         };
 
-        auto Tee = [&count]()->tinycoro::Task<std::string> {
-            EXPECT_EQ(count++, 2);  // Need to call third
+        auto Tee = [&count]() -> tinycoro::Task<std::string> {
+            EXPECT_EQ(count++, 2); // Need to call third
             co_return "tee";
         };
 
@@ -355,11 +352,7 @@ struct SyncAwaiterDynamicTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    SyncAwaiterDynamicTest,
-    SyncAwaiterDynamicTest,
-    testing::Values(1, 10, 100, 1000, 10000)
-);
+INSTANTIATE_TEST_SUITE_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicTest, testing::Values(1, 10, 100, 1000, 10000));
 
 TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
 {
@@ -369,15 +362,12 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
 
     std::atomic<size_t> count{};
 
-    auto task = [&count]()->tinycoro::Task<size_t>{
-        co_return ++count;
-    };
+    auto task = [&count]() -> tinycoro::Task<size_t> { co_return ++count; };
 
-    auto coro = [&]()-> tinycoro::Task<void>
-    {
+    auto coro = [&]() -> tinycoro::Task<void> {
         std::vector<tinycoro::Task<size_t>> tasks;
 
-        for(size_t i=0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
         {
             tasks.push_back(task());
         }
@@ -385,10 +375,10 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
         auto results = co_await tinycoro::SyncAwait(scheduler, tasks);
 
         EXPECT_EQ(results.size(), count);
-        
+
         // check for unique values
         std::set<size_t> set;
-        for(auto it : results)
+        for (auto it : results)
         {
             // no lock needed here only one consumer
             auto [_, inserted] = set.insert(it);
@@ -407,24 +397,21 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
 
     std::atomic<size_t> count{};
 
-    auto task = [&count]()->tinycoro::Task<size_t> {
-        co_return ++count;
-    };
+    auto task = [&count]() -> tinycoro::Task<size_t> { co_return ++count; };
 
-    auto coro = [&]()-> tinycoro::Task<void>
-    {
+    auto coro = [&]() -> tinycoro::Task<void> {
         std::vector<tinycoro::Task<size_t>> tasks;
 
-        for(size_t i = 0; i < size; ++i)
+        for (size_t i = 0; i < size; ++i)
         {
             tasks.push_back(task());
         }
 
         auto results = co_await tinycoro::AnyOfAwait(scheduler, tasks);
-        
+
         // check for unique values
         std::set<size_t> set;
-        for(auto it : results)
+        for (auto it : results)
         {
             // no lock needed here only one consumer
             auto [_, inserted] = set.insert(it);
@@ -435,39 +422,72 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
     tinycoro::RunInline(coro());
 }
 
-TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
+TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 {
-    tinycoro::Scheduler scheduler{8};
+    // only 1 thread
+    tinycoro::Scheduler scheduler{1};
+
+    const auto size = GetParam();
 
     std::atomic<size_t> count{};
 
-    auto task = [&count](auto duration)->tinycoro::Task<void> {
-        co_await tinycoro::SleepCancellable(duration);
-        ++count;    // should never reach this code
+    auto task = [](auto& c) -> tinycoro::Task<size_t> { 
+        co_await tinycoro::CancellableSuspend{42};
+        co_return ++c;
     };
 
-    auto coro = [&]()-> tinycoro::Task<void>
-    {
-        std::vector<tinycoro::Task<void>> tasks;
+    auto coro = [&]() -> tinycoro::Task<void> {
+        std::vector<tinycoro::Task<size_t>> tasks;
 
-        auto t2 = [&]() -> tinycoro::Task<void> {
-            ++count;
-            co_return;
+        for (size_t i = 0; i < size; ++i)
+        {
+            tasks.push_back(task(count));
+        }
+
+        auto results = co_await tinycoro::AnyOfAwait(scheduler, tasks);
+
+        EXPECT_EQ(count, 1);
+        EXPECT_EQ(results.size(), size);
+        EXPECT_EQ(results.at(0), 1);
+
+        for(size_t i = 1 ; i < results.size() ; ++i)
+        {
+            EXPECT_EQ(results[i], 42);
+        }
+    };
+
+    tinycoro::RunInline(coro());
+}
+
+TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
+{
+    // scheduler with only 1 thread
+    tinycoro::Scheduler scheduler{1};
+
+    std::atomic<size_t> count{};
+
+    auto coro = [&]() -> tinycoro::Task<void> {
+        auto task = [&](auto duration) -> tinycoro::Task<void> {
+            co_await tinycoro::SleepCancellable(duration);
+            ++count; // should never reach this code
         };
 
-        // TODO this raises an UB....
-        /*tasks.push_back([&]() -> tinycoro::Task<void> {
-            ++count;
-            co_return;
-        }());*/
+        std::vector<tinycoro::Task<void>> tasks;
 
-        tasks.push_back(t2());
+        {
+            auto t2 = [](auto& c) -> tinycoro::Task<void> {
+                ++c;
+                co_return;
+            };
+
+            tasks.push_back(t2(count));
+        }
 
         tasks.push_back(task(1000ms));
         tasks.push_back(task(2000ms));
 
         co_await tinycoro::AnyOfAwait(scheduler, tasks);
-        
+
         EXPECT_EQ(count, 1);
     };
 
@@ -476,17 +496,17 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 
 TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
 {
-    tinycoro::Scheduler scheduler{8};
+    // scheduler with only 1 thread
+    tinycoro::Scheduler scheduler{1};
 
     std::atomic<size_t> count{};
 
-    auto task = [&count](auto duration)->tinycoro::Task<void> {
+    auto task = [&count](auto duration) -> tinycoro::Task<void> {
         co_await tinycoro::SleepCancellable(duration);
-        ++count;    // should never reach this code
+        ++count; // should never reach this code
     };
 
-    auto coro = [&]()-> tinycoro::Task<void>
-    {
+    auto coro = [&]() -> tinycoro::Task<void> {
         std::vector<tinycoro::Task<void>> tasks;
 
         auto t2 = [&]() -> tinycoro::Task<void> {
@@ -494,19 +514,13 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
             co_return;
         };
 
-        // TODO this raises an UB....
-        /*tasks.push_back([&]() -> tinycoro::Task<void> {
-            ++count;
-            co_return;
-        }());*/
-
         tasks.push_back(t2());
 
         tasks.push_back(task(1000ms));
         tasks.push_back(task(2000ms));
 
         EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, tasks), std::runtime_error);
-        
+
         EXPECT_EQ(count, 0);
     };
 
