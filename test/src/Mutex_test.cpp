@@ -12,8 +12,8 @@ struct MutexTest : testing::TestWithParam<size_t>
 INSTANTIATE_TEST_SUITE_P(
     MutexTest,
     MutexTest,
-    testing::Values(1, 10, 100, 1000, 20'000)
- );
+    testing::Values(1, 10, 100, 1000, 10'000)
+);
  
 template <typename, typename>
 class AwaiterMock
@@ -32,6 +32,11 @@ TEST(MutexTest, MutexTest_coawaitReturn)
 
     using expectedAwaiterType = AwaiterMock<decltype(mutex), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
+}
+
+TEST(MutexTest, MutexTest_await_ready)
+{
+    
 }
 
 TEST_P(MutexTest, MutexFunctionalTest_1)
@@ -65,6 +70,43 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
         auto [_, inserted] = set.insert(it);
         EXPECT_TRUE(inserted);
     }
+
+    EXPECT_EQ(count, size);
+}
+
+struct MutexStressTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    MutexStressTest,
+    MutexStressTest,
+    testing::Values(10'000, 50'000)
+);
+
+TEST_P(MutexStressTest, MutexFunctionalStressTest_1)
+{
+    tinycoro::Mutex mutex;
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    size_t count{0};
+
+    auto task = [&]()->tinycoro::Task<void> {
+        auto lock = co_await mutex;
+        ++count;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+
+    auto size = GetParam();
+
+    for(size_t i = 0; i < size; ++i)
+    {
+        tasks.push_back(task());
+    }
+    
+    tinycoro::GetAll(scheduler, tasks);
 
     EXPECT_EQ(count, size);
 }

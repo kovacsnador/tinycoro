@@ -6,8 +6,8 @@
 #include <stdexcept>
 
 #include "PauseHandler.hpp"
-#include "Finally.hpp"
 #include "LinkedPtrStack.hpp"
+#include "LockGuard.hpp"
 
 namespace tinycoro {
 
@@ -26,6 +26,7 @@ namespace tinycoro {
             using awaitable_type = AwaitableT<Semaphore, detail::PauseCallbackEvent>;
 
             friend class AwaitableT<Semaphore, detail::PauseCallbackEvent>;
+            friend class LockGuard<Semaphore>;
 
             Semaphore(size_t initCount)
             : _counter{initCount}
@@ -104,7 +105,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr auto await_resume() noexcept
             {
-                return Finally([this] { _semaphore.Release(); });
+                return LockGuard{_semaphore};
             }
 
             void Notify() const { _event.Notify(); }

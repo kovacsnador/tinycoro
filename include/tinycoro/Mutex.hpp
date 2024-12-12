@@ -4,6 +4,7 @@
 #include <atomic>
 
 #include "PauseHandler.hpp"
+#include "LockGuard.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -15,6 +16,7 @@ namespace tinycoro {
             using awaitable_type = AwaitableT<Mutex, detail::PauseCallbackEvent>;
 
             friend class AwaitableT<Mutex, detail::PauseCallbackEvent>;
+            friend class LockGuard<Mutex>;
 
             Mutex() = default;
 
@@ -24,14 +26,23 @@ namespace tinycoro {
             [[nodiscard]] auto operator co_await() { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
+            // Checks only if the mutex is free to take.
+            bool Ready() noexcept
+            {
+                auto oldValue = _state.load();
+                if (oldValue == nullptr)
+                {
+                    if (_state.compare_exchange_strong(oldValue, this))
+                    {
+                        // mutex was free to take.
+                        return true;
+                    }
+                }
+                return false;
+            }
+
             void Release()
             {
-                if(_control > 1)
-                {
-                    int k=0;
-                    ++k;
-                }
-                
                 auto oldValue = _state.load();
 
                 assert(oldValue != nullptr);
@@ -40,7 +51,6 @@ namespace tinycoro {
                 {
                     if (_state.compare_exchange_strong(oldValue, nullptr))
                     {
-                        --_control;
                         // No waiters, just release the mutex.
                         return;
                     }
@@ -53,8 +63,7 @@ namespace tinycoro {
                 while (_state.compare_exchange_strong(oldValue, next) == false)
                 {
                     oldHead = static_cast<awaitable_type*>(oldValue);
-                    next = oldHead->next ? static_cast<void*>(oldHead->next) : static_cast<void*>(this);
-
+                    next    = oldHead->next ? static_cast<void*>(oldHead->next) : static_cast<void*>(this);
                 }
 
                 // wake the next awaiter
@@ -63,35 +72,37 @@ namespace tinycoro {
 
             auto TryAcquire(awaitable_type* awaiter)
             {
-                auto oldValue = _state.load();
-
-                if (oldValue == nullptr)
+                for (;;)
                 {
-                    if (_state.compare_exchange_strong(oldValue, this))
+                    auto oldValue = _state.load();
+
+                    if (oldValue == nullptr)
                     {
-                        // mutex was free to take.
-                        ++_control;
-                        return true;
+                        if (_state.compare_exchange_strong(oldValue, this))
+                        {
+                            // mutex was free to take.
+                            return true;
+                        }
                     }
-                }
 
-                if (oldValue != this)
-                {
-                    awaiter->next = static_cast<awaitable_type*>(oldValue);
-                }
-
-                while (oldValue != nullptr && _state.compare_exchange_strong(oldValue, awaiter) == false)
-                {
                     if (oldValue != this)
                     {
                         awaiter->next = static_cast<awaitable_type*>(oldValue);
                     }
-                }
 
-                if (oldValue == nullptr)
-                {
-                    // looks like the mutex is free to take, make a try...
-                    return TryAcquire(awaiter);
+                    while (oldValue != nullptr && _state.compare_exchange_strong(oldValue, awaiter) == false)
+                    {
+                        if (oldValue != this)
+                        {
+                            awaiter->next = static_cast<awaitable_type*>(oldValue);
+                        }
+                    }
+
+                    if (oldValue != nullptr)
+                    {
+                        // awaiter is now in waiting queue
+                        break;
+                    }
                 }
 
                 // awaiter is now in waiting queue
@@ -102,8 +113,6 @@ namespace tinycoro {
             // this => Locked with NO waiters
             // other => Locked with waiters in the stack
             std::atomic<void*> _state{nullptr};
-
-            std::atomic<size_t> _control{0};
         };
 
         template <typename MutexT, typename EventT>
@@ -119,7 +128,7 @@ namespace tinycoro {
             // disable move and copy
             MutexAwaiter(MutexAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
+            [[nodiscard]] constexpr bool await_ready() const noexcept { return _mutex.Ready(); }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
@@ -135,10 +144,7 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            [[nodiscard]] constexpr auto await_resume() noexcept
-            {
-                return Finally([this] { _mutex.Release(); });
-            }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return LockGuard{_mutex}; }
 
             void Notify() const { _event.Notify(); }
 
