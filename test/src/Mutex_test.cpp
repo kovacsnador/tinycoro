@@ -9,12 +9,8 @@ struct MutexTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    MutexTest,
-    MutexTest,
-    testing::Values(1, 10, 100, 1000, 10'000)
-);
- 
+INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000));
+
 template <typename, typename>
 class AwaiterMock
 {
@@ -34,10 +30,7 @@ TEST(MutexTest, MutexTest_coawaitReturn)
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
-TEST(MutexTest, MutexTest_await_ready)
-{
-    
-}
+TEST(MutexTest, MutexTest_await_ready) { }
 
 TEST_P(MutexTest, MutexFunctionalTest_1)
 {
@@ -47,7 +40,7 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
 
     size_t count{0};
 
-    auto task = [&]()->tinycoro::Task<size_t> {
+    auto task = [&]() -> tinycoro::Task<size_t> {
         auto lock = co_await mutex;
         co_return ++count;
     };
@@ -56,11 +49,11 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
 
     auto size = GetParam();
 
-    for(size_t i = 0; i < size; ++i)
+    for (size_t i = 0; i < size; ++i)
     {
         tasks.push_back(task());
     }
-    
+
     auto results = tinycoro::GetAll(scheduler, tasks);
 
     // check for unique values
@@ -78,11 +71,7 @@ struct MutexStressTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    MutexStressTest,
-    MutexStressTest,
-    testing::Values(10'000, 50'000)
-);
+INSTANTIATE_TEST_SUITE_P(MutexStressTest, MutexStressTest, testing::Values(100, 1'000, 10'000));
 
 TEST_P(MutexStressTest, MutexFunctionalStressTest_1)
 {
@@ -90,23 +79,20 @@ TEST_P(MutexStressTest, MutexFunctionalStressTest_1)
 
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
+    const auto size = GetParam();
+
     size_t count{0};
 
-    auto task = [&]()->tinycoro::Task<void> {
-        auto lock = co_await mutex;
-        ++count;
+    auto task = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < size; ++i)
+        {
+            auto lock = co_await mutex;
+            ++count;
+        }
     };
 
-    std::vector<tinycoro::Task<void>> tasks;
+    // starting 8 async tasks at the same time
+    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
-    auto size = GetParam();
-
-    for(size_t i = 0; i < size; ++i)
-    {
-        tasks.push_back(task());
-    }
-    
-    tinycoro::GetAll(scheduler, tasks);
-
-    EXPECT_EQ(count, size);
+    EXPECT_EQ(count, size * 8);
 }

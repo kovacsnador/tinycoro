@@ -44,7 +44,6 @@ namespace tinycoro {
             void Release()
             {
                 auto oldValue = _state.load();
-
                 assert(oldValue != nullptr);
 
                 if (oldValue == this)
@@ -94,7 +93,13 @@ namespace tinycoro {
                     {
                         if (oldValue != this)
                         {
+                            // set the next waiter to have a proper stack chain
                             awaiter->next = static_cast<awaitable_type*>(oldValue);
+                        }
+                        else
+                        {
+                            // clear the next node
+                            awaiter->next = nullptr;
                         }
                     }
 
