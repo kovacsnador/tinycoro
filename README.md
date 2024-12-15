@@ -215,6 +215,7 @@ catch(const std::exception& e)
     - [SyncAwaiter](#syncawaiter)
     - [AnyOfAwait](#anyofawait)
 * [Awaitables](#awaitables)
+    - [Mutex](#mutex)
     - [Semaphore](#semaphore)
     - [ManualEvent](#manualevent)
     - [AutoEvent](#autoevent)
@@ -630,11 +631,39 @@ tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
 
 ## Awaitables
 
+### `Mutex`
+
+The `tinycoro::Mutex` class provides an efficient coroutine-compatible mutual exclusion mechanism. It ensures that only one coroutine can access a critical section at a time, simplifying synchronization in coroutine-based systems. 
+
+The `co_await` operator returns a `tinycoro::LockGuard` object, which utilizes its destructor (RAII) to automatically release the lock
+
+```cpp
+    void Example_Mutex(tinycoro::Scheduler& scheduler)
+    {
+        tinycoro::Mutex mutex;
+
+        int32_t count{0};
+
+        auto task = [&]() -> tinycoro::Task<int32_t> {
+            auto lock = co_await mutex;
+            co_return ++count;
+        };
+
+        auto [c1, c2, c3] = tinycoro::GetAll(scheduler, task(), task(), task());
+
+        // Every varaible should have unique value (on intel processor for sure :) ).
+        // So (c1 != c2 && c2 != c3 && c3 != c1)
+        // possible output: c1 == 1, c2 == 2, c3 == 3
+    }
+```
+
 ### `Semaphore`
 
 The tinycoro::Semaphore is a counting semaphore designed for controlling concurrent access to shared resources in a coroutine-friendly manner. It ensures that only a limited number of tasks can acquire the semaphore at any given time, and the remaining tasks will be suspended until the semaphore becomes available.
 
 In the example below, a semaphore with an initial count of 1 is created, ensuring that only one task can access the shared resource (in this case, incrementing a counter) at a time. The example demonstrates the use of a semaphore to synchronize multiple coroutines, where each task acquires the semaphore, increments the counter, and then releases it.
+
+The `co_await` operator returns a `tinycoro::LockGuard` object, which utilizes its destructor (RAII) to automatically release the lock
 
 ```cpp
     void Example_Semaphore(tinycoro::Scheduler& scheduler)
