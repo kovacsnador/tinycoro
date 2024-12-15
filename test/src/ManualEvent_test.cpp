@@ -19,11 +19,11 @@ TEST(ManualEventTest, ManualEventTest_set_reset)
     EXPECT_TRUE(event.IsSet());
 }
 
-template<typename, typename>
+template <typename, typename>
 class AwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto) {}
+    AwaiterMock(auto&, auto) { }
 };
 
 TEST(ManualEventTest, ManualEventTest_coawaitReturn)
@@ -70,7 +70,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend)
 
     auto awaiter = event.operator co_await();
 
-    bool pauseResumerCalled = false;
+    bool                                                         pauseResumerCalled = false;
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseResumerCalled]() { pauseResumerCalled = true; });
 
@@ -86,7 +86,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_singleConsumer)
 
     EXPECT_FALSE(awaiter1.await_ready());
 
-    bool pauseResumerCalled = false;
+    bool                                                         pauseResumerCalled = false;
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseResumerCalled]() { pauseResumerCalled = true; });
 
@@ -112,8 +112,8 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_multiConsumer)
     auto awaiter3 = event.operator co_await();
     EXPECT_FALSE(awaiter3.await_ready());
 
-    size_t pauseResumerCalled = 0;
-    auto pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
+    size_t pauseResumerCalled   = 0;
+    auto   pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
 
     auto makeHdl = [&]() {
         tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
@@ -137,11 +137,7 @@ struct ManualEventTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(
-    ManualEventTest,
-    ManualEventTest,
-    testing::Values(1, 10, 100, 1000)
-);
+INSTANTIATE_TEST_SUITE_P(ManualEventTest, ManualEventTest, testing::Values(1, 10, 100, 1000));
 
 TEST_P(ManualEventTest, ManualEventFunctionalTest)
 {
@@ -164,7 +160,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest)
     };
 
     std::vector<tinycoro::Task<void>> tasks;
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         tasks.push_back(listener());
     }
@@ -191,7 +187,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest_preSet)
     };
 
     std::vector<tinycoro::Task<void>> tasks;
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         tasks.push_back(listener());
     }

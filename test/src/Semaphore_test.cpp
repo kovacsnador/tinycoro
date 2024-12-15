@@ -282,3 +282,33 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
     tinycoro::GetAll(scheduler, tasks);
     EXPECT_TRUE(max <= 4);
 }
+
+struct SemaphoreStressTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SemaphoreStressTest, SemaphoreStressTest, testing::Values(100, 1'000, 10'000));
+
+TEST_P(SemaphoreStressTest, SemaphoreStressTest_1)
+{
+    tinycoro::Semaphore semaphore{1};
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    const auto size = GetParam();
+
+    size_t count{0};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < size; ++i)
+        {
+            auto lock = co_await semaphore;
+            ++count;
+        }
+    };
+
+    // starting 8 async tasks at the same time
+    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+
+    EXPECT_EQ(count, size * 8);
+}
