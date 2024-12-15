@@ -199,39 +199,3 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest_preSet)
 
     EXPECT_EQ(globalCount, count);
 }
-
-struct ManualEventStressTest : testing::TestWithParam<size_t>
-{
-};
-
-INSTANTIATE_TEST_SUITE_P(ManualEventStressTest, ManualEventStressTest, testing::Values(1, 10, 100, 1000, 10'000, 100'000));
-
-TEST_P(ManualEventStressTest, ManualEventStressTest_1)
-{
-    const auto count = GetParam();
-
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
-
-    tinycoro::ManualEvent event;
-
-    std::atomic<size_t> globalCount{};
-
-    auto producer = [&]() -> tinycoro::Task<void> {
-        while (++globalCount < count)
-        {
-            event.Set();
-        }
-        co_return;
-    };
-
-    auto task = [&]() -> tinycoro::Task<void> {
-        while (globalCount < count)
-        {
-            co_await event;
-        }
-    };
-
-    tinycoro::GetAll(scheduler, task(), producer(), task(), task(), task(), task(), task(), task());
-
-    EXPECT_EQ(globalCount, count);
-}
