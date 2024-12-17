@@ -24,5 +24,6 @@
 #include "BufferedChannel.hpp"
 #include "Barrier.hpp"
 #include "Mutex.hpp"
+#include "BoundTask.hpp"
 
 #endif //!__TINY_CORO_TINY_CORO_ALL_H__
