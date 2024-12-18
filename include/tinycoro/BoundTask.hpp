@@ -3,13 +3,34 @@
 
 namespace tinycoro {
 
+    // Binds the coroutine function and the Task together to manage the
+    // lifecycle of both object as one.
+    // So if the coroutine function is a lambda object (with capture list),
+    // his lifetime is extended until the Task is done.
     template <typename CoroutineFunctionT, typename TaskT>
     struct BoundTask
     {
+        using promise_type  = TaskT::promise_type;
+
         explicit BoundTask(CoroutineFunctionT function, TaskT task)
         : _function{std::move(function)}
         , _task{std::move(task)}
         {
+        }
+
+        auto await_ready()
+        {
+            return _task.await_ready();
+        }
+
+        [[nodiscard]] auto await_resume()
+        {
+            return _task.await_resume();
+        }
+
+        auto await_suspend(auto hdl)
+        {
+            return _task.await_suspend(hdl);
         }
 
         void Resume() { _task.Resume(); }
@@ -48,22 +69,13 @@ namespace tinycoro {
     };
 
     template<typename CoroutineFunctionT, typename... Args>
-    auto MakeBound(CoroutineFunctionT&& func, Args&&... args)
+    [[nodiscard]] auto MakeBound(CoroutineFunctionT&& func, Args&&... args)
     {
         // creating the coroutine task
         auto task = func(std::forward<Args>(args)...);
 
-        // Put it all together in a task wrapper to manage life cycle of the possible lambda object as func.
-        if constexpr(std::copy_constructible<CoroutineFunctionT>)
-        {
-            // if we can we will copy the function.
-            return BoundTask{func, std::move(task)};
-        }
-        else
-        {
-            // If the function or lambda is not copyable, we move it.
-            return BoundTask{std::move(func), std::move(task)};
-        }
+        // binding the corouitne function and the task together.
+        return BoundTask{std::forward<CoroutineFunctionT>(func), std::move(task)};
     }
 
 } // namespace tinycoro

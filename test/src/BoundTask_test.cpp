@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <set>
 #include <string>
 
 #include <tinycoro/tinycoro_all.h>
@@ -35,6 +36,8 @@ struct TaskWrapperMockImpl
 
 struct TaskWrapperMock
 {
+    using promise_type = void;
+
     void Resume() { impl->Resume(); }
 
     [[nodiscard]] auto ResumeState() { return impl->ResumeState(); }
@@ -68,7 +71,7 @@ TEST(BoundTaskTest, BoundTaskTest_Resume)
 
     EXPECT_CALL(*mock.impl, Resume).Times(1);
 
-    tinycoro::BoundTask taskWrapper{ [] {}, mock};
+    tinycoro::BoundTask taskWrapper{[] {}, mock};
     taskWrapper.Resume();
 }
 
@@ -78,8 +81,8 @@ TEST(BoundTaskTest, BoundTaskTest_ResumeState)
 
     EXPECT_CALL(*mock.impl, ResumeState).Times(1).WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED));
 
-    tinycoro::BoundTask taskWrapper{ [] {}, mock};
-    auto state = taskWrapper.ResumeState();
+    tinycoro::BoundTask taskWrapper{[] {}, mock};
+    auto                state = taskWrapper.ResumeState();
 
     EXPECT_EQ(state, tinycoro::ETaskResumeState::SUSPENDED);
 }
@@ -91,7 +94,7 @@ TEST(BoundTaskTest, BoundTaskTest_GetPauseHandler)
     EXPECT_CALL(*mock.impl, GetPauseHandler).Times(1);
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
-    auto pauseHandler = taskWrapper.GetPauseHandler();
+    auto                pauseHandler = taskWrapper.GetPauseHandler();
     EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
 }
 
@@ -111,9 +114,7 @@ TEST(BoundTaskTest, BoundTaskTest_IsPaused)
 {
     TaskWrapperMock mock;
 
-    EXPECT_CALL(*mock.impl, IsPaused)
-        .WillOnce(testing::Return(false))
-        .WillOnce(testing::Return(true));
+    EXPECT_CALL(*mock.impl, IsPaused).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
 
@@ -128,7 +129,7 @@ TEST(BoundTaskTest, BoundTaskTest_TaskView)
     EXPECT_CALL(*mock.impl, TaskView).Times(1);
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
-    auto taskView = taskWrapper.TaskView();
+    auto                taskView = taskWrapper.TaskView();
     EXPECT_TRUE((std::same_as<decltype(taskView), TaskWrapperMockImpl::TaskViewMock>));
 }
 
@@ -149,5 +150,121 @@ TEST(BoundTaskTest, BoundTaskTest_SetDestroyNotifier)
     EXPECT_CALL(*mock.impl, SetDestroyNotifier).Times(1);
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
-    taskWrapper.SetDestroyNotifier([]{});
+    taskWrapper.SetDestroyNotifier([] {});
+}
+
+TEST(BoundTaskTest, BoundTaskFunctionalTest_SingleBoundTask)
+{
+    tinycoro::Scheduler scheduler{4};
+
+    int32_t i{};
+
+    auto coro = [&i]() -> tinycoro::Task<int32_t> { co_return i++; };
+
+    auto result = tinycoro::GetAll(scheduler, tinycoro::MakeBound(coro));
+
+    EXPECT_EQ(result, 0);
+    EXPECT_EQ(i, 1);
+}
+
+TEST(BoundTaskTest, BoundTaskFunctionalTest_coawait_task)
+{
+    tinycoro::Scheduler scheduler{4};
+
+    int32_t i{};
+
+    auto coro = [&i]() -> tinycoro::Task<int32_t> { 
+
+        auto coro2 = [&]() -> tinycoro::Task<int32_t>{
+            co_return ++i;
+        };
+
+        auto val = co_await tinycoro::MakeBound(coro2);
+        EXPECT_EQ(val, 1);
+
+        co_return ++val;
+    };
+
+    auto result = tinycoro::GetAll(scheduler, tinycoro::MakeBound(coro));
+
+    EXPECT_EQ(result, 2);
+    EXPECT_EQ(i, 1);
+}
+
+struct BoundTaskTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(BoundTaskTest, BoundTaskTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(BoundTaskTest, BoundTaskFunctionalTest_MultiTasks)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    std::atomic<int32_t> i{};
+
+    auto coro = [&i]() -> tinycoro::Task<int32_t> { co_return ++i; };
+
+    using BoundTaskT = decltype(tinycoro::MakeBound(coro));
+    std::vector<BoundTaskT> tasks;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(tinycoro::MakeBound(coro));
+    }
+
+    auto results = tinycoro::GetAll(scheduler, tasks);
+
+    // check for unique values
+    std::set<size_t> set;
+    for (auto it : results)
+    {
+        // no lock needed here only one consumer
+        auto [_, inserted] = set.insert(it);
+        EXPECT_TRUE(inserted);
+    }
+
+    EXPECT_EQ(count, i);
+}
+
+TEST_P(BoundTaskTest, BoundTaskFunctionalTest_coawait_task_multi)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+
+    std::atomic<int32_t> i{};
+
+    auto coro = [&]() -> tinycoro::Task<int32_t> { 
+
+        auto coro2 = [&]() -> tinycoro::Task<int32_t>{
+            co_await std::suspend_always{};
+            co_return ++i;
+        };
+
+        co_return co_await tinycoro::MakeBound(coro2);
+    };
+
+    using BoundTaskT = decltype(tinycoro::MakeBound(coro));
+    std::vector<BoundTaskT> tasks;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(tinycoro::MakeBound(coro));
+    }
+
+    auto results = tinycoro::GetAll(scheduler, tasks);
+
+    // check for unique values
+    std::set<size_t> set;
+    for (auto it : results)
+    {
+        // no lock needed here only one consumer
+        auto [_, inserted] = set.insert(it);
+        EXPECT_TRUE(inserted);
+    }
+
+    EXPECT_EQ(count, i);
 }
