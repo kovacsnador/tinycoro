@@ -298,21 +298,19 @@ void Example_BoundTask(tinycoro::Scheduler& scheduler)
 {
     int32_t i{};
 
-    auto coro1 = [&]() -> tinycoro::Task<void> {
-        ++i;
-        co_return;
+    auto coro1 = [&]() -> tinycoro::Task<int32_t> {
+        co_return ++i;
     };
 
     using BoundTaskType = decltype(tinycoro::MakeBound(coro1));
     std::vector<BoundTaskType> tasks;
 
-    // This is safe because coro1 outlives his task.
-    tasks.push_back(coro1());  
+    // Put the first task into the batch
+    tasks.push_back(tinycoro::MakeBound(coro1));  
 
     {
-        auto coro2 = [&]() -> tinycoro::Task<void> {
-            ++i;
-            co_return;
+        auto coro2 = [&]() -> tinycoro::Task<int32_t> {
+            co_return ++i;
         };
 
         // We need to use MakeBound to make sure coro2 is also copied.
@@ -321,7 +319,7 @@ void Example_BoundTask(tinycoro::Scheduler& scheduler)
     // here is coro2 destroyed, so this should be an error without tinycoro::MakeBound 
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    std::ignore = tinycoro::GetAll(scheduler, tasks);
 
     assert(i == 2);
 }
