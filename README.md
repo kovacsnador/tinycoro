@@ -294,34 +294,18 @@ If you want to manage the lifetime of a coroutine function and its associated ta
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_BoundTask(tinycoro::Scheduler& scheduler)
+auto Example_BoundTask(tinycoro::Scheduler& scheduler)
 {
     int32_t i{};
 
-    auto coro1 = [&]() -> tinycoro::Task<int32_t> {
+    auto coro = [&]() -> tinycoro::Task<int32_t> {
         co_return ++i;
     };
 
-    using BoundTaskType = decltype(tinycoro::MakeBound(coro1));
-    std::vector<BoundTaskType> tasks;
-
-    // Put the first task into the batch
-    tasks.push_back(tinycoro::MakeBound(coro1));  
-
-    {
-        auto coro2 = [&]() -> tinycoro::Task<int32_t> {
-            co_return ++i;
-        };
-
-        // We need to use MakeBound to make sure coro2 is also copied.
-        tasks.push_back(tinycoro::MakeBound(coro2));
-
-    // here is coro2 destroyed, so this should be an error without tinycoro::MakeBound 
-    }
-
-    std::ignore = tinycoro::GetAll(scheduler, tasks);
-
-    assert(i == 2);
+    // We are not waiting for the Task, so coro is destroyed after function return.
+    // To make it safe we need to use tinycoro::MakeBound
+    auto future = scheduler.Enqueue(tinycoro::MakeBound(coro));
+    return future;
 }
 ```
 
