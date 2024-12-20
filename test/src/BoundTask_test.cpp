@@ -24,6 +24,10 @@ struct TaskWrapperMockImpl
     {
     };
 
+    MOCK_METHOD(void, await_ready, ());
+    MOCK_METHOD(void, await_resume, ());
+    MOCK_METHOD(bool, await_suspend, (std::coroutine_handle<>));
+
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
@@ -37,6 +41,12 @@ struct TaskWrapperMockImpl
 struct TaskWrapperMock
 {
     using promise_type = void;
+
+    auto await_ready() { return impl->await_ready(); }
+
+    [[nodiscard]] auto await_resume() { return impl->await_resume(); }
+
+    auto await_suspend(auto hdl) { return impl->await_suspend(hdl); }
 
     void Resume() { impl->Resume(); }
 
@@ -173,11 +183,8 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_coawait_task)
 
     int32_t i{};
 
-    auto coro = [&i]() -> tinycoro::Task<int32_t> { 
-
-        auto coro2 = [&]() -> tinycoro::Task<int32_t>{
-            co_return ++i;
-        };
+    auto coro = [&i]() -> tinycoro::Task<int32_t> {
+        auto coro2 = [&]() -> tinycoro::Task<int32_t> { co_return ++i; };
 
         auto val = co_await tinycoro::MakeBound(coro2);
         EXPECT_EQ(val, 1);
@@ -237,9 +244,8 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_coawait_task_multi)
 
     std::atomic<int32_t> i{};
 
-    auto coro = [&]() -> tinycoro::Task<int32_t> { 
-
-        auto coro2 = [&]() -> tinycoro::Task<int32_t>{
+    auto coro = [&]() -> tinycoro::Task<int32_t> {
+        auto coro2 = [&]() -> tinycoro::Task<int32_t> {
             co_await std::suspend_always{};
             co_return ++i;
         };

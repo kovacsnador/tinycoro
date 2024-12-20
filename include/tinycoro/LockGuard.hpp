@@ -19,12 +19,22 @@ namespace tinycoro {
         {
         }
 
-        ~LockGuard()
+        [[nodiscard]] bool owns_lock() const noexcept {
+            return _device;
+        }
+
+        void unlock() noexcept
         {
             if (_device)
             {
                 _device->Release();
+                _device = nullptr;
             }
+        }
+
+        ~LockGuard()
+        {
+            unlock();
         }
 
     private:

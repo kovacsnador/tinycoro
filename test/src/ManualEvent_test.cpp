@@ -24,6 +24,10 @@ class AwaiterMock
 {
 public:
     AwaiterMock(auto&, auto) { }
+
+    void Notify() const noexcept {}
+
+    AwaiterMock* next{nullptr};
 };
 
 TEST(ManualEventTest, ManualEventTest_coawaitReturn)

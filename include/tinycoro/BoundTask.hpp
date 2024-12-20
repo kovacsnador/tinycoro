@@ -8,64 +8,34 @@ namespace tinycoro {
     // So if the coroutine function is a lambda object (with capture list),
     // his lifetime is extended until the Task is done.
     template <typename CoroutineFunctionT, typename TaskT>
-    struct BoundTask
+    struct BoundTask : private TaskT 
     {
         using promise_type  = TaskT::promise_type;
 
         explicit BoundTask(CoroutineFunctionT function, TaskT task)
-        : _function{std::move(function)}
-        , _task{std::move(task)}
+        : TaskT{std::move(task)}
+        , _function{std::move(function)}
         {
         }
 
-        auto await_ready()
-        {
-            return _task.await_ready();
-        }
+        using TaskT::await_ready;
+        using TaskT::await_resume;
+        using TaskT::await_suspend;
 
-        [[nodiscard]] auto await_resume()
-        {
-            return _task.await_resume();
-        }
+        using TaskT::Resume;
+        using TaskT::ResumeState;
 
-        auto await_suspend(auto hdl)
-        {
-            return _task.await_suspend(hdl);
-        }
+        using TaskT::SetPauseHandler;
+        using TaskT::GetPauseHandler;
 
-        void Resume() { _task.Resume(); }
-
-        [[nodiscard]] auto ResumeState() { return _task.ResumeState(); }
-
-        auto SetPauseHandler(auto pauseResume)
-        {
-            return _task.SetPauseHandler(std::move(pauseResume));
-        }
-
-        bool IsPaused() const noexcept
-        {
-            return _task.IsPaused();
-        }
-
-        auto GetPauseHandler() noexcept { return _task.GetPauseHandler(); }
-
-        [[nodiscard]] auto TaskView() const noexcept {  return _task.TaskView(); }
-
-        template<typename T>
-        void SetStopSource(T&& arg)
-        {
-            _task.SetStopSource(std::forward<T>(arg));
-        }
-
-        template <typename T>
-        void SetDestroyNotifier(T&& cb)
-        {
-            _task.SetDestroyNotifier(std::forward<T>(cb));
-        }
+        using TaskT::IsPaused;
+        using TaskT::TaskView;
+        
+        using TaskT::SetStopSource;
+        using TaskT::SetDestroyNotifier;
 
     private:
         CoroutineFunctionT _function;
-        TaskT              _task;
     };
 
     template<typename CoroutineFunctionT, typename... Args>
