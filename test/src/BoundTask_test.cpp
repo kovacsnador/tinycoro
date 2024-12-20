@@ -12,7 +12,7 @@ TEST(BoundTaskTest, BoundTaskTest_make)
 
     auto taskWrapper = tinycoro::MakeBound(task);
 
-    EXPECT_TRUE((std::same_as<tinycoro::BoundTask<decltype(task), decltype(task())>, decltype(taskWrapper)>));
+    EXPECT_TRUE((std::same_as<tinycoro::BoundTask<std::unique_ptr<decltype(task)>, decltype(task())>, decltype(taskWrapper)>));
 }
 
 struct TaskWrapperMockImpl
