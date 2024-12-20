@@ -202,6 +202,7 @@ catch(const std::exception& e)
     - [Scheduler](#scheduler)
     - [Task](#task)
     - [TaskView](#taskview)
+    - [BoundTask](#boundtask)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
@@ -284,6 +285,44 @@ void Example_taskView(tinycoro::Scheduler& scheduler)
 
     auto coro   = task();
     tinycoro::GetAll(scheduler, coro.TaskView());
+}
+```
+
+### `BoundTask`
+If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::BoundTask<>`, which is a specialized task that encapsulates both the `tinycoro::Task<>` and the coroutine function. This ensures that the task cannot outlive its coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+void Example_BoundTask(tinycoro::Scheduler& scheduler)
+{
+    int32_t i{};
+
+    auto coro1 = [&]() -> tinycoro::Task<void> {
+        ++i;
+        co_return;
+    };
+
+    using function_type = decltype(coro1);
+    std::vector<function_type, tinycoro::Task<void>> tasks;
+
+    tasks.push_back(tinycoro::MakeBound(coro1));  
+
+    {
+        auto coro2 = [&]() -> tinycoro::Task<void> {
+            ++i;
+            co_return;
+        };
+
+        // Make BoundTask to make sure coro2 is also copied
+        tasks.push_back(tinycoro::MakeBound(coro2));
+
+    // here is coro2 destroyed, so this should be an error without tinycoro::MakeBound 
+    }
+
+    tinycoro::GetAll(scheduler, tasks);
+
+    assert(i == 2);
 }
 ```
 
