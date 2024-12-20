@@ -47,7 +47,7 @@ namespace tinycoro {
         // binding the corouitne function and the task together.
         return BoundTask<std::decay_t<CoroutineFunctionT>, decltype(task)>{std::forward<CoroutineFunctionT>(func), std::move(task)};
     }
-
+    
 } // namespace tinycoro
 
 #endif //!__TINY_CORO_BOUND_TASK_HPP__

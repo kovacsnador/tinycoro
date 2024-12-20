@@ -303,10 +303,11 @@ void Example_BoundTask(tinycoro::Scheduler& scheduler)
         co_return;
     };
 
-    using function_type = decltype(coro1);
-    std::vector<function_type, tinycoro::Task<void>> tasks;
+    using BoundTaskType = decltype(tinycoro::MakeBound(coro1));
+    std::vector<BoundTaskType> tasks;
 
-    tasks.push_back(tinycoro::MakeBound(coro1));  
+    // This is safe because coro1 outlives his task.
+    tasks.push_back(coro1());  
 
     {
         auto coro2 = [&]() -> tinycoro::Task<void> {
@@ -314,7 +315,7 @@ void Example_BoundTask(tinycoro::Scheduler& scheduler)
             co_return;
         };
 
-        // Make BoundTask to make sure coro2 is also copied
+        // We need to use MakeBound to make sure coro2 is also copied.
         tasks.push_back(tinycoro::MakeBound(coro2));
 
     // here is coro2 destroyed, so this should be an error without tinycoro::MakeBound 
