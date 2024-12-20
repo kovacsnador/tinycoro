@@ -150,7 +150,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_moveOnlyValue)
 
         MoveOnly& operator=(MoveOnly&& other) noexcept
         {
-            if(std::addressof(other) != this)
+            if (std::addressof(other) != this)
             {
                 value = std::exchange(other.value, 0);
             }
@@ -187,9 +187,20 @@ public:
     AwaiterMock* next{nullptr};
 };
 
+template <typename, typename>
+class ListenerAwaiterMock
+{
+public:
+    ListenerAwaiterMock(auto, auto, auto) { }
+
+    void Notify() const noexcept {};
+
+    ListenerAwaiterMock* next{nullptr};
+};
+
 TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)
 {
-    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, tinycoro::detail::Queue> channel;
+    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
 
     int32_t val;
     auto    awaiter = channel.PopWait(val);
@@ -269,7 +280,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_push_close)
     int32_t val{};
     auto    awaiter = channel.PopWait(val);
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
 
     channel.Push(42);
 
@@ -296,7 +307,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_close)
     int32_t val{};
     auto    awaiter = channel.PopWait(val);
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
 
     EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
 
@@ -376,7 +387,240 @@ struct BufferedChannelTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(BufferedChannelTest, BufferedChannelTest, testing::Values(1, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(BufferedChannelTest,
+                         BufferedChannelTest,
+                         testing::Values(1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         1,
+                                         10,
+                                         100,
+                                         1000,
+                                         10000));
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
 {
@@ -384,7 +628,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
 
     tinycoro::Scheduler scheduler{8};
 
-    tinycoro::Latch                    latch{count};
+    tinycoro::Latch                   latch{count};
     tinycoro::BufferedChannel<size_t> channel;
 
     std::set<size_t> allValues;
@@ -424,10 +668,10 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
 
     tinycoro::Scheduler scheduler{8};
 
-    tinycoro::Latch                    latch{count};
+    tinycoro::Latch                   latch{count};
     tinycoro::BufferedChannel<size_t> channel;
 
-    std::mutex        mtx;
+    std::mutex       mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
@@ -467,14 +711,13 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorC
 {
     const auto count = GetParam();
 
-    tinycoro::Scheduler scheduler{8};
+    tinycoro::Scheduler scheduler;
 
-    tinycoro::Latch                    latch{count};
-    
-    
-    auto channel = std::make_unique<tinycoro::BufferedChannel<size_t>>(); 
+    tinycoro::Latch latch{count};
 
-    std::mutex        mtx;
+    auto channel = std::make_unique<tinycoro::BufferedChannel<size_t>>();
+
+    std::mutex       mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
@@ -501,6 +744,10 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorC
         // waiting for the latch
         co_await latch;
 
+        // last element is done in channel.
+        // Wait to have all the listeners up and running
+        co_await channel->WaitForListeners(count);
+
         // closing the channel after latch is done with destructor
         channel.reset();
     };
@@ -523,10 +770,10 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
 
     tinycoro::Scheduler scheduler{8};
 
-    tinycoro::AutoEvent                event;
+    tinycoro::AutoEvent               event;
     tinycoro::BufferedChannel<size_t> channel;
 
-    std::mutex        mtx;
+    std::mutex       mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
@@ -643,22 +890,22 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_EmplaceClose_multi)
     tinycoro::BufferedChannel<size_t> channel;
     std::mutex                        mtx;
     std::set<size_t>                  allValues;
-    size_t lastValue{};
+    size_t                            lastValue{};
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        while(true)
+        while (true)
         {
             size_t val;
-            auto status =  co_await channel.PopWait(val);
+            auto   status = co_await channel.PopWait(val);
 
-            if(status == tinycoro::BufferedChannel_OpStatus::CLOSED)
+            if (status == tinycoro::BufferedChannel_OpStatus::CLOSED)
             {
                 break;
             }
 
-            if(status == tinycoro::BufferedChannel_OpStatus::LAST)
+            if (status == tinycoro::BufferedChannel_OpStatus::LAST)
             {
-                lastValue = val;   
+                lastValue = val;
             }
 
             {
@@ -685,7 +932,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_EmplaceClose_multi)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(),consumer(), producer(), consumer(), consumer());
+    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), producer(), consumer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
     EXPECT_EQ(lastValue, count - 1);
@@ -704,19 +951,19 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose_multi)
     size_t lastValue{};
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        while(true)
+        while (true)
         {
             size_t val;
-            auto status =  co_await channel.PopWait(val);
+            auto   status = co_await channel.PopWait(val);
 
-            if(status == tinycoro::BufferedChannel_OpStatus::CLOSED)
+            if (status == tinycoro::BufferedChannel_OpStatus::CLOSED)
             {
                 break;
             }
 
-            if(status == tinycoro::BufferedChannel_OpStatus::LAST)
+            if (status == tinycoro::BufferedChannel_OpStatus::LAST)
             {
-                lastValue = val;   
+                lastValue = val;
             }
 
             {

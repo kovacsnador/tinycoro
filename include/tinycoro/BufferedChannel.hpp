@@ -5,6 +5,7 @@
 #include <queue>
 #include <cassert>
 #include <bitset>
+#include <map>
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
@@ -20,7 +21,7 @@ namespace tinycoro {
             CLOSED
         };
 
-        template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename> class ContainerT>
+        template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename, typename> class ListenerAwaiterT, template <typename> class ContainerT>
         class BufferedChannel
         {
             struct Element
@@ -31,8 +32,10 @@ namespace tinycoro {
 
         public:
             friend class AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            friend class ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
 
             using awaiter_type = AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using listener_awaiter_type = ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
 
             // default constructor
             BufferedChannel() {};
@@ -43,6 +46,8 @@ namespace tinycoro {
             ~BufferedChannel() { Close(); }
 
             [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
+
+            [[nodiscard]] auto WaitForListeners(size_t listenerCount) { return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount}; }
 
             void Push(ValueT t) { _Emplace(std::move(t), false); }
 
@@ -75,7 +80,7 @@ namespace tinycoro {
                 lock.unlock();
 
                 // notify all waiters
-                NotifyAll(top);
+                _NotifyAll(top);
             }
 
             [[nodiscard]] bool IsOpen() const noexcept
@@ -115,7 +120,7 @@ namespace tinycoro {
                     if(_closed)
                     {
                         // notify all waiters
-                        NotifyAll(others);
+                        _NotifyAll(others);
                     }
 
                     return;
@@ -135,7 +140,7 @@ namespace tinycoro {
                     auto waiters = _waiters.steal();
                     lock.unlock();
 
-                    NotifyAll(waiters);
+                    _NotifyAll(waiters);
                 }
 
                 return ready;
@@ -153,17 +158,61 @@ namespace tinycoro {
                     auto waiters = _waiters.steal();
                     lock.unlock();
 
-                    NotifyAll(waiters);
+                    _NotifyAll(waiters);
                     return suspend;
                 }
 
                 if (suspend)
                 {
                     _waiters.push(waiter);
+
+                    auto iter = _listenerWaiters.find(_waiters.size());
+                    if(iter != _listenerWaiters.end())
+                    {
+                        auto top = iter->second.steal();
+                        lock.unlock();
+
+                        // notify all if somebody waits for listerens
+                        _NotifyAll(top);
+                    }
+                    
+
+                    // check if somebody is waiting for listener(s)
+                    /*auto [begin, end] = _listenerWaiters.equal_range(_waiter.size());
+                    for([[maybe_unused]] auto& [key, val] : std::ranges::subrange(begin, end))
+                    {
+                        val->Notify();
+                    }*/
                 }
 
                 // susend coroutine
                 return suspend;
+            }
+
+            [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return waiter->ListenerCount() <= _waiters.size();
+            }
+
+            [[nodiscard]] bool Add(listener_awaiter_type* waiter)
+            {
+                const auto wantedListerenCount = waiter->ListenerCount();
+
+                std::unique_lock lock{_mtx};
+
+                if(wantedListerenCount <= _waiters.size())
+                {
+                    // no suspend
+                    return false;
+                }
+
+                // insert new listener waiter into the list
+                //_listenerWaiters.insert(wantedListerenCount, waiter);
+                _listenerWaiters[wantedListerenCount].push(waiter);
+                
+                // suspend coroutine
+                return true;               
             }
 
             // auto [ready, lastElement] = std::tuple<bool, bool>
@@ -198,7 +247,7 @@ namespace tinycoro {
                 return {false, false};
             }
 
-            void NotifyAll(awaiter_type* awaiter)
+            void _NotifyAll(auto* awaiter)
             {
                 // Notify all waiters
                 while (awaiter)
@@ -210,6 +259,7 @@ namespace tinycoro {
             }
 
             LinkedPtrStack<awaiter_type> _waiters;
+            std::map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
             ContainerT<Element>          _valueCollection;
             bool                         _closed{false};
             mutable std::mutex           _mtx;
@@ -310,13 +360,73 @@ namespace tinycoro {
             EventT    _event;
         };
 
+        template<typename ChannelT, typename EventT>
+        class ListenerAwaiter
+        {   
+        public:
+            ListenerAwaiter(ChannelT& channel, EventT event, size_t count)
+            : _channel{channel}
+            , _event{std::move(event)}
+            , _listenersCount{count}
+            {
+            }
+
+            // disable move and copy
+            ListenerAwaiter(ListenerAwaiter&&) = delete;
+
+            [[nodiscard]] constexpr bool await_ready() noexcept
+            {
+                return _channel.IsReady(this);
+            }
+
+            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            {
+                PutOnPause(parentCoro);
+                if (_channel.Add(this) == false)
+                {
+                    // resume immediately
+                    ResumeFromPause(parentCoro);
+                    return parentCoro;
+                }
+                return std::noop_coroutine();;
+            }
+
+            constexpr void await_resume() const noexcept {}
+
+            [[nodiscard]] auto ListenerCount() const noexcept
+            {
+                return _listenersCount;
+            } 
+
+            void Notify()
+            { 
+                // Notify scheduler to put coroutine back on CPU
+                _event.Notify();
+            }
+
+            ListenerAwaiter* next{nullptr};
+
+        private:
+            void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
+
+            void ResumeFromPause(auto parentCoro)
+            {
+                _event.Set(nullptr);
+                PauseHandler::UnpauseTask(parentCoro);
+            }
+
+            ChannelT& _channel;
+            EventT    _event;
+            const size_t _listenersCount;
+        };
+
         template <typename ValueT>
         using Queue = std::queue<ValueT>;
 
     } // namespace detail
 
     template <typename ValueT>
-    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, detail::Queue>;
+    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, detail::ListenerAwaiter, detail::Queue>;
 
     using BufferedChannel_OpStatus = detail::EOpStatus;
 

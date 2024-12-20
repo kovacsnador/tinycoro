@@ -17,6 +17,8 @@ namespace tinycoro { namespace detail {
         {
             assert(newNode);
 
+            ++_size;
+
             newNode->next = _top;
             _top          = newNode;
         }
@@ -27,10 +29,13 @@ namespace tinycoro { namespace detail {
             auto top = _top;
             if (top)
             {
+                --_size;
                 _top = _top->next;
             }
             return top;
         }
+
+        [[nodiscard]] auto size() const noexcept { return _size; }
 
         [[nodiscard]] constexpr value_type* top() noexcept { return _top; }
 
@@ -38,11 +43,13 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] value_type* steal() noexcept
         {
+            _size = 0;
             return std::exchange(_top, nullptr);
         }
 
     private:
         value_type* _top{nullptr};
+        size_t _size{};
     };
 }} // namespace tinycoro::detail
 
