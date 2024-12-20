@@ -45,7 +45,7 @@ namespace tinycoro {
         auto task = func(std::forward<Args>(args)...);
 
         // binding the corouitne function and the task together.
-        return BoundTask{std::forward<CoroutineFunctionT>(func), std::move(task)};
+        return BoundTask<std::decay_t<CoroutineFunctionT>, decltype(task)>{std::forward<CoroutineFunctionT>(func), std::move(task)};
     }
 
 } // namespace tinycoro

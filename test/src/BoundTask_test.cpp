@@ -208,7 +208,6 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_destructed_coroFunction)
 
     {
         auto coro = [&i]() -> tinycoro::Task<int32_t> { co_return ++i; };
-
         future = scheduler.Enqueue(tinycoro::MakeBound(coro));
     }
 
