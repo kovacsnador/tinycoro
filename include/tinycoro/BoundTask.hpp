@@ -1,51 +1,76 @@
 #ifndef __TINY_CORO_BOUND_TASK_HPP__
 #define __TINY_CORO_BOUND_TASK_HPP__
 
+#include <memory>
+
 namespace tinycoro {
 
     // Binds the coroutine function and the Task together to manage the
     // lifecycle of both object as one.
     // So if the coroutine function is a lambda object (with capture list),
     // his lifetime is extended until the Task is done.
+    
     template <typename CoroutineFunctionT, typename TaskT>
-    struct BoundTask : private TaskT 
+    struct BoundTask
     {
         using promise_type  = TaskT::promise_type;
 
         explicit BoundTask(CoroutineFunctionT function, TaskT task)
-        : TaskT{std::move(task)}
-        , _function{std::move(function)}
+        : _function{std::move(function)}
+        , _task{std::move(task)}
         {
         }
 
-        using TaskT::await_ready;
-        using TaskT::await_resume;
-        using TaskT::await_suspend;
+        auto await_ready()
+        {
+            return _task.await_ready();
+        }
 
-        using TaskT::Resume;
-        using TaskT::ResumeState;
+        [[nodiscard]] auto await_resume()
+        {
+            return _task.await_resume();
+        }
 
-        using TaskT::SetPauseHandler;
-        using TaskT::GetPauseHandler;
+        auto await_suspend(auto hdl)
+        {
+            return _task.await_suspend(hdl);
+        }
+        void Resume() { _task.Resume(); }
+        [[nodiscard]] auto ResumeState() { return _task.ResumeState(); }
+        auto SetPauseHandler(auto pauseResume)
+        {
+            return _task.SetPauseHandler(std::move(pauseResume));
+        }
 
-        using TaskT::IsPaused;
-        using TaskT::TaskView;
-        
-        using TaskT::SetStopSource;
-        using TaskT::SetDestroyNotifier;
+        bool IsPaused() const noexcept
+        {
+            return _task.IsPaused();
+        }
+        auto GetPauseHandler() noexcept { return _task.GetPauseHandler(); }
+        [[nodiscard]] auto TaskView() const noexcept {  return _task.TaskView(); }
+        template<typename T>
+        void SetStopSource(T&& arg)
+        {
+            _task.SetStopSource(std::forward<T>(arg));
+        }
+        template <typename T>
+        void SetDestroyNotifier(T&& cb)
+        {
+            _task.SetDestroyNotifier(std::forward<T>(cb));
+        }
 
     private:
         CoroutineFunctionT _function;
+        TaskT              _task;
     };
 
     template<typename CoroutineFunctionT, typename... Args>
     [[nodiscard]] auto MakeBound(CoroutineFunctionT&& func, Args&&... args)
     {
-        // creating the coroutine task
-        auto task = func(std::forward<Args>(args)...);
+        auto functionPtr = std::make_unique<std::decay_t<CoroutineFunctionT>>(std::forward<CoroutineFunctionT>(func));
+        auto task = (*functionPtr)(std::forward<Args>(args)...);
 
-        // binding the corouitne function and the task together.
-        return BoundTask<std::decay_t<CoroutineFunctionT>, decltype(task)>{std::move(func), std::move(task)};
+        return BoundTask<decltype(functionPtr), decltype(task)>{std::move(functionPtr), std::move(task)};
     }
 
 } // namespace tinycoro
