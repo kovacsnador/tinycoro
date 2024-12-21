@@ -217,6 +217,25 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_destructed_coroFunction)
     EXPECT_EQ(i, 1);
 }
 
+TEST(BoundTaskTest, BoundTaskFunctionalTest_destructed_coroFunction_safe)
+{
+    tinycoro::Scheduler scheduler;
+
+    int32_t i{};
+
+    std::future<int32_t> future;
+
+    {
+        auto coro = [](auto& i) -> tinycoro::Task<int32_t> { co_return ++i; };
+        future = scheduler.Enqueue(coro(i));
+    }
+
+    auto result = future.get();
+
+    EXPECT_EQ(result, 1);
+    EXPECT_EQ(i, 1);
+}
+
 TEST(BoundTaskTest, BoundTaskFunctionalTest_lambda_immediately_invoked)
 {
     tinycoro::Scheduler scheduler;
