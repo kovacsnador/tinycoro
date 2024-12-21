@@ -231,6 +231,86 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_ready)
     EXPECT_EQ(val, 0);
 }
 
+TEST(BufferedChannelTest, BufferedChannelTest_await_ready_listener)
+{
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    auto listenerAwaiter = channel.WaitForListeners(1);
+
+    EXPECT_FALSE(listenerAwaiter.await_ready());
+    EXPECT_TRUE(channel.IsOpen());
+}
+
+using ListenerTestData = std::tuple<size_t, bool>;
+
+struct BufferedChannelListenerTest : testing::TestWithParam<ListenerTestData>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(
+    BufferedChannelListenerTest,
+    BufferedChannelListenerTest,
+    testing::Values(ListenerTestData{1, true}, ListenerTestData{2, true}, ListenerTestData{3, true}, ListenerTestData{4, false}, ListenerTestData{10, false})
+);
+
+TEST_P(BufferedChannelListenerTest, BufferedChannelTest_await_ready_with_listener)
+{
+    auto [count, ready] = GetParam();
+
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val1{};
+    auto awaiter1 = channel.PopWait(val1);
+    EXPECT_EQ(awaiter1.await_suspend(hdl1), std::noop_coroutine());
+
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val2{};
+    auto awaiter2 = channel.PopWait(val2);
+    EXPECT_EQ(awaiter2.await_suspend(hdl2), std::noop_coroutine());
+
+    auto hdl3 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val3{};
+    auto awaiter3 = channel.PopWait(val3);
+    EXPECT_EQ(awaiter3.await_suspend(hdl3), std::noop_coroutine());
+
+    auto listenerAwaiter = channel.WaitForListeners(count);
+
+    // we have already 3 awaiter so listeners are listening
+    EXPECT_EQ(listenerAwaiter.await_ready(), ready);
+    EXPECT_TRUE(channel.IsOpen());
+}
+
+TEST_P(BufferedChannelListenerTest, BufferedChannelTest_await_suspend_with_listener)
+{
+    auto [count, ready] = GetParam();
+
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val1{};
+    auto awaiter1 = channel.PopWait(val1);
+    EXPECT_EQ(awaiter1.await_suspend(hdl1), std::noop_coroutine());
+
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val2{};
+    auto awaiter2 = channel.PopWait(val2);
+    EXPECT_EQ(awaiter2.await_suspend(hdl2), std::noop_coroutine());
+
+    auto hdl3 = tinycoro::test::MakeCoroutineHdl([]{});
+    int32_t val3{};
+    auto awaiter3 = channel.PopWait(val3);
+    EXPECT_EQ(awaiter3.await_suspend(hdl3), std::noop_coroutine());
+
+    auto listenerAwaiter = channel.WaitForListeners(count);
+
+    auto listenerHdl = tinycoro::test::MakeCoroutineHdl([]{});
+
+    // we have already 3 awaiter so listeners are listening
+    EXPECT_NE(listenerAwaiter.await_suspend(listenerHdl), ready);
+    EXPECT_TRUE(channel.IsOpen());
+}
+
 TEST(BufferedChannelTest, BufferedChannelTest_await_ready_close)
 {
     tinycoro::BufferedChannel<int32_t> channel;
@@ -498,8 +578,6 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
     tinycoro::BufferedChannel<size_t> channel;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await tinycoro::Sleep(10ms);
-        
         size_t value{};
         co_await channel.PopWait(value);
     };

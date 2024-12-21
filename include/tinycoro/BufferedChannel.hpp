@@ -374,16 +374,16 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr bool await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_channel.Add(this) == false)
                 {
                     // resume immediately
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
-                return std::noop_coroutine();
+                return true;
             }
 
             constexpr void await_resume() const noexcept { }
