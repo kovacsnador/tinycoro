@@ -7,8 +7,9 @@
 namespace tinycoro {
 
     template <typename DeviceT>
-    struct LockGuard
+    class LockGuard
     {
+    public:
         explicit LockGuard(DeviceT& d)
         : _device{std::addressof(d)}
         {
