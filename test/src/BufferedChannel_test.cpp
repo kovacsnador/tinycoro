@@ -187,11 +187,11 @@ public:
     AwaiterMock* next{nullptr};
 };
 
-template <typename, typename>
+template <typename C, typename E>
 class ListenerAwaiterMock
 {
 public:
-    ListenerAwaiterMock(auto, auto, auto) { }
+    ListenerAwaiterMock(C&, E, size_t) { }
 
     void Notify() const noexcept {};
 
@@ -206,6 +206,16 @@ TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)
     auto    awaiter = channel.PopWait(val);
 
     using expectedAwaiterType = AwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
+}
+
+TEST(BufferedChannelTest, BufferedChannelTest_coawait_listenerWaiter)
+{
+    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
+
+    auto awaiter = channel.WaitForListeners(1);
+
+    using expectedAwaiterType = ListenerAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -478,6 +488,33 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
     tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
+{
+    const auto count = GetParam();
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::BufferedChannel<size_t> channel;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t value{};
+        co_await channel.PopWait(value);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        co_await channel.WaitForListeners(count);
+        channel.Close();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(consumer());
+    }
+    tasks.push_back(producer());
+
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorClose)
