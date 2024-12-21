@@ -307,19 +307,21 @@ Use statefull lambda functions (lambdas with capture block) with caution in a co
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-auto Example_BoundTask(tinycoro::Scheduler& scheduler)
+struct MyClass
 {
-    int32_t i{};
+    int32_t m_value{};
 
-    auto coro = [&]() -> tinycoro::Task<int32_t> {
-        co_return ++i;
-    };
+    auto MemberFunction(tinycoro::Scheduler& scheduler)
+    {
+        auto coro = [this]() -> tinycoro::Task<int32_t> {
+            co_return ++m_value;
+        };
 
-    // We are not waiting for the Task, so coro is destroyed after function return.
-    // To make it safe we need to use tinycoro::MakeBound
-    auto future = scheduler.Enqueue(tinycoro::MakeBound(coro));
-    return future;
-}
+        // We are not waiting for the Task, so coro is destroyed after function return.
+        // To make it safe we need to use tinycoro::MakeBound
+        return scheduler.Enqueue(tinycoro::MakeBound(coro));
+    }
+};
 ```
 
 ### `RunInline`
