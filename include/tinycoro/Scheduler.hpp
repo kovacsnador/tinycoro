@@ -39,7 +39,7 @@ namespace tinycoro {
         using TaskVariantT = std::variant<DoNotPauseTask, TaskT>;
 
     public:
-        CoroThreadPool(size_t workerThreadCount) { _AddWorkers(workerThreadCount); }
+        CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency()) { _AddWorkers(workerThreadCount); }
 
         ~CoroThreadPool()
         {

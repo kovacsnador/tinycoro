@@ -7,8 +7,9 @@
 namespace tinycoro {
 
     template <typename DeviceT>
-    struct LockGuard
+    class LockGuard
     {
+    public:
         explicit LockGuard(DeviceT& d)
         : _device{std::addressof(d)}
         {
@@ -19,12 +20,22 @@ namespace tinycoro {
         {
         }
 
-        ~LockGuard()
+        [[nodiscard]] bool owns_lock() const noexcept {
+            return _device;
+        }
+
+        void unlock() noexcept
         {
             if (_device)
             {
                 _device->Release();
+                _device = nullptr;
             }
+        }
+
+        ~LockGuard()
+        {
+            unlock();
         }
 
     private:

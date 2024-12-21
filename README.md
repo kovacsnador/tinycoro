@@ -125,13 +125,19 @@ While this works, the code quickly becomes messy with nested callbacks exception
 
 ### `Tinycoro to rescue`
 
-With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, exception handling and no thread blocker waiting points:
+With coroutines and structured concurrency, the code becomes much more readable. There are no nested callbacks, exception handling and no thread blocker waiting points: [AsyncCallbackAwaiter](#asynccallbackawaiter)
 ```cpp
-tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
+tinycoro::Task<std::string> MyCoroutine()
 {
     std::string result;
-    co_await tinycoro::AsyncCallbackAwaiter{[](auto cb) { AsyncDownload("http://test.hu", cb); }, [&result](std::string data) { result = std::move(data);}}; 
-    co_await tinycoro::AsyncCallbackAwaiter{[&result](auto cb) { AsyncPrepareData(result, cb); }, [&result](std::string res) { result = std::move(res);}};
+    co_await tinycoro::AsyncCallbackAwaiter{
+        [](auto cb) { AsyncDownload("http://test.hu", cb); },
+        [&result](std::string data) { result = std::move(data);}}; 
+    
+    co_await tinycoro::AsyncCallbackAwaiter{
+        [&result](auto cb) { AsyncPrepareData(result, cb); },
+        [&result](std::string res) { result = std::move(res);}};
+    
     co_return result;
 }
 ```
@@ -142,20 +148,24 @@ You can make this even more readable by wrapping the asynchronous API calls in t
 tinycoro::Task<std::string> AsyncDownloadCoro(const std::string& url)
 {
     std::string result;
-    co_await tinycoro::AsyncCallbackAwaiter{[&url](auto cb) { AsyncDownload(url, cb); }, [&result](std::string data) { result = std::move(data);}};
+    co_await tinycoro::AsyncCallbackAwaiter{
+        [&url](auto cb) { AsyncDownload(url, cb); },
+        [&result](std::string data) { result = std::move(data);}};
     co_return result;
 }
 
 tinycoro::Task<std::string> AsyncPrepareCoro(std::string data)
 {
-    co_await tinycoro::AsyncCallbackAwaiter{[&data](auto cb) { AsyncPrepareData(data, cb); }, [&data](std::string res) { data = std::move(res);}};
+    co_await tinycoro::AsyncCallbackAwaiter{
+        [&data](auto cb) { AsyncPrepareData(data, cb); },
+        [&data](std::string res) { data = std::move(res);}};
     co_return data;
 }
 ```
 ### `Final coroutine Task`
 Now, the final coroutine looks even cleaner and more intuitive:
 ```cpp
-tinycoro::Task<std::string> CollectAllDataWithErrorHandlingCorouitne()
+tinycoro::Task<std::string> MyCoroutine()
 {
     auto data = co_await AsyncDownloadCoro("http://test.hu");
     auto result = co_await AsyncPrepareCoro(data); // implicit exception handling here...
@@ -172,7 +182,7 @@ try
 {
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
-    std::future<std::string> future = scheduler.Enqueue(CollectAllDataWithErrorHandlingCorouitne());
+    std::future<std::string> future = scheduler.Enqueue(MyCoroutine());
     std::cout << future.get() << '\n';
 }
 catch(const std::exception& e)
@@ -185,7 +195,7 @@ Alternatively, you can use helper functions to aggregate the value or values of 
 ```cpp
 try
 {
-    auto result = tinycoro::GetAll(scheduler, CollectAllDataWithErrorHandlingCorouitne());
+    auto result = tinycoro::GetAll(scheduler, MyCoroutine());
     std::cout << result << '\n';
 }
 catch(const std::exception& e)
@@ -202,6 +212,7 @@ catch(const std::exception& e)
     - [Scheduler](#scheduler)
     - [Task](#task)
     - [TaskView](#taskview)
+    - [BoundTask](#boundtask)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
@@ -285,6 +296,32 @@ void Example_taskView(tinycoro::Scheduler& scheduler)
     auto coro   = task();
     tinycoro::GetAll(scheduler, coro.TaskView());
 }
+```
+
+### `BoundTask`
+If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::BoundTask<>`, which is a specialized task that encapsulates both the `tinycoro::Task<>` and the coroutine function. This ensures that the task cannot outlive its coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
+
+#### ⚠️General recomendation
+Use statefull lambda functions (lambdas with capture block) with caution in a coroutine environment. They can cause lifetime issues. A better approach is to pass the necessary dependencies explicitly through function parameters, like so. `[](auto& dep1, auto& dep2... ) -> tinycoro::Task<void> {...}; `  
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+struct MyClass
+{
+    int32_t m_value{};
+
+    auto MemberFunction(tinycoro::Scheduler& scheduler)
+    {
+        auto coro = [this]() -> tinycoro::Task<int32_t> {
+            co_return ++m_value;
+        };
+
+        // We are not waiting for the Task, so coro is destroyed after function return.
+        // To make it safe we need to use tinycoro::MakeBound
+        return scheduler.Enqueue(tinycoro::MakeBound(coro));
+    }
+};
 ```
 
 ### `RunInline`
@@ -449,7 +486,8 @@ void Example_asyncCallbackAwaiter(tinycoro::Scheduler& scheduler)
         };
 
         // create and co_await for the AsyncCallbackAwaiter
-        co_await tinycoro::AsyncCallbackAwaiter([](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
+        co_await tinycoro::AsyncCallbackAwaiter(
+            [](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
         co_return 42;
     };
 
@@ -491,11 +529,13 @@ void Example_asyncCallbackAwaiter_CStyle(tinycoro::Scheduler& scheduler)
             *d = 21;
         };
 
-        auto async = [](auto wrappedCallback, void* wrappedUserData) { AsyncCallbackAPIvoid(wrappedCallback, wrappedUserData); return 21; };
+        auto async = [](auto wrappedCallback, void* wrappedUserData) { 
+            AsyncCallbackAPIvoid(wrappedCallback, wrappedUserData); return 21; };
         
         int userData{0};
 
-        auto res = co_await tinycoro::AsyncCallbackAwaiter_CStyle(async, cb, tinycoro::IndexedUserData<0>(&userData));
+        auto res = co_await tinycoro::AsyncCallbackAwaiter_CStyle(
+            async, cb, tinycoro::IndexedUserData<0>(&userData));
         
         co_return userData + res;
     };

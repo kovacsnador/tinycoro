@@ -99,7 +99,7 @@ namespace tinycoro {
 
         ~CoroTaskView() { destroy(); }
 
-        void Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        void Resume() { std::invoke(_coroResumer, _hdl, _source); }
 
         [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
@@ -111,7 +111,7 @@ namespace tinycoro {
             return _hdl.promise().pauseHandler;
         }
 
-        bool IsPaused() const noexcept
+        [[nodiscard]] bool IsPaused() const noexcept
         {
             if (_hdl.promise().pauseHandler)
             {
@@ -120,7 +120,7 @@ namespace tinycoro {
             return false;
         }
 
-        auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
+        [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
         template <typename T>
             requires std::constructible_from<StopSourceT, T>
@@ -200,7 +200,7 @@ namespace tinycoro {
 
         ~CoroTask() { destroy(); }
 
-        void Resume() { return std::invoke(_coroResumer, _hdl, _source); }
+        void Resume() { std::invoke(_coroResumer, _hdl, _source); }
 
         [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
@@ -211,7 +211,7 @@ namespace tinycoro {
             return _hdl.promise().pauseHandler;
         }
 
-        bool IsPaused() const noexcept
+        [[nodiscard]] bool IsPaused() const noexcept
         {
             if (_hdl.promise().pauseHandler)
             {
@@ -220,7 +220,7 @@ namespace tinycoro {
             return false;
         }
 
-        auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
+        [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
         [[nodiscard]] auto TaskView() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl, _source}; }
 

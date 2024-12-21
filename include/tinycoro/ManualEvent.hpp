@@ -17,7 +17,13 @@ namespace tinycoro {
 
             friend class AwaiterT<ManualEvent, detail::PauseCallbackEvent>;
 
-            ManualEvent() = default;
+            ManualEvent(bool preSet = false)
+            {
+                if(preSet)
+                {
+                    Set();
+                }
+            }
 
             // disable move and copy
             ManualEvent(ManualEvent&&) = delete;
