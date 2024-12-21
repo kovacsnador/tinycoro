@@ -21,7 +21,10 @@ namespace tinycoro {
             CLOSED
         };
 
-        template <typename ValueT, template <typename, typename, typename> class AwaiterT, template <typename, typename> class ListenerAwaiterT, template <typename> class ContainerT>
+        template <typename ValueT,
+                  template <typename, typename, typename> class AwaiterT,
+                  template <typename, typename> class ListenerAwaiterT,
+                  template <typename> class ContainerT>
         class BufferedChannel
         {
             struct Element
@@ -34,7 +37,7 @@ namespace tinycoro {
             friend class AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
             friend class ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
 
-            using awaiter_type = AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using awaiter_type          = AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
             using listener_awaiter_type = ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
 
             // default constructor
@@ -47,7 +50,10 @@ namespace tinycoro {
 
             [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
 
-            [[nodiscard]] auto WaitForListeners(size_t listenerCount) { return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount}; }
+            [[nodiscard]] auto WaitForListeners(size_t listenerCount)
+            {
+                return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
+            }
 
             void Push(ValueT t) { _Emplace(std::move(t), false); }
 
@@ -117,7 +123,7 @@ namespace tinycoro {
                     top->SetValue(std::forward<T>(t), close);
                     top->Notify();
 
-                    if(_closed)
+                    if (_closed)
                     {
                         // notify all waiters
                         _NotifyAll(others);
@@ -167,7 +173,7 @@ namespace tinycoro {
                     _waiters.push(waiter);
 
                     auto iter = _listenerWaiters.find(_waiters.size());
-                    if(iter != _listenerWaiters.end())
+                    if (iter != _listenerWaiters.end())
                     {
                         auto top = iter->second.steal();
                         lock.unlock();
@@ -175,14 +181,6 @@ namespace tinycoro {
                         // notify all if somebody waits for listerens
                         _NotifyAll(top);
                     }
-                    
-
-                    // check if somebody is waiting for listener(s)
-                    /*auto [begin, end] = _listenerWaiters.equal_range(_waiter.size());
-                    for([[maybe_unused]] auto& [key, val] : std::ranges::subrange(begin, end))
-                    {
-                        val->Notify();
-                    }*/
                 }
 
                 // susend coroutine
@@ -201,18 +199,17 @@ namespace tinycoro {
 
                 std::unique_lock lock{_mtx};
 
-                if(wantedListerenCount <= _waiters.size())
+                if (wantedListerenCount <= _waiters.size())
                 {
                     // no suspend
                     return false;
                 }
 
                 // insert new listener waiter into the list
-                //_listenerWaiters.insert(wantedListerenCount, waiter);
                 _listenerWaiters[wantedListerenCount].push(waiter);
-                
+
                 // suspend coroutine
-                return true;               
+                return true;
             }
 
             // auto [ready, lastElement] = std::tuple<bool, bool>
@@ -258,11 +255,12 @@ namespace tinycoro {
                 }
             }
 
-            LinkedPtrStack<awaiter_type> _waiters;
+            LinkedPtrStack<awaiter_type>                            _waiters;
             std::map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
-            ContainerT<Element>          _valueCollection;
-            bool                         _closed{false};
-            mutable std::mutex           _mtx;
+
+            ContainerT<Element> _valueCollection;
+            bool                _closed{false};
+            mutable std::mutex  _mtx;
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
@@ -322,7 +320,7 @@ namespace tinycoro {
             void Notify()
             {
                 // detach from the channel
-                _channel = nullptr; 
+                _channel = nullptr;
 
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
@@ -360,9 +358,9 @@ namespace tinycoro {
             EventT    _event;
         };
 
-        template<typename ChannelT, typename EventT>
+        template <typename ChannelT, typename EventT>
         class ListenerAwaiter
-        {   
+        {
         public:
             ListenerAwaiter(ChannelT& channel, EventT event, size_t count)
             : _channel{channel}
@@ -374,10 +372,7 @@ namespace tinycoro {
             // disable move and copy
             ListenerAwaiter(ListenerAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept
-            {
-                return _channel.IsReady(this);
-            }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
 
             constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
             {
@@ -388,18 +383,15 @@ namespace tinycoro {
                     ResumeFromPause(parentCoro);
                     return parentCoro;
                 }
-                return std::noop_coroutine();;
+                return std::noop_coroutine();
             }
 
-            constexpr void await_resume() const noexcept {}
+            constexpr void await_resume() const noexcept { }
 
-            [[nodiscard]] auto ListenerCount() const noexcept
-            {
-                return _listenersCount;
-            } 
+            [[nodiscard]] auto ListenerCount() const noexcept { return _listenersCount; }
 
             void Notify()
-            { 
+            {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
@@ -415,8 +407,8 @@ namespace tinycoro {
                 PauseHandler::UnpauseTask(parentCoro);
             }
 
-            ChannelT& _channel;
-            EventT    _event;
+            ChannelT&    _channel;
+            EventT       _event;
             const size_t _listenersCount;
         };
 

@@ -498,6 +498,8 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
     tinycoro::BufferedChannel<size_t> channel;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
+        co_await tinycoro::Sleep(10ms);
+        
         size_t value{};
         co_await channel.PopWait(value);
     };
@@ -508,11 +510,11 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
     };
 
     std::vector<tinycoro::Task<void>> tasks;
+    tasks.push_back(producer());
     for (size_t i = 0; i < count; ++i)
     {
         tasks.push_back(consumer());
     }
-    tasks.push_back(producer());
 
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
