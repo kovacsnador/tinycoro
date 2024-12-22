@@ -279,6 +279,9 @@ TEST_P(BufferedChannelListenerTest, BufferedChannelTest_await_ready_with_listene
     // we have already 3 awaiter so listeners are listening
     EXPECT_EQ(listenerAwaiter.await_ready(), ready);
     EXPECT_TRUE(channel.IsOpen());
+
+    // because of the awaiters registration close is necessary here.
+    channel.Close();
 }
 
 TEST_P(BufferedChannelListenerTest, BufferedChannelTest_await_suspend_with_listener)
@@ -309,6 +312,9 @@ TEST_P(BufferedChannelListenerTest, BufferedChannelTest_await_suspend_with_liste
     // we have already 3 awaiter so listeners are listening
     EXPECT_NE(listenerAwaiter.await_suspend(listenerHdl), ready);
     EXPECT_TRUE(channel.IsOpen());
+
+    // because of the awaiters registration close is necessary here.
+    channel.Close();
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_await_ready_close)
@@ -341,6 +347,9 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_suspend)
     channel.Push(42);
     EXPECT_TRUE(pauseResumeCalled);
     EXPECT_EQ(val, 42);
+
+    // because of the awaiters registration close is necessary here.
+    channel.Close();
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume)
@@ -361,6 +370,9 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume)
     auto result = awaiter.await_resume();
     EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::SUCCESS, result);
     EXPECT_EQ(val, 42);
+
+    // because of the awaiters registration close is necessary here.
+    channel.Close();
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume_push_close)
