@@ -4,7 +4,7 @@
 #include <atomic>
 
 #include "PauseHandler.hpp"
-#include "LockGuard.hpp"
+#include "ReleaseGuard.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -16,7 +16,7 @@ namespace tinycoro {
             using awaitable_type = AwaitableT<Mutex, detail::PauseCallbackEvent>;
 
             friend class AwaitableT<Mutex, detail::PauseCallbackEvent>;
-            friend class LockGuard<Mutex>;
+            friend class ReleaseGuard<Mutex>;
 
             Mutex() = default;
 
@@ -149,7 +149,7 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            [[nodiscard]] constexpr auto await_resume() noexcept { return LockGuard{_mutex}; }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_mutex}; }
 
             void Notify() const { _event.Notify(); }
 

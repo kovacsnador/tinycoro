@@ -675,7 +675,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
 
 The `tinycoro::Mutex` class provides an efficient coroutine-compatible mutual exclusion mechanism. It ensures that only one coroutine can access a critical section at a time, simplifying synchronization in coroutine-based systems. 
 
-The `co_await` operator returns a `tinycoro::LockGuard` object, which utilizes its destructor (RAII) to automatically release the lock
+The `co_await` operator returns a `tinycoro::ReleaseGuard` object, which utilizes its destructor (RAII) to automatically release the lock
 
 ```cpp
     void Example_Mutex(tinycoro::Scheduler& scheduler)
@@ -703,7 +703,7 @@ The tinycoro::Semaphore is a counting semaphore designed for controlling concurr
 
 In the example below, a semaphore with an initial count of 1 is created, ensuring that only one task can access the shared resource (in this case, incrementing a counter) at a time. The example demonstrates the use of a semaphore to synchronize multiple coroutines, where each task acquires the semaphore, increments the counter, and then releases it.
 
-The `co_await` operator returns a `tinycoro::LockGuard` object, which utilizes its destructor (RAII) to automatically release the lock
+The `co_await` operator returns a `tinycoro::ReleaseGuard` object, which utilizes its destructor (RAII) to automatically release the lock
 
 ```cpp
     void Example_Semaphore(tinycoro::Scheduler& scheduler)

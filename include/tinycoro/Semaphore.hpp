@@ -7,7 +7,7 @@
 
 #include "PauseHandler.hpp"
 #include "LinkedPtrStack.hpp"
-#include "LockGuard.hpp"
+#include "ReleaseGuard.hpp"
 
 namespace tinycoro {
 
@@ -26,7 +26,7 @@ namespace tinycoro {
             using awaitable_type = AwaitableT<Semaphore, detail::PauseCallbackEvent>;
 
             friend class AwaitableT<Semaphore, detail::PauseCallbackEvent>;
-            friend class LockGuard<Semaphore>;
+            friend class ReleaseGuard<Semaphore>;
 
             Semaphore(size_t initCount)
             : _counter{initCount}
@@ -105,7 +105,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr auto await_resume() noexcept
             {
-                return LockGuard{_semaphore};
+                return ReleaseGuard{_semaphore};
             }
 
             void Notify() const { _event.Notify(); }

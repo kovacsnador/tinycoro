@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_LOCK_GUARD_HPP__
-#define __TINY_CORO_LOCK_GUARD_HPP__
+#ifndef __TINY_CORO_RELEASE_GUARD_HPP__
+#define __TINY_CORO_RELEASE_GUARD_HPP__
 
 #include <memory>
 #include <utility>
@@ -7,17 +7,23 @@
 namespace tinycoro {
 
     template <typename DeviceT>
-    class LockGuard
+    class ReleaseGuard
     {
     public:
-        explicit LockGuard(DeviceT& d)
+        explicit ReleaseGuard(DeviceT& d)
         : _device{std::addressof(d)}
         {
         }
 
-        LockGuard(LockGuard&& other)
+        ReleaseGuard(ReleaseGuard&& other)
         : _device{std::exchange(other._device, nullptr)}
         {
+        }
+
+        ReleaseGuard& operator=(ReleaseGuard&& other)
+        {
+            unlock();
+            _device = std::exchange(other._device, nullptr);
         }
 
         [[nodiscard]] bool owns_lock() const noexcept {
@@ -33,7 +39,7 @@ namespace tinycoro {
             }
         }
 
-        ~LockGuard()
+        ~ReleaseGuard()
         {
             unlock();
         }
@@ -44,4 +50,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_LOCK_GUARD_HPP__
+#endif //!__TINY_CORO_RELEASE_GUARD_HPP__
