@@ -262,3 +262,34 @@ TEST(AutoEventTest, AutoEventFunctionalTest_setBeforeAwait)
     // Since the event was set before co_await, waited should be true
     EXPECT_TRUE(waited);
 }
+
+struct AutoEventStressTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(AutoEventStressTest, AutoEventStressTest, testing::Values(100, 1'000, 10'000));
+
+TEST_P(AutoEventStressTest, AutoEventStressTest_1)
+{
+    tinycoro::AutoEvent autoEvent{true};
+
+    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    const auto size = GetParam();
+
+    size_t count{0};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < size; ++i)
+        {
+            co_await autoEvent;
+            ++count;
+            autoEvent.Set();
+        }
+    };
+
+    // starting 8 async tasks at the same time
+    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+
+    EXPECT_EQ(count, size * 8);
+}
