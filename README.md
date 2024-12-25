@@ -256,8 +256,12 @@ The constructor accepts the number of threads, allowing you to utilize hardware 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-// create a scheduler
-tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+// create a scheduler with explicit worker thread count
+tinycoro::Scheduler scheduler{4}; // 4 worker threads
+
+// Or just use the default constructor which is equivalent to:
+// tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+tinycoro::Scheduler scheduler; 
 ```
 
 ### `Task`
