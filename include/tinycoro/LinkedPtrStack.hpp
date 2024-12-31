@@ -1,14 +1,11 @@
 #ifndef __TINY_CORO_LINEKD_PTR_STACK_HPP__
 #define __TINY_CORO_LINEKD_PTR_STACK_HPP__
 
-#include <concepts>
+#include "Common.hpp"
 
 namespace tinycoro { namespace detail {
 
-    template <typename NodeT>
-        requires requires (std::remove_pointer_t<NodeT> n) {
-            { n.next } -> std::same_as<std::remove_pointer_t<NodeT>*&>;
-        }
+    template <concepts::Linkable NodeT>
     struct LinkedPtrStack
     {
         using value_type = std::remove_pointer_t<NodeT>;
@@ -16,6 +13,7 @@ namespace tinycoro { namespace detail {
         void push(value_type* newNode)
         {
             assert(newNode);
+            assert(newNode->next == nullptr);
 
             ++_size;
 

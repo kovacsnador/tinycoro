@@ -9,17 +9,11 @@
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
+#include "ChannelOpStatus.hpp"
 
 namespace tinycoro {
 
     namespace detail {
-
-        enum class EOpStatus
-        {
-            SUCCESS,
-            LAST,
-            CLOSED
-        };
 
         template <typename ValueT,
                   template <typename, typename, typename> class AwaiterT,
@@ -306,15 +300,15 @@ namespace tinycoro {
             {
                 if (_lastElement)
                 {
-                    return EOpStatus::LAST;
+                    return EChannelOpStatus::LAST;
                 }
 
                 if (_set)
                 {
-                    return EOpStatus::SUCCESS;
+                    return EChannelOpStatus::SUCCESS;
                 }
 
-                return EOpStatus::CLOSED;
+                return EChannelOpStatus::CLOSED;
             }
 
             void Notify()
@@ -419,8 +413,6 @@ namespace tinycoro {
 
     template <typename ValueT>
     using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, detail::ListenerAwaiter, detail::Queue>;
-
-    using BufferedChannel_OpStatus = detail::EOpStatus;
 
 } // namespace tinycoro
 

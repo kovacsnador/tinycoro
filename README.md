@@ -883,7 +883,7 @@ tinycoro::Task<void> Consumer()
 {
     int32_t val;
     // Pop values from channel
-    while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(val))
+    while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
     {
         // 'val' holds the received value here
     }

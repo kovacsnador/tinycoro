@@ -99,7 +99,7 @@ struct CoroResumerMock
 };
 
 template<typename ReturnValueT, typename BaseT>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
     constexpr bool await_ready() const noexcept { return true; }
@@ -109,7 +109,7 @@ public:
 
 TEST(CoroTaskTest, CoroTaskTest)
 {
-    auto task = []()->tinycoro::CoroTask<void, PromiseMock, AwaiterMock, CoroResumerMock> { co_return; }();
+    auto task = []()->tinycoro::CoroTask<void, PromiseMock, PopAwaiterMock, CoroResumerMock> { co_return; }();
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 
