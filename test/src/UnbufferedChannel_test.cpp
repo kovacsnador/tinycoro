@@ -338,7 +338,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_paramMulti)
     EXPECT_EQ(allValues.size(), count);
 }
 
-TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement)
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushAndClose)
 {
     const auto count = GetParam();
 
@@ -378,7 +378,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement)
     tinycoro::GetAll(scheduler, consumer(), producer());
 }
 
-TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement_multi)
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushAndClose_multi)
 {
     const auto count = GetParam();
 
@@ -386,7 +386,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement_multi)
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    std::mutex mtx;
+    tinycoro::Mutex mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
@@ -394,8 +394,9 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement_multi)
         size_t val;
         while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
-            std::scoped_lock lock{mtx};
+            auto lock = co_await mtx;
             auto [iter, inserted] = allValues.insert(val);
+            lock.unlock();
             EXPECT_TRUE(inserted);
         }
     };
@@ -418,4 +419,54 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushLastElement_multi)
 
     tinycoro::GetAll(scheduler, consumer(), producer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
     EXPECT_EQ(allValues.size(), count);
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    tinycoro::Mutex mtx;
+    std::set<size_t> allValues;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+
+        size_t val;
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        {
+            auto lock = co_await mtx;
+            auto [iter, inserted] = allValues.insert(val);
+            lock.unlock();
+            EXPECT_TRUE(inserted);
+        }
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+
+        std::remove_const_t<decltype(count)> i{};
+        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PushWait(i))
+        {
+            ++i;
+        }
+    };
+
+    auto closer = [&]() ->tinycoro::Task<void>
+    {
+        co_await tinycoro::Sleep(200ms);
+        channel.Close();
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), producer(), consumer(), consumer(), consumer(), consumer(), closer());
+    
+    // check for values
+    bool found{true};
+    for(std::remove_const_t<decltype(count)> i{}; i < count; ++i)
+    {
+        auto f = allValues.contains(i);
+        ASSERT_TRUE((found == false && f == false) || found);
+        found = f;
+    }
 }

@@ -23,8 +23,8 @@ namespace tinycoro {
         {
             struct Element
             {
+                bool lastElement{false};
                 ValueT value;
-                bool   lastElement{false};
             };
 
         public:
@@ -49,20 +49,20 @@ namespace tinycoro {
                 return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
             }
 
-            void Push(ValueT t) { _Emplace(std::move(t), false); }
+            void Push(ValueT t) { _Emplace(false, std::move(t)); }
 
-            void PushAndClose(ValueT t) { _Emplace(std::move(t), true); }
+            void PushAndClose(ValueT t) { _Emplace(true, std::move(t)); }
 
-            template <typename T>
-            void Emplace(T&& t)
+            template <typename... Args>
+            void Emplace(Args&&... args)
             {
-                _Emplace(std::forward<T>(t), false);
+                _Emplace(false, std::forward<Args>(args)...);
             }
 
-            template <typename T>
-            void EmplaceAndClose(T&& t)
+            template <typename... Args>
+            void EmplaceAndClose(Args&&... args)
             {
-                _Emplace(std::forward<T>(t), true);
+                _Emplace(true, std::forward<Args>(args)...);
             }
 
             [[nodiscard]] bool Empty() const noexcept
@@ -90,8 +90,8 @@ namespace tinycoro {
             }
 
         private:
-            template <typename T>
-            void _Emplace(T&& t, bool close)
+            template <typename... Args>
+            void _Emplace(bool close, Args&&... args)
             {
                 std::unique_lock lock{_mtx};
 
@@ -114,7 +114,7 @@ namespace tinycoro {
 
                     lock.unlock();
 
-                    top->SetValue(std::forward<T>(t), close);
+                    top->SetValue(ValueT{std::forward<Args>(args)...}, close);
                     top->Notify();
 
                     if (_closed)
@@ -127,7 +127,7 @@ namespace tinycoro {
                 }
 
                 // No awaiters
-                _valueCollection.emplace(Element{std::forward<T>(t), close});
+                _valueCollection.emplace(Element{close, std::forward<Args>(args)...});
             }
 
             [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
@@ -217,7 +217,7 @@ namespace tinycoro {
 
                 if (_valueCollection.empty() == false)
                 {
-                    auto& [value, lastElement] = _valueCollection.front();
+                    auto& [lastElement, value] = _valueCollection.front();
 
                     if (lastElement)
                     {
