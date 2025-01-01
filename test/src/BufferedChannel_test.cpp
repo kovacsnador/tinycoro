@@ -591,7 +591,8 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t value{};
-        co_await channel.PopWait(value);
+        auto status = co_await channel.PopWait(value);
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::SUCCESS);
     };
 
     auto producer = [&]() -> tinycoro::Task<void> {

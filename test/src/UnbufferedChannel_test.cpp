@@ -13,7 +13,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_open)
     EXPECT_FALSE(channel.IsOpen());
 }
 
-template <typename...>
+template <typename, typename, typename>
 class PopAwaiterMock
 {
 public:
@@ -24,7 +24,7 @@ public:
     PopAwaiterMock* next{nullptr};
 };
 
-template <typename...>
+template <typename, typename, typename>
 class PushAwaiterMock
 {
 public:
