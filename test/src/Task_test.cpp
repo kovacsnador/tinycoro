@@ -72,6 +72,8 @@ struct PauseHandlerMock
 
 struct PromiseMock
 {
+    using value_type = void;
+
     auto initial_suspend() { return std::suspend_always{}; }
 
     auto final_suspend() noexcept { return std::suspend_always{}; }
