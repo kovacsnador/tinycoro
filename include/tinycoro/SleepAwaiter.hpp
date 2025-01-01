@@ -38,7 +38,7 @@ namespace tinycoro {
         struct IsDurationT<const volatile std::chrono::duration<RepT, PerT>> : std::true_type
         {
         };
-        
+
     } // namespace detail
 
     namespace concepts {
@@ -77,13 +77,13 @@ namespace tinycoro {
         }
     }
 
-    template<concepts::IsDuration DurationT>
+    template <concepts::IsDuration DurationT>
     Task<void> SleepCancellable(DurationT duration)
     {
         co_await Sleep(duration);
 
         auto stopToken = co_await StopTokenAwaiter{};
-        if(stopToken.stop_possible() && stopToken.stop_requested())
+        if (stopToken.stop_possible() && stopToken.stop_requested())
         {
             co_await CancellableSuspend<void>{};
         }

@@ -68,6 +68,8 @@ namespace tinycoro {
         using promise_type  = PromiseT;
         using coro_hdl_type = std::coroutine_handle<promise_type>;
 
+        using value_type = promise_type::value_type;
+
         using AwaiterT::await_ready;
         using AwaiterT::await_resume;
         using AwaiterT::await_suspend;
@@ -171,6 +173,8 @@ namespace tinycoro {
 
         using promise_type  = PromiseT;
         using coro_hdl_type = std::coroutine_handle<promise_type>;
+
+        using value_type = promise_type::value_type;
 
         template <typename... Args>
             requires std::constructible_from<coro_hdl_type, Args...>

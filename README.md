@@ -234,6 +234,7 @@ catch(const std::exception& e)
     - [Latch](#latch)
     - [Barrier](#barrier)
     - [BufferedChannel](#bufferedchannel)
+    - [UnbufferedChannel](#unbufferedchannel)
 * [Warning](#warning)
 * [Contributing](#contributing)
 * [Support](#support)
@@ -875,7 +876,7 @@ tinycoro::Task<void> Waiter()
 ```
 ### `BufferedChannel`
 
-The tinycoro::BufferedChannel<T> is an asynchronous communication primitive in tinycoro designed for passing messages between producers and consumers. It supports a buffer that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way. The channel can also be closed to signal that no more items will be produced.
+The `tinycoro::BufferedChannel<T>` is an asynchronous communication primitive in tinycoro designed for passing messages between multiple coroutines. It supports a buffer that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way. The channel can also be closed to signal that no more items will be produced. See also [EChannelOpStatus](#echannelopstatus)
 ```cpp
 tinycoro::BufferedChannel<int32_t> channel;
 
@@ -883,7 +884,7 @@ tinycoro::Task<void> Consumer()
 {
     int32_t val;
     // Pop values from channel
-    while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(val))
+    while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
     {
         // 'val' holds the received value here
     }
@@ -898,11 +899,65 @@ void Producer()
     // Close the channel when finished (this also happens in the BufferedChannel destructor)
     channel.Close();
 
-    // Alternatively, if this will be the last entry, use PushAndClose/EmplaceAndClose
-    // This guarantees that all entries before 44 will be consumed.
-    channel.PushAndClose(44);
+    /* Alternatively, if this will be the last entry, use PushAndClose/EmplaceAndClose
+     * This guarantees that all entries before 44 will be consumed.
+     */
+    // channel.PushAndClose(44);
 }
 ```
+
+### `UnbufferedChannel`
+
+The `tinycoro::UnbufferedChannel<T>` is an asynchronous communication primitive in `tinycoro`, designed for passing messages between coroutines. It facilitates direct communication between a producer and a consumer coroutine, with operations that suspend until the counterpart is ready.
+
+```cpp
+#include <tinycoro/UnbufferedChannel.hpp>
+
+// Define an unbuffered channel for int32_t values
+tinycoro::UnbufferedChannel<int32_t> channel;
+
+// Consumer coroutine that retrieves values from the channel
+tinycoro::Task<void> Consumer()
+{
+    int32_t val;
+    // Continuously pop values from the channel until it's closed
+    while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+    {
+        // 'val' holds the received value here
+    }
+}
+
+// Producer coroutine that pushes values into the channel
+tinycoro::Task<void> Producer()
+{
+    // Push a value into the channel and wait until it's received by the consumer
+    tinycoro::EChannelOpStatus status = co_await channel.PushWait(42);
+    assert(status == tinycoro::EChannelOpStatus::SUCCESS);
+
+    // Push a value and simultaneously close the channel, ensuring all prior entries are consumed
+    status = co_await channel.PushAndCloseWait(44);
+
+    if (status == tinycoro::EChannelOpStatus::LAST)
+    {
+        // The consumer received the last value (44), and the channel is now closed
+    }
+    else if (status == tinycoro::EChannelOpStatus::CLOSED)
+    {
+        // The value (44) was not received because the channel was already closed
+    }
+
+    // Alternatively, you can close the channel explicitly
+    // channel.Close();
+}
+```
+
+### `EChannelOpStatus`
+
+The operations on `BufferedChannel` and `UnbufferedChannel` returns an `EChannelOpStatus` to indicate their outcome:
+
+- `SUCCESS`: The operation completed successfully.
+- `LAST`: Indicates the last value was received, and the channel is now closed.
+- `CLOSED`: The operation failed because the channel was already closed.
 
 ## Warning
 

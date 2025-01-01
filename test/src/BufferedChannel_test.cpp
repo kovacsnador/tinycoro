@@ -172,19 +172,19 @@ TEST(BufferedChannelTest, BufferedChannelTest_moveOnlyValue)
     EXPECT_TRUE(channel.Empty());
 
     auto result = awaiter.await_resume();
-    EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::SUCCESS, result);
+    EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, result);
     EXPECT_EQ(42, val.value);
 }
 
 template <typename, typename, typename>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(auto, auto, auto) { }
+    PopAwaiterMock(auto, auto, auto) { }
 
     void Notify() const noexcept {};
 
-    AwaiterMock* next{nullptr};
+    PopAwaiterMock* next{nullptr};
 };
 
 template <typename C, typename E>
@@ -200,18 +200,18 @@ public:
 
 TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)
 {
-    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
+    tinycoro::detail::BufferedChannel<int32_t, PopAwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
 
     int32_t val;
     auto    awaiter = channel.PopWait(val);
 
-    using expectedAwaiterType = AwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_coawait_listenerWaiter)
 {
-    tinycoro::detail::BufferedChannel<int32_t, AwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
+    tinycoro::detail::BufferedChannel<int32_t, PopAwaiterMock, ListenerAwaiterMock, tinycoro::detail::Queue> channel;
 
     auto awaiter = channel.WaitForListeners(1);
 
@@ -368,7 +368,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume)
     channel.Push(42);
 
     auto result = awaiter.await_resume();
-    EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::SUCCESS, result);
+    EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, result);
     EXPECT_EQ(val, 42);
 
     // because of the awaiters registration close is necessary here.
@@ -394,12 +394,12 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_push_close)
     auto result = awaiter.await_resume();
 
     // the value was already set
-    EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::SUCCESS, result);
+    EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, result);
     EXPECT_EQ(val, 42);
 
     // for the next is already closed
     auto awaiter2 = channel.PopWait(val);
-    EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::CLOSED, awaiter2.await_resume());
+    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, awaiter2.await_resume());
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume_close)
@@ -417,7 +417,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_close)
 
     auto result = awaiter.await_resume();
     // the value was not set
-    EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::CLOSED, result);
+    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, result);
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume_multi)
@@ -440,7 +440,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_multi)
         EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
 
         auto result = awaiter.await_resume();
-        EXPECT_EQ(tinycoro::BufferedChannel_OpStatus::SUCCESS, result);
+        EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, result);
         EXPECT_EQ(val, i);
     }
 }
@@ -455,7 +455,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         std::variant<int32_t, CloseChannelBuffer> val;
-        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await bufferedChannel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::SUCCESS == co_await bufferedChannel.PopWait(val))
         {
             if (std::holds_alternative<int32_t>(val))
             {
@@ -510,7 +510,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             // no lock needed here only one consumer
             auto [iter, inserted] = allValues.insert(val);
@@ -551,7 +551,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             {
                 // lock needed here multi consumer
@@ -591,7 +591,8 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t value{};
-        co_await channel.PopWait(value);
+        auto status = co_await channel.PopWait(value);
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
     };
 
     auto producer = [&]() -> tinycoro::Task<void> {
@@ -624,7 +625,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorC
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel->PopWait(val))
+        while (tinycoro::EChannelOpStatus::SUCCESS == co_await channel->PopWait(val))
         {
             {
                 // lock needed here multi consumer
@@ -680,7 +681,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::SUCCESS == co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::SUCCESS == co_await channel.PopWait(val))
         {
             {
                 // lock needed here multi consumer
@@ -721,7 +722,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose)
         std::set<size_t> allValues;
 
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
             auto [iter, inserted] = allValues.insert(val);
             EXPECT_TRUE(inserted);
@@ -747,6 +748,45 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose)
     tinycoro::GetAll(scheduler, consumer());
 }
 
+TEST(BufferedChannelTest, BufferedChannelTest_PushCloseMulti)
+{
+    tinycoro::Scheduler scheduler{1};
+    tinycoro::BufferedChannel<size_t> channel;
+
+    std::vector<size_t> allValues;
+    tinycoro::Mutex mutex;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t val;
+        if (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        {
+            auto lock = co_await mutex;
+            allValues.push_back(val);
+        }
+    };
+
+    auto producer = [&]()->tinycoro::Task<void> {
+
+        co_await tinycoro::Sleep(50ms);
+
+        channel.Push(39);
+        channel.Push(40);
+        channel.Push(41);
+        channel.PushAndClose(42);
+
+        EXPECT_THROW(channel.Push(33), tinycoro::BufferedChannelException);
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer());
+
+    EXPECT_EQ(allValues.size(), 4);
+
+    EXPECT_EQ(allValues[0], 39);
+    EXPECT_EQ(allValues[1], 40);
+    EXPECT_EQ(allValues[2], 41);
+    EXPECT_EQ(allValues[3], 42);
+}
+
 TEST_P(BufferedChannelTest, BufferedChannelTest_EmplaceClose)
 {
     const auto count = GetParam();
@@ -757,7 +797,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_EmplaceClose)
         std::set<size_t> allValues;
 
         size_t val;
-        while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
             auto [iter, inserted] = allValues.insert(val);
             EXPECT_TRUE(inserted);
@@ -800,12 +840,12 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_EmplaceClose_multi)
             size_t val;
             auto   status = co_await channel.PopWait(val);
 
-            if (status == tinycoro::BufferedChannel_OpStatus::CLOSED)
+            if (status == tinycoro::EChannelOpStatus::CLOSED)
             {
                 break;
             }
 
-            if (status == tinycoro::BufferedChannel_OpStatus::LAST)
+            if (status == tinycoro::EChannelOpStatus::LAST)
             {
                 lastValue = val;
             }
@@ -858,12 +898,12 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose_multi)
             size_t val;
             auto   status = co_await channel.PopWait(val);
 
-            if (status == tinycoro::BufferedChannel_OpStatus::CLOSED)
+            if (status == tinycoro::EChannelOpStatus::CLOSED)
             {
                 break;
             }
 
-            if (status == tinycoro::BufferedChannel_OpStatus::LAST)
+            if (status == tinycoro::EChannelOpStatus::LAST)
             {
                 lastValue = val;
             }

@@ -25,21 +25,21 @@ TEST(AutoEventTest, AutoEventTest_constructor)
 }
 
 template <typename, typename>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto) { }
+    PopAwaiterMock(auto&, auto) { }
 
-    AwaiterMock* next{nullptr};
+    PopAwaiterMock* next{nullptr};
 };
 
 TEST(AutoEventTest, AutoEventTest_coawaitReturn)
 {
-    tinycoro::detail::AutoEvent<AwaiterMock> event;
+    tinycoro::detail::AutoEvent<PopAwaiterMock> event;
 
     auto awaiter = event.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(event), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(event), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

@@ -16,6 +16,9 @@ namespace tinycoro
             {t.Resume()} -> std::same_as<void>;
             {t.ResumeState()} -> std::same_as<ETaskResumeState>;
         };
+
+        template<typename ValueT, typename... TaskT>
+        concept SameAsValueType = (std::same_as<ValueT, typename TaskT::value_type> && ...);
     }
 
     template<concepts::LocalRunable TaskT>
@@ -50,9 +53,9 @@ namespace tinycoro
         return task.await_resume();
     }
 
-    template<typename... Args>
-        requires (sizeof...(Args) > 1)
-    [[nodiscard]] auto RunInline(Args&&... tasks)
+    template<typename... TaskT>
+        requires (sizeof...(TaskT) > 1) && (!concepts::SameAsValueType<void, TaskT...>)
+    [[nodiscard]] auto RunInline(TaskT&&... tasks)
     {
         auto returnValueConverter = []<typename T>(T&& task)
         {
@@ -67,7 +70,14 @@ namespace tinycoro
             }
         };
 
-        return std::tuple{returnValueConverter(std::forward<Args>(tasks))...};
+        return std::tuple{returnValueConverter(std::forward<TaskT>(tasks))...};
+    }
+
+    template<typename... TaskT>
+        requires (sizeof...(TaskT) > 1) && concepts::SameAsValueType<void, TaskT...>
+    void RunInline(TaskT&&... tasks)
+    {
+        (RunInline(std::forward<TaskT>(tasks)), ...);
     }
 
     template<concepts::Iterable ContainerT>

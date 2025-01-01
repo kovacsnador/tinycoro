@@ -21,7 +21,7 @@ void Example_bufferedChannel(auto& scheduler)
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         std::vector<int32_t> data;
-        while (tinycoro::BufferedChannel_OpStatus::CLOSED != co_await channel.PopWait(data))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(data))
         {
             processData(data);
         }

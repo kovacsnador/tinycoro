@@ -17,19 +17,19 @@ TEST(SingleEventTest, SingleEventTest_Set)
 }
 
 template<typename, typename>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto) {}
+    PopAwaiterMock(auto&, auto) {}
 };
 
 TEST(SingleEventTest, SingleEventTest_coawaitReturn)
 {
-    tinycoro::detail::SingleEvent<int32_t, AwaiterMock> singleEvent;
+    tinycoro::detail::SingleEvent<int32_t, PopAwaiterMock> singleEvent;
 
     auto awaiter = singleEvent.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(singleEvent), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(singleEvent), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

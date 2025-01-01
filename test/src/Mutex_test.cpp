@@ -12,21 +12,21 @@ struct MutexTest : testing::TestWithParam<size_t>
 INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000));
 
 template <typename, typename>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto) { }
+    PopAwaiterMock(auto&, auto) { }
 
-    AwaiterMock* next{nullptr};
+    PopAwaiterMock* next{nullptr};
 };
 
 TEST(MutexTest, MutexTest_coawaitReturn)
 {
-    tinycoro::detail::Mutex<AwaiterMock> mutex;
+    tinycoro::detail::Mutex<PopAwaiterMock> mutex;
 
     auto awaiter = mutex.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(mutex), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(mutex), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

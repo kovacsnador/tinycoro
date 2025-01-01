@@ -69,10 +69,10 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
 }
 
 template <typename SemaphoreT, typename EventT>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(SemaphoreT& s, EventT e)
+    PopAwaiterMock(SemaphoreT& s, EventT e)
     : semaphore{s}
     , event{std::move(e)}
     {
@@ -85,7 +85,7 @@ public:
 
     auto TestRelease() { return semaphore.Release(); }
 
-    AwaiterMock* next{nullptr};
+    PopAwaiterMock* next{nullptr};
     SemaphoreT&  semaphore;
     EventT event;
 };
@@ -96,7 +96,7 @@ struct EventMock
 
 struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
-    using semaphore_type  = tinycoro::detail::Semaphore<AwaiterMock, tinycoro::detail::LinkedPtrStack>;
+    using semaphore_type  = tinycoro::detail::Semaphore<PopAwaiterMock, tinycoro::detail::LinkedPtrStack>;
     using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
 
     void SetUp() override

@@ -209,6 +209,32 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
     });
 }
 
+TEST(RunInlineTest, RunInline_FunctionalTest_voidTasks)
+{
+    size_t i = 0;
+
+    auto consumer1 = [&]()->tinycoro::Task<void>
+    {
+        EXPECT_EQ(i++, 0);
+        co_return; 
+    };
+
+    auto consumer2 = [&]()->tinycoro::Task<void>
+    {
+        EXPECT_EQ(i++, 1);
+        co_return; 
+    };
+
+    auto consumer3 = [&]()->tinycoro::Task<void>
+    {
+        EXPECT_EQ(i++, 2);
+        co_return; 
+    };
+
+    tinycoro::RunInline(consumer1(), consumer2(), consumer3());
+    EXPECT_EQ(i, 3);
+}
+
 TEST(RunInlineTest, RunInline_FunctionalTest_1)
 {
     tinycoro::SingleEvent<int32_t> event;

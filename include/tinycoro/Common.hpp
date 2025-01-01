@@ -23,6 +23,11 @@ namespace tinycoro {
         template<typename T>
         concept HasVirtualDestructor = std::has_virtual_destructor_v<T>;
 
+        template<typename T>
+        concept Linkable = requires (std::remove_pointer_t<T> n) {
+            { n.next } -> std::same_as<std::remove_pointer_t<T>*&>;
+        };
+
     } // namespace concepts
 
     struct VoidType

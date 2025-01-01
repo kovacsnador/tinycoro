@@ -61,21 +61,21 @@ TEST(LatchTest, LatchTest_constructor)
 }
 
 template <typename, typename>
-class AwaiterMock
+class PopAwaiterMock
 {
 public:
-    AwaiterMock(auto&, auto) { }
+    PopAwaiterMock(auto&, auto) { }
 
-    AwaiterMock* next{nullptr};
+    PopAwaiterMock* next{nullptr};
 };
 
 TEST(LatchTest, LatchTest_coawaitReturn)
 {
-    tinycoro::detail::Latch<AwaiterMock> latch{1};
+    tinycoro::detail::Latch<PopAwaiterMock> latch{1};
 
     auto awaiter = latch.operator co_await();
 
-    using expectedAwaiterType = AwaiterMock<decltype(latch), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(latch), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
