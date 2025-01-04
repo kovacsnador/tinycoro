@@ -195,7 +195,7 @@ namespace tinycoro {
                     std::unique_lock pauseLock{_pausedTasksMtx};
                     const auto [it, success] = _pausedTasks.try_emplace(id, std::move(task));
 
-                    if(success == false)
+                    if (success == false)
                     {
                         _pausedTasks.erase(it);
                         pauseLock.unlock();
@@ -232,6 +232,7 @@ namespace tinycoro {
                     [this](std::stop_token stopToken) {
                         while (stopToken.stop_requested() == false)
                         {
+                            // wait on conditional variable
                             std::unique_lock queueLock{_tasksQueueMtx};
                             if (_cv.wait(queueLock, stopToken, [this] { return !_tasks.empty(); }) == false)
                             {
@@ -239,12 +240,30 @@ namespace tinycoro {
                                 return;
                             }
 
-                            TaskT task{std::move(_tasks.back())};
-                            _tasks.pop_back();
+                            {
+                                TaskT task{std::move(_tasks.back())};
+                                _tasks.pop_back();
 
-                            queueLock.unlock();
+                                queueLock.unlock();
 
-                            _InvokeTask(task);
+                                _InvokeTask(task);
+                            }
+
+                            // If the worker thread is already running, we will check for tasks in the queue
+                            queueLock.lock();
+                            while (stopToken.stop_requested() == false && _tasks.empty() == false)
+                            {
+                                {
+                                    TaskT task{std::move(_tasks.back())};
+                                    _tasks.pop_back();
+
+                                    queueLock.unlock();
+
+                                    _InvokeTask(task);
+                                }
+
+                                queueLock.lock();
+                            }
                         }
                     },
                     _stopSource.get_token());
