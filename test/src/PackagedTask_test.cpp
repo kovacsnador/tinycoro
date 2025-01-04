@@ -60,7 +60,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 
         EXPECT_FALSE(packagedTask.IsPaused());
 
-        packagedTask();
+        packagedTask.Resume();
     }
 
     if constexpr (std::same_as<ValueT, int32_t>)
@@ -109,7 +109,7 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 
         EXPECT_TRUE(packagedTask.IsPaused());
         
-        packagedTask();
+        packagedTask.Resume();
     }
 
     EXPECT_THROW(future.get(), std::runtime_error);

@@ -116,7 +116,7 @@ namespace tinycoro {
             _pimpl = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
         }
 
-        void operator()()
+        inline void Resume()
         {
             _pimpl->Resume();
         }

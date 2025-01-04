@@ -5,7 +5,7 @@
 #include <future>
 #include <functional>
 #include <vector>
-#include <queue>
+#include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <concepts>
@@ -13,6 +13,7 @@
 #include <ranges>
 #include <algorithm>
 #include <variant>
+#include <map>
 
 #include "Future.hpp"
 #include "Common.hpp"
@@ -25,7 +26,7 @@ namespace tinycoro {
 
     template <std::move_constructible TaskT>
         requires requires (TaskT t) {
-            { std::invoke(t) } -> std::same_as<void>;
+            { t.Resume() } -> std::same_as<void>;
             { t.IsPaused() } -> std::same_as<bool>;
             { t.ResumeState() } -> std::same_as<ETaskResumeState>;
         }
@@ -126,7 +127,7 @@ namespace tinycoro {
 
                 {
                     std::scoped_lock lock{_tasksQueueMtx};
-                    _tasks.emplace(std::move(coro), std::move(futureState), id);
+                    _tasks.emplace_front(std::move(coro), std::move(futureState), id);
                 }
 
                 _cv.notify_all();
@@ -146,7 +147,7 @@ namespace tinycoro {
                     {
                         std::scoped_lock queueLock{_tasksQueueMtx};
 
-                        _tasks.emplace(std::move(std::get<TaskT>(it->second)));
+                        _tasks.emplace_front(std::move(std::get<TaskT>(it->second)));
                         _pausedTasks.erase(i);
 
                         // pause lock can be released
@@ -166,6 +167,61 @@ namespace tinycoro {
             };
         }
 
+        inline void _InvokeTask(TaskT& task)
+        {
+            using enum ETaskResumeState;
+            for (;;)
+            {
+                // resume the task
+                task.Resume();
+
+                // get the resume state from the coroutine or corouitne child
+                auto resumeState = task.ResumeState();
+
+                switch (resumeState)
+                {
+                case SUSPENDED: {
+                    {
+                        std::scoped_lock lock{_tasksQueueMtx};
+                        _tasks.emplace_front(std::move(task));
+                    }
+
+                    _cv.notify_all();
+                    break;
+                }
+                case PAUSED: {
+                    auto id = task.id;
+
+                    std::unique_lock pauseLock{_pausedTasksMtx};
+                    const auto [it, success] = _pausedTasks.try_emplace(id, std::move(task));
+
+                    if(success == false)
+                    {
+                        _pausedTasks.erase(it);
+                        pauseLock.unlock();
+
+                        // we can continue to resume this task
+                        continue;
+                    }
+                    break;
+                }
+                case STOPPED:
+                    [[fallthrough]];
+                case DONE: {
+                    // task is done
+                    _tasksCount.fetch_sub(1, std::memory_order_release);
+                    _tasksCount.notify_all();
+                    break;
+                }
+                default:
+                    break;
+                }
+
+                // task is handled regarding on his resumeState
+                break;
+            }
+        }
+
         void _AddWorkers(size_t workerThreadCount)
         {
             assert(workerThreadCount >= 1);
@@ -176,82 +232,28 @@ namespace tinycoro {
                     [this](std::stop_token stopToken) {
                         while (stopToken.stop_requested() == false)
                         {
+                            std::unique_lock queueLock{_tasksQueueMtx};
+                            if (_cv.wait(queueLock, stopToken, [this] { return !_tasks.empty(); }) == false)
                             {
-                                using enum ETaskResumeState;
-
-                                std::unique_lock queueLock{_tasksQueueMtx};
-                                if (_cv.wait(queueLock, stopToken, [this] { return !_tasks.empty(); }) == false)
-                                {
-                                    // stop was requested
-                                    return;
-                                }
-
-                                TaskT task{std::move(_tasks.front())};
-                                _tasks.pop();
-
-                                queueLock.unlock();
-
-                                // resume the task
-                                std::invoke(task);
-
-                                // get the resume state from the coroutine or corouitne child
-                                auto resumeState = task.ResumeState();
-
-                                switch (resumeState)
-                                {
-                                case SUSPENDED: {
-                                    queueLock.lock();
-                                    _tasks.emplace(std::move(task));
-                                    queueLock.unlock();
-
-                                    _cv.notify_all();
-                                    break;
-                                }
-                                case PAUSED: {
-
-                                    auto id = task.id;
-
-                                    std::unique_lock pauseLock{_pausedTasksMtx};
-
-                                    if (auto it = _pausedTasks.find(id); it != _pausedTasks.end())
-                                    {
-                                        // need to wakeup the task.
-                                        _pausedTasks.erase(it);
-                                        pauseLock.unlock();
-
-                                        queueLock.lock();
-                                        _tasks.emplace(std::move(task));
-                                        queueLock.unlock();
-                                    }
-                                    else
-                                    {
-                                        // put on pause the task.
-                                        _pausedTasks.emplace(id, std::move(task));
-                                    }
-
-                                    break;
-                                }
-                                case STOPPED:
-                                    [[fallthrough]];
-                                case DONE: {
-                                    // task is done
-                                    _tasksCount.fetch_sub(1, std::memory_order_release);
-                                    _tasksCount.notify_all();
-                                    break;
-                                }
-                                default:
-                                    break;
-                                }
+                                // stop was requested
+                                return;
                             }
+
+                            TaskT task{std::move(_tasks.back())};
+                            _tasks.pop_back();
+
+                            queueLock.unlock();
+
+                            _InvokeTask(task);
                         }
                     },
                     _stopSource.get_token());
             }
         }
 
-        std::queue<TaskT>                       _tasks;
-        std::unordered_map<cid_t, TaskVariantT> _pausedTasks;
-        std::atomic<size_t>                     _tasksCount{0};
+        std::deque<TaskT>             _tasks;
+        std::map<cid_t, TaskVariantT> _pausedTasks;
+        std::atomic<size_t>           _tasksCount{0};
 
         std::vector<std::jthread> _workerThreads;
         std::stop_source          _stopSource;

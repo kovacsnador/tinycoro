@@ -124,7 +124,7 @@ namespace tinycoro {
         Barrier(size_t initCount, CompletionCallbackT callback = {})
         : _total{initCount}
         , _current{initCount}
-        , _complitionCallback{std::move(callback)}
+        , _completionCallback{std::move(callback)}
         {
             if (initCount < 1)
             {
@@ -179,7 +179,7 @@ namespace tinycoro {
                 });
 
                 // call complition callback
-                detail::local::SafeRegularInvoke(_complitionCallback);
+                detail::local::SafeRegularInvoke(_completionCallback);
 
                 // unlock the mutex
                 lock.unlock();
@@ -235,7 +235,7 @@ namespace tinycoro {
         size_t _total;
         size_t _current;
 
-        CompletionCallbackT _complitionCallback;
+        CompletionCallbackT _completionCallback;
 
         detail::LinkedPtrStack<awaiter_type> _waiters;
     };
