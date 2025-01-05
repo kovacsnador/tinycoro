@@ -140,12 +140,12 @@ namespace tinycoro {
 
             void Notify() const { _event.Notify(); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
                 _event.Set(nullptr);
-                PauseHandler::UnpauseTask(parentCoro);
+                context::UnpauseTask(parentCoro);
             }
 
         private:

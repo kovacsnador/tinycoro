@@ -13,7 +13,7 @@ struct CustomAwaiter
     void await_suspend(auto hdl) noexcept
     {
         // save resume task callback
-        _resumeTask = tinycoro::PauseHandler::PauseTask(hdl);
+        _resumeTask = tinycoro::context::PauseTask(hdl);
 
         auto cb = [](void* userData, [[maybe_unused]] int i) {
 

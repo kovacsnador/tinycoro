@@ -63,7 +63,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            this->_event.Set(PauseHandler::PauseTask(hdl));
+            this->_event.Set(context::PauseTask(hdl));
 
             auto destroyNotifier = this->MakeDestroyNotifier();
 
@@ -92,7 +92,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            this->_event.Set(PauseHandler::PauseTask(hdl));
+            this->_event.Set(context::PauseTask(hdl));
 
             auto destroyNotifier = this->MakeDestroyNotifier();
 
@@ -126,7 +126,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            this->_event.Set(PauseHandler::PauseTask(hdl));
+            this->_event.Set(context::PauseTask(hdl));
 
             auto destroyNotifier = this->MakeDestroyNotifier();
 
@@ -157,7 +157,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            this->_event.Set(PauseHandler::PauseTask(hdl));
+            this->_event.Set(context::PauseTask(hdl));
 
             auto destroyNotifier = this->MakeDestroyNotifier();
 

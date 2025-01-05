@@ -78,7 +78,7 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
 
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&called](){ called = true; });
 
-    auto pauseResumerCallback = tinycoro::PauseHandler::PauseTask(hdl);
+    auto pauseResumerCallback = tinycoro::context::PauseTask(hdl);
 
     EXPECT_TRUE(hdl.promise().pauseHandler->IsPaused());
     

@@ -19,7 +19,7 @@ namespace tinycoro {
 
         constexpr void await_suspend(auto coro) const noexcept
         { 
-            PauseHandler::MakeCancellable(coro, std::move(_returnValue));
+            context::MakeCancellable(coro, std::move(_returnValue));
         }
 
         constexpr void await_resume() const noexcept { }
@@ -35,7 +35,7 @@ namespace tinycoro {
 
         constexpr void await_suspend(auto coro) const noexcept
         { 
-            PauseHandler::MakeCancellable(coro);
+            context::MakeCancellable(coro);
         }
 
         constexpr void await_resume() const noexcept {}
