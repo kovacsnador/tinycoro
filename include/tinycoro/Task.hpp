@@ -108,16 +108,14 @@ namespace tinycoro {
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
 
-            using elementType           = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
-            _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
-            return _hdl.promise().pauseHandler;
+            return _hdl.promise().MakePauseHandler(pauseResume);
         }
 
         [[nodiscard]] bool IsPaused() const noexcept
         {
-            if (_hdl.promise().pauseHandler)
+            if (const auto& pauseHandler = _hdl.promise().pauseHandler)
             {
-                return _hdl.promise().pauseHandler->IsPaused();
+                return pauseHandler->IsPaused();
             }
             return false;
         }
@@ -210,16 +208,14 @@ namespace tinycoro {
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
-            using elementType           = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
-            _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
-            return _hdl.promise().pauseHandler;
+            return _hdl.promise().MakePauseHandler(pauseResume);
         }
 
         [[nodiscard]] bool IsPaused() const noexcept
         {
-            if (_hdl.promise().pauseHandler)
+            if (const auto& pauseHandler = _hdl.promise().pauseHandler)
             {
-                return _hdl.promise().pauseHandler->IsPaused();
+                return pauseHandler->IsPaused();
             }
             return false;
         }

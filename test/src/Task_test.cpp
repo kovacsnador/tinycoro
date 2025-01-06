@@ -84,6 +84,13 @@ struct PromiseMock
 
     auto get_return_object() { return std::coroutine_handle<PromiseMock>::from_promise(*this); }
 
+    template<typename... Args>
+    auto MakePauseHandler(Args&&... args)
+    {
+        pauseHandler = std::make_shared<PauseHandlerMock>(std::forward<Args>(args)...);
+        return pauseHandler.get();
+    }
+
     std::shared_ptr<PauseHandlerMock> pauseHandler;
     std::stop_source stopSource{};
 };
