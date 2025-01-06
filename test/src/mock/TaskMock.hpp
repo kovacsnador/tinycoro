@@ -41,8 +41,6 @@ namespace tinycoro { namespace test {
 
         T await_resume() { return mock->await_resume(); }
 
-        bool IsPaused() const noexcept { return mock->IsPaused(); }
-
         void SetPauseHandler(tinycoro::PauseHandlerCallbackT func)
         {
             mock->SetPauseHandler(func);

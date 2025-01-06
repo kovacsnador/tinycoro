@@ -30,7 +30,6 @@ namespace tinycoro {
         using TaskT::SetPauseHandler;
         using TaskT::GetPauseHandler;
 
-        using TaskT::IsPaused;
         using TaskT::TaskView;
 
         using TaskT::SetStopSource;

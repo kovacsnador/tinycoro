@@ -27,7 +27,6 @@ namespace tinycoro {
     template <std::move_constructible TaskT>
         requires requires (TaskT t) {
             { t.Resume() } -> std::same_as<void>;
-            { t.IsPaused() } -> std::same_as<bool>;
             { t.ResumeState() } -> std::same_as<ETaskResumeState>;
         }
     class CoroThreadPool
