@@ -21,7 +21,7 @@ First, we create two simple coroutine tasks: Toast and Coffee. These simulate th
 ```cpp
 tinycoro::Task<std::string> Toast()
 {
-    // make the toast ready...
+    // make the toast ready... takes 4 seconds
     std::this_thread::sleep_for(4s);
     
     co_return "toast";
@@ -29,7 +29,7 @@ tinycoro::Task<std::string> Toast()
 
 tinycoro::Task<std::string> Coffee()
 {
-    // make the coffee ready...
+    // make the coffee ready... takes 2 seconds
     std::this_thread::sleep_for(2s);
 
     co_return "coffee";
@@ -48,7 +48,7 @@ tinycoro::Task<std::string> Breakfast(tinycoro::Scheduler& scheduler)
 
 ```
 ### Step 3: Run the Scheduler
-Finally, we create a `tinycoro::Scheduler` to manage the execution of the Breakfast coroutine. The total time taken is measured and displayed.
+Finally, we create a `tinycoro::Scheduler` to manage the execution of the Breakfast coroutine. The total time taken is measured and displayed (4 seconds).
 ```cpp
 
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
