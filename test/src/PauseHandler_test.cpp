@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <gmock/gmock.h>
 
 #include <memory>
 #include <type_traits>
@@ -85,4 +86,95 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
     std::invoke(pauseResumerCallback);
 
     EXPECT_TRUE(called);
+}
+
+TEST(PauseHandlerTest, PauseHandlerTest_pause)
+{
+    bool called = false;
+
+    std::function<void()> func = [&called]{ called = true; };
+
+    tinycoro::PauseHandler pauseHandler{func};
+
+    auto res = pauseHandler.Pause();
+    EXPECT_TRUE((std::same_as<decltype(func), decltype(res)>));
+
+    EXPECT_TRUE(pauseHandler.IsPaused());
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    pauseHandler.Unpause();
+    EXPECT_FALSE(pauseHandler.IsPaused());
+
+    EXPECT_FALSE(called);
+}
+
+TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
+{
+    tinycoro::PauseHandler pauseHandler{[]{}};
+
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(true);
+    EXPECT_TRUE(pauseHandler.IsCancellable());
+}
+
+struct Context_PauseHandlerMock
+{
+    MOCK_METHOD(std::function<void()>, Pause, ());
+    MOCK_METHOD(void, SetCancellable, (bool));
+    MOCK_METHOD(void, Unpause, ());
+};
+
+struct Context_PromiseMock
+{
+    MOCK_METHOD(void, return_value, (int32_t));
+
+    std::shared_ptr<Context_PauseHandlerMock> pauseHandler = std::make_shared<Context_PauseHandlerMock>();
+};
+
+struct Context_CoroutineHandlerMock
+{   
+    auto& promise() { return *p; }
+
+    std::shared_ptr<Context_PromiseMock> p = std::make_shared<Context_PromiseMock>();
+};
+
+TEST(ContextTest, ContextTest_PauseTask)
+{
+    Context_CoroutineHandlerMock hdl;
+
+    EXPECT_CALL(*hdl.p->pauseHandler, Pause).Times(1).WillOnce(testing::Return([]{}));   
+    auto res = tinycoro::context::PauseTask(hdl);
+}
+
+TEST(ContextTest, ContextTest_UnpauseTask)
+{
+    Context_CoroutineHandlerMock hdl;
+
+    EXPECT_CALL(*hdl.p->pauseHandler, Unpause).Times(1);   
+    tinycoro::context::UnpauseTask(hdl);
+}
+
+TEST(ContextTest, ContextTest_MakeCancellable)
+{
+    Context_CoroutineHandlerMock hdl;
+
+    EXPECT_CALL(*hdl.p->pauseHandler, SetCancellable(true)).Times(1);   
+    tinycoro::context::MakeCancellable(hdl);
+}
+
+TEST(ContextTest, ContextTest_MakeCancellable_return_value)
+{
+    Context_CoroutineHandlerMock hdl;
+
+    EXPECT_CALL(*hdl.p, return_value(42)).Times(1);
+    EXPECT_CALL(*hdl.p->pauseHandler, SetCancellable(true)).Times(1);   
+    tinycoro::context::MakeCancellable(hdl, 42);
+}
+
+TEST(ContextTest, ContextTest_GetHandler)
+{
+    Context_CoroutineHandlerMock hdl;
+  
+    EXPECT_EQ(tinycoro::context::GetHandler(hdl), hdl.p->pauseHandler.get());
 }
