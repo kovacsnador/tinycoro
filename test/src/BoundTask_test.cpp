@@ -31,7 +31,6 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
-    MOCK_METHOD(bool, IsPaused, (), (const, noexcept));
     MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
     MOCK_METHOD(TaskViewMock, TaskView, (), (const, noexcept));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
@@ -54,7 +53,6 @@ struct TaskWrapperMock
 
     auto SetPauseHandler(auto pauseResume) { return impl->SetPauseHandler(std::move(pauseResume)); }
 
-    bool IsPaused() const noexcept { return impl->IsPaused(); }
 
     auto GetPauseHandler() noexcept { return impl->GetPauseHandler(); }
 
@@ -120,17 +118,6 @@ TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
     EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
 }
 
-TEST(BoundTaskTest, BoundTaskTest_IsPaused)
-{
-    TaskWrapperMock mock;
-
-    EXPECT_CALL(*mock.impl, IsPaused).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-
-    EXPECT_FALSE(taskWrapper.IsPaused());
-    EXPECT_TRUE(taskWrapper.IsPaused());
-}
 
 TEST(BoundTaskTest, BoundTaskTest_TaskView)
 {

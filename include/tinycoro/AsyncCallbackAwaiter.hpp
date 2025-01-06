@@ -109,7 +109,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            _event.Set(PauseHandler::PauseTask(hdl));
+            _event.Set(context::PauseTask(hdl));
 
             // invoke callback
             _result = _asyncFunction([this]<typename... Ts>(Ts... ts) {
@@ -145,7 +145,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            _event.Set(PauseHandler::PauseTask(hdl));
+            _event.Set(context::PauseTask(hdl));
 
             // invoke callback with wrapped function
             _asyncFunction([this]<typename... Ts>(Ts... ts) {
@@ -222,7 +222,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            _userData.event.Set(PauseHandler::PauseTask(hdl));
+            _userData.event.Set(context::PauseTask(hdl));
 
             // invoke callback
             _result = _asyncFunction(
@@ -269,7 +269,7 @@ namespace tinycoro {
         void await_suspend(auto hdl)
         {
             // put tast on pause
-            _userData.event.Set(PauseHandler::PauseTask(hdl));
+            _userData.event.Set(context::PauseTask(hdl));
 
             // invoke callback
             _asyncFunction(

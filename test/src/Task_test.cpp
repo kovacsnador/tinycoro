@@ -23,7 +23,6 @@ TEST(TaskTest, TaskTest_void)
 
     EXPECT_EQ(task.await_ready(), false);
     EXPECT_TRUE((std::same_as<void, decltype(task.await_resume())>));
-    EXPECT_FALSE(task.IsPaused());
 
     task.Resume();
 
@@ -32,7 +31,6 @@ TEST(TaskTest, TaskTest_void)
 
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
-    EXPECT_FALSE(task.IsPaused());
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 }
@@ -43,7 +41,6 @@ TEST(TaskTest, TaskTest_int)
 
     EXPECT_EQ(task.await_ready(), false);
     EXPECT_TRUE((std::same_as<int32_t&&, decltype(task.await_resume())>));
-    EXPECT_FALSE(task.IsPaused());
 
     task.Resume();
 
@@ -52,7 +49,6 @@ TEST(TaskTest, TaskTest_int)
 
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
-    EXPECT_FALSE(task.IsPaused());
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 }
@@ -83,6 +79,13 @@ struct PromiseMock
     void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
 
     auto get_return_object() { return std::coroutine_handle<PromiseMock>::from_promise(*this); }
+
+    template<typename... Args>
+    auto MakePauseHandler(Args&&... args)
+    {
+        pauseHandler = std::make_shared<PauseHandlerMock>(std::forward<Args>(args)...);
+        return pauseHandler.get();
+    }
 
     std::shared_ptr<PauseHandlerMock> pauseHandler;
     std::stop_source stopSource{};
@@ -126,6 +129,5 @@ TEST(CoroTaskTest, CoroTaskTest)
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
     
-    EXPECT_TRUE(task.IsPaused());
     EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
 }

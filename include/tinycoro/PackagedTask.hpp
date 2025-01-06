@@ -18,7 +18,6 @@ namespace tinycoro {
         concept CoroTask = std::move_constructible<T> && requires (T c) {
             { c.Resume() } -> std::same_as<void>;
             { c.await_resume() };
-            { c.IsPaused() } -> std::same_as<bool>;
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
         };
 
@@ -41,7 +40,6 @@ namespace tinycoro {
 
             virtual void Resume()                  = 0;
             virtual ETaskResumeState ResumeState() = 0;
-            virtual bool             IsPaused() const noexcept = 0;
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -98,8 +96,6 @@ namespace tinycoro {
                 return _coro.ResumeState();
             }
 
-            bool IsPaused() const noexcept override { return _coro.IsPaused(); }
-
         private:
             bool         _needValueSet{true};
             CoroT        _coro;
@@ -124,11 +120,6 @@ namespace tinycoro {
         ETaskResumeState ResumeState()
         {
             return _pimpl->ResumeState();
-        }
-
-        bool IsPaused() const noexcept
-        {
-            return _pimpl->IsPaused();
         }
 
         const cid_t id;

@@ -333,12 +333,12 @@ namespace tinycoro {
             BufferedChannelAwaiter* next{nullptr};
 
         private:
-            void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
                 _event.Set(nullptr);
-                PauseHandler::UnpauseTask(parentCoro);
+                context::UnpauseTask(parentCoro);
             }
 
             // Flag to check if this is the last element in the channel. (The channel is already in closed state)
@@ -393,12 +393,12 @@ namespace tinycoro {
             ListenerAwaiter* next{nullptr};
 
         private:
-            void PutOnPause(auto parentCoro) { _event.Set(PauseHandler::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
                 _event.Set(nullptr);
-                PauseHandler::UnpauseTask(parentCoro);
+                context::UnpauseTask(parentCoro);
             }
 
             ChannelT&    _channel;

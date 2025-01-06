@@ -16,22 +16,22 @@
 
 namespace tinycoro {
 
-    struct DestroyNofifier
+    struct DestroyNotifier
     {
-        DestroyNofifier() = default;
+        DestroyNotifier() = default;
 
         template <std::regular_invocable T>
-        DestroyNofifier(T&& callback)
+        DestroyNotifier(T&& callback)
         : _notifier{std::forward<T>(callback)}
         {
         }
 
-        DestroyNofifier(DestroyNofifier&& other) noexcept
+        DestroyNotifier(DestroyNotifier&& other) noexcept
         : _notifier{std::exchange(other._notifier, nullptr)}
         {
         }
 
-        DestroyNofifier& operator=(DestroyNofifier&& other) noexcept
+        DestroyNotifier& operator=(DestroyNotifier&& other) noexcept
         {
             if (std::addressof(other) != this)
             {
@@ -62,7 +62,7 @@ namespace tinycoro {
               typename AwaiterT,
               typename CoroResumerT     = TaskResumer,
               typename StopSourceT      = std::stop_source,
-              typename DestroyNotifierT = DestroyNofifier>
+              typename DestroyNotifierT = DestroyNotifier>
     struct CoroTaskView : private AwaiterT
     {
         using promise_type  = PromiseT;
@@ -108,18 +108,7 @@ namespace tinycoro {
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
 
-            using elementType           = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
-            _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
-            return _hdl.promise().pauseHandler;
-        }
-
-        [[nodiscard]] bool IsPaused() const noexcept
-        {
-            if (_hdl.promise().pauseHandler)
-            {
-                return _hdl.promise().pauseHandler->IsPaused();
-            }
-            return false;
+            return _hdl.promise().MakePauseHandler(pauseResume);
         }
 
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
@@ -157,7 +146,7 @@ namespace tinycoro {
               class AwaiterT,
               typename CoroResumerT     = TaskResumer,
               typename StopSourceT      = std::stop_source,
-              typename DestroyNotifierT = DestroyNofifier>
+              typename DestroyNotifierT = DestroyNotifier>
     struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
     {
         using SelfType = CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
@@ -210,18 +199,7 @@ namespace tinycoro {
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
-            using elementType           = typename std::pointer_traits<decltype(_hdl.promise().pauseHandler)>::element_type;
-            _hdl.promise().pauseHandler = std::make_shared<elementType>(pauseResume);
-            return _hdl.promise().pauseHandler;
-        }
-
-        [[nodiscard]] bool IsPaused() const noexcept
-        {
-            if (_hdl.promise().pauseHandler)
-            {
-                return _hdl.promise().pauseHandler->IsPaused();
-            }
-            return false;
+            return _hdl.promise().MakePauseHandler(pauseResume);
         }
 
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
