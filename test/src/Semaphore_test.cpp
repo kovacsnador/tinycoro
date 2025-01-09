@@ -96,7 +96,7 @@ struct EventMock
 
 struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
-    using semaphore_type  = tinycoro::detail::Semaphore<PopAwaiterMock, tinycoro::detail::LinkedPtrStack>;
+    using semaphore_type  = tinycoro::detail::Semaphore<PopAwaiterMock, tinycoro::detail::LinkedPtrQueue>;
     using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
 
     void SetUp() override

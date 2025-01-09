@@ -6,7 +6,7 @@
 #include <stdexcept>
 
 #include "PauseHandler.hpp"
-#include "LinkedPtrStack.hpp"
+#include "LinkedPtrQueue.hpp"
 #include "ReleaseGuard.hpp"
 
 namespace tinycoro {
@@ -121,7 +121,7 @@ namespace tinycoro {
 
     } // namespace detail
 
-    using Semaphore = detail::Semaphore<detail::SemaphoreAwaiter, detail::LinkedPtrStack>;
+    using Semaphore = detail::Semaphore<detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
 
 } // namespace tinycoro
 

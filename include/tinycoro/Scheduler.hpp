@@ -13,7 +13,7 @@
 #include <ranges>
 #include <algorithm>
 #include <variant>
-#include <map>
+#include <unordered_map>
 
 #include "Future.hpp"
 #include "Common.hpp"
@@ -270,7 +270,7 @@ namespace tinycoro {
         }
 
         std::deque<TaskT>             _tasks;
-        std::map<cid_t, TaskVariantT> _pausedTasks;
+        std::unordered_map<cid_t, TaskVariantT> _pausedTasks;
         std::atomic<size_t>           _tasksCount{0};
 
         std::vector<std::jthread> _workerThreads;

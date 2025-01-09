@@ -4,7 +4,7 @@
 #include <mutex>
 
 #include "PauseHandler.hpp"
-#include "LinkedPtrStack.hpp"
+#include "LinkedPtrQueue.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -82,7 +82,7 @@ namespace tinycoro {
             // false -> NOT SET
             bool _state;
 
-            LinkedPtrStack<awaiter_type> _waiters;
+            LinkedPtrQueue<awaiter_type> _waiters;
             mutable std::mutex           _mtx;
         };
 

@@ -3,6 +3,7 @@
 
 #include <cassert>
 #include <mutex>
+#include <unordered_map>
 
 #include "ChannelOpStatus.hpp"
 #include "PauseHandler.hpp"
@@ -15,14 +16,18 @@ namespace tinycoro {
                   template <typename, typename, typename>
                   class PopAwaiterT,
                   template <typename, typename, typename>
-                  class PushAwaiterT>
+                  class PushAwaiterT,
+                  template <typename, typename>
+                  class ListenerAwaiterT>
         class UnbufferedChannel
         {
             friend class PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
             friend class PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            friend class ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
 
-            using pop_awaiter_type  = PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            using push_awaiter_type = PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using pop_awaiter_type      = PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
 
         public:
             // default constructor
@@ -45,6 +50,31 @@ namespace tinycoro {
                 return push_awaiter_type{this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...};
             }
 
+            [[nodiscard]] auto WaitForListeners(size_t listenerCount)
+            {
+                return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
+            }
+
+            /*
+             * Push element to the channel from a non corouitne environment.
+             * This operaton blocks the current thread until it get's notified.
+             */
+            template <typename... Args>
+            auto Push(Args&&... args)
+            {
+                return _Push(false, std::forward<Args>(args)...);
+            }
+
+            /*
+             * Pushing the last element to the channel from a non corouitne environment.
+             * This operaton blocks the current thread until it get's notified.
+             */
+            template <typename... Args>
+            auto PushAndClose(Args&&... args)
+            {
+                return _Push(true, std::forward<Args>(args)...);
+            }
+
             void Close()
             {
                 std::unique_lock lock{_mtx};
@@ -52,6 +82,11 @@ namespace tinycoro {
 
                 auto waiters      = _waiters.steal();
                 auto pushAwaiters = _pushAwaiters.steal();
+
+                // swap/resets the _listenerWaiters before unlock
+                decltype(_listenerWaiters) listeners{};
+                _listenerWaiters.swap(listeners);
+
                 lock.unlock();
 
                 // notify all waiters
@@ -59,6 +94,12 @@ namespace tinycoro {
 
                 // notify all push awaiters
                 _NotifyAll(pushAwaiters);
+
+                // notify all listener awaiters
+                for (auto& [_, list] : listeners)
+                {
+                    _NotifyAll(list.top());
+                }
             }
 
             [[nodiscard]] bool IsOpen() const noexcept
@@ -68,6 +109,63 @@ namespace tinycoro {
             }
 
         private:
+            // Pushing element to the channel from a non corouitne environment.
+            // This operaton blocks the current thread until it get's notified.
+            template <typename... Args>
+            auto _Push(bool lastElement, Args&&... args)
+            {
+                std::atomic<bool> flag{false};
+
+                // prepare a special event for notification
+                detail::PauseCallbackEvent event;
+
+                event.Set([&flag] {
+                    flag.store(true);
+                    flag.notify_all();
+                });
+
+                // create a custom push awaiter.
+                // We don't need the scheduler as pointer, because non of the
+                // special awaiter functions will be called except await_resume
+                // to get the awaiter state.
+                push_awaiter_type pushAwaiter{nullptr, event, lastElement, std::forward<Args>(args)...};
+
+                // Try to push the awaiter (with value inside) into the queue.
+                if (_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
+                {
+                    // wait for the flag to get notified
+                    flag.wait(false);
+                }
+
+                // get's the awaiter state
+                return pushAwaiter.await_resume();
+            }
+
+            [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return waiter->ListenerCount() <= _waiters.size();
+            }
+
+            [[nodiscard]] bool Add(listener_awaiter_type* waiter)
+            {
+                const auto wantedListerenCount = waiter->ListenerCount();
+
+                std::unique_lock lock{_mtx};
+
+                if (wantedListerenCount <= _waiters.size())
+                {
+                    // no suspend
+                    return false;
+                }
+
+                // insert new listener waiter into the list
+                _listenerWaiters[wantedListerenCount].push(waiter);
+
+                // suspend coroutine
+                return true;
+            }
+
             bool IsReady(pop_awaiter_type* awaiter) { return _IsReady(awaiter, _pushAwaiters); }
 
             bool Add(pop_awaiter_type* awaiter) { return _Add(awaiter, _pushAwaiters, _waiters); }
@@ -89,6 +187,19 @@ namespace tinycoro {
 
                 if (auto waiter = waiters.pop())
                 {
+                    listener_awaiter_type* topListener{nullptr};
+
+                    if constexpr (std::same_as<T, push_awaiter_type>)
+                    {
+                        auto iter = _listenerWaiters.find(_waiters.size());
+                        if (iter != _listenerWaiters.end())
+                        {
+                            topListener = iter->second.steal();
+                            // remove the entry
+                            _listenerWaiters.erase(iter);
+                        }
+                    }
+
                     lock.unlock();
 
                     if (_ExchangeValue(waiter, awaiter))
@@ -99,6 +210,9 @@ namespace tinycoro {
 
                     // wake up the waiter
                     waiter->Notify();
+
+                    // wake up the listeners
+                    _NotifyAll(topListener);
 
                     // no suspend
                     return true;
@@ -137,6 +251,23 @@ namespace tinycoro {
                 }
 
                 container.push(awaiter);
+
+                if constexpr (std::same_as<T, pop_awaiter_type>)
+                {
+                    auto iter = _listenerWaiters.find(_waiters.size());
+                    if (iter != _listenerWaiters.end())
+                    {
+                        auto top = iter->second.steal();
+                        // remove the entry
+                        _listenerWaiters.erase(iter);
+
+                        lock.unlock();
+
+                        // notify all if somebody waits for listerens
+                        _NotifyAll(top);
+                    }
+                }
+
                 // suspend needed
                 return true;
             }
@@ -179,6 +310,9 @@ namespace tinycoro {
 
             // using Queue to maintain order of values.
             LinkedPtrQueue<push_awaiter_type> _pushAwaiters;
+
+            // The listerens awaiters
+            std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
 
             bool _closed{false};
         };
@@ -373,10 +507,67 @@ namespace tinycoro {
             bool _used{false};
         };
 
+        template <typename ChannelT, typename EventT>
+        class UnbufferedChannelListenerAwaiter
+        {
+        public:
+            UnbufferedChannelListenerAwaiter(ChannelT& channel, EventT event, size_t count)
+            : _channel{channel}
+            , _event{std::move(event)}
+            , _listenersCount{count}
+            {
+            }
+
+            // disable move and copy
+            UnbufferedChannelListenerAwaiter(UnbufferedChannelListenerAwaiter&&) = delete;
+
+            [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
+
+            constexpr bool await_suspend(auto parentCoro)
+            {
+                PutOnPause(parentCoro);
+                if (_channel.Add(this) == false)
+                {
+                    // resume immediately
+                    ResumeFromPause(parentCoro);
+                    return false;
+                }
+                return true;
+            }
+
+            constexpr void await_resume() const noexcept { }
+
+            [[nodiscard]] auto ListenerCount() const noexcept { return _listenersCount; }
+
+            void Notify()
+            {
+                // Notify scheduler to put coroutine back on CPU
+                _event.Notify();
+            }
+
+            UnbufferedChannelListenerAwaiter* next{nullptr};
+
+        private:
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+
+            void ResumeFromPause(auto parentCoro)
+            {
+                _event.Set(nullptr);
+                context::UnpauseTask(parentCoro);
+            }
+
+            ChannelT&    _channel;
+            EventT       _event;
+            const size_t _listenersCount;
+        };
+
     } // namespace detail
 
     template <typename ValueT>
-    using UnbufferedChannel = detail::UnbufferedChannel<ValueT, detail::UnbufferedChannelPopAwaiter, detail::UnbufferedChannelPushAwaiter>;
+    using UnbufferedChannel = detail::UnbufferedChannel<ValueT,
+                                                        detail::UnbufferedChannelPopAwaiter,
+                                                        detail::UnbufferedChannelPushAwaiter,
+                                                        detail::UnbufferedChannelListenerAwaiter>;
 
 } // namespace tinycoro
 

@@ -35,9 +35,21 @@ public:
     PushAwaiterMock* next{nullptr};
 };
 
+
+template <typename, typename>
+class ListenerAwaiterMock
+{
+public:
+    ListenerAwaiterMock(auto&, auto...) { }
+
+    void Notify() const noexcept {};
+
+    ListenerAwaiterMock* next{nullptr};
+};
+
 TEST(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_return)
 {
-    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock> channel;
+    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock, ListenerAwaiterMock> channel;
 
     int32_t val;
     auto    awaiter = channel.PopWait(val);
@@ -48,7 +60,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_return)
 
 TEST(UnbufferedChannelTest, UnbufferedChannel_PushWait_return)
 {
-    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock> channel;
+    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock, ListenerAwaiterMock> channel;
 
     auto awaiter = channel.PushWait(1);
 
@@ -58,11 +70,21 @@ TEST(UnbufferedChannelTest, UnbufferedChannel_PushWait_return)
 
 TEST(UnbufferedChannelTest, UnbufferedChannel_PushWaitAndClose_return)
 {
-    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock> channel;
+    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock, ListenerAwaiterMock> channel;
 
     auto awaiter = channel.PushAndCloseWait(1);
 
     using expectedAwaiterType = PushAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannel_WaitForListeners_return)
+{
+    tinycoro::detail::UnbufferedChannel<int32_t, PopAwaiterMock, PushAwaiterMock, ListenerAwaiterMock> channel;
+
+    auto awaiter = channel.WaitForListeners(1);
+
+    using expectedAwaiterType = ListenerAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -209,6 +231,77 @@ TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple)
     };
 
     tinycoro::GetAll(scheduler, consumer(), producer());
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple_push)
+{
+    tinycoro::Scheduler                 scheduler;
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t val;
+        auto   status = co_await channel.PopWait(val);
+
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::SUCCESS);
+        EXPECT_EQ(val, 42);
+    };
+
+    // starting a consumer in an async environment
+    auto future = scheduler.Enqueue(consumer());
+
+    auto result = channel.Push(42u);
+    EXPECT_EQ(result, tinycoro::EChannelOpStatus::SUCCESS);
+
+    // wait for the future
+    future.get();
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple_pop_before_push)
+{
+    tinycoro::Scheduler                 scheduler;
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t val;
+        auto   status = co_await channel.PopWait(val);
+
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::SUCCESS);
+        EXPECT_EQ(val, 42);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        // wait for the consumer
+        co_await channel.WaitForListeners(1);
+
+        // Push (the non coroutine version)
+        auto result = channel.Push(42u);
+        EXPECT_EQ(result, tinycoro::EChannelOpStatus::SUCCESS);
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), producer());
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple_push_and_close)
+{
+    tinycoro::Scheduler                 scheduler;
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t val;
+        auto   status = co_await channel.PopWait(val);
+
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::LAST);
+        EXPECT_EQ(val, 42);
+    };
+
+    // starting a consumer in an async environment
+    auto future = scheduler.Enqueue(consumer());
+
+    auto result = channel.PushAndClose(42u);
+    EXPECT_EQ(result, tinycoro::EChannelOpStatus::LAST);
+
+    // wait for the future
+    future.get();
 }
 
 TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_lastElement)
@@ -469,4 +562,99 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
         ASSERT_TRUE((found == false && f == false) || found);
         found = f;
     }
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_push)
+{
+    const auto param = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]()->tinycoro::Task<void>
+    {
+        size_t controlCount{0};
+        size_t val;
+        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        {
+            EXPECT_EQ(controlCount++, val);
+        }
+
+        EXPECT_EQ(controlCount, param);
+    };
+
+    auto producer = [&]() ->tinycoro::Task<void> {
+        for(size_t i = 0; i < param; ++i)
+        {
+            // just a normal blocking push
+            channel.Push(i);
+        }
+        channel.Close();
+
+        co_return;
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), producer());
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_pushAndClose)
+{
+    const auto param = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]()->tinycoro::Task<void>
+    {
+        size_t controlCount{0};
+        size_t val;
+        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        {
+            EXPECT_EQ(controlCount++, val);
+        }
+
+        EXPECT_EQ(controlCount, param);
+    };
+
+    auto producer = [&]() ->tinycoro::Task<void> {
+        for(size_t i = 0; i < param - 1; ++i)
+        {
+            // just a normal blocking push
+            channel.Push(i);
+        }
+        // normal blocking push and close
+        channel.PushAndClose(param - 1);
+
+        co_return;
+    };
+
+    tinycoro::GetAll(scheduler, consumer(), producer());
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
+{
+    const auto count = GetParam();
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto listeners = [&]() -> tinycoro::Task<void> {
+        size_t value{};
+        auto status = co_await channel.PopWait(value);
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        co_await channel.WaitForListeners(count);
+        channel.Close();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    tasks.push_back(producer());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(listeners());
+    }
+
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
