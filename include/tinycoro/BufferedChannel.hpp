@@ -5,25 +5,30 @@
 #include <queue>
 #include <cassert>
 #include <bitset>
-#include <map>
+#include <unordered_map>
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "ChannelOpStatus.hpp"
+#include "LinkedPtrQueue.hpp"
+#include "LinkedPtrStack.hpp"
 
 namespace tinycoro {
 
     namespace detail {
 
         template <typename ValueT,
-                  template <typename, typename, typename> class AwaiterT,
-                  template <typename, typename> class ListenerAwaiterT,
-                  template <typename> class ContainerT>
+                  template <typename, typename, typename>
+                  class AwaiterT,
+                  template <typename, typename>
+                  class ListenerAwaiterT,
+                  template <typename>
+                  class ContainerT>
         class BufferedChannel
         {
             struct Element
             {
-                bool lastElement{false};
+                bool   lastElement{false};
                 ValueT value;
             };
 
@@ -170,6 +175,9 @@ namespace tinycoro {
                     if (iter != _listenerWaiters.end())
                     {
                         auto top = iter->second.steal();
+                        // remove the entry
+                        _listenerWaiters.erase(iter);
+
                         lock.unlock();
 
                         // notify all if somebody waits for listerens
@@ -249,8 +257,8 @@ namespace tinycoro {
                 }
             }
 
-            LinkedPtrStack<awaiter_type>                            _waiters;
-            std::map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
+            LinkedPtrQueue<awaiter_type>                                      _waiters;
+            std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
 
             ContainerT<Element> _valueCollection;
             bool                _closed{false};
