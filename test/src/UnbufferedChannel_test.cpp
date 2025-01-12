@@ -35,7 +35,6 @@ public:
     PushAwaiterMock* next{nullptr};
 };
 
-
 template <typename, typename>
 class ListenerAwaiterMock
 {
@@ -658,3 +657,32 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
 
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
+{
+    const auto count = GetParam();
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        co_await channel.WaitForListeners(count);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        // close the channel and wake up all awaiters
+        channel.Close();
+        co_return;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(consumer());
+    }
+    tasks.push_back(producer());
+
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+}
+
+// TODO listener awaiter for closing need to be tested....

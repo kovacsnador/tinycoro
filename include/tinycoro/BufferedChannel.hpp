@@ -6,6 +6,7 @@
 #include <cassert>
 #include <bitset>
 #include <unordered_map>
+#include <limits>
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
@@ -19,9 +20,11 @@ namespace tinycoro {
 
         template <typename ValueT,
                   template <typename, typename, typename>
-                  class AwaiterT,
+                  class PopAwaiterT,
                   template <typename, typename>
                   class ListenerAwaiterT,
+                  template <typename, typename, typename>
+                  class PushAwaiterT,
                   template <typename>
                   class ContainerT>
         class BufferedChannel
@@ -33,41 +36,70 @@ namespace tinycoro {
             };
 
         public:
-            friend class AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            friend class PopAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
             friend class ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
+            friend class PushAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
-            using awaiter_type          = AwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
+            using pop_awaiter_type          = PopAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
             using listener_awaiter_type = ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
+            using push_awaiter_type     = PushAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
             // default constructor
-            BufferedChannel() {};
+            BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max())
+            : _maxQueueSize{maxQueueSize}
+            {
+                if(_maxQueueSize == 0)
+                {
+                    throw BufferedChannelException{"BufferedChannel: queue size need to be >0."};
+                }
+            }
 
             // disable copy and move
             BufferedChannel(BufferedChannel&&) = delete;
 
             ~BufferedChannel() { Close(); }
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
             {
                 return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
             }
 
-            void Push(ValueT t) { _Emplace(false, std::move(t)); }
+            template<typename... Args>
+            [[nodiscard]] auto PushWait(Args&&... args) { return push_awaiter_type{this, detail::PauseCallbackEvent{}, false, std::forward<Args>(args)...}; }
+            
+            template<typename... Args>
+            [[nodiscard]] auto PushAndCloseWait(Args&&... args) { return push_awaiter_type{this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...}; }
 
-            void PushAndClose(ValueT t) { _Emplace(true, std::move(t)); }
-
+            // This is a waiting push. If the queue is full this will block the current thread
+            // until the value can be pushed into the channel.
             template <typename... Args>
-            void Emplace(Args&&... args)
+            void Push(Args&&... args)
             {
-                _Emplace(false, std::forward<Args>(args)...);
+                _Emplace(true, false, std::forward<Args>(args)...);
             }
 
+            // This is a waiting push. If the queue is full this will block the current thread
+            // until the value can be pushed into the channel.
             template <typename... Args>
-            void EmplaceAndClose(Args&&... args)
+            void PushAndClose(Args&&... args)
             {
-                _Emplace(true, std::forward<Args>(args)...);
+                _Emplace(true, true, std::forward<Args>(args)...);
+            }
+
+            // Returns false if the queue is full.
+            template <typename... Args>
+            bool TryPush(Args&&... args)
+            {
+                return _Emplace(false, false, std::forward<Args>(args)...);
+            }
+
+            // Returns false if the queue is full.
+            template <typename... Args>
+            bool TryPushAndClose(Args&&... args)
+            {
+                return _Emplace(false, true, std::forward<Args>(args)...);
             }
 
             [[nodiscard]] bool Empty() const noexcept
@@ -76,16 +108,34 @@ namespace tinycoro {
                 return _valueCollection.empty();
             }
 
+            [[nodiscard]] auto Size() const noexcept
+            {
+                return _valueCollection.size();
+            }
+
             void Close()
             {
                 std::unique_lock lock{_mtx};
                 _closed = true;
 
-                auto top = _waiters.steal();
+                auto popAwaiterTop = _popAwaiters.steal();
+                auto pushAwaiterTop = _pushAwaiters.steal();
+
+                // swap/resets the _listenerWaiters before unlock
+                decltype(_listenerWaiters) listeners{};
+                _listenerWaiters.swap(listeners);
+
                 lock.unlock();
 
                 // notify all waiters
-                _NotifyAll(top);
+                _NotifyAll(popAwaiterTop);
+                _NotifyAll(pushAwaiterTop);
+
+                // notify all listener awaiters
+                for (auto& [_, list] : listeners)
+                {
+                    _NotifyAll(list.top());
+                }
             }
 
             [[nodiscard]] bool IsOpen() const noexcept
@@ -96,62 +146,99 @@ namespace tinycoro {
 
         private:
             template <typename... Args>
-            void _Emplace(bool close, Args&&... args)
+            bool _Emplace(bool forceWaiting, bool close, Args&&... args)
             {
                 std::unique_lock lock{_mtx};
 
-                if (_closed)
+                if(_closed)
                 {
-                    throw BufferedChannelException{"BufferedChannel: channel is already closed."};
+                    if(forceWaiting)
+                    {
+                        throw BufferedChannelException{"BufferedChannel: channel is already closed."};
+                    }
+                    // channel is closed and we don't need to have force waiting
+                    return false;
                 }
 
                 // Is there any awaiter
-                if (auto* top = _waiters.pop())
+                if (auto* top = _popAwaiters.pop())
                 {
-                    awaiter_type* others{nullptr};
-
-                    if (close)
+                    if(close)
                     {
-                        others = _waiters.steal();
+                        _closed = true;
                     }
-
-                    _closed = close;
 
                     lock.unlock();
 
                     top->SetValue(ValueT{std::forward<Args>(args)...}, close);
                     top->Notify();
 
-                    if (_closed)
+                    if (close)
                     {
-                        // notify all waiters
-                        _NotifyAll(others);
+                        Close();
                     }
 
-                    return;
+                    // the value is passed to the next pop_awaiter
+                    return true;
+                }
+                
+                // check if the queue has enough place
+                if(_valueCollection.size() < _maxQueueSize)
+                {
+                    // No awaiters
+                    _valueCollection.emplace_front(close, std::forward<Args>(args)...);
+
+                    // Still need an open channel, because pop awaiters can arrive.
+                    // the value is placed in the queue
+                    return true;
+                }
+                else if(forceWaiting)
+                {
+                    // flag for event complition
+                    std::atomic<bool> flag{false};
+
+                    // create custom event for the push_awaiter
+                    PauseCallbackEvent event;
+                    event.Set([&flag] { 
+                        flag.store(true, std::memory_order::relaxed);
+                        flag.notify_one();
+                    });
+
+                    // create custom push_awaiter for inline waiting 
+                    push_awaiter_type pushAwaiter{this, std::move(event), close, std::forward<Args>(args)...};
+
+                    // try to register push_awaiter in the queue
+                    if(Add(std::addressof(pushAwaiter)))
+                    {
+                        // wait for the event to be notified
+                        flag.wait(false);
+                    }
+
+                    // Still need an open channel, because pop awaiters can arrive.
+                    return true;
                 }
 
-                // No awaiters
-                _valueCollection.emplace(Element{close, std::forward<Args>(args)...});
+                return false;
             }
 
-            [[nodiscard]] bool IsReady(awaiter_type* waiter) noexcept
+            [[nodiscard]] bool IsReady(pop_awaiter_type* waiter) noexcept
             {
                 std::unique_lock lock{_mtx};
+                
                 auto [ready, lastElement] = _SetValue(waiter);
+
+                // we don't need too hold the lock any more
+                lock.unlock();
 
                 if (lastElement)
                 {
-                    auto waiters = _waiters.steal();
-                    lock.unlock();
-
-                    _NotifyAll(waiters);
+                    Close();
                 }
 
                 return ready;
             }
 
-            [[nodiscard]] bool Add(awaiter_type* waiter)
+            [[nodiscard]] bool Add(pop_awaiter_type* waiter)
             {
                 std::unique_lock lock{_mtx};
 
@@ -160,18 +247,18 @@ namespace tinycoro {
 
                 if (lastElement)
                 {
-                    auto waiters = _waiters.steal();
                     lock.unlock();
 
-                    _NotifyAll(waiters);
+                    Close();
+
                     return suspend;
                 }
 
                 if (suspend)
                 {
-                    _waiters.push(waiter);
+                    _popAwaiters.push(waiter);
 
-                    auto iter = _listenerWaiters.find(_waiters.size());
+                    auto iter = _listenerWaiters.find(_popAwaiters.size());
                     if (iter != _listenerWaiters.end())
                     {
                         auto top = iter->second.steal();
@@ -192,30 +279,110 @@ namespace tinycoro {
             [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
-                return waiter->ListenerCount() <= _waiters.size();
+
+                if(_closed)
+                {
+                    // no suspend, the channel is closed
+                    return true;
+                }
+
+                return waiter->ListenerCount() <= _popAwaiters.size();
             }
 
             [[nodiscard]] bool Add(listener_awaiter_type* waiter)
             {
-                const auto wantedListerenCount = waiter->ListenerCount();
+                const auto desiredListerenCount = waiter->ListenerCount();
 
                 std::unique_lock lock{_mtx};
 
-                if (wantedListerenCount <= _waiters.size())
+                if (desiredListerenCount <= _popAwaiters.size() || _closed)
                 {
-                    // no suspend
+                    // no suspend if there is enough listeners or the channel is closed
                     return false;
                 }
 
                 // insert new listener waiter into the list
-                _listenerWaiters[wantedListerenCount].push(waiter);
+                _listenerWaiters[desiredListerenCount].push(waiter);
 
                 // suspend coroutine
                 return true;
             }
 
+            template<typename LockT, typename T>
+            bool _EmplaceValue(LockT& lock, T&& value, bool close)
+            {
+                assert(lock.owns_lock());
+
+                if (_closed)
+                {
+                    throw BufferedChannelException{"BufferedChannel: channel is already closed."};
+                }
+
+                // Is there any awaiter
+                if (auto* top = _popAwaiters.pop())
+                {
+                    if(close)
+                    {
+                        _closed = true;
+                    }
+
+                    lock.unlock();
+
+                    top->SetValue(ValueT{std::forward<T>(value)}, close);
+                    top->Notify();
+
+                    if (close)
+                    {
+                        Close();
+                    }
+
+                    // value is passed forward, the lock is not hold
+                    return true;
+                }
+                
+                // check if there place int the queue
+                if(_valueCollection.size() < _maxQueueSize)
+                {
+                    // emplace the value in the queue
+                    _valueCollection.emplace_front(close, std::forward<T>(value));
+
+                    lock.unlock();
+
+                    // value is passed forward, the lock is not hold
+                    return true;
+                }   
+
+                // the lock is hold
+                return false;
+            }
+
+            [[nodiscard]] bool IsReady(push_awaiter_type* waiter)
+            {
+                std::unique_lock lock{_mtx};
+
+                auto [valueRef, lastElement] = waiter->Value();
+                return _EmplaceValue(lock, std::move(valueRef), lastElement);
+            }
+
+            [[nodiscard]] bool Add(push_awaiter_type* waiter)
+            {
+                std::unique_lock lock{_mtx};
+
+                auto [valueRef, lastElement] = waiter->Value();
+                if(_EmplaceValue(lock, std::move(valueRef), lastElement))
+                {
+                    // no suspend, the value is in queue
+                    return false;
+                }
+
+                _pushAwaiters.push(waiter);
+
+                // suspend, the push awaiter pushed into the queue
+                return true;
+            }
+
             // auto [ready, lastElement] = std::tuple<bool, bool>
-            std::tuple<bool, bool> _SetValue(awaiter_type* waiter)
+            std::tuple<bool, bool> _SetValue(pop_awaiter_type* waiter)
             {
                 if (_closed)
                 {
@@ -225,7 +392,7 @@ namespace tinycoro {
 
                 if (_valueCollection.empty() == false)
                 {
-                    auto& [lastElement, value] = _valueCollection.front();
+                    auto& [lastElement, value] = _valueCollection.back();
 
                     if (lastElement)
                     {
@@ -236,7 +403,19 @@ namespace tinycoro {
                     auto last = lastElement;
 
                     waiter->SetValue(std::move(value), lastElement);
-                    _valueCollection.pop();
+                    _valueCollection.pop_back();
+
+                    // Get the next awaiter if there is one
+                    if(auto pushAwaiter = _pushAwaiters.pop())
+                    {
+                        auto [value, close] = pushAwaiter->Value();
+
+                        // emplace the value in the queue
+                        _valueCollection.emplace_front(close, std::move(value));
+                        
+                        // notify the push awaiter for wakeup
+                        pushAwaiter->Notify();
+                    }
 
                     // we have a value from the channel, no suspend
                     return {true, last};
@@ -257,19 +436,22 @@ namespace tinycoro {
                 }
             }
 
-            LinkedPtrQueue<awaiter_type>                                      _waiters;
+            LinkedPtrQueue<pop_awaiter_type>  _popAwaiters;
+            LinkedPtrQueue<push_awaiter_type> _pushAwaiters;
+
             std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
 
             ContainerT<Element> _valueCollection;
-            bool                _closed{false};
+            const size_t        _maxQueueSize;
+            bool                _closed{false};         
             mutable std::mutex  _mtx;
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        class BufferedChannelAwaiter
+        class BufferedChannelPopAwaiter
         {
         public:
-            BufferedChannelAwaiter(ChannelT* channel, EventT event, ValueT& v)
+            BufferedChannelPopAwaiter(ChannelT* channel, EventT event, ValueT& v)
             : _channel{channel}
             , _value{v}
             , _event{std::move(event)}
@@ -277,7 +459,7 @@ namespace tinycoro {
             }
 
             // disable move and copy
-            BufferedChannelAwaiter(BufferedChannelAwaiter&&) = delete;
+            BufferedChannelPopAwaiter(BufferedChannelPopAwaiter&&) = delete;
 
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
@@ -338,7 +520,7 @@ namespace tinycoro {
                 _set         = true;
             }
 
-            BufferedChannelAwaiter* next{nullptr};
+            BufferedChannelPopAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
@@ -414,13 +596,104 @@ namespace tinycoro {
             const size_t _listenersCount;
         };
 
+        template <typename ChannelT, typename EventT, typename ValueT>
+        class BufferedChannelPushAwaiter
+        {
+        public:
+            template <typename... Args>
+            BufferedChannelPushAwaiter(ChannelT* channel, EventT event, bool lastValue, Args&&... args)
+            : _channel{channel}
+            , _event{std::move(event)}
+            , _value{std::forward<Args>(args)...}
+            , _lastElement{lastValue}
+            {
+            }
+
+            // disable move and copy
+            BufferedChannelPushAwaiter(BufferedChannelPushAwaiter&&) = delete;
+
+            [[nodiscard]] constexpr bool await_ready() noexcept
+            {
+                if (_channel)
+                {
+                    return _channel->IsReady(this);
+                }
+                return true;
+            }
+
+            constexpr bool await_suspend(auto parentCoro)
+            {
+                if (_channel)
+                {
+                    PutOnPause(parentCoro);
+                    if (_channel->Add(this) == false)
+                    {
+                        // resume immediately
+                        ResumeFromPause(parentCoro);
+                        return false;
+                    }
+                    return true;
+                }
+                return false;
+            }
+
+            [[nodiscard]] constexpr auto await_resume() const noexcept
+            {
+                if (_used)
+                {
+                    if (_lastElement)
+                    {
+                        return EChannelOpStatus::LAST;
+                    }
+                    return EChannelOpStatus::SUCCESS;
+                }
+                return EChannelOpStatus::CLOSED;
+            }
+
+            [[nodiscard]] auto Value() noexcept -> std::tuple<ValueT&, bool>
+            {
+                _used = true;
+                return {_value, _lastElement};
+            }
+
+            void Notify()
+            {
+                // detach from the channel
+                _channel = nullptr;
+
+                // Notify scheduler to put coroutine back on CPU
+                _event.Notify();
+            }
+
+            BufferedChannelPushAwaiter* next{nullptr};
+
+        private:
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+
+            void ResumeFromPause(auto parentCoro)
+            {
+                _event.Set(nullptr);
+                context::UnpauseTask(parentCoro);
+            }
+
+            ChannelT* _channel;
+            EventT    _event;
+            ValueT    _value;
+
+            // Flag to check if this is the last element in the channel. (The channel is already in closed state)
+            bool _lastElement{false};
+
+            // Flag which is true if the value is in use
+            bool _used{false};
+        };
+
         template <typename ValueT>
-        using Queue = std::queue<ValueT>;
+        using Queue = std::deque<ValueT>;
 
     } // namespace detail
 
     template <typename ValueT>
-    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelAwaiter, detail::ListenerAwaiter, detail::Queue>;
+    using BufferedChannel = detail::BufferedChannel<ValueT, detail::BufferedChannelPopAwaiter, detail::ListenerAwaiter, detail::BufferedChannelPushAwaiter, detail::Queue>;
 
 } // namespace tinycoro
 

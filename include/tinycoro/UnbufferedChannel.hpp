@@ -144,6 +144,13 @@ namespace tinycoro {
             [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
+
+                if(_closed)
+                {
+                    // no suspend, the channel is closed
+                    return true;
+                }
+
                 return waiter->ListenerCount() <= _waiters.size();
             }
 
@@ -153,9 +160,9 @@ namespace tinycoro {
 
                 std::unique_lock lock{_mtx};
 
-                if (wantedListerenCount <= _waiters.size())
+                if (wantedListerenCount <= _waiters.size() || _closed)
                 {
-                    // no suspend
+                    // no suspend, we have enough listeners or the channel is already closed.
                     return false;
                 }
 
@@ -503,7 +510,7 @@ namespace tinycoro {
             // Flag to check if this is the last element in the channel. (The channel is already in closed state)
             bool _lastElement{false};
 
-            // Flag which is true if the value is set
+            // Flag which is true if the value is in use already
             bool _used{false};
         };
 
