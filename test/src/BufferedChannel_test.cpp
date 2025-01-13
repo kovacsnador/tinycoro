@@ -504,6 +504,42 @@ TEST(BufferedChannelTest, BufferedChannelTest_push_await)
     EXPECT_EQ(val, 42);
 }
 
+TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
+{
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::BufferedChannel<int32_t> channel{2};
+
+    channel.Push(1);
+    channel.Push(2);
+
+    auto consumer = [&](auto sleepDuration)->tinycoro::Task<void>
+    {
+        co_await tinycoro::Sleep(sleepDuration);
+
+        int32_t val;
+        EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, co_await channel.PopWait(val));
+
+        EXPECT_EQ(val, 1);
+    };
+
+    auto producer = [&](auto sleepDuration) -> tinycoro::Task<void>
+    {
+        auto start = std::chrono::system_clock::now();
+
+        // this is a blocker push
+        channel.Push(3);
+
+        EXPECT_TRUE(std::chrono::system_clock::now() - start > sleepDuration);
+
+        co_return;
+    };
+
+    auto duration = 200ms;
+
+    tinycoro::GetAll(scheduler, producer(duration), consumer(duration));
+}
+
 TEST(BufferedChannelTest, BufferedChannelTest_push_await_order)
 {
     tinycoro::BufferedChannel<int32_t> channel{3};

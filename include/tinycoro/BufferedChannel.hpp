@@ -207,6 +207,8 @@ namespace tinycoro {
                 }
                 else if (forceWaiting)
                 {
+                    lock.unlock();
+
                     ForceWait(close, std::forward<Args>(args)...);
 
                     // Still need an open channel, because pop awaiters can arrive.
