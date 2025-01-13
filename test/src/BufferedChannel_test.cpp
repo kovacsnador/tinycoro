@@ -559,6 +559,9 @@ TEST(BufferedChannelTest, BufferedChannelTest_WaitForListeners_simple)
 
     // listenersAwaiter is notified
     EXPECT_TRUE(called);
+
+    // Close the channel, before awaiter get's destroyed on the stack.
+    channel.Close();
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_push_before_WaitForListeners)
@@ -581,6 +584,9 @@ TEST(BufferedChannelTest, BufferedChannelTest_push_before_WaitForListeners)
 
     auto listenersAwaiter = channel.WaitForListeners(2);
     EXPECT_TRUE(listenersAwaiter.await_ready());
+
+    // Close the channel, before awaiter get's destroyed on the stack.
+    channel.Close();
 }
 
 TEST(BufferedChannelTest, BufferedChannelFunctionalTest)
@@ -1230,7 +1236,8 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_WaitPush_singleThread_minQueueSi
     {
         while(currentValue < count)
         {
-            auto status = co_await channel.PushWait(++currentValue);
+            ++currentValue;
+            auto status = co_await channel.PushWait(currentValue);
 
             EXPECT_EQ(status, tinycoro::EChannelOpStatus::SUCCESS);
         }
@@ -1286,18 +1293,21 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_fixedQueueSiz
     EXPECT_EQ(allValues.size(), count);
 }
 
-TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_fixedQueueSizeClose)
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_close_fixedQueueSize)
 {
     const auto count = GetParam();
 
     tinycoro::Scheduler scheduler;
     tinycoro::BufferedChannel<size_t> channel{1};
 
-    std::mutex       mtx;
     std::set<size_t> allValues;
 
+    // push first value in the channel to make them full.
+    channel.Push(41u);
+
     auto consumer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(tinycoro::EChannelOpStatus::CLOSED == co_await channel.PushWait(42u));
+        // channel should be full, so CLOSED is returned.
+        EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, co_await channel.PushWait(42u));
     };
 
     auto producer = [&]() -> tinycoro::Task<void> {
