@@ -152,6 +152,11 @@ namespace tinycoro {
                 return !_closed;
             }
 
+            [[nodiscard]] auto MaxSize() const noexcept
+            {
+                return _maxQueueSize;
+            }
+
         private:
             template <typename... Args>
             bool _Emplace(bool forceWaiting, bool close, Args&&... args)
