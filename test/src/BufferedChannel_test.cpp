@@ -1470,6 +1470,9 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_tryPush)
 
         while(not channel.TryPushAndClose(count));
 
+        // the channek is closed, this should return false
+        EXPECT_FALSE(channel.TryPush(42u));
+
         co_return;
     };
 
