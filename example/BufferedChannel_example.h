@@ -27,11 +27,11 @@ void Example_bufferedChannel(auto& scheduler)
         }
     };
 
-    channel.Push({1, 2, 3});
-    channel.Push({1, 2, 3});
-    channel.Push({4, 5, 6});          
-    channel.Push({7});
-    channel.PushAndClose({8, 9});   // push and close the channel
+    channel.Push(std::vector<int32_t>{1, 2, 3});
+    channel.Push(std::vector<int32_t>{1, 2, 3});
+    channel.Push(std::vector<int32_t>{4, 5, 6});          
+    channel.Push(std::vector<int32_t>{7});
+    channel.PushAndClose(std::vector<int32_t>{8, 9});   // push and close the channel
 
     tinycoro::GetAll(scheduler, consumer());
 }

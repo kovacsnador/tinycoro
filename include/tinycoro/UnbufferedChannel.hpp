@@ -4,6 +4,7 @@
 #include <cassert>
 #include <mutex>
 #include <unordered_map>
+#include <latch>
 
 #include "ChannelOpStatus.hpp"
 #include "PauseHandler.hpp"
@@ -114,27 +115,26 @@ namespace tinycoro {
             template <typename... Args>
             auto _Push(bool lastElement, Args&&... args)
             {
-                std::atomic<bool> flag{false};
+                std::latch latch{1};
 
                 // prepare a special event for notification
                 detail::PauseCallbackEvent event;
 
-                event.Set([&flag] {
-                    flag.store(true);
-                    flag.notify_all();
+                event.Set([&latch] {
+                    latch.count_down();
                 });
 
                 // create a custom push awaiter.
-                // We don't need the scheduler as pointer, because non of the
+                // We don't need the channel (first parameter), because non of the
                 // special awaiter functions will be called except await_resume
                 // to get the awaiter state.
-                push_awaiter_type pushAwaiter{nullptr, event, lastElement, std::forward<Args>(args)...};
+                push_awaiter_type pushAwaiter{nullptr, std::move(event), lastElement, std::forward<Args>(args)...};
 
                 // Try to push the awaiter (with value inside) into the queue.
-                if (_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
+                if(_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
                 {
                     // wait for the flag to get notified
-                    flag.wait(false);
+                    latch.wait();
                 }
 
                 // get's the awaiter state
@@ -144,6 +144,13 @@ namespace tinycoro {
             [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
+
+                if(_closed)
+                {
+                    // no suspend, the channel is closed
+                    return true;
+                }
+
                 return waiter->ListenerCount() <= _waiters.size();
             }
 
@@ -153,9 +160,9 @@ namespace tinycoro {
 
                 std::unique_lock lock{_mtx};
 
-                if (wantedListerenCount <= _waiters.size())
+                if (wantedListerenCount <= _waiters.size() || _closed)
                 {
-                    // no suspend
+                    // no suspend, we have enough listeners or the channel is already closed.
                     return false;
                 }
 
@@ -503,7 +510,7 @@ namespace tinycoro {
             // Flag to check if this is the last element in the channel. (The channel is already in closed state)
             bool _lastElement{false};
 
-            // Flag which is true if the value is set
+            // Flag which is true if the value is in use already
             bool _used{false};
         };
 
