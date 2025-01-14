@@ -24,6 +24,11 @@ TEST(BufferedChannelTest, BufferedChannelTest_defaultConstructor)
     EXPECT_EQ(channel.MaxSize(), std::numeric_limits<size_t>::max());
 }
 
+TEST(BufferedChannelTest, BufferedChannelTest_constructorException)
+{
+    EXPECT_THROW(tinycoro::BufferedChannel<int32_t> channel{0}, tinycoro::BufferedChannelException);
+}
+
 TEST(BufferedChannelTest, BufferedChannelTest_open_push)
 {
     tinycoro::BufferedChannel<int32_t> channel;
@@ -1433,4 +1438,40 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_close_fixedQu
     tasks.push_back(producer());
 
     tinycoro::GetAll(scheduler, std::move(tasks));
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_tryPush)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler               scheduler;
+    tinycoro::BufferedChannel<size_t> channel{1};
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t val;
+        size_t expected{0};
+        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        {
+            EXPECT_EQ(val, expected++);
+        }
+
+        EXPECT_EQ(count, expected - 1);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        size_t val{};
+        while(val < count)
+        {
+            if(channel.TryPush(val))
+            {
+                val++;
+            }
+        }
+
+        while(not channel.TryPushAndClose(count));
+
+        co_return;
+    };
+
+    tinycoro::GetAll(scheduler, producer(), consumer());
 }
