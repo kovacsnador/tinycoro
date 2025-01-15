@@ -499,20 +499,20 @@ namespace tinycoro {
                 return true;
             }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            [[nodiscard]] constexpr bool await_suspend(auto parentCoro)
             {
                 if (_channel)
                 {
                     PutOnPause(parentCoro);
-                    if (_channel->Add(this) == false)
+                    if (_channel->Add(this))
                     {
-                        // resume immediately
-                        ResumeFromPause(parentCoro);
-                        return parentCoro;
+                        return true;
                     }
-                    return std::noop_coroutine();
+                    
+                    // resume immediately
+                    ResumeFromPause(parentCoro);
                 }
-                return parentCoro;
+                return false;
             }
 
             [[nodiscard]] constexpr auto await_resume() const noexcept
