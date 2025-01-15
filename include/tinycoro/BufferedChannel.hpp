@@ -666,7 +666,7 @@ namespace tinycoro {
                 return false;
             }
 
-            [[nodiscard]] constexpr auto await_resume() const noexcept
+            constexpr auto await_resume() const noexcept
             {
                 if (_used)
                 {

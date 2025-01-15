@@ -874,9 +874,105 @@ tinycoro::Task<void> Waiter()
     // do something...
 };
 ```
+
 ### `BufferedChannel`
 
 The `tinycoro::BufferedChannel<T>` is an asynchronous communication primitive in tinycoro designed for passing messages between multiple coroutines. It supports a buffer that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way. The channel can also be closed to signal that no more items will be produced. See also [EChannelOpStatus](#echannelopstatus)
+
+#### Key Features
+
+1. **Coroutines Support**: The channel integrates seamlessly with coroutines, enabling efficient asynchronous data transfer.
+2. **Configurable Buffer Size**: The channel's buffer size can be specified during construction. The default size is the maximum value of `size_t`.
+3. **Custom Awaiters**: The behavior of popping, pushing, and listening can be customized through template parameters.
+4. **Thread Safety**: The channel operations are thread-safe, ensuring reliable communication across multiple threads.
+5. **Graceful Shutdown**: Supports orderly channel closure while notifying all waiting coroutines.
+
+#### Constructor
+
+```
+BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max());
+```
+- **`maxQueueSize`**: The maximum number of elements the channel can buffer. Must be greater than zero.
+
+#### Public Methods
+
+- **PopWait**: Awaits the next value from the channel. (with `co_await`)
+  ```cpp
+  [[nodiscard]] auto PopWait(ValueT& val);
+  ```
+  - **`val`**: The variable to store the popped value.
+
+- **WaitForListeners**: Waits until the specified number of listeners are present. (with `co_await`)
+  ```cpp
+  [[nodiscard]] auto WaitForListeners(size_t listenerCount);
+  ```
+
+- **PushWait**: Awaits until a value can be pushed into the channel. (with `co_await`)
+  ```cpp
+  template <typename... Args>
+  [[nodiscard]] auto PushWait(Args&&... args);
+  ```
+
+- **PushAndCloseWait**: Pushes a value and closes the channel. (with `co_await`)
+  ```cpp
+  template <typename... Args>
+  [[nodiscard]] auto PushAndCloseWait(Args&&... args);
+  ```
+
+- **Push**: Blocks the calling thread until the value is pushed into the channel. (NOT awaitable)
+  ```cpp
+  template <typename... Args>
+  void Push(Args&&... args);
+  ```
+
+- **PushAndClose**: Pushes a value into the channel and closes it. (NOT awaitable)
+  ```cpp
+  template <typename... Args>
+  void PushAndClose(Args&&... args);
+  ```
+
+- **TryPush**: Attempts to push a value into the channel without blocking.
+  ```cpp
+  template <typename... Args>
+  bool TryPush(Args&&... args);
+  ```
+
+- **TryPushAndClose**: Attempts to push a value into the channel and close it, without blocking.
+  ```cpp
+  template <typename... Args>
+  bool TryPushAndClose(Args&&... args);
+  ```
+
+- **Empty**: Checks if the channel is empty.
+  ```cpp
+  [[nodiscard]] bool Empty() const noexcept;
+  ```
+
+- **Size**: Gets the current number of elements in the channel.
+  ```cpp
+  [[nodiscard]] auto Size() const noexcept;
+  ```
+
+- **Close**: Closes the channel, notifying all awaiters.
+  ```cpp
+  void Close();
+  ```
+
+- **IsOpen**: Checks if the channel is open.
+  ```cpp
+  [[nodiscard]] bool IsOpen() const noexcept;
+  ```
+
+- **MaxSize**: Returns the maximum size of the channel.
+  ```cpp
+  [[nodiscard]] auto MaxSize() const noexcept;
+  ```
+
+#### Exceptions
+
+- **`BufferedChannelException`**: Thrown if invalid operations are attempted, such as pushing to a closed channel or initializing the channel with a zero buffer size.
+
+#### Example:
 ```cpp
 tinycoro::BufferedChannel<int32_t> channel;
 
@@ -890,19 +986,24 @@ tinycoro::Task<void> Consumer()
     }
 };
 
-void Producer()
+tinycoro::Task<void> Producer()
 {
-    channel.Push(42);
-    channel.Push(33);
+    // push 42 in the queue
+    // if the value can not be pushed, the coroutine goes in a suspended state
+    // and gets resumed, wenn the operation is succeded or the channel gets closed.
+    tinycoro::EChannelOpStatus status = co_await channel.PushWait(42);
+
+    // push 43 in the queue
+    status = co_await channel.PushWait(43);
     ...
 
     // Close the channel when finished (this also happens in the BufferedChannel destructor)
     channel.Close();
 
-    /* Alternatively, if this will be the last entry, use PushAndClose/EmplaceAndClose
+    /* Alternatively, if this will be the last entry, you can use PushAndCloseWait.
      * This guarantees that all entries before 44 will be consumed.
      */
-    // channel.PushAndClose(44);
+    // co_await channel.PushAndCloseWait(44);
 }
 ```
 
