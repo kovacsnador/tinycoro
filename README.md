@@ -877,7 +877,7 @@ tinycoro::Task<void> Waiter()
 
 ### `BufferedChannel`
 
-The `tinycoro::BufferedChannel<T>` is an asynchronous communication primitive in tinycoro designed for passing messages between multiple coroutines. It supports a buffer that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way. The channel can also be closed to signal that no more items will be produced. See also [EChannelOpStatus](#echannelopstatus)
+The `tinycoro::BufferedChannel<T>` is an asynchronous communication primitive in tinycoro designed for passing messages between multiple coroutines. It supports a queue that allows producers to push values into the channel, and consumers can retrieve these values in a coroutine-friendly way (MPMC). The channel can also be closed to signal that no more items will be produced. See also [EChannelOpStatus](#echannelopstatus)
 
 #### Key Features
 
@@ -1010,6 +1010,69 @@ tinycoro::Task<void> Producer()
 ### `UnbufferedChannel`
 
 The `tinycoro::UnbufferedChannel<T>` is an asynchronous communication primitive in `tinycoro`, designed for passing messages between coroutines. It facilitates direct communication between a producer and a consumer coroutine, with operations that suspend until the counterpart is ready.
+
+### Member Functions
+
+#### Coroutine-Based Operations
+
+- **PopWait:**
+  ```cpp
+  [[nodiscard]] auto PopWait(ValueT& val);
+  ```
+  Suspends the coroutine until a value is available. The value is written to `val`.
+
+- **PushWait:**
+  ```cpp
+  template <typename... Args>
+  [[nodiscard]] auto PushWait(Args&&... args);
+  ```
+  Suspends the coroutine until the value is consumed. Constructs the value in-place.
+
+- **PushAndCloseWait:**
+  ```cpp
+  template <typename... Args>
+  [[nodiscard]] auto PushAndCloseWait(Args&&... args);
+  ```
+  Pushes a value into the channel and closes it, signaling no more values will be pushed.
+
+- **WaitForListeners:**
+  ```cpp
+  [[nodiscard]] auto WaitForListeners(size_t listenerCount);
+  ```
+  Suspends the coroutine until the specified number of listeners are present.
+
+#### Blocking Operations
+
+- **Push:**
+  ```cpp
+  template <typename... Args>
+  auto Push(Args&&... args);
+  ```
+  Pushes a value into the channel from a non-coroutine environment. Blocks the thread until the value is consumed.
+
+- **PushAndClose:**
+  ```cpp
+  template <typename... Args>
+  auto PushAndClose(Args&&... args);
+  ```
+  Pushes a value and closes the channel from a non-coroutine environment. Blocks the thread.
+
+#### Utility Functions
+
+- **Close:**
+  ```cpp
+  void Close();
+  ```
+  Closes the channel, notifying all awaiters.
+
+- **IsOpen:**
+  ```cpp
+  [[nodiscard]] bool IsOpen() const noexcept;
+  ```
+  Returns whether the channel is open.
+
+
+### Exmaple:
 
 ```cpp
 #include <tinycoro/UnbufferedChannel.hpp>
