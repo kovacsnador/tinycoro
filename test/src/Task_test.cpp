@@ -35,6 +35,11 @@ TEST(TaskTest, TaskTest_void)
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 }
 
+TEST(TaskTest, TaskTest_defaultReturnValue_void)
+{
+    EXPECT_TRUE((std::same_as<tinycoro::Task<>::value_type, void>));
+}
+
 TEST(TaskTest, TaskTest_int)
 {
     auto task = []()->tinycoro::Task<int32_t> { co_return 42; }();

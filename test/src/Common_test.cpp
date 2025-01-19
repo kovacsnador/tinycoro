@@ -105,3 +105,29 @@ TEST(Concepts_HasVirtualDestructor, Concepts_HasVirtualDestructor_abstractClass_
 {
     EXPECT_FALSE((tinycoro::concepts::HasVirtualDestructor<NoVirtualDestructorAbstract>)) << "Type has virtual destructor!";
 }
+
+TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_defaultConstructor)
+{
+    tinycoro::detail::helper::AutoResetEvent event;
+    EXPECT_FALSE(event.IsSet());
+
+    event.Set();
+
+    EXPECT_TRUE(event.IsSet());
+    EXPECT_TRUE(event.Wait());
+
+    EXPECT_FALSE(event.IsSet());
+}
+
+TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_customConstructor)
+{
+    tinycoro::detail::helper::AutoResetEvent event{true};
+    EXPECT_TRUE(event.IsSet());
+
+    EXPECT_TRUE(event.Wait());
+    EXPECT_FALSE(event.IsSet());
+
+    event.Set();
+
+    EXPECT_TRUE(event.IsSet());
+}

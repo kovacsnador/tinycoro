@@ -285,6 +285,7 @@ void Example_voidTask()
     tinycoro::GetAll(scheduler, task())
 }
 ```
+For simplicity, if you want to return void, you can also write `tinycoro::Task<>`. The default template parameter here is `void``. 
 
 ### `TaskView`
 If you don't want to give full ownership of a coroutine to the scheduler, you can use TaskView, which allows you to retain control over the coroutine's lifecycle while still scheduling it for execution.

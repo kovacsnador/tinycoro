@@ -105,6 +105,10 @@ namespace tinycoro {
 
         [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
+        [[nodiscard]] bool IsPaused() const noexcept { return _hdl.promise().pauseHandler->IsPaused(); }
+
+        [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
+
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
 
@@ -197,6 +201,10 @@ namespace tinycoro {
 
         [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 
+        [[nodiscard]] bool IsPaused() const noexcept { return _hdl.promise().pauseHandler->IsPaused(); }
+
+        [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
+
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
         {
             return _hdl.promise().MakePauseHandler(pauseResume);
@@ -238,7 +246,7 @@ namespace tinycoro {
         DestroyNotifierT                   _destroyNotifier;
     };
 
-    template <typename ReturnValueT>
+    template <typename ReturnValueT = void>
     using Task = CoroTask<ReturnValueT, Promise<ReturnValueT>, AwaiterValue>;
 
 } // namespace tinycoro
