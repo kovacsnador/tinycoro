@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <array>
+
 #include <tinycoro/tinycoro_all.h>
 
 struct RunInline_PauseHandlerMock
