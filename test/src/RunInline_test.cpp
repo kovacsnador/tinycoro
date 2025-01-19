@@ -32,6 +32,8 @@ struct RunInline_TaskMock
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
+    MOCK_METHOD(bool, IsPaused, (), (const, noexcept));
+    MOCK_METHOD(bool, IsDone, (), (const, noexcept));
 
     std::shared_ptr<PauseHandlerT> pauseHandlerMock;
 };
@@ -39,6 +41,7 @@ struct RunInline_TaskMock
 template<typename ReturnT, typename PauseHandlerT>
 struct RunInline_TaskMockWrapper
 {
+    using value_type = ReturnT;
     using promise_type = PromiseMock<ReturnT>;
 
     RunInline_TaskMockWrapper()
@@ -71,6 +74,16 @@ struct RunInline_TaskMockWrapper
     tinycoro::ETaskResumeState ResumeState()
     {
         return mock->ResumeState();
+    }
+
+    bool IsPaused() const noexcept
+    {
+        return mock->IsPaused();
+    }
+
+    bool IsDone() const noexcept
+    {
+        return mock->IsDone();
     }
 
     std::shared_ptr<RunInline_TaskMock<ReturnT, PauseHandlerT>> mock;
@@ -144,6 +157,13 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
 
     mock1.pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
 
+    EXPECT_CALL(mock1, IsDone)
+        .WillOnce(testing::Return(false))
+        .WillOnce(testing::Return(true));
+
+    EXPECT_CALL(mock1, IsPaused)
+        .WillRepeatedly(testing::Return(false));
+
     EXPECT_CALL(mock1, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock1] (auto) {
             return mock1.pauseHandlerMock;
@@ -152,13 +172,20 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
 
     EXPECT_CALL(mock1, Resume()).Times(1);
     EXPECT_CALL(mock1, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+        .WillRepeatedly(testing::Return(tinycoro::ETaskResumeState::DONE));
 
     EXPECT_CALL(mock1, await_resume()).Times(1).WillOnce(testing::Return(42));
 
     RunInline_TaskMock<int32_t, RunInline_PauseHandlerMock> mock2;
 
     mock2.pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+
+    EXPECT_CALL(mock2, IsDone)
+        .WillOnce(testing::Return(false))
+        .WillOnce(testing::Return(false));
+
+    EXPECT_CALL(mock2, IsPaused)
+        .WillRepeatedly(testing::Return(false));
 
     EXPECT_CALL(mock2, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock2] (auto) {
@@ -168,10 +195,8 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
 
     EXPECT_CALL(mock2, Resume()).Times(2);
     EXPECT_CALL(mock2, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::PAUSED))
+        .WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED))
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
-
-    EXPECT_CALL(*mock2.pauseHandlerMock, AtomicWait(true)).Times(1);
 
     EXPECT_CALL(mock2, await_resume()).Times(1).WillOnce(testing::Return(43));
 
@@ -197,6 +222,8 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
         ));
 
         EXPECT_CALL(*tasks[i].mock, Resume()).Times(1);
+        EXPECT_CALL(*tasks[i].mock, IsPaused()).Times(1);
+        EXPECT_CALL(*tasks[i].mock, IsDone()).Times(1);
         EXPECT_CALL(*tasks[i].mock, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
@@ -213,19 +240,19 @@ TEST(RunInlineTest, RunInline_FunctionalTest_voidTasks)
 {
     size_t i = 0;
 
-    auto consumer1 = [&]()->tinycoro::Task<void>
+    auto consumer1 = [&]()->tinycoro::Task<>
     {
         EXPECT_EQ(i++, 0);
         co_return; 
     };
 
-    auto consumer2 = [&]()->tinycoro::Task<void>
+    auto consumer2 = [&]()->tinycoro::Task<>
     {
         EXPECT_EQ(i++, 1);
         co_return; 
     };
 
-    auto consumer3 = [&]()->tinycoro::Task<void>
+    auto consumer3 = [&]()->tinycoro::Task<>
     {
         EXPECT_EQ(i++, 2);
         co_return; 
@@ -260,7 +287,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_2)
         co_return co_await event; 
     };
 
-    auto producer = [&event]()->tinycoro::Task<void>
+    auto producer = [&event]()->tinycoro::Task<>
     {
         co_await tinycoro::Sleep(100ms);
         event.SetValue(42);
@@ -355,7 +382,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_5)
         co_return 42u; 
     };
 
-    auto task3 = [&count]()->tinycoro::Task<void>
+    auto task3 = [&count]()->tinycoro::Task<>
     {
         EXPECT_EQ(count++, 2);
 
@@ -391,7 +418,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_exception)
         co_return 42u; 
     };
 
-    auto task3 = [&count]()->tinycoro::Task<void>
+    auto task3 = [&count]()->tinycoro::Task<>
     {
         EXPECT_EQ(count++, 2);
 
@@ -429,4 +456,184 @@ TEST(RunInlineTest, RunInline_FunctionalTest_exception2)
 
     EXPECT_THROW(func(), std::runtime_error);
     EXPECT_EQ(3, count);
+}
+
+TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask)
+{
+    tinycoro::Latch latch{2};
+
+    size_t i = 0;
+
+    auto consumer1 = [&]()->tinycoro::Task<>
+    {
+        EXPECT_EQ(i++, 0);
+        co_await latch.ArriveAndWait();
+        EXPECT_EQ(i++, 5);
+    };
+
+    auto consumer2 = [&]()->tinycoro::Task<>
+    {
+        EXPECT_EQ(i++, 1);
+        co_await latch.ArriveAndWait();
+        EXPECT_EQ(i++, 2);
+    };
+
+    auto consumer3 = [&]()->tinycoro::Task<>
+    {
+        EXPECT_EQ(i++, 3);
+        co_await latch.ArriveAndWait();
+        EXPECT_EQ(i++, 4);
+    };
+
+    tinycoro::RunInline(consumer1(), consumer2(), consumer3());
+    EXPECT_EQ(i, 6);
+}
+
+TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
+{
+    std::stop_source ssource;
+
+    tinycoro::Latch latch{2};
+
+    size_t i = 0;
+
+    auto consumer1 = [&]()->tinycoro::Task<>
+    {
+        EXPECT_EQ(i++, 0);
+        co_await latch.ArriveAndWait();
+        EXPECT_EQ(i++, 3);
+    };
+
+    auto consumer2 = [&]()->tinycoro::Task<>
+    {
+        EXPECT_EQ(i++, 1);
+        co_await latch.ArriveAndWait();
+
+        // request a stop
+        ssource.request_stop();
+
+        EXPECT_EQ(i++, 2);
+    };
+
+    auto consumer3 = [&]()->tinycoro::Task<>
+    {
+        // this task should be stopped through stopsource
+        co_await tinycoro::CancellableSuspend<void>{};
+
+        // This code should never reached...
+        i++; 
+    };
+
+    auto task3 = consumer3();
+    task3.SetStopSource(ssource);
+
+    tinycoro::RunInline(consumer1(), consumer2(), std::move(task3));
+    EXPECT_EQ(i, 4);
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
+{   
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::Barrier barrier{4};
+
+    auto task = [&barrier](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await barrier.ArriveAndWait();
+        co_return r;
+    };
+
+    auto deferedTask = [&task](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Sleep(200ms);
+        co_return co_await task(r);
+    };
+
+    // simulate parallel tasks
+    auto [fut1, fut2] = scheduler.Enqueue(deferedTask(40), deferedTask(43));
+
+    // Run intline the 2 task which are notified by other scheduler
+    auto [ret1, ret2] = tinycoro::RunInline(task(41), task(42));
+
+    EXPECT_EQ(ret1, 41);
+    EXPECT_EQ(ret2, 42);
+
+    // wait for the other tasks to finish
+    EXPECT_EQ(fut1.get(), 40);
+    EXPECT_EQ(fut2.get(), 43);
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleep)
+{
+    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Sleep(200ms);
+        co_return r;
+    };
+
+    auto start = std::chrono::system_clock::now();
+    auto res = tinycoro::RunInline(deferedTask(42));
+
+    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_EQ(res, 42);
+    
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti)
+{
+    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Sleep(200ms);
+        co_return r;
+    };
+
+    auto start = std::chrono::system_clock::now();
+    auto [r1, r2, r3] = tinycoro::RunInline(deferedTask(41), deferedTask(42), deferedTask(43));
+
+    // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
+    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_EQ(r1, 41);
+    EXPECT_EQ(r2, 42);
+    EXPECT_EQ(r3, 43);
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti_dynamic)
+{
+    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Sleep(200ms);
+        co_return r;
+    };
+
+    std::array<tinycoro::Task<int32_t>, 3> tasks{deferedTask(41), deferedTask(42), deferedTask(43)};
+
+    auto start = std::chrono::system_clock::now();
+    auto results = tinycoro::RunInline(tasks);
+
+    // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
+    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_EQ(results[0], 41);
+    EXPECT_EQ(results[1], 42);
+    EXPECT_EQ(results[2], 43);
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_pushawait)
+{
+    tinycoro::BufferedChannel<int32_t> channel;
+
+    auto task1 = [&]() -> tinycoro::Task<int32_t> {
+
+        auto consumer = [&]()-> tinycoro::Task<int32_t> {
+            int32_t val;
+            std::ignore = co_await channel.PopWait(val);
+            co_return val;
+        };
+
+        auto producer = [&]()-> tinycoro::Task<> {
+            co_await channel.PushWait(42);
+        };
+
+        auto [val1, val2] = tinycoro::RunInline(consumer(), producer());
+
+        EXPECT_TRUE((std::same_as<decltype(val2), tinycoro::VoidType>));
+        co_return val1;
+    };
+
+    auto fortyTwo = tinycoro::RunInline(task1());
+    EXPECT_EQ(fortyTwo, 42);
 }
