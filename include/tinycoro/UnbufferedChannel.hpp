@@ -37,18 +37,18 @@ namespace tinycoro {
             // disable move and copy
             UnbufferedChannel(UnbufferedChannel&&) = delete;
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{this, detail::PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::PauseCallbackEvent{}, val}; }
 
             template <typename... Args>
             [[nodiscard]] auto PushWait(Args&&... args)
             {
-                return push_awaiter_type{this, detail::PauseCallbackEvent{}, false, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, false, std::forward<Args>(args)...};
             }
 
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
-                return push_awaiter_type{this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...};
             }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
@@ -125,10 +125,10 @@ namespace tinycoro {
                 });
 
                 // create a custom push awaiter.
-                // We don't need the channel (first parameter), because non of the
+                // The channel is here unnecessary (first parameter), because non of the
                 // special awaiter functions will be called except await_resume
                 // to get the awaiter state.
-                push_awaiter_type pushAwaiter{nullptr, std::move(event), lastElement, std::forward<Args>(args)...};
+                push_awaiter_type pushAwaiter{*this, std::move(event), lastElement, std::forward<Args>(args)...};
 
                 // Try to push the awaiter (with value inside) into the queue.
                 if(_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
@@ -328,15 +328,11 @@ namespace tinycoro {
         class UnbufferedChannelPopAwaiter
         {
         public:
-            UnbufferedChannelPopAwaiter(ChannelT* channel, EventT event, ValueT& value)
+            UnbufferedChannelPopAwaiter(ChannelT& channel, EventT event, ValueT& value)
             : _channel{channel}
             , _event{std::move(event)}
             , _value{value}
             {
-                static int32_t i = 0;
-                _value           = ++i;
-
-                assert(channel);
             }
 
             // disable move and copy
@@ -344,31 +340,27 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
-                if (_channel)
-                {
-                    return _channel->IsReady(this);
-                }
-                return true;
+                return _channel.IsReady(this);
             }
 
             constexpr bool await_suspend(auto parentCoro)
             {
-                if (_channel)
+                PutOnPause(parentCoro);
+                // after channel.Add never touch the _channel member again
+                // it could be a dangling ref
+                if (_channel.Add(this) == false)
                 {
-                    PutOnPause(parentCoro);
-                    if (_channel->Add(this) == false)
-                    {
-                        // resume immediately
-                        ResumeFromPause(parentCoro);
-                        return false;
-                    }
-                    return true;
+                    // resume immediately
+                    ResumeFromPause(parentCoro);
+                    return false;
                 }
-                return false;
+                return true;
             }
 
             [[nodiscard]] constexpr auto await_resume() const noexcept
             {
+                // after await_suspend channel can be a dangling reference
+                // if the channel closes and calls notify
                 if (_lastElement)
                 {
                     return EChannelOpStatus::LAST;
@@ -384,9 +376,6 @@ namespace tinycoro {
 
             void Notify()
             {
-                // detach from the channel
-                _channel = nullptr;
-
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
@@ -418,7 +407,7 @@ namespace tinycoro {
             // Flag which is true if the value is set
             bool _set{false};
 
-            ChannelT* _channel;
+            ChannelT& _channel;
             EventT    _event;
             ValueT&   _value;
         };
@@ -428,7 +417,7 @@ namespace tinycoro {
         {
         public:
             template <typename... Args>
-            UnbufferedChannelPushAwaiter(ChannelT* channel, EventT event, bool lastValue, Args&&... args)
+            UnbufferedChannelPushAwaiter(ChannelT& channel, EventT event, bool lastValue, Args&&... args)
             : _channel{channel}
             , _event{std::move(event)}
             , _value{std::forward<Args>(args)...}
@@ -441,31 +430,27 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
-                if (_channel)
-                {
-                    return _channel->IsReady(this);
-                }
-                return true;
+                return _channel.IsReady(this);
             }
 
             constexpr bool await_suspend(auto parentCoro)
             {
-                if (_channel)
+                PutOnPause(parentCoro);
+                // after channel.Add never touch the _channel member again
+                // it could be a dangling ref
+                if (_channel.Add(this) == false)
                 {
-                    PutOnPause(parentCoro);
-                    if (_channel->Add(this) == false)
-                    {
-                        // resume immediately
-                        ResumeFromPause(parentCoro);
-                        return false;
-                    }
-                    return true;
+                    // resume immediately
+                    ResumeFromPause(parentCoro);
+                    return false;
                 }
-                return false;
+                return true;
             }
 
             [[nodiscard]] constexpr auto await_resume() const noexcept
             {
+                // after await suspend channel can be a dangling reference
+                // if the channel closes and calls notify 
                 if (_used)
                 {
                     if (_lastElement)
@@ -485,9 +470,6 @@ namespace tinycoro {
 
             void Notify()
             {
-                // detach from the channel
-                _channel = nullptr;
-
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
@@ -503,7 +485,7 @@ namespace tinycoro {
                 context::UnpauseTask(parentCoro);
             }
 
-            ChannelT* _channel;
+            ChannelT& _channel;
             EventT    _event;
             ValueT    _value;
 

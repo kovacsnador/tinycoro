@@ -178,7 +178,7 @@ template <typename, typename, typename>
 class PopAwaiterMock
 {
 public:
-    PopAwaiterMock(auto, auto, auto) { }
+    PopAwaiterMock(auto&, auto, auto) { }
 
     void Notify() const noexcept {};
 
@@ -200,7 +200,7 @@ template <typename, typename, typename>
 class PushAwaiterMock
 {
 public:
-    PushAwaiterMock(auto...) { }
+    PushAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept {};
 
@@ -559,65 +559,6 @@ TEST(BufferedChannelTest, BufferedChannelTest_push_await_close_after)
     EXPECT_FALSE(pushAwaiter.await_suspend(hdl));
 
     EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, pushAwaiter.await_resume());
-}
-
-TEST(BufferedChannelTest, BufferedChannelTest_push_await_notify_before)
-{
-    tinycoro::BufferedChannel<int32_t> channel{1};
-
-    auto pushAwaiter = channel.PushWait(42);
-
-    pushAwaiter.Notify();
-
-    EXPECT_TRUE(pushAwaiter.await_ready());
-    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, pushAwaiter.await_resume());
-}
-
-TEST(BufferedChannelTest, BufferedChannelTest_push_await_notify_after)
-{
-    tinycoro::BufferedChannel<int32_t> channel{1};
-
-    // make the channel full
-    channel.Push(41);
-
-    auto pushAwaiter = channel.PushWait(42);
-    EXPECT_FALSE(pushAwaiter.await_ready());
-
-    pushAwaiter.Notify();
-
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
-    EXPECT_FALSE(pushAwaiter.await_suspend(hdl));
-
-    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, pushAwaiter.await_resume());
-}
-
-TEST(BufferedChannelTest, BufferedChannelTest_pop_await_notify_before)
-{
-    tinycoro::BufferedChannel<int32_t> channel{1};
-
-    int32_t val;
-    auto popAwaiter = channel.PopWait(val);
-
-    popAwaiter.Notify();
-
-    EXPECT_TRUE(popAwaiter.await_ready());
-    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, popAwaiter.await_resume());
-}
-
-TEST(BufferedChannelTest, BufferedChannelTest_pop_await_notify_after)
-{
-    tinycoro::BufferedChannel<int32_t> channel{1};
-
-    int32_t val;
-    auto popAwaiter = channel.PopWait(val);
-    EXPECT_FALSE(popAwaiter.await_ready());
-
-    popAwaiter.Notify();
-
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
-    EXPECT_FALSE(popAwaiter.await_suspend(hdl));
-
-    EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, popAwaiter.await_resume());
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_waitForce)

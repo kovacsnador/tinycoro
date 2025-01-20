@@ -41,6 +41,14 @@ namespace tinycoro { namespace test {
         return hdl;
     }
 
+    template<typename T = void>
+    auto MakeCoroutineHdl()
+    {
+        tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
+        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([]{});
+        return hdl;
+    }
+
 }} // namespace tinycoro::test
 
 #endif //!__TINY_CORO_TEST_SRC_MOCK_COROUTINE_HANDLE_MOCK_H__

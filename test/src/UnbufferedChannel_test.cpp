@@ -17,7 +17,7 @@ template <typename, typename, typename>
 class PopAwaiterMock
 {
 public:
-    PopAwaiterMock(auto...) { }
+    PopAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept {};
 
@@ -28,7 +28,7 @@ template <typename, typename, typename>
 class PushAwaiterMock
 {
 public:
-    PushAwaiterMock(auto...) { }
+    PushAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept {};
 
@@ -209,6 +209,24 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_close)
 
     channel.Close();
     EXPECT_FALSE(channel.IsOpen());
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_suspend)
+{
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    size_t val;
+    auto popAwaiter = channel.PopWait(val);
+    EXPECT_FALSE(popAwaiter.await_ready());
+
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
+
+    // testing the listener awaiter
+    auto listenerAwaiter = channel.WaitForListeners(1);
+
+    // calling directly await_suspend without await_ready
+    EXPECT_FALSE(listenerAwaiter.await_suspend(tinycoro::test::MakeCoroutineHdl()));
 }
 
 TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple)
