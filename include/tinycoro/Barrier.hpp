@@ -1,10 +1,6 @@
 #ifndef __TINY_CORO_BARRIER_HPP__
 #define __TINY_CORO_BARRIER_HPP__
 
-#include <barrier>
-
-#include <atomic>
-
 #include "LinkedPtrStack.hpp"
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
@@ -237,6 +233,7 @@ namespace tinycoro {
 
         CompletionCallbackT _completionCallback;
 
+        // we can use here stack, because we steal all the values from there
         detail::LinkedPtrStack<awaiter_type> _waiters;
     };
 
