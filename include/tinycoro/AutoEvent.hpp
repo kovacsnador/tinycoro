@@ -1,10 +1,9 @@
 #ifndef __TINY_CORO_AUTO_EVENT_HPP__
 #define __TINY_CORO_AUTO_EVENT_HPP__
 
-#include <mutex>
+#include <atomic>
 
 #include "PauseHandler.hpp"
-#include "LinkedPtrQueue.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -18,33 +17,66 @@ namespace tinycoro {
             friend class AwaiterT<AutoEvent, detail::PauseCallbackEvent>;
 
             AutoEvent(bool initialySet = false)
-            : _state{initialySet}
+            : _state{initialySet ? this : nullptr}
             {
             }
 
+            // disable move and copy
             AutoEvent(AutoEvent&&) = delete;
 
             void Set() noexcept
             {
-                std::unique_lock lock{_mtx};
+                void* expected = _state.load();
 
-                if (_state == false)
+                if(expected == this)
                 {
-                    if (auto* top = _waiters.pop())
-                    {
-                        lock.unlock();
+                    // the event is already set nothing to do
+                    return;
+                }
 
-                        top->Notify();
+                void* desired = this; 
+                if(expected && expected != this)
+                {
+                    // we have waiter in the stack 
+                    desired = static_cast<awaiter_type*>(expected)->next;
+                }
+
+                while(!_state.compare_exchange_strong(expected, desired))
+                {
+                    if(expected == this)
+                    {
+                        // The event is already set
+                        // so we can move on, nothing to do 
                         return;
                     }
+
+                    if(expected == nullptr)
+                    {
+                        // the event got unset,
+                        // so we can try to set it
+                        desired = this;
+                    }
+                    else
+                    {
+                        // the stack has changed so we can continue to pop
+                        // the last value from it
+                        desired = static_cast<awaiter_type*>(expected)->next;
+                    }
                 }
-                _state = true;
+
+                if(expected)
+                {   
+                    // finally we were able to pop an awaiter 
+                    // so we can notify it
+                    static_cast<awaiter_type*>(expected)->Notify();
+                }
             }
 
             bool IsSet() const noexcept
             {
-                std::scoped_lock lock{_mtx};
-                return _state;
+                // checks if the current states points to this.
+                // that means the event is set
+                return _state.load() == this;
             }
 
             auto operator co_await() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
@@ -52,38 +84,59 @@ namespace tinycoro {
         private:
             bool IsReady() noexcept
             {
-                std::scoped_lock lock{_mtx};
-
-                if (_state)
-                {
-                    _state = false;
-                    return true;
-                }
-                return false;
+                // try to reset the event, if succeeds that means
+                // we can take the event.
+                void* expected = this;
+                return _state.compare_exchange_strong(expected, nullptr);
             }
 
             bool Add(awaiter_type* awaiter)
             {
-                std::scoped_lock lock{_mtx};
+                void* expected = _state.load();
+                void* desired = nullptr;
 
-                // is already set
-                if (_state)
+                if(expected != this)
                 {
-                    _state = false;
-                    return false;
+                    // we have some awaiters in the stack already
+                    // or the stack is empty but,
+                    // so we want to set the new awaiter on the 
+                    // front of the stack
+                    desired = awaiter;
+                    awaiter->next = static_cast<awaiter_type*>(expected);
                 }
 
-                // Not set
-                _waiters.push(awaiter);
-                return true;
+                while(!_state.compare_exchange_strong(expected, desired))
+                {
+                    if(expected == this)
+                    {
+                        // the event got set,
+                        // so we can try to get them.
+                        desired = nullptr;
+
+                        // safely reset the next pointer
+                        // not strictly necessary but anyway
+                        awaiter->next = nullptr;
+                    }
+                    else
+                    {
+                        // try to continue pushing to the front
+                        // of the stack the awaiter
+                        desired = awaiter;
+                        awaiter->next = static_cast<awaiter_type*>(expected);
+                    }
+                }
+
+                // check the last state before a succesfull push
+                // if the last state was 'this' that means 
+                // we could just reset the event (to nullptr)
+                // so the awaiter can be resumed without suspend 
+                return expected != this;
             }
 
-            // true -> SET
-            // false -> NOT SET
-            bool _state;
-
-            LinkedPtrQueue<awaiter_type> _waiters;
-            mutable std::mutex           _mtx;
+            // nullptr => NOT set
+            // this => Set no waiters
+            // other => Not set with waiters
+            std::atomic<void*> _state{nullptr};
         };
 
         template <typename AutoEventT, typename CallbackEventT>
@@ -96,6 +149,7 @@ namespace tinycoro {
             {
             }
 
+            // disable move and copy
             AutoEventAwaiter(AutoEventAwaiter&&) = delete;
 
             [[nodiscard]] constexpr bool await_ready() noexcept
@@ -120,6 +174,9 @@ namespace tinycoro {
 
             void Notify() const { _event.Notify(); }
 
+            AutoEventAwaiter* next{nullptr};
+
+        private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
@@ -128,9 +185,6 @@ namespace tinycoro {
                 context::UnpauseTask(parentCoro);
             }
 
-            AutoEventAwaiter* next{nullptr};
-
-        private:
             AutoEventT&    _autoEvent;
             CallbackEventT _event;
         };
