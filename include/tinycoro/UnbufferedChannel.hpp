@@ -13,6 +13,7 @@
 
 namespace tinycoro {
     namespace detail {
+
         template <typename ValueT,
                   template <typename, typename, typename>
                   class PopAwaiterT,
@@ -30,9 +31,14 @@ namespace tinycoro {
             using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
             using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
 
+            using cleanupFunction_t = std::function<void(ValueT&)>;
+
         public:
             // default constructor
-            UnbufferedChannel() = default;
+            UnbufferedChannel(cleanupFunction_t cleanupFunc = {})
+            : _cleanupFunction{std::move(cleanupFunc)}
+            {
+            }
 
             // disable move and copy
             UnbufferedChannel(UnbufferedChannel&&) = delete;
@@ -42,13 +48,13 @@ namespace tinycoro {
             template <typename... Args>
             [[nodiscard]] auto PushWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, false, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
             }
 
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
             }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
@@ -128,7 +134,7 @@ namespace tinycoro {
                 // The channel is here unnecessary (first parameter), because non of the
                 // special awaiter functions will be called except await_resume
                 // to get the awaiter state.
-                push_awaiter_type pushAwaiter{*this, std::move(event), lastElement, std::forward<Args>(args)...};
+                push_awaiter_type pushAwaiter{*this, std::move(event), _cleanupFunction, lastElement, std::forward<Args>(args)...};
 
                 // Try to push the awaiter (with value inside) into the queue.
                 if(_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
@@ -321,6 +327,11 @@ namespace tinycoro {
             // The listerens awaiters
             std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
 
+            // This is an optional cleanup function.
+            // If we call close, this function will be called
+            // for the rest of the elements which are stored in push_awaiters
+            cleanupFunction_t _cleanupFunction{nullptr};
+
             bool _closed{false};
         };
 
@@ -415,13 +426,16 @@ namespace tinycoro {
         template <typename ChannelT, typename EventT, typename ValueT>
         class UnbufferedChannelPushAwaiter
         {
+            using cleanupFunction_t = std::function<void(ValueT&)>;
+
         public:
             template <typename... Args>
-            UnbufferedChannelPushAwaiter(ChannelT& channel, EventT event, bool lastValue, Args&&... args)
+            UnbufferedChannelPushAwaiter(ChannelT& channel, EventT event, cleanupFunction_t cleanupFunc, bool lastValue, Args&&... args)
             : _channel{channel}
             , _event{std::move(event)}
             , _value{std::forward<Args>(args)...}
             , _lastElement{lastValue}
+            , _cleanupFunction{std::move(cleanupFunc)}
             {
             }
 
@@ -447,7 +461,7 @@ namespace tinycoro {
                 return true;
             }
 
-            [[nodiscard]] constexpr auto await_resume() const noexcept
+            [[nodiscard]] constexpr auto await_resume() noexcept
             {
                 // after await suspend channel can be a dangling reference
                 // if the channel closes and calls notify 
@@ -459,6 +473,15 @@ namespace tinycoro {
                     }
                     return EChannelOpStatus::SUCCESS;
                 }
+
+                if(_cleanupFunction)
+                {
+                    // If we have a cleanup function,
+                    // we can perform some cleanup here,
+                    // if the value was not popped from the channel
+                    _cleanupFunction(_value);
+                }
+
                 return EChannelOpStatus::CLOSED;
             }
 
@@ -494,6 +517,11 @@ namespace tinycoro {
 
             // Flag which is true if the value is in use already
             bool _used{false};
+
+            // This is an optional cleanup function.
+            // If the channel is closed and the value stuck in the push awaiter
+            // we will perform this operation on the value as cleanup
+            cleanupFunction_t _cleanupFunction;
         };
 
         template <typename ChannelT, typename EventT>

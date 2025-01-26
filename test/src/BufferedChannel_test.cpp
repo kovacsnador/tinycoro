@@ -474,6 +474,60 @@ TEST(BufferedChannelTest, BufferedChannelTest_await_resume_push_close)
     EXPECT_EQ(tinycoro::EChannelOpStatus::CLOSED, awaiter2.await_resume());
 }
 
+TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback)
+{
+    std::vector<size_t> coll;
+    auto cleanup = [&coll](auto& val) { coll.push_back(val); };
+
+    tinycoro::BufferedChannel<size_t> channel{cleanup};
+
+    channel.Push(40u);
+    channel.Push(41u);
+    channel.Push(42u);
+    channel.Push(43u);
+    channel.Push(44u);
+
+    channel.Close();
+
+    EXPECT_EQ(coll.size(), 5);
+
+    size_t expected = 44;
+    for(const auto& it : coll)
+    {
+        EXPECT_EQ(expected--, it);
+    }
+}
+
+TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_pushWait)
+{
+    std::vector<size_t> coll;
+    auto cleanup = [&coll](auto& val) { coll.push_back(val); };
+
+    tinycoro::BufferedChannel<size_t> channel{cleanup};
+
+    auto producer = [&](size_t val)->tinycoro::Task<> {
+        co_await channel.PushWait(val);
+    };
+
+    auto consumer = [&](size_t expected)->tinycoro::Task<> {
+        size_t val;
+        co_await channel.PopWait(val);
+        EXPECT_EQ(val, expected);
+    };
+
+    tinycoro::RunInline(producer(40),producer(41),producer(42),producer(43),producer(44), consumer(40), consumer(41));
+
+    channel.Close();
+
+    EXPECT_EQ(coll.size(), 3);
+
+    size_t expected = 44;
+    for(const auto& it : coll)
+    {
+        EXPECT_EQ(expected--, it);
+    }
+}
+
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume_close)
 {
     tinycoro::BufferedChannel<int32_t> channel;
