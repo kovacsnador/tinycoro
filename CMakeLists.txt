@@ -53,3 +53,8 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 # build unit tests
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+
+if(UNIX)
+# on linux we also build the echo server stress test
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/example/echo_server_example)
+endif()
