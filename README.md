@@ -891,9 +891,13 @@ The `tinycoro::BufferedChannel<T>` is an asynchronous communication primitive in
 #### Constructor
 
 ```
-BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max());
+BufferedChannel(size_t maxQueueSize = std::numeric_limits<size_t>::max(), std::function<void(ValueT&)> cleanupFunc = {});
+
+BufferedChannel(std::function<void(ValueT&)> cleanupFunc);
 ```
-- **`maxQueueSize`**: The maximum number of elements the channel can buffer. Must be greater than zero.
+- **`maxQueueSize`**: The maximum number of elements the channel can buffer. Must be greater than zero. Default value is `std::numeric_limits<size_t>::max()`
+
+- **`cleanupFunc`**: This is a optional cleanup function for the elements which are stucked in the channel after close was performed.
 
 #### Public Methods
 
@@ -1011,6 +1015,14 @@ tinycoro::Task<void> Producer()
 ### `UnbufferedChannel`
 
 The `tinycoro::UnbufferedChannel<T>` is an asynchronous communication primitive in `tinycoro`, designed for passing messages between coroutines. It facilitates direct communication between a producer and a consumer coroutine, with operations that suspend until the counterpart is ready.
+
+#### Constructor
+
+```
+UnbufferedChannel(std::function<void(ValueT&)> cleanupFunc = {});
+```
+
+- **`cleanupFunc`**: This is a optional cleanup function for the elements which are stucked in the channel after close was performed.
 
 ### Member Functions
 
