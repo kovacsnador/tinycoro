@@ -200,19 +200,6 @@ namespace tinycoro {
 
                 if (auto waiter = waiters.pop())
                 {
-                    listener_awaiter_type* topListener{nullptr};
-
-                    if constexpr (std::same_as<T, push_awaiter_type>)
-                    {
-                        auto iter = _listenerWaiters.find(_waiters.size());
-                        if (iter != _listenerWaiters.end())
-                        {
-                            topListener = iter->second.steal();
-                            // remove the entry
-                            _listenerWaiters.erase(iter);
-                        }
-                    }
-
                     lock.unlock();
 
                     if (_ExchangeValue(waiter, awaiter))
@@ -223,9 +210,6 @@ namespace tinycoro {
 
                     // wake up the waiter
                     waiter->Notify();
-
-                    // wake up the listeners
-                    _NotifyAll(topListener);
 
                     // no suspend
                     return true;

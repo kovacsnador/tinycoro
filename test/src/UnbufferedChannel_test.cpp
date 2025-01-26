@@ -229,6 +229,27 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_suspend
     EXPECT_FALSE(listenerAwaiter.await_suspend(tinycoro::test::MakeCoroutineHdl()));
 }
 
+TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_ready_closed)
+{
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    size_t val;
+    auto popAwaiter = channel.PopWait(val);
+    EXPECT_FALSE(popAwaiter.await_ready());
+
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
+
+    // close the channel
+    channel.Close();
+
+    // testing the listener awaiter
+    auto listenerAwaiter = channel.WaitForListeners(1);
+
+    // calling directly await_suspend without await_ready
+    EXPECT_TRUE(listenerAwaiter.await_ready());
+}
+
 TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple)
 {
     tinycoro::Scheduler                 scheduler;
@@ -413,6 +434,27 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cleanup_callback_pushWait)
     {
         EXPECT_EQ(expected++, it);
     }
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelTest_pop_awaiter_listener)
+{
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto waitForListeners = [&]()->tinycoro::Task<>{
+        co_await channel.WaitForListeners(3);
+    };
+
+    auto producer = [&](size_t val)->tinycoro::Task<>{
+        co_await channel.PushWait(val);
+    };
+
+    auto consumer = [&](size_t expected)->tinycoro::Task<>{
+        size_t val;
+        co_await channel.PopWait(val);
+        EXPECT_EQ(val, expected);
+    };
+
+    tinycoro::RunInline(waitForListeners(), consumer(40), consumer(41), consumer(42), producer(40), producer(41), producer(42));
 }
 
 struct UnbufferedChannelTest : testing::TestWithParam<size_t>

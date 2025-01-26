@@ -528,6 +528,39 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_pushWai
     }
 }
 
+TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_stuck_pushawaiter)
+{
+    std::vector<size_t> coll;
+    auto cleanup = [&coll](auto& val) { coll.push_back(val); };
+
+    tinycoro::BufferedChannel<size_t> channel{1, cleanup};
+
+    auto producer = [&](size_t val)->tinycoro::Task<> {
+        co_await channel.PushWait(val);
+    };
+
+    auto consumer = [&](size_t expected)->tinycoro::Task<> {
+        size_t val;
+        co_await channel.PopWait(val);
+        EXPECT_EQ(val, expected);
+    };
+
+    auto closer = [&]()->tinycoro::Task<> {
+        channel.Close();
+        co_return;
+    };
+
+    tinycoro::RunInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
+
+    EXPECT_EQ(coll.size(), 3);
+
+    size_t expected = 42;
+    for(const auto& it : coll)
+    {
+        EXPECT_EQ(expected++, it);
+    }
+}
+
 TEST(BufferedChannelTest, BufferedChannelTest_await_resume_close)
 {
     tinycoro::BufferedChannel<int32_t> channel;
