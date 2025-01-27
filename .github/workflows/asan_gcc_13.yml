@@ -19,10 +19,13 @@ jobs:
           apt update -y
           apt install -y cmake
 
+    - name: Print python version
+      run: python --version
+
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.7'
+        python-version: '3.1'
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
