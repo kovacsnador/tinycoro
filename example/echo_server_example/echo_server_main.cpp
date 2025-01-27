@@ -7,7 +7,6 @@
 #include <fcntl.h>
 
 #include <iostream>
-#include <string_view>
 #include <vector>
 #include <syncstream>
 
@@ -32,7 +31,10 @@ int SetNonBlocking(file_desc_t socket)
     return -1;
 }
 
-tinycoro::Task<void> Acceptor(auto &channel, auto &workersDone)
+// This is the acceptor coroutine.
+// It's intented to accept new client connections on the server socket
+// and register the connections into the epoll through events.
+tinycoro::Task<void> Acceptor(auto& channel, auto& workersDone)
 {
     // notify the waiters if the function exits
     auto onExit = tinycoro::Finally([&workersDone] { 
@@ -78,7 +80,11 @@ tinycoro::Task<void> Acceptor(auto &channel, auto &workersDone)
     }
 }
 
-tinycoro::Task<void> ReceiveAndEcho(auto &channel, auto &workersDone)
+// This coroutine receives and echos back the messages.
+// It listens to the channel (tinycoro::BufferedChannel),
+// if there is a new entry in the channel that means
+// there was an event on the file descriptor and it's ready for read/write. 
+tinycoro::Task<void> ReceiveAndEcho(auto& channel, auto& workersDone)
 {
     // mutex to pretect write
     static std::mutex writeMtx;
@@ -137,7 +143,12 @@ tinycoro::Task<void> ReceiveAndEcho(auto &channel, auto &workersDone)
     }
 }
 
-tinycoro::Task<void> EPoll(auto& newConnectionChannel, auto& receiveChannel, file_desc_t server_socket, int32_t max_events, int32_t timeoutMs, auto &workersDone)
+// EPoll coroutine mean to be to handle and poll the events
+// from the underlying operation system.
+// EPoll pushing his results into 2 channels,
+// new connections will be pushed into newConnectionChannel,
+// ready file desriptors (read/write) into receiveChannel.
+tinycoro::Task<void> EPoll(auto& newConnectionChannel, auto& receiveChannel, file_desc_t server_socket, int32_t max_events, int32_t timeoutMs, auto& workersDone)
 {
     int epoll_fd{-1};
 
@@ -235,6 +246,7 @@ tinycoro::Task<void> EPoll(auto& newConnectionChannel, auto& receiveChannel, fil
     }
 }
 
+// Simply opens a server socket
 file_desc_t CreateServerSocket(uint32_t ip, uint16_t port)
 {
     constexpr static file_desc_t s_invalid{-1};
@@ -320,16 +332,24 @@ int main(int argc, const char **argv)
         return -1;
     }
 
-    auto socketCleanup = [](auto& socket) { close(socket); };
-
+    // creating a scheduler
     tinycoro::Scheduler scheduler;
 
+    auto socketCleanup = [](auto& socket) { close(socket); };
+
+    // Channel for new connections to be accepted.
     tinycoro::BufferedChannel<std::tuple<file_desc_t, epoll_fd_t>> connToaccept{100};
+
+    // Channels for receiving and echoing back the messages to the clients.
     tinycoro::BufferedChannel<file_desc_t> receiveAndEcho{10000, socketCleanup};
 
     // need to match the total count of Acceptor() and ReceiveAndEcho()
     tinycoro::Latch workersDone{8};
 
+    // We start all the work here.
+    // 2 coroutines making all the pull work from the os.
+    // 2 coroutine tasks are responsible to acceppt all the new incomming connections.
+    // 6 corouitnes receiving the messages from the clients and echoing back.
     tinycoro::AnyOf(scheduler, EPoll(connToaccept, receiveAndEcho, server_socket, 10000, 100, workersDone),
                                EPoll(connToaccept, receiveAndEcho, server_socket, 10000, 100, workersDone),
                                 Acceptor(connToaccept, workersDone),
