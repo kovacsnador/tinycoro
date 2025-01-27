@@ -1,0 +1,53 @@
+name: code_cov
+
+on:
+  push:
+    branches: [ "main" ]
+  pull_request:
+    branches: [ "main" ]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container: gcc:13
+
+    steps:
+    - uses: actions/checkout@v3
+
+    - name: Install CMake and lcov
+      run: |
+          apt update -y
+          apt install -y cmake lcov
+    - name: Add safe repo directory
+      run: git config --global --add safe.directory /__w/tinycoro/tinycoro
+
+    - name: Initialize Git submodules
+      run: git submodule update --init --recursive
+      working-directory: ${{ github.workspace }}
+    
+    - name: Configure with coverage flags
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_FLAGS="--coverage" -D WithASAN=OFF -D BUILD_WITH_EXAMPLES=OFF
+      working-directory: ${{ github.workspace }}
+
+    - name: Build
+      run: cmake --build build
+      working-directory: ${{ github.workspace }}
+
+    - name: Run Unit Tests
+      run: ./build/test/tinycoro_tests
+      working-directory: ${{ github.workspace }}
+
+    - name: Capture coverage data
+      working-directory: ${{ github.workspace }}
+      run: |
+          lcov --directory . --capture --output-file coverage.info
+          lcov --remove coverage.info '/usr/*' '*/test/*' '*/vendor/*' '*/example/*' --output-file coverage.info
+      
+    - name: Upload coverage to Codecov
+      uses: codecov/codecov-action@v4
+      with:
+        files: coverage.info
+        token: ${{secrets.CODECOV_TOKEN}}
+        verbose: true
+        flags: unittests
+        name: codecov-coverage
