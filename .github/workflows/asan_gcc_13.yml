@@ -18,6 +18,7 @@ jobs:
       run: |
           apt update -y
           apt install -y cmake
+          apt install -y python3
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
@@ -40,4 +41,10 @@ jobs:
 
     - name: Run Examples
       run: ./build/tinycoro_example
+      working-directory: ${{ github.workspace }}
+
+    - name: Run echo server and stress test
+      run: | 
+        ./build/example/echo_server_example/tinycoro_echo_server
+        python ./example/echo_server_example/echo_server_stress_test.py 1000 true
       working-directory: ${{ github.workspace }}
