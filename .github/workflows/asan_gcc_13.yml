@@ -12,18 +12,15 @@ jobs:
     container: gcc:13
 
     steps:
-    - uses: actions/checkout@v3
+    - uses: actions/checkout@v4
+    - uses: actions/setup-python@v5
+      with:
+        python-version: '3.13' 
 
     - name: Install CMake
       run: |
           apt update -y
           apt install -y cmake
-          apt install -y python3
-
-    - name: Set up Python
-      uses: actions/setup-python@v4
-      with:
-        python-version: '3.7.1'
 
     - name: Print python version
       run: python --version
