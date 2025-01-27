@@ -401,12 +401,12 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cleanup_callback_pushWait)
     tinycoro::UnbufferedChannel<size_t> channel{cleanup};
 
     auto producer = [&](size_t val)->tinycoro::Task<> {
-        co_await channel.PushWait(val);
+        std::ignore = co_await channel.PushWait(val);
     };
 
     auto consumer = [&](size_t expected)->tinycoro::Task<> {
         size_t val;
-        co_await channel.PopWait(val);
+        std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
 
         latch.CountDown();
@@ -445,12 +445,12 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_pop_awaiter_listener)
     };
 
     auto producer = [&](size_t val)->tinycoro::Task<>{
-        co_await channel.PushWait(val);
+        std::ignore = co_await channel.PushWait(val);
     };
 
     auto consumer = [&](size_t expected)->tinycoro::Task<>{
         size_t val;
-        co_await channel.PopWait(val);
+        std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
     };
 

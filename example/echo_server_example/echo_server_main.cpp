@@ -338,18 +338,22 @@ int main(int argc, const char **argv)
     auto socketCleanup = [](auto& socket) { close(socket); };
 
     // Channel for new connections to be accepted.
-    tinycoro::BufferedChannel<std::tuple<file_desc_t, epoll_fd_t>> connToaccept{100};
+    tinycoro::BufferedChannel<std::tuple<file_desc_t, epoll_fd_t>> connToaccept{1000};
 
     // Channels for receiving and echoing back the messages to the clients.
     tinycoro::BufferedChannel<file_desc_t> receiveAndEcho{10000, socketCleanup};
 
     // need to match the total count of Acceptor() and ReceiveAndEcho()
-    tinycoro::Latch workersDone{8};
+    tinycoro::Latch workersDone{10};
+
+    // this is a general timeout
+    // if this is over, all other coroutines are cancelled
+    auto timeoutTask = tinycoro::SleepCancellable(5min);
 
     // We start all the work here.
     // 2 coroutines making all the pull work from the os.
     // 2 coroutine tasks are responsible to acceppt all the new incomming connections.
-    // 6 corouitnes receiving the messages from the clients and echoing back.
+    // 8 corouitnes receiving the messages from the clients and echoing back.
     tinycoro::AnyOf(scheduler, EPoll(connToaccept, receiveAndEcho, server_socket, 10000, 100, workersDone),
                                EPoll(connToaccept, receiveAndEcho, server_socket, 10000, 100, workersDone),
                                 Acceptor(connToaccept, workersDone),
@@ -359,7 +363,10 @@ int main(int argc, const char **argv)
                                  ReceiveAndEcho(receiveAndEcho, workersDone),
                                  ReceiveAndEcho(receiveAndEcho, workersDone),
                                  ReceiveAndEcho(receiveAndEcho, workersDone),
-                                 ReceiveAndEcho(receiveAndEcho, workersDone));
+                                 ReceiveAndEcho(receiveAndEcho, workersDone),
+                                 ReceiveAndEcho(receiveAndEcho, workersDone),
+                                 ReceiveAndEcho(receiveAndEcho, workersDone),
+                                 std::move(timeoutTask));
 
     close(server_socket);
 

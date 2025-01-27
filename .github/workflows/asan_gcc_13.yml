@@ -1,4 +1,4 @@
-name: gcc_13_asan
+name: asan_gcc_13
 
 on:
   push:

@@ -71,6 +71,7 @@ if __name__ == "__main__":
     print(f"\nStress test completed in {elapsed_time:.2f} seconds.")
     print(f"\nSummary:")
     print(f"  Total connections: {NUMBER_OF_CONNECTIONS}")
+    print(f"  Total messages: {NUMBER_OF_CONNECTIONS * REPEAT_COUNT}")
     print(f"  Successful connections: {success_count}")
     print(f"  Mismatches: {mismatch_count}")
     print(f"  Errors: {error_count}")
