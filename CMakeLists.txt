@@ -54,12 +54,12 @@ if(UNIX)
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/example/echo_server_example)
 endif()
 
-endif()
-
 # add include directories
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+endif()
 
 # build unit tests
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
