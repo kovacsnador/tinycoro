@@ -43,11 +43,10 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Capture coverage data
+      working-directory: ${{ github.workspace }}
       run: |
           lcov --directory . --capture --output-file coverage.info
-          lcov --remove coverage.info '/usr/*' '*/test/*' '*/vendor/*' '*/example/*' '*/example/echo_server_example/*' --output-file coverage.info
-          lcov --list coverage.info
-      working-directory: ${{ github.workspace }}
+          lcov --remove coverage.info '/usr/*' '*/test/*' '*/vendor/*' '*/example/*' '*/example/*' --output-file coverage.info
       
     - name: Upload coverage to Codecov
       uses: codecov/codecov-action@v4
