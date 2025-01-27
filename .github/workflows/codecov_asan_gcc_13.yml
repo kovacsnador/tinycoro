@@ -1,4 +1,4 @@
-name: codecov_asan_gcc_13
+name: gcc_13_asan
 
 on:
   push:
@@ -14,10 +14,10 @@ jobs:
     steps:
     - uses: actions/checkout@v3
 
-    - name: Install CMake and lcov
+    - name: Install CMake
       run: |
           apt update -y
-          apt install -y cmake lcov
+          apt install -y cmake
 
     - name: Add safe repo directory
       run: git config --global --add safe.directory /__w/tinycoro/tinycoro
@@ -26,8 +26,8 @@ jobs:
       run: git submodule update --init --recursive
       working-directory: ${{ github.workspace }}
     
-    - name: Configure with coverage flags
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_FLAGS="--coverage" -D WithASAN=ON
+    - name: Configure
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D WithASAN=ON
       working-directory: ${{ github.workspace }}
 
     - name: Build
@@ -41,19 +41,3 @@ jobs:
     - name: Run Examples
       run: ./build/tinycoro_example
       working-directory: ${{ github.workspace }}
-
-    - name: Capture coverage data
-      run: |
-          lcov --directory . --capture --output-file coverage.info
-          lcov --remove coverage.info '/usr/*' '*/test/*' '*/vendor/*' '*/example/*' --output-file coverage.info
-          lcov --list coverage.info
-      working-directory: ${{ github.workspace }}
-      
-    - name: Upload coverage to Codecov
-      uses: codecov/codecov-action@v4
-      with:
-        files: coverage.info
-        token: ${{secrets.CODECOV_TOKEN}}
-        verbose: true
-        flags: unittests
-        name: codecov-coverage
