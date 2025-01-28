@@ -42,15 +42,19 @@ namespace tinycoro {
     } // namespace detail
 
     namespace concepts {
+
         template <typename... Ts>
         concept IsDuration = detail::IsDurationT<Ts...>::value;
 
+        template<typename T>
+        concept IsStopToken = requires(T t) { {t.stop_requested()} -> std::same_as<bool>;
+                                              {t.stop_possible()} -> std::same_as<bool>; };
+
     } // namespace concepts
 
-    Task<void> Sleep(concepts::IsDuration auto duration)
+    Task<void> Sleep(concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
     {
         auto start = std::chrono::system_clock::now();
-        auto stopToken = co_await StopTokenAwaiter{};
 
         auto asyncCallback = [&stopToken, duration, start]() {
             struct NonMutex
@@ -77,16 +81,26 @@ namespace tinycoro {
         }
     }
 
-    template <concepts::IsDuration DurationT>
-    Task<void> SleepCancellable(DurationT duration)
+    Task<void> Sleep(concepts::IsDuration auto duration)
     {
-        co_await Sleep(duration);
-
         auto stopToken = co_await StopTokenAwaiter{};
+        co_await Sleep(duration, stopToken);
+    }
+
+    Task<void> SleepCancellable(concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    {
+        co_await Sleep(duration, stopToken);
+        
         if (stopToken.stop_possible() && stopToken.stop_requested())
         {
             co_await CancellableSuspend<void>{};
         }
+    }
+
+    Task<void> SleepCancellable(concepts::IsDuration auto duration)
+    {
+        auto stopToken = co_await StopTokenAwaiter{};
+        co_await SleepCancellable(duration, stopToken);
     }
 
 } // namespace tinycoro

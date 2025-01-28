@@ -1,7 +1,27 @@
 #include <gtest/gtest.h>
 
+#include <thread>
+
 #include <tinycoro/tinycoro_all.h>
-#include <example/Common.h>
+
+typedef void (*funcPtr)(void*, int, int);
+
+std::jthread AsyncCallbackAPI(void* userData, funcPtr cb, int i = 43)
+{
+    return std::jthread{[cb, userData, i] {
+        std::this_thread::sleep_for(200ms);
+        cb(userData, 42, i);
+    }};
+}
+
+void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* userData)
+{
+    std::jthread t{[cb, userData] {
+        std::this_thread::sleep_for(200ms);
+        cb(userData, 42);
+    }};
+    t.detach();
+}
 
 struct ExampleTest : public testing::Test
 {

@@ -33,9 +33,14 @@ jobs:
            wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
            echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-16 main" | tee /etc/apt/sources.list.d/llvm.list
            apt update -y
+           apt install -y python3
+           ln -sf /usr/bin/python3 /usr/bin/python  # Create a symlink for python
            apt install -y clang-16 lld-16 cmake
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
+
+    - name: Verify python version
+      run: python --version
 
     - name: Add safe repo directory
       run: |
@@ -68,4 +73,11 @@ jobs:
 
     - name: Run Examples
       run: ./build/tinycoro_example
+      working-directory: ${{ github.workspace }}
+
+    - name: Run echo server and stress test
+      run: |
+        ./build/example/echo_server_example/tinycoro_echo_server &
+        python ./example/echo_server_example/echo_server_stress_test.py 1000 true &
+        wait
       working-directory: ${{ github.workspace }}

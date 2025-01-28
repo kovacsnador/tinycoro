@@ -45,14 +45,24 @@ namespace tinycoro {
             using listener_awaiter_type = ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
             using push_awaiter_type     = PushAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
-            // default constructor
-            BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max())
+            using cleanupFunction_t = std::function<void(ValueT&)>;
+
+            // constructor
+            BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max(), cleanupFunction_t cleanupFunc = {})
             : _maxQueueSize{maxQueueSize}
+            , _cleanupFunction{std::move(cleanupFunc)}
             {
                 if (_maxQueueSize == 0)
                 {
                     throw BufferedChannelException{"BufferedChannel: queue size need to be >0."};
                 }
+            }
+
+            // constructor
+            BufferedChannel(cleanupFunction_t cleanupFunc)
+            : _maxQueueSize{std::numeric_limits<decltype(_maxQueueSize)>::max()}
+            , _cleanupFunction{std::move(cleanupFunc)}
+            {
             }
 
             // disable copy and move
@@ -70,13 +80,13 @@ namespace tinycoro {
             template <typename... Args>
             [[nodiscard]] auto PushWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, false, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
             }
 
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, true, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
             }
 
             // This is a waiting push. If the queue is full this will block the current thread
@@ -143,6 +153,17 @@ namespace tinycoro {
                 for (auto& [_, list] : listeners)
                 {
                     _NotifyAll(list.top());
+                }
+
+                if(_cleanupFunction)
+                {
+                    // if we have a custom defined cleanup function
+                    // for the remaing elements after we closed the channel
+                    // we iterate over them and make the cleanup
+                    for(auto& [_, value] : _valueCollection)
+                    {
+                        _cleanupFunction(value);
+                    }
                 }
             }
 
@@ -234,7 +255,7 @@ namespace tinycoro {
                 // The channel is here unnecessary (first parameter), because non of the
                 // special awaiter functions will be called except await_resume
                 // to get the awaiter state.
-                push_awaiter_type pushAwaiter{*this, std::move(event), lastElement, std::forward<Args>(args)...};
+                push_awaiter_type pushAwaiter{*this, std::move(event), _cleanupFunction, lastElement, std::forward<Args>(args)...};
 
                 // try to register push_awaiter in the queue
                 if (Add(std::addressof(pushAwaiter)))
@@ -476,6 +497,12 @@ namespace tinycoro {
             ContainerT<Element> _valueCollection;
             const size_t        _maxQueueSize;
             bool                _closed{false};
+
+            // this is an optional cleanup function
+            // If we call close this function will be called
+            // for the rest of the elements in the queue (_valueCollection)
+            cleanupFunction_t _cleanupFunction{nullptr};
+
             mutable std::mutex  _mtx;
         };
 
@@ -625,13 +652,16 @@ namespace tinycoro {
         template <typename ChannelT, typename EventT, typename ValueT>
         class BufferedChannelPushAwaiter
         {
+            using cleanupFunction_t = std::function<void(ValueT&)>;
+
         public:
             template <typename... Args>
-            BufferedChannelPushAwaiter(ChannelT& channel, EventT event, bool lastValue, Args&&... args)
+            BufferedChannelPushAwaiter(ChannelT& channel, EventT event, cleanupFunction_t cleanupFunc, bool lastValue, Args&&... args)
             : _channel{channel}
             , _event{std::move(event)}
             , _value{std::forward<Args>(args)...}
             , _lastElement{lastValue}
+            , _cleanupFunction{std::move(cleanupFunc)}
             {
             }
 
@@ -657,7 +687,7 @@ namespace tinycoro {
                 return true;
             }
 
-            constexpr auto await_resume() const noexcept
+            constexpr auto await_resume() noexcept
             {
                 // after await_suspend channel can be a dangling reference
                 // if the channel closes and calls notify
@@ -669,6 +699,15 @@ namespace tinycoro {
                     }
                     return EChannelOpStatus::SUCCESS;
                 }
+
+                if(_cleanupFunction)
+                {   
+                    // If we have a cleanup function,
+                    // we can perform some cleanup here,
+                    // if the value was not popped from the channel
+                    _cleanupFunction(_value);
+                }
+
                 return EChannelOpStatus::CLOSED;
             }
 
@@ -704,6 +743,11 @@ namespace tinycoro {
 
             // Flag which is true if the value is in use
             bool _used{false};
+
+            // this is an optinal cleanup function.
+            // If the channel is closed and the value stuck in the awaiter
+            // we will perform this operation on the value as cleanup
+            cleanupFunction_t _cleanupFunction;
         };
 
         template <typename ValueT>

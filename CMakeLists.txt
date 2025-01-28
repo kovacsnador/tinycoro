@@ -10,6 +10,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Option to enable ASAN
 option(WithASAN "Build with AddressSanitizer" OFF)
+option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
@@ -43,13 +44,22 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
   message("CMAKE_CXX_FLAGS_RELEASE -> ${CMAKE_CXX_FLAGS_RELEASE}")
 endif()
 
+if(BUILD_WITH_EXAMPLES)
+
 # Add an executable with the source file
 add_executable(${PROJECT_NAME} example/example.cpp)
+
+if(UNIX)
+# on linux we also build the echo server stress test
+add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/example/echo_server_example)
+endif()
 
 # add include directories
 target_include_directories(${PROJECT_NAME} PUBLIC
     ${CMAKE_CURRENT_SOURCE_DIR}/include
 )
+
+endif()
 
 # build unit tests
 add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
