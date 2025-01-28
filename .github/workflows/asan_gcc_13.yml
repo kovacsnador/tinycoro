@@ -18,7 +18,7 @@ jobs:
       run: |
           apt update -y
           apt install -y cmake
-          apt install python3.10 python3.10-venv python3.10-dev
+          apt install python3
 
     - name: Print python version
       run: python --version
