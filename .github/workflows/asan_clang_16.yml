@@ -39,7 +39,7 @@ jobs:
            update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
            update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
-    - name: Print python version
+    - name: Verify python version
       run: python --version
 
     - name: Add safe repo directory
