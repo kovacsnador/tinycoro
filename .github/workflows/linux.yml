@@ -100,5 +100,5 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         ./example/echo_server_example/tinycoro_echo_server &
-        python3 ./echo_server_example/echo_server_stress_test.py 1000 true &
+        python ./echo_server_example/echo_server_stress_test.py 1000 true &
         wait
