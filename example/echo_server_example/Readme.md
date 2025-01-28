@@ -4,9 +4,16 @@ This Python script performs a stress test on a TCP echo server by simulating a l
 
 ## Requirements
 - Python 3.7+
-- A running TCP echo server (replace `SERVER_HOST` and `SERVER_PORT` with the correct values for your server).
 
 ## Usage
+
+### run the echo server
+```bash
+# default port 12345 default ip 0.0.0.0
+tinycoro_echo_server [port] [ip]
+```
+
+### starting stress test
 ```bash
 python echo_server_stress_test.py [NUMBER_OF_CONNECTIONS] [QUIT] [SERVER_HOST] [SERVER_PORT]
 ```
