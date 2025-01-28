@@ -18,7 +18,7 @@ jobs:
       run: |
           apt update -y
           apt install -y cmake
-          apt install python3
+          ln -sf /usr/bin/python3 /usr/bin/python  # Create a symlink for python
 
     - name: Print python version
       run: python --version
