@@ -290,7 +290,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token)
 
     tinycoro::SoftClock clock{40ms};
 
-    std::vector<tinycoro::CancellationToken> tokens(count);
+    std::vector<tinycoro::CancellationToken> tokens;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -364,7 +364,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
 
     tinycoro::SoftClock clock{40ms};
 
-    std::vector<tinycoro::CancellationToken> tokens(count / 2);
+    std::vector<tinycoro::CancellationToken> tokens;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -406,7 +406,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)
         co_await barrier;
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -434,7 +434,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1)
         EXPECT_TRUE(clock.Now() - start >= duration);
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -464,7 +464,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
         EXPECT_TRUE(clock.Now() - start >= duration);
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -490,7 +490,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2)
         EXPECT_TRUE(clock.Now() - start >= duration);
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -520,7 +520,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2_random)
         EXPECT_TRUE(clock.Now() - start >= duration);
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -551,7 +551,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token)
         co_await barrier;
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -580,7 +580,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
         co_return;
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -619,7 +619,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel_st
         co_return;
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -656,7 +656,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
         co_return;
     };
 
-    std::vector<tinycoro::Task<void>> tasks(count);
+    std::vector<tinycoro::Task<void>> tasks;
 
     for (size_t i = 0; i < count; ++i)
     {
