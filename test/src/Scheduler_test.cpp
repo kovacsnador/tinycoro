@@ -1,7 +1,6 @@
 #include <gtest/gtest.h>
 
-#include <tinycoro/Scheduler.hpp>
-#include <tinycoro/Task.hpp>
+#include <tinycoro/tinycoro_all.h>
 
 #include "mock/TaskMock.hpp"
 
@@ -179,5 +178,9 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
 
     auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 
-    scheduler.Wait();
+    auto[t1, t2, t3] = tinycoro::GetAll(futures);
+    
+    EXPECT_EQ(t1, 42);
+    EXPECT_EQ(t2, 41);
+    EXPECT_TRUE((std::same_as<tinycoro::VoidType, decltype(t3)>));
 }

@@ -43,14 +43,26 @@ namespace tinycoro {
 
         ~CoroThreadPool()
         {
+            // requesting the stop for the worker threads.
+            // Note: we are using jthread
+            // so we don't need to explicitly join them.
             _stopSource.request_stop();
+
+            // Explicitly join the jthread workers here to ensure proper destruction order.
+            // Although jthread automatically joins in its destructor, we must ensure
+            // that the jthread is the first member to be destroyed. This is because
+            // if the jthread destructor calls join (thread still running) after other members
+            // are destroyed, it could lead to dangling references or undefined behavior.
+            //
+            // By joining here, we guarantee that the jthread has stopped before
+            // any other members are destroyed, avoiding potential race conditions
+            // or access to invalid memory.
             std::ranges::for_each(_workerThreads, [](auto& it) {
                 if (it.joinable())
                 {
                     it.join();
                 }
             });
-            _tasksCount.store(0, std::memory_order::release);
         }
 
         // Disable copy and move
@@ -95,16 +107,6 @@ namespace tinycoro {
             return futures;
         }
 
-        void Wait()
-        {
-            auto count = _tasksCount.load(std::memory_order_acquire);
-            while (count > 0)
-            {
-                _tasksCount.wait(count, std::memory_order_acquire);
-                count = _tasksCount.load(std::memory_order_acquire);
-            }
-        }
-
     private:
         template <template<typename> class FutureStateT, typename CoroTaksT>
             requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
@@ -119,8 +121,6 @@ namespace tinycoro {
 
             if (_stopSource.stop_requested() == false)
             {
-                _tasksCount.fetch_add(1, std::memory_order_relaxed);
-
                 auto id = _coroutineIdCount.fetch_add(1, std::memory_order_relaxed);
                 coro.SetPauseHandler(GeneratePauseResume(id));
 
@@ -206,12 +206,8 @@ namespace tinycoro {
                 }
                 case STOPPED:
                     [[fallthrough]];
-                case DONE: {
-                    // task is done
-                    _tasksCount.fetch_sub(1, std::memory_order_release);
-                    _tasksCount.notify_all();
+                case DONE:
                     break;
-                }
                 default:
                     break;
                 }
@@ -271,7 +267,6 @@ namespace tinycoro {
 
         std::deque<TaskT>             _tasks;
         std::unordered_map<cid_t, TaskVariantT> _pausedTasks;
-        std::atomic<size_t>           _tasksCount{0};
 
         std::vector<std::jthread> _workerThreads;
         std::stop_source          _stopSource;

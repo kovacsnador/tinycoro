@@ -10,47 +10,31 @@
 #include "AsyncCallbackAwaiter.hpp"
 #include "StopSourceAwaiter.hpp"
 #include "CancellableSuspend.hpp"
+#include "Latch.hpp"
 
 namespace tinycoro {
-    namespace detail {
-
-        template <typename>
-        struct IsDurationT : std::false_type
-        {
-        };
-
-        template <typename RepT, typename PerT>
-        struct IsDurationT<std::chrono::duration<RepT, PerT>> : std::true_type
-        {
-        };
-
-        template <typename RepT, typename PerT>
-        struct IsDurationT<const std::chrono::duration<RepT, PerT>> : std::true_type
-        {
-        };
-
-        template <typename RepT, typename PerT>
-        struct IsDurationT<volatile std::chrono::duration<RepT, PerT>> : std::true_type
-        {
-        };
-
-        template <typename RepT, typename PerT>
-        struct IsDurationT<const volatile std::chrono::duration<RepT, PerT>> : std::true_type
-        {
-        };
-
-    } // namespace detail
 
     namespace concepts {
-
-        template <typename... Ts>
-        concept IsDuration = detail::IsDurationT<Ts...>::value;
 
         template<typename T>
         concept IsStopToken = requires(T t) { {t.stop_requested()} -> std::same_as<bool>;
                                               {t.stop_possible()} -> std::same_as<bool>; };
 
+        template<typename T>
+        concept IsSoftClock = requires(T t) { {t.Register([]{}, 1ms)}; };
+
     } // namespace concepts
+
+    Task<void> Sleep(concepts::IsSoftClock auto softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    {
+        tinycoro::Latch finished{1};
+
+        auto cancellationToken = softClock.RegisterWithCancellation([&finished]{ finished.CountDown(); }, duration);
+
+        std::stop_callback stopCallback{stopToken, [&cancellationToken, &finished]{ cancellationToken.TryCancel(); finished.CountDown(); }};
+
+        co_await finished;
+    }
 
     Task<void> Sleep(concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
     {
