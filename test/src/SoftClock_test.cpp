@@ -7,9 +7,7 @@ struct CancellationTokenMock
 {
     CancellationTokenMock() { }
 
-    CancellationTokenMock(auto, auto parent) { parent->Attach(this); }
-
-    MOCK_METHOD(void, Disable, ());
+    CancellationTokenMock(auto) { }
 };
 
 TEST(SoftClockTest, SoftClockTest_constructor_and_freqency_check)
@@ -66,38 +64,6 @@ TEST(SoftClockTest, SoftClockTest_registration_token_type)
 
     EXPECT_TRUE((std::same_as<CancellationTokenMock, tokenType1>));
     EXPECT_TRUE((std::same_as<CancellationTokenMock, tokenType2>));
-}
-
-TEST(SoftClockTest, SoftClockTest_token_disable)
-{
-    tinycoro::detail::SoftClock<CancellationTokenMock> clock{};
-
-    auto token = clock.RegisterWithCancellation([]() noexcept { }, 50ms);
-    EXPECT_CALL(token, Disable()).Times(1);
-
-    clock.RequestStop();
-}
-
-TEST(SoftClockTest, SoftClockTest_token_disable_multiple)
-{
-    tinycoro::detail::SoftClock<CancellationTokenMock> clock{};
-
-    auto token1 = clock.RegisterWithCancellation([]() noexcept { }, 2s);
-    EXPECT_CALL(token1, Disable()).Times(1);
-
-    auto token2 = clock.RegisterWithCancellation([]() noexcept { }, 2s);
-    EXPECT_CALL(token2, Disable()).Times(1);
-
-    auto token3 = clock.RegisterWithCancellation([]() noexcept { }, 2s);
-    EXPECT_CALL(token3, Disable()).Times(1);
-
-    auto token4 = clock.RegisterWithCancellation([]() noexcept { }, 2s);
-    EXPECT_CALL(token4, Disable()).Times(1);
-
-    auto token5 = clock.RegisterWithCancellation([]() noexcept { }, 2s);
-    EXPECT_CALL(token5, Disable()).Times(1);
-
-    clock.RequestStop();
 }
 
 TEST(SoftClockTest, SoftClockTest_simple)
@@ -322,7 +288,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token)
 
     tinycoro::SoftClock clock{40ms};
 
-    std::vector<tinycoro::CancellationToken> tokens{count};
+    std::vector<tinycoro::CancellationToken> tokens(count);
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -396,7 +362,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
 
     tinycoro::SoftClock clock{40ms};
 
-    std::vector<tinycoro::CancellationToken> tokens{count / 2};
+    std::vector<tinycoro::CancellationToken> tokens(count / 2);
 
     for (size_t i = 0; i < count; ++i)
     {
