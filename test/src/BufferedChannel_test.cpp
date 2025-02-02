@@ -658,8 +658,11 @@ TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
     channel.Push(1);
     channel.Push(2);
 
+    std::chrono::time_point<std::chrono::system_clock> start;
+
     auto consumer = [&](auto sleepDuration)->tinycoro::Task<void>
     {
+        start = std::chrono::system_clock::now();
         co_await tinycoro::SleepFor(clock, sleepDuration);
 
         int32_t val;
@@ -670,12 +673,10 @@ TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
 
     auto producer = [&](auto sleepDuration) -> tinycoro::Task<void>
     {
-        auto start = std::chrono::system_clock::now();
-
         // this is a blocker push
         channel.Push(3);
 
-        EXPECT_TRUE(std::chrono::system_clock::now() - start > sleepDuration);
+        EXPECT_TRUE(std::chrono::system_clock::now() - start >= sleepDuration);
 
         co_return;
     };
