@@ -33,6 +33,7 @@ namespace tinycoro {
             // allow move construction
             CancellationToken(CancellationToken&& other)
             {
+                std::scoped_lock lock{_mtx, other._mtx};
                 _cancellationCallback       = std::move(other._cancellationCallback);
                 other._cancellationCallback = nullptr;
             }
@@ -44,6 +45,7 @@ namespace tinycoro {
                 {
                     TryCancel();
 
+                    std::scoped_lock lock{_mtx, other._mtx};
                     _cancellationCallback       = std::move(other._cancellationCallback);
                     other._cancellationCallback = nullptr;
                 }
@@ -62,14 +64,18 @@ namespace tinycoro {
             // We detach ourself from the parent
             // and clear the cancellation callback,
             // but the event is NOT cancelled
-            void Release() { _cancellationCallback = nullptr; }
+            void Release()
+            {
+                std::scoped_lock lock{_mtx};
+                _cancellationCallback = nullptr;
+            }
 
             // We try to cancel the event
             // and at the same time we also make a detach
             // from the parent
             bool TryCancel()
             {
-                if (_cancellationCallback)
+                if (std::scoped_lock lock{_mtx}; _cancellationCallback)
                 {
                     auto result = _cancellationCallback();
 
@@ -94,6 +100,8 @@ namespace tinycoro {
             // this is a cancellation function
             // with this callback you can cancel the timeout
             std::function<bool()> _cancellationCallback;
+
+            std::mutex _mtx;
         };
 
         template <typename CancellationTokenT>
@@ -183,16 +191,14 @@ namespace tinycoro {
                     RegisterImpl(std::forward<CbT>(cb), tp);
                 }
 
-                // You can register a callback
-                // and you get back a cancellation token
+                // Register a callback and get cancellation token. 
                 template <concepts::IsNothrowInvokeable CbT>
                 [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
                 {
                     return RegisterWithCancellation(std::forward<CbT>(cb), clock_t::now() + duration);
                 }
 
-                // You can register a callback
-                // and you get back a cancellation token
+                // Register a callback and get cancellation token. 
                 template <concepts::IsNothrowInvokeable CbT>
                 [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
                 {
@@ -207,7 +213,7 @@ namespace tinycoro {
                             if (auto sPtr = wPtr.lock())
                             {
                                 // after we get the weak_ptr
-                                // we are safe to make operations on this
+                                // we are safe to make operations on 'this' pointer
                                 std::scoped_lock lock{_mtx};
 
                                 if (tp > clock_t::now() && StopRequested() == false)
@@ -243,16 +249,14 @@ namespace tinycoro {
                 [[nodiscard]] constexpr static auto Now() noexcept { return clock_t::now(); };
 
             private:
-
                 template <concepts::IsNothrowInvokeable CbT>
                 std::optional<map_t::iterator> RegisterImpl(CbT&& cb, concepts::IsTimePoint auto timePoint)
                 {
                     std::unique_lock lock{_mtx};
 
-                    if (/*timePoint < clock_t::now() ||*/ StopRequested())
+                    if (StopRequested())
                     {
-                        // if the event timed out already,
-                        // or a stop was requested
+                        // if the stop was requested
                         // we just return an empty optional
                         return {};
                     }
@@ -260,7 +264,7 @@ namespace tinycoro {
                     auto iter = _events.insert({timePoint, callback_t{std::forward<CbT>(cb)}});
                     lock.unlock();
 
-                    // notify that we have new event in the list
+                    // notify, that we have a new event in the list
                     _cv.notify_one();
 
                     return iter;
@@ -324,7 +328,7 @@ namespace tinycoro {
 
                         for (auto& it : tempEvents)
                         {
-                            // iterate over the timed out elements
+                            // iterate over the timed out events
                             // and notify the callee about that
                             it();
                         }
@@ -341,7 +345,6 @@ namespace tinycoro {
                 std::stop_callback<std::function<void()>> _stopCallback;
 
                 // Mutex to protect the _events container
-                // and the _cancellationTokens
                 std::mutex _mtx;
 
                 // conditional variable to notify if there is new events.
@@ -375,6 +378,8 @@ namespace tinycoro {
             {
             }
 
+            
+            // Register a callback with a custom duration (no cancellation possible)
             template <concepts::IsNothrowInvokeable CbT>
             void Register(CbT&& cb, concepts::IsDuration auto duration)
             {
@@ -388,16 +393,14 @@ namespace tinycoro {
                 _sharedImpl->Register(std::forward<CbT>(cb), timePoint);
             }
 
-            // You can register a callback
-            // and you get back a cancellation token
+            // Register a callback and get cancellation token. 
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
             {
                 return _sharedImpl->RegisterWithCancellation(std::forward<CbT>(cb), duration);
             }
 
-            // You can register a callback
-            // and you get back a cancellation token
+            // Register a callback and get cancellation token. 
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
             {

@@ -650,6 +650,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_push_await_close_after)
 
 TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
 {
+    tinycoro::SoftClock clock;
     tinycoro::Scheduler scheduler;
 
     tinycoro::BufferedChannel<int32_t> channel{2};
@@ -659,7 +660,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
 
     auto consumer = [&](auto sleepDuration)->tinycoro::Task<void>
     {
-        co_await tinycoro::Sleep(sleepDuration);
+        co_await tinycoro::SleepFor(clock, sleepDuration);
 
         int32_t val;
         EXPECT_EQ(tinycoro::EChannelOpStatus::SUCCESS, co_await channel.PopWait(val));
@@ -1296,6 +1297,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose)
 
 TEST(BufferedChannelTest, BufferedChannelTest_PushCloseMulti)
 {
+    tinycoro::SoftClock clock;
     tinycoro::Scheduler               scheduler{1};
     tinycoro::BufferedChannel<size_t> channel;
 
@@ -1312,7 +1314,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_PushCloseMulti)
     };
 
     auto producer = [&]() -> tinycoro::Task<void> {
-        co_await tinycoro::Sleep(50ms);
+        co_await tinycoro::SleepFor(clock, 50ms);
 
         channel.Push(39u);
         channel.Push(40u);

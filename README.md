@@ -217,6 +217,8 @@ catch(const std::exception& e)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
     - [Nested task](#nestedtask)
+    - [SoftClock](#softclock)
+    - [CancellationToken](#cancellationtoken)
     - [Generator](#generator)
     - [Multi Tasks](#multitasks)
     - [AsyncCallbackAwaiter](#asynccallbackawaiter)
@@ -416,6 +418,124 @@ void Example_nestedTask(tinycoro::Scheduler& scheduler)
     };
 
     int32_t val42 = tinycoro::GetAll(scheduler, task());
+}
+```
+
+### `SoftClock`
+The `tinycoro::SoftClock` class is a lightweight, thread-safe timer that allows you to register callbacks to be executed after a specified duration or at a specific time point.
+
+#### **Key Features**
+- **Thread Safety**: Protected by a mutex and uses `std::condition_variable_any` for event notification.
+- **Cancellation Support**: Events can be canceled using a `CancellationToken` or `std::stop_token`.
+- **Custom Frequency**: Allows setting a custom update frequency for the clock (minimum frequency is 40ms).
+
+#### **Constructors**
+- **`SoftClock(Frequency frequency = 100ms)`**  
+  Constructs a `SoftClock` with a custom update frequency.  
+  - `frequency`: The frequency at which the clock checks for timed-out events (default is 100ms). The minimum allowed frequency is 40ms.
+
+- **`SoftClock(std::stop_token stopToken, Frequency frequency = 100ms)`**  
+  Constructs a `SoftClock` with a custom update frequency and a stop token.  
+  - `stopToken`: A `std::stop_token` to allow external control over the clock's execution.  
+  - `frequency`: The frequency at which the clock checks for timed-out events (default is 100ms). The minimum allowed frequency is 40ms.
+
+#### **Public Methods**
+- **`Register(CbT&& cb, Duration duration)`**  
+  Registers a callback to be executed after the specified duration.  
+  - `cb`: Callback to execute (must be nothrow-invocable).  
+  - `duration`: Time duration after which the callback will be executed.
+
+- **`Register(CbT&& cb, TimePoint timePoint)`**  
+  Registers a callback to be executed at the specified time point.  
+  - `cb`: Callback to execute (must be nothrow-invocable).  
+  - `timePoint`: Time point at which the callback will be executed.
+
+- **`RegisterWithCancellation(CbT&& cb, Duration duration)`**  
+  Registers a callback and returns a `CancellationToken` that can be used to cancel the event.  
+  - `cb`: Callback to execute (must be nothrow-invocable).  
+  - `duration`: Time duration after which the callback will be executed.  
+  - Returns: A `CancellationToken` for canceling the event.
+
+- **`RegisterWithCancellation(CbT&& cb, TimePoint timePoint)`**  
+  Registers a callback and returns a `CancellationToken` that can be used to cancel the event.  
+  - `cb`: Callback to execute (must be nothrow-invocable).  
+  - `timePoint`: Time point at which the callback will be executed.  
+  - Returns: A `CancellationToken` for canceling the event.
+
+- **`RequestStop()`**  
+  Requests the `SoftClock` to stop processing events. This will stop the internal worker thread.
+
+- **`Frequency()`**  
+  Returns the current update frequency of the `SoftClock`.
+
+- **`StopRequested()`**  
+  Returns `true` if a stop has been requested for the `SoftClock`.
+
+- **`Now()`**  
+  Returns the current time point using `std::chrono::steady_clock`.
+
+### `CancellationToken`
+
+The `tinycoro::CancellationToken` class provides a mechanism to cancel registered events in the `SoftClock`. It is returned by the `RegisterWithCancellation` methods of the `SoftClock` class.
+
+### **Key Features**
+- **Move-Only**: Supports move semantics but cannot be copied.
+- **Automatic Cancellation**: Automatically cancels the event when the token is destroyed.
+- **Manual Cancellation**: Allows explicit cancellation of the event.
+
+### **Public Methods**
+- **`Release()`**  
+  Detaches the token from its parent `SoftClock` without canceling the event.
+
+- **`TryCancel()`**  
+  Attempts to cancel the event. Returns `true` if the event was successfully canceled, `false` otherwise (most likely the event was already fired...).
+
+
+
+```cpp
+int main() {
+    tinycoro::SoftClock clock;
+
+    // Register a callback to execute after 1 second
+    clock.Register([] { std::cout << "1 second passed!\n"; }, 1s);
+
+    // Register a callback with cancellation support
+    auto token = clock.RegisterWithCancellation([] { std::cout << "2 seconds passed!\n"; }, 2s);
+
+    // Cancel the second event
+    if (token.TryCancel()) {
+        std::cout << "Event canceled!\n";
+    }
+
+    // Wait for events to complete
+    std::this_thread::sleep_for(std::chrono::seconds(3));
+
+    return 0;
+}
+```
+The same approuch is used to handle sleeps in a coroutine environment.
+- **`tinycoro::SleepFor`**
+  - The sleep can be interrupted, but the coroutine **will resume** after the interruption.
+- **`tinycoro::SleepUntil`**
+  - The sleep can be interrupted, but the coroutine **will resume** after the interruption.
+- **`tinycoro::SleepForCancellable`**
+  - The sleep can be interrupted, and the coroutine **will NOT resume** after the interruption.
+- **`tinycoro::SleepUntilCancellable`**
+  - The sleep can be interrupted, and the coroutine **will NOT resume** after the interruption.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+tinycoro::SoftClock clock;
+
+tinycoro::Task<void> Task()
+{
+    // do something
+
+    // this is a coroutine friendly sleep
+    co_await tinycoro::SleepFor(clock, 2s);
+
+    // after 2 seconds we get back the control...
 }
 ```
 

@@ -460,12 +460,8 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
     size_t c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
-        auto token = clock.RegisterWithCancellation(
-            [&]() noexcept {
-                c++;
-            },
-            2000ms);
-        
+        auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 2000ms);
+
         // here should be cancelled
         co_return;
     };
@@ -476,6 +472,47 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
     {
         tasks.push_back(setTimer());
     }
+
+    tinycoro::GetAll(scheduler, std::move(tasks));
+
+    // should be 0
+    EXPECT_EQ(0, c);
+}
+
+TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel_stop_token)
+{
+    const auto count = GetParam();
+
+    std::stop_source ss;
+
+    tinycoro::Latch     latch{1};
+    tinycoro::SoftClock clock{ss.get_token(), 40ms};
+
+    tinycoro::Scheduler scheduler;
+
+    size_t c{0};
+
+    auto setTimer = [&]() -> tinycoro::Task<void> {
+        auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 20s);
+
+        // here should be cancelled
+        co_await latch;
+    };
+
+    auto canceller = [&]() -> tinycoro::Task<void> {
+        ss.request_stop();
+        latch.CountDown();
+        co_return;
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(setTimer());
+    }
+
+    tasks.push_back(canceller());
 
     tinycoro::GetAll(scheduler, std::move(tasks));
 
@@ -494,17 +531,13 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
     size_t c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
-        auto token = clock.RegisterWithCancellation(
-            [&]() noexcept {
-                c++;
-            },
-            2000ms);
-        
+        auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 2000ms);
+
         // here should be cancelled
         co_return;
     };
 
-    auto closer = [&clock]()->tinycoro::Task<void> {
+    auto closer = [&clock]() -> tinycoro::Task<void> {
         clock.RequestStop();
         co_return;
     };
@@ -515,7 +548,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
     {
         tasks.push_back(setTimer());
 
-        if( i == count / 2)
+        if (i == count / 2)
         {
             // push the closer task in the middle somewhere
             tasks.push_back(closer());

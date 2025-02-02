@@ -3,11 +3,8 @@
 
 #include <type_traits>
 #include <chrono>
-#include <future>
-#include <condition_variable>
 
 #include "Task.hpp"
-#include "AsyncCallbackAwaiter.hpp"
 #include "StopSourceAwaiter.hpp"
 #include "CancellableSuspend.hpp"
 #include "Latch.hpp"
@@ -16,75 +13,75 @@ namespace tinycoro {
 
     namespace concepts {
 
-        template<typename T>
-        concept IsStopToken = requires(T t) { {t.stop_requested()} -> std::same_as<bool>;
-                                              {t.stop_possible()} -> std::same_as<bool>; };
+        template <typename T>
+        concept IsStopToken = requires (T t) {
+            { t.stop_requested() } -> std::same_as<bool>;
+            { t.stop_possible() } -> std::same_as<bool>;
+        };
 
-        template<typename T>
-        concept IsSoftClock = requires(T t) { {t.Register([]{}, 1ms)}; };
+        template <typename T>
+        concept IsSoftClock = requires (T t) {
+            { t.RegisterWithCancellation([] () noexcept{ }, 1ms)};
+        };
 
     } // namespace concepts
 
-    Task<void> Sleep(concepts::IsSoftClock auto softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    Task<void> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
     {
         tinycoro::Latch finished{1};
 
-        auto cancellationToken = softClock.RegisterWithCancellation([&finished]{ finished.CountDown(); }, duration);
+        auto cancellationToken = softClock.RegisterWithCancellation([&finished] () noexcept { finished.CountDown(); }, timePoint);
 
-        std::stop_callback stopCallback{stopToken, [&cancellationToken, &finished]{ cancellationToken.TryCancel(); finished.CountDown(); }};
+        std::stop_callback stopCallback{stopToken, [&cancellationToken, &finished] {
+                                            cancellationToken.TryCancel();
+                                            finished.CountDown();
+                                        }};
 
         co_await finished;
     }
 
-    Task<void> Sleep(concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    Task<void> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
     {
-        auto start = std::chrono::system_clock::now();
-
-        auto asyncCallback = [&stopToken, duration, start]() {
-            struct NonMutex
-            {
-                void lock() { }
-                bool try_lock() noexcept { return true; }
-                void unlock() noexcept { }
-            };
-
-            NonMutex                    mtx;
-            std::condition_variable_any cv;
-
-            std::unique_lock lock{mtx};
-            cv.wait_for(lock, stopToken, duration, [deadLine = start + duration] { return deadLine < std::chrono::system_clock::now(); });
-        };
-
-        auto async = [](auto wrappedCallback) { return std::async(std::launch::async, wrappedCallback); };
-
-        auto future = co_await AsyncCallbackAwaiter(async, asyncCallback);
-        
-        if (future.valid())
-        {
-            future.get();
-        }
+        co_await SleepUntil(softClock, softClock.Now() + duration, stopToken);
     }
 
-    Task<void> Sleep(concepts::IsDuration auto duration)
+    Task<void> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
     {
         auto stopToken = co_await StopTokenAwaiter{};
-        co_await Sleep(duration, stopToken);
+        co_await SleepFor(softClock, duration, stopToken);
     }
 
-    Task<void> SleepCancellable(concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    Task<void> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
     {
-        co_await Sleep(duration, stopToken);
-        
+        auto stopToken = co_await StopTokenAwaiter{};
+        co_await SleepUntil(softClock, timePoint, stopToken);
+    }
+    
+    Task<void> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
+    {
+        co_await SleepUntil(softClock, timePoint, stopToken);
+
         if (stopToken.stop_possible() && stopToken.stop_requested())
         {
             co_await CancellableSuspend<void>{};
         }
     }
 
-    Task<void> SleepCancellable(concepts::IsDuration auto duration)
+    Task<void> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    {
+        co_await SleepUntilCancellable(softClock, softClock.Now() + duration, stopToken);
+    }
+
+    Task<void> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
     {
         auto stopToken = co_await StopTokenAwaiter{};
-        co_await SleepCancellable(duration, stopToken);
+        co_await SleepForCancellable(softClock, duration, stopToken);
+    }
+
+    Task<void> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
+    {
+        auto stopToken = co_await StopTokenAwaiter{};
+        co_await SleepUntilCancellable(softClock, timePoint, stopToken);
     }
 
 } // namespace tinycoro

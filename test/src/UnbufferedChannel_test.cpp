@@ -619,6 +619,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushAndClose_multi)
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
 {
+    tinycoro::SoftClock clock;
     const auto count = GetParam();
 
     tinycoro::Scheduler scheduler;
@@ -651,7 +652,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
 
     auto closer = [&]() ->tinycoro::Task<void>
     {
-        co_await tinycoro::Sleep(200ms);
+        co_await tinycoro::SleepFor(clock, 200ms);
         channel.Close();
     };
 
