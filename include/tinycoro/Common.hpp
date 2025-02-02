@@ -143,10 +143,6 @@ namespace tinycoro {
         };
 
     }} // namespace detail::helper
-
-    // Coroutine id type
-    using cid_t = uint64_t;
-
 } // namespace tinycoro
 
 #endif // !__TINY_CORO_COMMON_HPP__

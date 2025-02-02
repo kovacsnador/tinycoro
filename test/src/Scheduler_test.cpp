@@ -19,6 +19,8 @@ TEST_F(SchedulerTest, SchedulerTest_done)
     EXPECT_CALL(*task.mock, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
     EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
     EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
+    EXPECT_CALL(*task.mock, Address).Times(1);
+
 
     auto future = scheduler.Enqueue(std::move(task));
     auto val = future.get();
@@ -36,6 +38,7 @@ TEST_F(SchedulerTest, SchedulerTest_suspended)
     EXPECT_CALL(*task.mock, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
     EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
     EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
+    EXPECT_CALL(*task.mock, Address).Times(1);
 
     auto future = scheduler.Enqueue(std::move(task));
     auto val = future.get();
@@ -56,6 +59,7 @@ TEST_F(SchedulerTest, SchedulerTest_paused)
     EXPECT_CALL(mock, SetPauseHandler).Times(1);
     EXPECT_CALL(mock, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock, IsPaused).Times(0);
+    EXPECT_CALL(mock, Address).Times(2);
 
     auto future = scheduler.Enqueue(std::move(task));
 
@@ -79,6 +83,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
+    EXPECT_CALL(mock1, Address).Times(2);
 
     auto& mock2 = *task2.mock;
 
@@ -87,6 +92,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
+    EXPECT_CALL(mock2, Address).Times(1);
 
     auto& mock3 = *task3.mock;
 
@@ -95,6 +101,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(0);
     EXPECT_CALL(mock3, IsPaused).Times(0);
+    EXPECT_CALL(mock3, Address).Times(1);
 
     auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 
@@ -118,6 +125,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
+    EXPECT_CALL(mock1, Address).Times(2);
 
     auto& mock2 = *task2.mock;
 
@@ -126,6 +134,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
+    EXPECT_CALL(mock2, Address).Times(1);
 
     auto& mock3 = *task3.mock;
 
@@ -134,6 +143,8 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(1).WillOnce(testing::Return(40));
     EXPECT_CALL(mock3, IsPaused).Times(0);
+    EXPECT_CALL(mock3, Address).Times(1);
+
 
     std::vector<decltype(task1)> tasks{std::move(task1), std::move(task2), std::move(task3)};
 
@@ -159,6 +170,8 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
+    EXPECT_CALL(mock1, Address).Times(2);
+
 
     auto& mock2 = *task2.mock;
 
@@ -167,6 +180,8 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
+    EXPECT_CALL(mock2, Address).Times(1);
+
 
     auto& mock3 = *task3.mock;
 
@@ -175,6 +190,8 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(0);
     EXPECT_CALL(mock3, IsPaused).Times(0);
+    EXPECT_CALL(mock3, Address).Times(1);
+
 
     auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 

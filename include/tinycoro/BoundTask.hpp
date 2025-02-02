@@ -35,6 +35,8 @@ namespace tinycoro {
         using TaskT::SetStopSource;
         using TaskT::SetDestroyNotifier;
 
+        using TaskT::Address;
+
     private:
         CoroutineFunctionT _function;
     };

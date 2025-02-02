@@ -35,6 +35,7 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(TaskViewMock, TaskView, (), (const, noexcept));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, SetDestroyNotifier, (std::function<void()>));
+    MOCK_METHOD(void*, Address, (), (const noexcept));
 };
 
 struct TaskWrapperMock
@@ -69,6 +70,8 @@ struct TaskWrapperMock
     {
         impl->SetDestroyNotifier(std::forward<T>(cb));
     }
+
+    [[nodiscard]] auto Address() const noexcept { return impl->Address(); }
 
     std::shared_ptr<TaskWrapperMockImpl> impl = std::make_shared<TaskWrapperMockImpl>();
 };

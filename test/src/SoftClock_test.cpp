@@ -251,7 +251,7 @@ TEST(SoftClockTest, SoftClockTest_stop_token)
 
     EXPECT_FALSE(clock.StopRequested());
 
-    auto token = clock.RegisterWithCancellation([stopSource]() noexcept { stopSource.request_stop(); }, 10ms);
+    auto token = clock.RegisterWithCancellation([&stopSource]() noexcept { stopSource.request_stop(); }, 10ms);
 
     // make sure the event is called
     std::this_thread::sleep_for(200ms);

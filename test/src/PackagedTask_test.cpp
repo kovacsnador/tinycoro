@@ -55,7 +55,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
         }
 
 
-        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise), 0);
+        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise));
 
 
         packagedTask.Resume();
@@ -102,7 +102,7 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
         EXPECT_CALL(*task.mock, await_resume()).Times(0); // Return any value you'd expect
 
 
-        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise), 0);
+        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise));
 
         
         packagedTask.Resume();

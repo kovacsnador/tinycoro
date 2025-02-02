@@ -511,7 +511,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_pushWai
 
     auto consumer = [&](size_t expected)->tinycoro::Task<> {
         size_t val;
-        co_await channel.PopWait(val);
+        std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
     };
 
@@ -541,7 +541,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_stuck_p
 
     auto consumer = [&](size_t expected)->tinycoro::Task<> {
         size_t val;
-        co_await channel.PopWait(val);
+        std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
     };
 
