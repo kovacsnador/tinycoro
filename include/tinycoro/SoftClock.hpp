@@ -24,7 +24,7 @@ namespace tinycoro {
         class CancellationToken
         {
             // Only sharedImpl_t has access to the real constructor
-            friend class ParentT<CancellationToken>::sharedImpl_t;
+            friend ParentT<CancellationToken>::sharedImpl_t;
 
         public:
             // support default construction
