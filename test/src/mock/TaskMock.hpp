@@ -15,6 +15,8 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(T, await_resume, ());
         MOCK_METHOD(bool, IsPaused, (), (const noexcept));
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+        MOCK_METHOD(void*, Address, (), (const noexcept));
+
 
         tinycoro::PauseHandlerCallbackT pauseCallback;
     };
@@ -45,6 +47,11 @@ namespace tinycoro { namespace test {
         {
             mock->SetPauseHandler(func);
             mock->pauseCallback = func;
+        }
+
+        void* Address() const noexcept
+        {
+            return mock->Address();
         }
 
         std::shared_ptr<TaskMockImpl<T>> mock;

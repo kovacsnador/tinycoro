@@ -10,27 +10,27 @@ struct SleepAwaiterTest : testing::Test
     tinycoro::Scheduler scheduler{4};
 };
 
-tinycoro::Task<void> SleepTask(auto duration)
+/*tinycoro::Task<void> SleepTask(auto duration)
 { 
-    co_await tinycoro::Sleep(duration);
+    co_await tinycoro::SleepFor(clock, duration);
 };
 
 tinycoro::Task<void> SleepTaskCustom(auto duration)
 {
     auto stopToken = co_await tinycoro::StopTokenAwaiter{};
-    co_await tinycoro::Sleep(duration, stopToken);
-};
+    co_await tinycoro::SleepFor(clock, duration, stopToken);
+};*/
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest)
 {
+    tinycoro::SoftClock clock;
+
     using namespace std::chrono_literals;
 
     auto timeout = 200ms;
 
-    auto sleepTask = SleepTask(timeout);
-
     auto start  = std::chrono::system_clock::now();
-    auto future = scheduler.Enqueue(std::move(sleepTask));
+    auto future = scheduler.Enqueue(tinycoro::SleepFor(clock, timeout));
 
     EXPECT_NO_THROW(future.get());
 
@@ -39,6 +39,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt)
 {
+    tinycoro::SoftClock clock;
     using namespace std::chrono_literals;
 
     auto timeout1 = 200ms;
@@ -46,7 +47,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt)
 
     auto start  = std::chrono::system_clock::now();
 
-    tinycoro::AnyOf(scheduler, SleepTask(timeout1), SleepTask(timeout2));
+    tinycoro::AnyOf(scheduler, tinycoro::SleepFor(clock, timeout1), tinycoro::SleepFor(clock, timeout2));
 
     auto end = std::chrono::system_clock::now();
 
@@ -56,6 +57,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_custom_stopToken)
 {
+    tinycoro::SoftClock clock;
     using namespace std::chrono_literals;
 
     auto timeout1 = 200ms;
@@ -63,7 +65,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_custom_stopToken)
 
     auto start  = std::chrono::system_clock::now();
 
-    tinycoro::AnyOf(scheduler, SleepTaskCustom(timeout1), SleepTaskCustom(timeout2));
+    tinycoro::AnyOf(scheduler, tinycoro::SleepForCancellable(clock, timeout1), tinycoro::SleepForCancellable(clock, timeout2));
 
     auto end = std::chrono::system_clock::now();
 
@@ -73,12 +75,13 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_custom_stopToken)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable)
 {
+    tinycoro::SoftClock clock;
     using namespace std::chrono_literals;
 
     std::atomic<int32_t> count{};
 
     auto sleepTaskCancellable = [&](auto duration) -> tinycoro::Task<void> {
-        co_await tinycoro::SleepCancellable(duration);
+        co_await tinycoro::SleepForCancellable(clock, duration);
         ++count;
     };
 
@@ -101,12 +104,13 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable_custom_stopToken)
 {
     using namespace std::chrono_literals;
 
+    tinycoro::SoftClock clock;
     std::atomic<int32_t> count{};
 
     auto sleepTaskCancellable = [&](auto duration) -> tinycoro::Task<void> {
 
         auto stopToken = co_await tinycoro::StopTokenAwaiter{};
-        co_await tinycoro::SleepCancellable(duration, stopToken);
+        co_await tinycoro::SleepForCancellable(clock, duration, stopToken);
         ++count;
     };
 

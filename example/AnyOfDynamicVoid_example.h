@@ -9,9 +9,11 @@
 
 void Example_AnyOfDynamicVoid(auto& scheduler)
 {
+    tinycoro::SoftClock clock;
+
     SyncOut() << "\n\nExample_AnyOfDynamicVoid:\n";
 
-    auto task1 = [](auto duration) -> tinycoro::Task<void> {
+    auto task1 = [&clock](auto duration) -> tinycoro::Task<void> {
         SyncOut() << "  Coro starting... before StopTokenAwaiter " << "  Thread id : " << std::this_thread::get_id() << '\n';
 
         [[maybe_unused]] auto stopToken  = co_await tinycoro::StopTokenAwaiter{};
@@ -19,7 +21,7 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
 
         SyncOut() << "  Coro starting... after StopTokenAwaiter " << "  Thread id : " << std::this_thread::get_id() << '\n';
 
-        co_await tinycoro::Sleep(duration);
+        co_await tinycoro::SleepFor(clock, duration);
 
         SyncOut() << std::boolalpha <<  "  Coro stop was requested:  " << stopToken.stop_requested() << "  Thread id : " << std::this_thread::get_id() << '\n';
     };

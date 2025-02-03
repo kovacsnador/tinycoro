@@ -282,6 +282,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_1)
 
 TEST(RunInlineTest, RunInline_FunctionalTest_2)
 {
+    tinycoro::SoftClock clock;
     tinycoro::SingleEvent<int32_t> event;
 
     auto consumer = [&event]()->tinycoro::Task<int32_t>
@@ -289,9 +290,9 @@ TEST(RunInlineTest, RunInline_FunctionalTest_2)
         co_return co_await event; 
     };
 
-    auto producer = [&event]()->tinycoro::Task<>
+    auto producer = [&event, &clock]()->tinycoro::Task<>
     {
-        co_await tinycoro::Sleep(100ms);
+        co_await tinycoro::SleepFor(clock, 100ms);
         event.SetValue(42);
     };
 
@@ -535,6 +536,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
 
 TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
 {   
+    tinycoro::SoftClock clock;
     tinycoro::Scheduler scheduler;
 
     tinycoro::Barrier barrier{4};
@@ -544,8 +546,8 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
         co_return r;
     };
 
-    auto deferedTask = [&task](int32_t r) -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Sleep(200ms);
+    auto deferedTask = [&task, &clock](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock,200ms);
         co_return co_await task(r);
     };
 
@@ -565,8 +567,9 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
 
 TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleep)
 {
-    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Sleep(200ms);
+    tinycoro::SoftClock clock;
+    auto deferedTask = [&clock](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 200ms);
         co_return r;
     };
 
@@ -580,8 +583,9 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleep)
 
 TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti)
 {
-    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Sleep(200ms);
+    tinycoro::SoftClock clock;
+    auto deferedTask = [&clock](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 200ms);
         co_return r;
     };
 
@@ -597,8 +601,10 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti)
 
 TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti_dynamic)
 {
-    auto deferedTask = [](int32_t r) -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Sleep(200ms);
+    tinycoro::SoftClock clock;
+
+    auto deferedTask = [&clock](int32_t r) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock,200ms);
         co_return r;
     };
 

@@ -6,8 +6,63 @@
 #include <atomic>
 #include <memory>
 #include <cassert>
+#include <chrono>
 
 namespace tinycoro {
+
+    namespace detail {
+
+        template <typename>
+        struct IsDurationT : std::false_type
+        {
+        };
+
+        template <typename RepT, typename PerT>
+        struct IsDurationT<std::chrono::duration<RepT, PerT>> : std::true_type
+        {
+        };
+
+        template <typename RepT, typename PerT>
+        struct IsDurationT<const std::chrono::duration<RepT, PerT>> : std::true_type
+        {
+        };
+
+        template <typename RepT, typename PerT>
+        struct IsDurationT<volatile std::chrono::duration<RepT, PerT>> : std::true_type
+        {
+        };
+
+        template <typename RepT, typename PerT>
+        struct IsDurationT<const volatile std::chrono::duration<RepT, PerT>> : std::true_type
+        {
+        };
+
+        template <typename>
+        struct IsTimePointT : std::false_type
+        {
+        };
+
+        template <typename ClockT, typename DurationT>
+        struct IsTimePointT<std::chrono::time_point<ClockT, DurationT>> : std::true_type
+        {
+        };
+
+        template <typename ClockT, typename DurationT>
+        struct IsTimePointT<const std::chrono::time_point<ClockT, DurationT>> : std::true_type
+        {
+        };
+
+        template <typename ClockT, typename DurationT>
+        struct IsTimePointT<volatile std::chrono::time_point<ClockT, DurationT>> : std::true_type
+        {
+        };
+
+        template <typename ClockT, typename DurationT>
+        struct IsTimePointT<const volatile std::chrono::time_point<ClockT, DurationT>> : std::true_type
+        {
+        };
+
+    } // namespace detail
 
     namespace concepts {
 
@@ -28,6 +83,15 @@ namespace tinycoro {
             { n.next } -> std::same_as<std::remove_pointer_t<T>*&>;
         };
 
+        template <typename... Ts>
+        concept IsDuration = detail::IsDurationT<Ts...>::value;
+
+        template <typename... Ts>
+        concept IsTimePoint = detail::IsTimePointT<Ts...>::value;
+
+        template<typename T>
+        concept IsNothrowInvokeable = std::is_nothrow_invocable_v<T>;
+
     } // namespace concepts
 
     struct VoidType
@@ -43,7 +107,7 @@ namespace tinycoro {
     };
 
     namespace detail { namespace helper {
-        
+
         // simple auto reset event
         struct AutoResetEvent
         {
@@ -72,20 +136,13 @@ namespace tinycoro {
                 return _flag.compare_exchange_strong(expected, false);
             }
 
-            [[nodiscard]] bool IsSet() const noexcept
-            {
-                return _flag.load(std::memory_order::relaxed);
-            }
+            [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }
 
         private:
             std::atomic<bool> _flag{};
         };
 
     }} // namespace detail::helper
-
-    // Coroutine id type
-    using cid_t = uint64_t;
-
 } // namespace tinycoro
 
 #endif // !__TINY_CORO_COMMON_HPP__

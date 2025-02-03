@@ -131,6 +131,11 @@ namespace tinycoro {
             _destroyNotifier.Set(std::forward<T>(cb));
         }
 
+        [[nodiscard]] void* Address() const noexcept
+        {
+            return _hdl.address();
+        }
+
     private:
         void destroy()
         {
@@ -226,6 +231,11 @@ namespace tinycoro {
         void SetDestroyNotifier(T&& cb)
         {
             _destroyNotifier.Set(std::forward<T>(cb));
+        }
+
+        [[nodiscard]] void* Address() const noexcept
+        {
+            return _hdl.address();
         }
 
     private:

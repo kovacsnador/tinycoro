@@ -40,6 +40,8 @@ namespace tinycoro {
 
             virtual void Resume()                  = 0;
             virtual ETaskResumeState ResumeState() = 0;
+
+            virtual void* Address() const noexcept = 0;
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -96,6 +98,11 @@ namespace tinycoro {
                 return _coro.ResumeState();
             }
 
+            void* Address() const noexcept override
+            {
+                return _coro.Address();
+            }
+
         private:
             bool         _needValueSet{true};
             CoroT        _coro;
@@ -105,8 +112,7 @@ namespace tinycoro {
     public:
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
             requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedTask>)
-        PackagedTask(CoroT&& coro, FutureStateT futureState, cid_t pauseId)
-        : id{pauseId}
+        PackagedTask(CoroT&& coro, FutureStateT futureState)
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
             _pimpl = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
@@ -122,7 +128,10 @@ namespace tinycoro {
             return _pimpl->ResumeState();
         }
 
-        const cid_t id;
+        void* Address() const noexcept
+        {
+            return _pimpl->Address();
+        }
 
     private:
         std::unique_ptr<ISchedulableBridged> _pimpl{};

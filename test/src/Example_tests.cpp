@@ -562,11 +562,13 @@ TEST_F(ExampleTest, Example_AnyOfDynamic)
 
 TEST_F(ExampleTest, Example_AnyOfDynamicVoid)
 {
-    auto task1 = [](auto duration) -> tinycoro::Task<void> {
+    tinycoro::SoftClock clock;
+
+    auto task1 = [&clock](auto duration) -> tinycoro::Task<void> {
         [[maybe_unused]] auto stopToken  = co_await tinycoro::StopTokenAwaiter{};
         [[maybe_unused]] auto stopSource = co_await tinycoro::StopSourceAwaiter{};
 
-        co_await tinycoro::Sleep(duration);
+        co_await tinycoro::SleepFor(clock, duration);
     };
 
     std::stop_source source;

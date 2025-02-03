@@ -461,6 +461,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 
 TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
 {
+    tinycoro::SoftClock clock;
     // scheduler with only 1 thread
     tinycoro::Scheduler scheduler{1};
 
@@ -468,7 +469,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
 
     auto coro = [&]() -> tinycoro::Task<void> {
         auto task = [&](auto duration) -> tinycoro::Task<void> {
-            co_await tinycoro::SleepCancellable(duration);
+            co_await tinycoro::SleepForCancellable(clock, duration);
             ++count; // should never reach this code
         };
 
@@ -496,13 +497,14 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
 
 TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
 {
+    tinycoro::SoftClock clock;
     // scheduler with only 1 thread
     tinycoro::Scheduler scheduler{1};
 
     std::atomic<size_t> count{};
 
-    auto task = [&count](auto duration) -> tinycoro::Task<void> {
-        co_await tinycoro::SleepCancellable(duration);
+    auto task = [&count, &clock](auto duration) -> tinycoro::Task<void> {
+        co_await tinycoro::SleepForCancellable(clock, duration);
         ++count; // should never reach this code
     };
 

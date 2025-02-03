@@ -332,6 +332,8 @@ int main(int argc, const char **argv)
         return -1;
     }
 
+    tinycoro::SoftClock clock;
+
     // creating a scheduler
     tinycoro::Scheduler scheduler;
 
@@ -348,7 +350,7 @@ int main(int argc, const char **argv)
 
     // this is a general timeout
     // if this is over, all other coroutines are cancelled
-    auto timeoutTask = tinycoro::SleepCancellable(5min);
+    auto timeoutTask = tinycoro::SleepForCancellable(clock, 5min);
 
     // We start all the work here.
     // 2 coroutines making all the pull work from the os.
