@@ -245,9 +245,6 @@ namespace tinycoro {
 
                 [[nodiscard]] auto StopRequested() const noexcept { return _thread.get_stop_token().stop_requested(); }
 
-                // This function using the std::steady_clock
-                [[nodiscard]] constexpr static auto Now() noexcept { return clock_t::now(); };
-
             private:
                 template <concepts::IsNothrowInvokeable CbT>
                 std::optional<map_t::iterator> RegisterImpl(CbT&& cb, concepts::IsTimePoint auto timePoint)
@@ -414,7 +411,10 @@ namespace tinycoro {
             [[nodiscard]] auto StopRequested() const noexcept { return _sharedImpl->StopRequested(); }
 
             // This function using the std::steady_clock
-            [[nodiscard]] constexpr static auto Now() noexcept { return clock_t::now(); };
+            template<typename DurationT = precision_t>
+            [[nodiscard]] constexpr static auto Now() noexcept { 
+                return std::chrono::time_point_cast<DurationT>(clock_t::now());
+            };
 
         private:
             // contains the real implementation of the clock

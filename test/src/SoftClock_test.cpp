@@ -431,7 +431,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1)
     auto measure = [&]() -> tinycoro::Task<void> {
         auto start = clock.Now();
         co_await tinycoro::SleepFor(clock, duration);
-        EXPECT_TRUE(clock.Now() - start >= duration);
+        EXPECT_TRUE(start + duration <= clock.Now());
     };
 
     std::vector<tinycoro::Task<void>> tasks;
@@ -461,7 +461,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
 
         auto start = clock.Now();
         co_await tinycoro::SleepFor(clock, duration);
-        EXPECT_TRUE(clock.Now() - start >= duration);
+        EXPECT_TRUE(start + duration <= clock.Now());
     };
 
     std::vector<tinycoro::Task<void>> tasks;
@@ -485,9 +485,9 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2)
     auto duration = 200ms;
 
     auto measure = [&]() -> tinycoro::Task<void> {
-        auto start = clock.Now();
-        co_await tinycoro::SleepUntil(clock, start + duration);
-        EXPECT_TRUE(clock.Now() - start >= duration);
+        auto tp = clock.Now() + duration;
+        co_await tinycoro::SleepUntil(clock, tp);
+        EXPECT_TRUE(tp <= clock.Now());
     };
 
     std::vector<tinycoro::Task<void>> tasks;
@@ -515,9 +515,9 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2_random)
     auto measure = [&]() -> tinycoro::Task<void> {
         std::chrono::milliseconds duration(static_cast<int32_t>(dist(mt)));
 
-        auto start = clock.Now();
-        co_await tinycoro::SleepUntil(clock, start + duration);
-        EXPECT_TRUE(clock.Now() - start >= duration);
+        auto tp = clock.Now() + duration;
+        co_await tinycoro::SleepUntil(clock, tp);
+        EXPECT_TRUE(tp <= clock.Now());
     };
 
     std::vector<tinycoro::Task<void>> tasks;
