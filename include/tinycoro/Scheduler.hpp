@@ -273,15 +273,26 @@ namespace tinycoro {
             }
         }
 
+        // currently active tasks
         std::deque<TaskT>             _tasks;
+
+        // tasks which are in pause state
         std::unordered_map<void*, TaskVariantT> _pausedTasks;
 
+        // the worker threads which are running the tasks
         std::vector<std::jthread> _workerThreads;
+
+        // stop_source to support safe cancellation
         std::stop_source          _stopSource;
 
+        // mutext to protect the active tasks queue
         std::mutex _tasksQueueMtx;
+
+        // mutext to protect the paused tasks map
         std::mutex _pausedTasksMtx;
 
+        // conditional variable used to notify
+        // if we have active tasks in the queue
         std::condition_variable_any _cv;
     };
 

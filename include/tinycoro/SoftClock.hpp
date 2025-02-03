@@ -194,14 +194,14 @@ namespace tinycoro {
                     RegisterImpl(std::forward<CbT>(cb), tp);
                 }
 
-                // Register a callback and get cancellation token. 
+                // Register a callback and get cancellation token.
                 template <concepts::IsNothrowInvokeable CbT>
                 [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
                 {
                     return RegisterWithCancellation(std::forward<CbT>(cb), clock_t::now() + duration);
                 }
 
-                // Register a callback and get cancellation token. 
+                // Register a callback and get cancellation token.
                 template <concepts::IsNothrowInvokeable CbT>
                 [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
                 {
@@ -275,11 +275,8 @@ namespace tinycoro {
                 // which is registered in the constructor
                 void Run(std::stop_token jthreadStopToken)
                 {
-                    // get the first/start timepoint
-                    auto timePoint = clock_t::now() + _frequency;
-
                     // this is a temporary container
-                    // in which we copy the times out callbacks
+                    // in which we copy the timed out callbacks
                     std::vector<callback_t> tempEvents;
 
                     auto transformer = [](auto& pair) { return pair.second; };
@@ -287,28 +284,25 @@ namespace tinycoro {
                     for (;;)
                     {
                         std::unique_lock lock{_mtx};
-                        if (_cv.wait_until(lock, jthreadStopToken, timePoint, [timePoint] { return timePoint <= clock_t::now(); }) == false)
-                        {
-                            // if the stop was requested
-                            // we can leave the scene
-                            break;
-                        }
-
-                        timePoint += _frequency;
-
                         if (_events.empty())
                         {
                             // we go to sleep if the list is empty
+                            // until a new event is pushed and we get notified
                             if (_cv.wait(lock, jthreadStopToken, [this] { return _events.empty() == false; }) == false)
                             {
                                 // if the stop was requested
                                 // we can leave the scene
                                 break;
                             }
-
-                            // update the timepoint after wakeup
-                            // and start the iteration again
-                            timePoint = clock_t::now() + _frequency;
+                        }
+                        
+                        // we have some events in the map
+                        auto timePoint = clock_t::now() + _frequency;
+                        if (_cv.wait_until(lock, jthreadStopToken, timePoint, [timePoint] { return timePoint <= clock_t::now(); }) == false)
+                        {
+                            // if the stop was requested
+                            // we can leave the scene
+                            break;
                         }
 
                         // getting the upper bound
@@ -352,7 +346,7 @@ namespace tinycoro {
 
                 // syncronized pool for events
                 // It is more cache friendly if we iterate
-                // on the events. 
+                // on the events.
                 std::pmr::synchronized_pool_resource _pool;
 
                 // Multimap is used, because multiple callbacks
@@ -383,7 +377,6 @@ namespace tinycoro {
             {
             }
 
-            
             // Register a callback with a custom duration (no cancellation possible)
             template <concepts::IsNothrowInvokeable CbT>
             void Register(CbT&& cb, concepts::IsDuration auto duration)
@@ -398,14 +391,14 @@ namespace tinycoro {
                 _sharedImpl->Register(std::forward<CbT>(cb), timePoint);
             }
 
-            // Register a callback and get cancellation token. 
+            // Register a callback and get cancellation token.
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
             {
                 return _sharedImpl->RegisterWithCancellation(std::forward<CbT>(cb), duration);
             }
 
-            // Register a callback and get cancellation token. 
+            // Register a callback and get cancellation token.
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
             {
@@ -419,8 +412,9 @@ namespace tinycoro {
             [[nodiscard]] auto StopRequested() const noexcept { return _sharedImpl->StopRequested(); }
 
             // This function using the std::steady_clock
-            template<typename DurationT = precision_t>
-            [[nodiscard]] constexpr static auto Now() noexcept { 
+            template <typename DurationT = precision_t>
+            [[nodiscard]] constexpr static auto Now() noexcept
+            {
                 return std::chrono::time_point_cast<DurationT>(clock_t::now());
             };
 

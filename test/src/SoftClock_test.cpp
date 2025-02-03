@@ -255,10 +255,26 @@ TEST(SoftClockTest, SoftClockTest_stop_token)
 
     auto token = clock.RegisterWithCancellation([&stopSource]() noexcept { stopSource.request_stop(); }, 10ms);
 
-    // make sure the event is called
+    // make sure the stop_source is called
     std::this_thread::sleep_for(200ms);
 
     EXPECT_TRUE(clock.StopRequested());
+
+    // those should timed out
+    EXPECT_FALSE(token.TryCancel());
+}
+
+TEST(SoftClockTest, SoftClockTest_stop_and_start)
+{
+    tinycoro::SoftClock clock{40ms};
+
+    std::this_thread::sleep_for(100ms);
+
+    // now the clock should be empty and waiting
+    auto token = clock.RegisterWithCancellation([]() noexcept { }, 10ms);
+
+    // event is called for sure
+    std::this_thread::sleep_for(100ms);
 
     // those should timed out
     EXPECT_FALSE(token.TryCancel());
