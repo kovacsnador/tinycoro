@@ -11,6 +11,7 @@
 #include <concepts>
 #include <vector>
 #include <memory>
+#include <memory_resource>
 
 #include "Common.hpp"
 
@@ -125,7 +126,7 @@ namespace tinycoro {
             public:
                 using callback_t = std::function<void()>;
 
-                using map_t = std::multimap<timepoint_t, callback_t>;
+                using map_t = std::pmr::multimap<timepoint_t, callback_t>;
 
                 // Constructor with custom update frequency
                 // the minimum frequency is defined in s_minFrequency
@@ -133,6 +134,7 @@ namespace tinycoro {
                 SoftClockImpl(T frequency = 100ms)
                 : _frequency{std::max(s_minFrequency, std::chrono::duration_cast<precision_t>(frequency))}
                 , _stopCallback{std::stop_token{}, [] {}}
+                , _events{&_pool}
                 , _thread{[this](std::stop_token token) { Run(token); }}
                 {
                 }
@@ -147,6 +149,7 @@ namespace tinycoro {
                                     // register a stop_callback which is intented to trigger the RequestStop.
                                     RequestStop();
                                 }}
+                , _events{&_pool}
                 , _thread{[this](std::stop_token token) { Run(token); }}
                 {
                 }
@@ -346,6 +349,11 @@ namespace tinycoro {
 
                 // conditional variable to notify if there is new events.
                 std::condition_variable_any _cv;
+
+                // syncronized pool for events
+                // It is more cache friendly if we iterate
+                // on the events. 
+                std::pmr::synchronized_pool_resource _pool;
 
                 // Multimap is used, because multiple callbacks
                 // could be registered with the same timepoint

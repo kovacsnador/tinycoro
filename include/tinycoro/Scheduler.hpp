@@ -117,11 +117,14 @@ namespace tinycoro {
         {
             FutureStateT<typename CoroTaksT::promise_type::value_type> futureState;
 
-            auto future = futureState.get_future();
+            auto future  = futureState.get_future();
+            auto address = coro.Address();
 
-            if (_stopSource.stop_requested() == false)
+            if (_stopSource.stop_requested() == false && address)
             {
-                coro.SetPauseHandler(GeneratePauseResume(coro.Address()));
+                // not allow to enqueue tasks without unique address
+                // or if the a stop is requested
+                coro.SetPauseHandler(GeneratePauseResume(address));
                 TaskT task{std::move(coro), std::move(futureState)};
 
                 {
@@ -137,7 +140,7 @@ namespace tinycoro {
 
         // Generates the pause resume callback
         // It relays on a std::coroutine_handle unique address
-        // which is used as an identifier 
+        // which is used as an identifier
         PauseHandlerCallbackT GeneratePauseResume(void* address)
         {
             return [this, address]() {
