@@ -41,7 +41,7 @@ namespace tinycoro {
             virtual void Resume()                  = 0;
             virtual ETaskResumeState ResumeState() = 0;
 
-            virtual void* Address() const noexcept = 0;
+            virtual address_t Address() const noexcept = 0;
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -98,7 +98,7 @@ namespace tinycoro {
                 return _coro.ResumeState();
             }
 
-            void* Address() const noexcept override
+            address_t Address() const noexcept override
             {
                 return _coro.Address();
             }
@@ -128,7 +128,7 @@ namespace tinycoro {
             return _pimpl->ResumeState();
         }
 
-        void* Address() const noexcept
+        address_t Address() const noexcept
         {
             return _pimpl->Address();
         }

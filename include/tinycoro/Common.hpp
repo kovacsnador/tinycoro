@@ -98,6 +98,10 @@ namespace tinycoro {
     {
     };
 
+    // this is the unique address type of
+    // an std::coroutine_handler::address
+    using address_t = void*;
+
     enum class ETaskResumeState
     {
         SUSPENDED,

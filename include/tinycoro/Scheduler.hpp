@@ -141,7 +141,7 @@ namespace tinycoro {
         // Generates the pause resume callback
         // It relays on a std::coroutine_handle unique address
         // which is used as an identifier
-        PauseHandlerCallbackT GeneratePauseResume(void* address)
+        PauseHandlerCallbackT GeneratePauseResume(address_t address)
         {
             return [this, address]() {
                 if (_stopSource.stop_requested() == false)
@@ -274,16 +274,16 @@ namespace tinycoro {
         }
 
         // currently active tasks
-        std::deque<TaskT>             _tasks;
+        std::deque<TaskT> _tasks;
 
         // tasks which are in pause state
-        std::unordered_map<void*, TaskVariantT> _pausedTasks;
+        std::unordered_map<address_t, TaskVariantT> _pausedTasks{1};
 
         // the worker threads which are running the tasks
         std::vector<std::jthread> _workerThreads;
 
         // stop_source to support safe cancellation
-        std::stop_source          _stopSource;
+        std::stop_source _stopSource;
 
         // mutext to protect the active tasks queue
         std::mutex _tasksQueueMtx;
