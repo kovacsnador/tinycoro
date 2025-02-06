@@ -7,7 +7,7 @@
 #include "Task.hpp"
 #include "StopSourceAwaiter.hpp"
 #include "CancellableSuspend.hpp"
-#include "Latch.hpp"
+#include "AutoEvent.hpp"
 
 namespace tinycoro {
 
@@ -28,14 +28,14 @@ namespace tinycoro {
 
     Task<void> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
     {
-        tinycoro::Latch finished{1};
+        tinycoro::AutoEvent finished;
 
-        auto cancellationToken = softClock.RegisterWithCancellation([&finished] () noexcept { finished.CountDown(); }, timePoint);
+        auto cancellationToken = softClock.RegisterWithCancellation([&finished] () noexcept { finished.Set(); }, timePoint);
 
         std::stop_callback stopCallback{stopToken, [&cancellationToken, &finished] {
                                             if(cancellationToken.TryCancel())
                                             {
-                                                finished.CountDown();
+                                                finished.Set();
                                             }
                                         }};
 
