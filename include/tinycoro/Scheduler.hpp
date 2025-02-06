@@ -5,20 +5,18 @@
 #include <future>
 #include <functional>
 #include <vector>
-#include <deque>
 #include <mutex>
 #include <condition_variable>
 #include <concepts>
 #include <assert.h>
 #include <ranges>
-#include <algorithm>
-#include <variant>
-#include <unordered_map>
 
 #include "Future.hpp"
 #include "Common.hpp"
 #include "PauseHandler.hpp"
 #include "PackagedTask.hpp"
+#include "LinkedPtrList.hpp"
+#include "LinkedPtrQueue.hpp"
 
 using namespace std::chrono_literals;
 
@@ -26,18 +24,12 @@ namespace tinycoro {
 
     template <std::move_constructible TaskT>
         requires requires (TaskT t) {
-            { t.Resume() } -> std::same_as<void>;
-            { t.ResumeState() } -> std::same_as<ETaskResumeState>;
+            { t->Resume() } -> std::same_as<void>;
+            { t->ResumeState() } -> std::same_as<ETaskResumeState>;
+            { t->SetPauseHandler([]{}) } -> std::same_as<void>;
         }
     class CoroThreadPool
     {
-        // Placeholder task type for to notify that the task should not be put on pause.
-        struct DoNotPauseTask
-        {
-        };
-
-        using TaskVariantT = std::variant<DoNotPauseTask, TaskT>;
-
     public:
         CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency()) { _AddWorkers(workerThreadCount); }
 
@@ -57,17 +49,23 @@ namespace tinycoro {
             // By joining here, we guarantee that the jthread has stopped before
             // any other members are destroyed, avoiding potential race conditions
             // or access to invalid memory.
-            std::ranges::for_each(_workerThreads, [](auto& it) {
+            for (auto& it : _workerThreads)
+            {
                 if (it.joinable())
                 {
                     it.join();
                 }
-            });
+            }
+
+            // Make some trivial cleanup for dangling tasks
+            _CleanUpDanglingTasks();
         }
 
         // Disable copy and move
         CoroThreadPool(const CoroThreadPool&) = delete;
         CoroThreadPool(CoroThreadPool&&)      = delete;
+
+        auto GetStopToken() const noexcept { return _stopSource.get_token(); }
 
         template <template <typename> class FutureStateT = std::promise, concepts::NonIterable... CoroTasksT>
             requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
@@ -122,14 +120,14 @@ namespace tinycoro {
 
             if (_stopSource.stop_requested() == false && address)
             {
-                // not allow to enqueue tasks without unique address
+                // not allow to enqueue tasks with uninitialized std::coroutine_handler
                 // or if the a stop is requested
-                coro.SetPauseHandler(GeneratePauseResume(address));
-                TaskT task{std::move(coro), std::move(futureState)};
+                TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState));
+                task->SetPauseHandler(GeneratePauseResume(task.get()));
 
                 {
                     std::scoped_lock lock{_tasksQueueMtx};
-                    _tasks.emplace_front(std::move(task));
+                    _tasks.push(task.release());
                 }
 
                 _cv.notify_all();
@@ -139,36 +137,41 @@ namespace tinycoro {
         }
 
         // Generates the pause resume callback
-        // It relays on a std::coroutine_handle unique address
-        // which is used as an identifier
-        PauseHandlerCallbackT GeneratePauseResume(address_t address)
+        // It relays on a task pointer address
+        PauseHandlerCallbackT GeneratePauseResume(auto taskPtr)
         {
-            return [this, address]() {
+            return [this, taskPtr]() {
                 if (_stopSource.stop_requested() == false)
                 {
                     std::unique_lock pauseLock{_pausedTasksMtx};
 
-                    if (auto it = _pausedTasks.find(address); it != _pausedTasks.end())
+                    if (taskPtr->next == nullptr && taskPtr->prev == nullptr && _pausedTasks.begin() != taskPtr)
                     {
-                        auto& task = std::get<TaskT>(it->second);
+                        // indicate that we don't need any sleep here
+                        // So notify task that it should be wakeup and put into tasks queue.
+                        // we make this with setting the next and a prev pointers to self
+                        taskPtr->next = taskPtr;
+                        taskPtr->prev = taskPtr;
 
-                        std::scoped_lock queueLock{_tasksQueueMtx};
+                        pauseLock.unlock();
 
-                        _tasks.emplace_front(std::move(task));
-                        _pausedTasks.erase(address);
+                        return;
+                    }
+                    else
+                    {
+                        // wake up the task
+                        _pausedTasks.erase(taskPtr);
 
                         // pause lock can be released
                         pauseLock.unlock();
+
+                        std::scoped_lock queueLock{_tasksQueueMtx};
+                        _tasks.push(taskPtr);
 
                         // if we notify, we still need to hold the lock.
                         // otherwise other threads can steal the task and finish up before we invoke notify_all.
                         // Note: notify_once would also work but notify_all performs better if there is a lot of tasks at once.
                         _cv.notify_all();
-                    }
-                    else
-                    {
-                        // notify task that it should be wakeup and put into tasks queue.
-                        _pausedTasks.emplace(address, DoNotPauseTask{});
                     }
                 }
             };
@@ -176,39 +179,53 @@ namespace tinycoro {
 
         inline void _InvokeTask(TaskT& task)
         {
+            // reset the navigation variables
+            task->prev = nullptr;
+            task->next = nullptr;
+
             using enum ETaskResumeState;
             for (;;)
             {
                 // resume the task
-                task.Resume();
+                task->Resume();
 
                 // get the resume state from the coroutine or corouitne child
-                auto resumeState = task.ResumeState();
+                auto resumeState = task->ResumeState();
 
                 switch (resumeState)
                 {
                 case SUSPENDED: {
                     {
                         std::scoped_lock lock{_tasksQueueMtx};
-                        _tasks.emplace_front(std::move(task));
+                        _tasks.push(task.release());
                     }
 
                     _cv.notify_all();
                     break;
                 }
                 case PAUSED: {
-                    auto address = task.Address();
-
                     std::unique_lock pauseLock{_pausedTasksMtx};
-                    const auto [it, success] = _pausedTasks.try_emplace(address, std::move(task));
-
-                    if (success == false)
+                    if (task->next == task.get() && task->prev == task.get())
                     {
-                        _pausedTasks.erase(it);
+                        // reset the navigation
+                        // the task is already waked up
+                        task->next = nullptr;
+                        task->prev = nullptr;
+
                         pauseLock.unlock();
 
                         // we can continue to resume this task
                         continue;
+                    }
+                    else
+                    {
+                        // release the unique_ptr
+                        auto taskPtr = task.release();
+
+                        // push back into the pause state
+                        _pausedTasks.push_front(taskPtr);
+
+                        pauseLock.unlock();
                     }
                     break;
                 }
@@ -244,8 +261,7 @@ namespace tinycoro {
                             }
 
                             {
-                                TaskT task{std::move(_tasks.back())};
-                                _tasks.pop_back();
+                                TaskT task{_tasks.pop()};
 
                                 queueLock.unlock();
 
@@ -257,8 +273,7 @@ namespace tinycoro {
                             while (stopToken.stop_requested() == false && _tasks.empty() == false)
                             {
                                 {
-                                    TaskT task{std::move(_tasks.back())};
-                                    _tasks.pop_back();
+                                    TaskT task{_tasks.pop()};
 
                                     queueLock.unlock();
 
@@ -273,14 +288,27 @@ namespace tinycoro {
             }
         }
 
-        // currently active tasks
-        std::deque<TaskT> _tasks;
+        void _CleanUpDanglingTasks() noexcept
+        {
+            auto cleanupLinkedPtrColl = [](auto& coll) {
+                auto it = coll.begin();
+                while (it != nullptr)
+                {
+                    auto  next = it->next;
+                    TaskT destroyer{it};
+                    it = next;
+                }
+            };
+
+            cleanupLinkedPtrColl(_pausedTasks);
+            cleanupLinkedPtrColl(_tasks);
+        }
+
+        // currently active/scheduled tasks
+        detail::LinkedPtrQueue<typename TaskT::pointer> _tasks;
 
         // tasks which are in pause state
-        std::unordered_map<address_t, TaskVariantT> _pausedTasks{1};
-
-        // the worker threads which are running the tasks
-        std::vector<std::jthread> _workerThreads;
+        detail::LinkedPtrList<typename TaskT::pointer> _pausedTasks;
 
         // stop_source to support safe cancellation
         std::stop_source _stopSource;
@@ -294,9 +322,12 @@ namespace tinycoro {
         // conditional variable used to notify
         // if we have active tasks in the queue
         std::condition_variable_any _cv;
+
+        // the worker threads which are running the tasks
+        std::vector<std::jthread> _workerThreads;
     };
 
-    using Scheduler = CoroThreadPool<PackagedTask>;
+    using Scheduler = CoroThreadPool<SchedulableTask>;
 
 } // namespace tinycoro
 

@@ -7,11 +7,9 @@
 #include <coroutine>
 #include <atomic>
 
+#include "Common.hpp"
+
 namespace tinycoro {
-
-    struct PauseHandler;
-
-    using PauseHandlerCallbackT = std::function<void()>;
 
     namespace concepts {
 

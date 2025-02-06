@@ -19,29 +19,32 @@ namespace tinycoro {
             { c.Resume() } -> std::same_as<void>;
             { c.await_resume() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
+            { c.SetPauseHandler([]{}) };
         };
 
     } // namespace concepts
 
-    struct PackagedTask
-    {
-        using PauseCallbackType = std::function<void()>;
-
-    private:
+    namespace detail {
         class ISchedulableBridged
         {
         public:
             ISchedulableBridged() = default;
 
-            ISchedulableBridged(ISchedulableBridged&&)            = default;
-            ISchedulableBridged& operator=(ISchedulableBridged&&) = default;
+            // disable copy and move
+            ISchedulableBridged(ISchedulableBridged&&) = delete;
 
             virtual ~ISchedulableBridged() = default;
 
-            virtual void Resume()                  = 0;
+            virtual void             Resume()      = 0;
             virtual ETaskResumeState ResumeState() = 0;
 
             virtual address_t Address() const noexcept = 0;
+
+            virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
+
+            // need for double linkage
+            ISchedulableBridged* prev{nullptr};
+            ISchedulableBridged* next{nullptr};
         };
 
         template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
@@ -90,7 +93,7 @@ namespace tinycoro {
             ETaskResumeState ResumeState() override
             {
                 // value already set, the coroutine should be done
-                if(_needValueSet == false)
+                if (_needValueSet == false)
                 {
                     return ETaskResumeState::DONE;
                 }
@@ -98,44 +101,29 @@ namespace tinycoro {
                 return _coro.ResumeState();
             }
 
-            address_t Address() const noexcept override
+            void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override
             {
-                return _coro.Address();
+                _coro.SetPauseHandler(std::move(cb));
             }
+
+            address_t Address() const noexcept override { return _coro.Address(); }
 
         private:
             bool         _needValueSet{true};
             CoroT        _coro;
             FutureStateT _futureState;
         };
+    } // namespace detail
 
-    public:
-        template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
-            requires (!std::is_reference_v<CoroT>) && (!std::same_as<std::decay_t<CoroT>, PackagedTask>)
-        PackagedTask(CoroT&& coro, FutureStateT futureState)
-        {
-            using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT>;
-            _pimpl = std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
-        }
+    using SchedulableTask = std::unique_ptr<detail::ISchedulableBridged>;
 
-        inline void Resume()
-        {
-            _pimpl->Resume();
-        }
-
-        ETaskResumeState ResumeState()
-        {
-            return _pimpl->ResumeState();
-        }
-
-        address_t Address() const noexcept
-        {
-            return _pimpl->Address();
-        }
-
-    private:
-        std::unique_ptr<ISchedulableBridged> _pimpl{};
-    };
+    template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
+        requires (!std::is_reference_v<CoroT>)
+    SchedulableTask MakeSchedulableTask(CoroT&& coro, FutureStateT futureState)
+    {
+        using BridgeType = detail::SchedulableBridgeImpl<CoroT, FutureStateT>;
+        return std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
+    }
 
 } // namespace tinycoro
 

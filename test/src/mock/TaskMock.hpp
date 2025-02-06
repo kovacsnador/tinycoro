@@ -17,7 +17,6 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
         MOCK_METHOD(void*, Address, (), (const noexcept));
 
-
         tinycoro::PauseHandlerCallbackT pauseCallback;
     };
 
