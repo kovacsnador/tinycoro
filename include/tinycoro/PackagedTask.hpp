@@ -38,8 +38,6 @@ namespace tinycoro {
             virtual void             Resume()      = 0;
             virtual ETaskResumeState ResumeState() = 0;
 
-            virtual address_t Address() const noexcept = 0;
-
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
 
             // need for double linkage
@@ -105,8 +103,6 @@ namespace tinycoro {
             {
                 _coro.SetPauseHandler(std::move(cb));
             }
-
-            address_t Address() const noexcept override { return _coro.Address(); }
 
         private:
             bool         _needValueSet{true};

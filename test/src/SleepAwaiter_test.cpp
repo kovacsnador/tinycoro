@@ -148,3 +148,28 @@ TEST(IsDurationTest, IsDurationTest)
         EXPECT_FALSE(true);
     }
 }
+
+struct SleepAwaiterStressTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SleepAwaiterStressTest, SleepAwaiterStressTest, testing::Values(1, 10, 100));
+
+TEST_P(SleepAwaiterStressTest, SleepAwaiterStressTest_sleepFor)
+{
+    const auto count = GetParam();
+
+    tinycoro::SoftClock clock;
+    tinycoro::Scheduler scheduler;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        std::stop_source source;
+
+        auto task = [&clock](auto duration) -> tinycoro::Task<void> {
+            co_await tinycoro::SleepFor(clock, duration);
+        };
+
+        EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, task(1ms), task(2s), task(3s)));
+    }
+}
