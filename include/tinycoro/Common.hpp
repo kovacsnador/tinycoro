@@ -79,8 +79,14 @@ namespace tinycoro {
         concept HasVirtualDestructor = std::has_virtual_destructor_v<T>;
 
         template <typename T>
-        concept Linkable = requires (std::remove_pointer_t<T> n) {
-            { n.next } -> std::same_as<std::remove_pointer_t<T>*&>;
+        concept Linkable = requires (std::remove_pointer_t<T>* n) {
+            { n->next } -> std::same_as<std::remove_pointer_t<T>*&>;
+        };
+
+        template <typename T>
+        concept DoubleLinkable = requires (std::remove_pointer_t<T>* n) {
+            { n->next } -> std::same_as<std::remove_pointer_t<T>*&>;
+            { n->prev } -> std::same_as<std::remove_pointer_t<T>*&>;
         };
 
         template <typename... Ts>
@@ -101,6 +107,10 @@ namespace tinycoro {
     // this is the unique address type of
     // an std::coroutine_handler::address
     using address_t = void*;
+
+    // The pause handler callback signature
+    // used mainly by the scheduler
+    using PauseHandlerCallbackT = std::function<void()>;
 
     enum class ETaskResumeState
     {

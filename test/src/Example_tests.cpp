@@ -40,7 +40,7 @@ TEST_F(ExampleTest, Example_taskView)
 {
     auto task = []() -> tinycoro::Task<void> { co_return; };
 
-    auto coro   = task();
+    auto coro = task();
 
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, coro.TaskView()));
 }
@@ -162,7 +162,7 @@ TEST_F(ExampleTest, Example_nestedException)
 
     auto future = scheduler.Enqueue(task());
 
-    auto func = [&future]{ std::ignore = future.get(); };
+    auto func = [&future] { std::ignore = future.get(); };
     EXPECT_THROW(func(), std::runtime_error);
 }
 
@@ -677,7 +677,10 @@ TEST_F(ExampleTest, ExampleSyncAwait)
 TEST_F(ExampleTest, ExampleSyncAwaitException)
 {
     auto syncAwait = [](auto& scheduler) -> tinycoro::Task<std::string> {
-        auto task1 = []() -> tinycoro::Task<std::string> { throw std::runtime_error{"test error"}; co_return "123"; };
+        auto task1 = []() -> tinycoro::Task<std::string> {
+            throw std::runtime_error{"test error"};
+            co_return "123";
+        };
         auto task2 = []() -> tinycoro::Task<std::string> { co_return "123"; };
         auto task3 = []() -> tinycoro::Task<std::string> { co_return "123"; };
 
@@ -696,7 +699,7 @@ TEST_F(ExampleTest, ExampleSyncAwaitException)
 
     auto future = scheduler.Enqueue(syncAwait(scheduler));
 
-    auto func = [&future]{ std::ignore = future.get(); };
+    auto func = [&future] { std::ignore = future.get(); };
     EXPECT_THROW(func(), std::runtime_error);
 }
 

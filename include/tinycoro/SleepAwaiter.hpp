@@ -33,8 +33,10 @@ namespace tinycoro {
         auto cancellationToken = softClock.RegisterWithCancellation([&finished] () noexcept { finished.CountDown(); }, timePoint);
 
         std::stop_callback stopCallback{stopToken, [&cancellationToken, &finished] {
-                                            cancellationToken.TryCancel();
-                                            finished.CountDown();
+                                            if(cancellationToken.TryCancel())
+                                            {
+                                                finished.CountDown();
+                                            }
                                         }};
 
         co_await finished;

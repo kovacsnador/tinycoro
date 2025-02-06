@@ -61,7 +61,7 @@ TEST_F(SchedulerTest, SchedulerTest_paused)
     EXPECT_CALL(mock, SetPauseHandler).Times(1);
     EXPECT_CALL(mock, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock, IsPaused).Times(0);
-    EXPECT_CALL(mock, Address).Times(2).WillRepeatedly(testing::Return(dummyAddress));;
+    EXPECT_CALL(mock, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
 
     auto future = scheduler.Enqueue(std::move(task));
 
@@ -85,7 +85,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
-    EXPECT_CALL(mock1, Address).Times(2).WillRepeatedly(testing::Return(dummyAddress));;
+    EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
 
     auto& mock2 = *task2.mock;
 
@@ -127,7 +127,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
-    EXPECT_CALL(mock1, Address).Times(2).WillRepeatedly(testing::Return(dummyAddress));;
+    EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
 
     auto& mock2 = *task2.mock;
 
@@ -172,7 +172,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
-    EXPECT_CALL(mock1, Address).Times(2).WillRepeatedly(testing::Return(dummyAddress));;
+    EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
 
 
     auto& mock2 = *task2.mock;
@@ -202,4 +202,41 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_EQ(t1, 42);
     EXPECT_EQ(t2, 41);
     EXPECT_TRUE((std::same_as<tinycoro::VoidType, decltype(t3)>));
+}
+
+
+struct SchedulerFunctionalTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SchedulerFunctionalTest, SchedulerFunctionalTest, testing::Values(1, 10, 100, 1000, 10000));
+
+
+TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
+{
+    const auto count = GetParam();
+
+    std::stop_source ss;
+    tinycoro::SoftClock clock;
+
+    {
+        tinycoro::Scheduler scheduler;
+
+        ss = scheduler.GetStopSource();
+
+        for(size_t i = 0; i < count; ++i)
+        {
+            std::ignore = scheduler.Enqueue(tinycoro::SleepFor(clock, 1s, ss.get_token()));
+        }
+
+        // and we leave this to die.
+        //
+        // scheduler destructor need to request
+        // a stop for the worker threads
+        // they will stop as soon as possible
+        // and the tasks they left in the queues
+        // need to be destroyed properly
+        //
+        // This test is intended to be checked with sanitizers
+    }
 }

@@ -10,7 +10,7 @@ namespace tinycoro { namespace detail {
     {
         using value_type = std::remove_pointer_t<NodeT>;
 
-        void push(value_type* newNode)
+        void push(value_type* newNode) noexcept
         {
             assert(newNode);
             assert(newNode->next == nullptr);
@@ -22,7 +22,7 @@ namespace tinycoro { namespace detail {
         }
 
         // Pops and return the poped node.
-        [[nodiscard]] value_type* pop()
+        [[nodiscard]] value_type* pop() noexcept
         {
             auto top = _top;
             if (top)

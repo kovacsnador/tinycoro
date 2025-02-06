@@ -54,11 +54,9 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
             EXPECT_CALL(*task.mock, await_resume()).Times(0);
         }
 
+        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
 
-        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise));
-
-
-        packagedTask.Resume();
+        packedTask->Resume();
     }
 
     if constexpr (std::same_as<ValueT, int32_t>)
@@ -101,11 +99,9 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 
         EXPECT_CALL(*task.mock, await_resume()).Times(0); // Return any value you'd expect
 
+        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
 
-        tinycoro::PackagedTask packagedTask(std::move(task), std::move(promise));
-
-        
-        packagedTask.Resume();
+        packedTask->Resume();
     }
 
     EXPECT_THROW(future.get(), std::runtime_error);
