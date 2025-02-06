@@ -216,23 +216,27 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
 {
     const auto count = GetParam();
 
-    tinycoro::Scheduler scheduler;
+    std::stop_source ss;
     tinycoro::SoftClock clock;
 
-    auto stopToken = scheduler.GetStopToken();
-
-    for(size_t i = 0; i < count; ++i)
     {
-        std::ignore = scheduler.Enqueue(tinycoro::SleepFor(clock, 1s, stopToken));
-    }
+        tinycoro::Scheduler scheduler;
 
-    // and we leave this to die.
-    //
-    // scheduler destructor need to request
-    // a stop for the worker threads
-    // they will stop as soon as possible
-    // and the tasks they left in the queues
-    // need to be destroyed properly
-    //
-    // This test is intended to be checked with sanitizers
+        ss = scheduler.GetStopSource();
+
+        for(size_t i = 0; i < count; ++i)
+        {
+            std::ignore = scheduler.Enqueue(tinycoro::SleepFor(clock, 1s, ss.get_token()));
+        }
+
+        // and we leave this to die.
+        //
+        // scheduler destructor need to request
+        // a stop for the worker threads
+        // they will stop as soon as possible
+        // and the tasks they left in the queues
+        // need to be destroyed properly
+        //
+        // This test is intended to be checked with sanitizers
+    }
 }

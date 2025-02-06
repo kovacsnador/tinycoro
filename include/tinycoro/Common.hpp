@@ -79,14 +79,14 @@ namespace tinycoro {
         concept HasVirtualDestructor = std::has_virtual_destructor_v<T>;
 
         template <typename T>
-        concept Linkable = requires (std::remove_pointer_t<T> n) {
-            { n.next } -> std::same_as<std::remove_pointer_t<T>*&>;
+        concept Linkable = requires (std::remove_pointer_t<T>* n) {
+            { n->next } -> std::same_as<std::remove_pointer_t<T>*&>;
         };
 
         template <typename T>
-        concept DoubleLinkable = requires (std::remove_pointer_t<T> n) {
-            { n.next } -> std::same_as<std::remove_pointer_t<T>*&>;
-            { n.prev } -> std::same_as<std::remove_pointer_t<T>*&>;
+        concept DoubleLinkable = requires (std::remove_pointer_t<T>* n) {
+            { n->next } -> std::same_as<std::remove_pointer_t<T>*&>;
+            { n->prev } -> std::same_as<std::remove_pointer_t<T>*&>;
         };
 
         template <typename... Ts>

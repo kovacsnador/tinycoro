@@ -66,6 +66,7 @@ namespace tinycoro {
         CoroThreadPool(CoroThreadPool&&)      = delete;
 
         auto GetStopToken() const noexcept { return _stopSource.get_token(); }
+        auto GetStopSource() const noexcept { return _stopSource; }
 
         template <template <typename> class FutureStateT = std::promise, concepts::NonIterable... CoroTasksT>
             requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
