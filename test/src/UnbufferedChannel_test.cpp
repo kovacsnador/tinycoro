@@ -44,6 +44,8 @@ public:
     void Notify() const noexcept {};
 
     ListenerAwaiterMock* next{nullptr};
+
+    size_t value() { return 42; }
 };
 
 TEST(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_return)

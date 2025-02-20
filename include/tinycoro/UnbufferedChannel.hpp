@@ -3,13 +3,13 @@
 
 #include <cassert>
 #include <mutex>
-#include <unordered_map>
 #include <latch>
 
 #include "ChannelOpStatus.hpp"
 #include "PauseHandler.hpp"
 #include "LinkedPtrStack.hpp"
 #include "LinkedPtrQueue.hpp"
+#include "LinkedPtrOrderedList.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -89,10 +89,7 @@ namespace tinycoro {
 
                 auto waiters      = _waiters.steal();
                 auto pushAwaiters = _pushAwaiters.steal();
-
-                // swap/resets the _listenerWaiters before unlock
-                decltype(_listenerWaiters) listeners{};
-                _listenerWaiters.swap(listeners);
+                auto listenersTop = _listenerWaiters.steal();
 
                 lock.unlock();
 
@@ -102,11 +99,8 @@ namespace tinycoro {
                 // notify all push awaiters
                 _NotifyAll(pushAwaiters);
 
-                // notify all listener awaiters
-                for (auto& [_, list] : listeners)
-                {
-                    _NotifyAll(list.top());
-                }
+                // notify all _listeners
+                _NotifyAll(listenersTop);
             }
 
             [[nodiscard]] bool IsOpen() const noexcept
@@ -157,12 +151,12 @@ namespace tinycoro {
                     return true;
                 }
 
-                return waiter->ListenerCount() <= _waiters.size();
+                return waiter->value() <= _waiters.size();
             }
 
             [[nodiscard]] bool Add(listener_awaiter_type* waiter)
             {
-                const auto wantedListerenCount = waiter->ListenerCount();
+                const auto wantedListerenCount = waiter->value();
 
                 std::unique_lock lock{_mtx};
 
@@ -173,7 +167,7 @@ namespace tinycoro {
                 }
 
                 // insert new listener waiter into the list
-                _listenerWaiters[wantedListerenCount].push(waiter);
+                _listenerWaiters.insert(waiter);
 
                 // suspend coroutine
                 return true;
@@ -251,18 +245,11 @@ namespace tinycoro {
 
                 if constexpr (std::same_as<T, pop_awaiter_type>)
                 {
-                    auto iter = _listenerWaiters.find(_waiters.size());
-                    if (iter != _listenerWaiters.end())
-                    {
-                        auto top = iter->second.steal();
-                        // remove the entry
-                        _listenerWaiters.erase(iter);
+                    auto listenersTop = _listenerWaiters.lower_bound(_waiters.size());
+                    lock.unlock();
 
-                        lock.unlock();
-
-                        // notify all if somebody waits for listerens
-                        _NotifyAll(top);
-                    }
+                    // notify all if somebody waits for listerens
+                    _NotifyAll(listenersTop);
                 }
 
                 // suspend needed
@@ -309,7 +296,7 @@ namespace tinycoro {
             LinkedPtrQueue<push_awaiter_type> _pushAwaiters;
 
             // The listerens awaiters
-            std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
+            LinkedPtrOrderedList<listener_awaiter_type> _listenerWaiters;
 
             // This is an optional cleanup function.
             // If we call close, this function will be called
@@ -538,7 +525,7 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            [[nodiscard]] auto ListenerCount() const noexcept { return _listenersCount; }
+            [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
             void Notify()
             {
