@@ -189,11 +189,18 @@ template <typename C, typename E>
 class ListenerAwaiterMock
 {
 public:
-    ListenerAwaiterMock(C&, E, size_t) { }
+    ListenerAwaiterMock(C&, E, size_t v) 
+    : val{v}
+    {
+    }
 
     void Notify() const noexcept {};
 
     ListenerAwaiterMock* next{nullptr};
+
+    auto value(){ return val; }
+
+    size_t val;
 };
 
 template <typename, typename, typename>

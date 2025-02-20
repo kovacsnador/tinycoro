@@ -5,7 +5,6 @@
 #include <queue>
 #include <cassert>
 #include <bitset>
-#include <unordered_map>
 #include <limits>
 #include <latch>
 
@@ -14,6 +13,7 @@
 #include "ChannelOpStatus.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrStack.hpp"
+#include "LinkedPtrOrderedList.hpp"
 
 namespace tinycoro {
 
@@ -139,21 +139,15 @@ namespace tinycoro {
                 auto popAwaiterTop  = _popAwaiters.steal();
                 auto pushAwaiterTop = _pushAwaiters.steal();
 
-                // swap/resets the _listenerWaiters before unlock
-                decltype(_listenerWaiters) listeners{};
-                _listenerWaiters.swap(listeners);
+                auto listenerAwaiterTop = _listenerWaiters.steal();
 
                 lock.unlock();
 
                 // notify all waiters
                 _NotifyAll(popAwaiterTop);
                 _NotifyAll(pushAwaiterTop);
+                _NotifyAll(listenerAwaiterTop);
 
-                // notify all listener awaiters
-                for (auto& [_, list] : listeners)
-                {
-                    _NotifyAll(list.top());
-                }
 
                 if(_cleanupFunction)
                 {
@@ -302,18 +296,11 @@ namespace tinycoro {
                 {
                     _popAwaiters.push(waiter);
 
-                    auto iter = _listenerWaiters.find(_popAwaiters.size());
-                    if (iter != _listenerWaiters.end())
-                    {
-                        auto top = iter->second.steal();
-                        // remove the entry
-                        _listenerWaiters.erase(iter);
+                    auto listenersTop = _listenerWaiters.lower_bound(_popAwaiters.size());
+                    lock.unlock();
 
-                        lock.unlock();
-
-                        // notify all if somebody waits for listerens
-                        _NotifyAll(top);
-                    }
+                    // notify all if somebody waits for listerens
+                    _NotifyAll(listenersTop);
                 }
 
                 // susend coroutine
@@ -330,14 +317,14 @@ namespace tinycoro {
                     return true;
                 }
 
-                return waiter->ListenerCount() <= _popAwaiters.size();
+                return waiter->value() <= _popAwaiters.size();
             }
 
             [[nodiscard]] bool Add(listener_awaiter_type* waiter)
             {
-                const auto desiredListerenCount = waiter->ListenerCount();
+                const auto desiredListerenCount = waiter->value();
 
-                std::unique_lock lock{_mtx};
+                std::scoped_lock lock{_mtx};
 
                 if (desiredListerenCount <= _popAwaiters.size() || _closed)
                 {
@@ -346,7 +333,7 @@ namespace tinycoro {
                 }
 
                 // insert new listener waiter into the list
-                _listenerWaiters[desiredListerenCount].push(waiter);
+                _listenerWaiters.insert(waiter);
 
                 // suspend coroutine
                 return true;
@@ -492,7 +479,7 @@ namespace tinycoro {
             LinkedPtrQueue<pop_awaiter_type>  _popAwaiters;
             LinkedPtrQueue<push_awaiter_type> _pushAwaiters;
 
-            std::unordered_map<size_t, LinkedPtrStack<listener_awaiter_type>> _listenerWaiters;
+            LinkedPtrOrderedList<listener_awaiter_type> _listenerWaiters;
 
             ContainerT<Element> _valueCollection;
             const size_t        _maxQueueSize;
@@ -596,10 +583,10 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT>
-        class ListenerAwaiter
+        class BufferedChannelListenerAwaiter
         {
         public:
-            ListenerAwaiter(ChannelT& channel, EventT event, size_t count)
+            BufferedChannelListenerAwaiter(ChannelT& channel, EventT event, size_t count)
             : _channel{channel}
             , _event{std::move(event)}
             , _listenersCount{count}
@@ -607,7 +594,7 @@ namespace tinycoro {
             }
 
             // disable move and copy
-            ListenerAwaiter(ListenerAwaiter&&) = delete;
+            BufferedChannelListenerAwaiter(BufferedChannelListenerAwaiter&&) = delete;
 
             [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
 
@@ -625,7 +612,7 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            [[nodiscard]] auto ListenerCount() const noexcept { return _listenersCount; }
+            [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
             void Notify()
             {
@@ -633,7 +620,7 @@ namespace tinycoro {
                 _event.Notify();
             }
 
-            ListenerAwaiter* next{nullptr};
+            BufferedChannelListenerAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
@@ -757,7 +744,7 @@ namespace tinycoro {
 
     template <typename ValueT>
     using BufferedChannel = detail::
-        BufferedChannel<ValueT, detail::BufferedChannelPopAwaiter, detail::ListenerAwaiter, detail::BufferedChannelPushAwaiter, detail::Queue>;
+        BufferedChannel<ValueT, detail::BufferedChannelPopAwaiter, detail::BufferedChannelListenerAwaiter, detail::BufferedChannelPushAwaiter, detail::Queue>;
 
 } // namespace tinycoro
 

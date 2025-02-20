@@ -207,6 +207,22 @@ struct LinkedPtrOrderedListTest : testing::TestWithParam<int32_t>
 
 INSTANTIATE_TEST_SUITE_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest, testing::Values(1, 10, 100, 1000, 10000));
 
+auto ValidateRange(auto range)
+{
+    size_t contraCount{};
+
+    while(range != nullptr)
+    {
+        contraCount++;
+        if(range->next)
+        {
+            EXPECT_FALSE(range->next->val < range->val);
+        }
+        range = range->next;
+    }
+    return contraCount;
+}
+
 TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder)
 {
     const auto count = GetParam();
@@ -226,16 +242,13 @@ TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder)
         list.insert(&it);
     }
 
+    EXPECT_EQ(list.size(), vec.size());
+
     auto range = list.steal();
 
-    while(range != nullptr)
-    {
-        if(range->next)
-        {
-            EXPECT_FALSE(range->next < range);
-        }
-        range = range->next;
-    }
+    EXPECT_TRUE(list.empty());
+
+    EXPECT_EQ(ValidateRange(range), count);
 }
 
 TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_reverse)
@@ -257,19 +270,16 @@ TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_reverse)
         list.insert(&it);
     }
 
+    EXPECT_EQ(list.size(), vec.size());
+
     auto range = list.lower_bound(count);
 
-    while(range != nullptr)
-    {
-        if(range->next)
-        {
-            EXPECT_FALSE(range->next->val < range->val);
-        }
-        range = range->next;
-    }
+    EXPECT_TRUE(list.empty());
+
+    EXPECT_EQ(ValidateRange(range), count);
 }
 
-TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_random)
+TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_random_big)
 {
     const auto count = GetParam();
 
@@ -292,14 +302,107 @@ TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_random)
         list.insert(&it);
     }
 
+    EXPECT_EQ(list.size(), vec.size());
+
     auto range = list.steal();
 
-    while(range != nullptr)
+    EXPECT_TRUE(list.empty());
+
+    EXPECT_EQ(ValidateRange(range), count);
+}
+
+TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_checkOrder_random_small)
+{
+    const auto count = GetParam();
+
+    std::random_device rd;
+    std::mt19937 mt(rd());
+    std::uniform_real_distribution<double> dist(0, static_cast<double>(50));
+
+    using node_t = ListNodeMock<int32_t>;
+    std::vector<node_t> vec;
+
+    for(int32_t i = count; i > 0; --i)
     {
-        if(range->next)
-        {
-            EXPECT_FALSE(range->next->val < range->val);
-        }
-        range = range->next;
+        vec.emplace_back(static_cast<int32_t>(dist(mt)));
     }
+
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    for(auto& it : vec)
+    {
+        list.insert(&it);
+    }
+
+    EXPECT_EQ(list.size(), vec.size());
+
+    auto range = list.steal();
+
+    EXPECT_TRUE(list.empty());
+
+    EXPECT_EQ(ValidateRange(range), count);
+}
+
+TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_lower_bound_unique)
+{
+    const auto count = GetParam();
+
+    using node_t = ListNodeMock<int32_t>;
+    std::vector<node_t> vec;
+
+    for(int32_t i = 0; i < count; ++i)
+    {
+        vec.emplace_back(i);
+    }
+
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    for(auto& it : vec)
+    {
+        list.insert(&it);
+    }
+
+    EXPECT_EQ(list.size(), vec.size());
+
+    const int32_t step{10};
+    int32_t bound{step};
+    while(list.empty() == false)
+    {
+        auto sizeBefore = list.size();
+        auto range = list.lower_bound(bound);
+        auto elemCount = ValidateRange(range);
+
+        // this only works because of unique elements
+        EXPECT_EQ(sizeBefore - elemCount, list.size());
+        bound += step;
+    }
+
+    EXPECT_TRUE(list.empty());
+}
+
+TEST_P(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_lower_bound_same_value)
+{
+    const auto count = GetParam();
+
+    using node_t = ListNodeMock<int32_t>;
+    std::vector<node_t> vec;
+
+    for(int32_t i = 0; i < count; ++i)
+    {
+        vec.emplace_back(42);
+    }
+
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    for(auto& it : vec)
+    {
+        list.insert(&it);
+    }
+
+    EXPECT_EQ(list.size(), vec.size());
+
+    auto range = list.lower_bound(42);
+
+    EXPECT_EQ(ValidateRange(range), count);
+    EXPECT_TRUE(list.empty());
 }
