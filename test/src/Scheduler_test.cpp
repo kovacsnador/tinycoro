@@ -209,7 +209,7 @@ struct SchedulerFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(SchedulerFunctionalTest, SchedulerFunctionalTest, testing::Values(1, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(SchedulerFunctionalTest, SchedulerFunctionalTest, testing::Values(1, 10, 100, 1000, 10000, 1000, 1000, 1000));
 
 
 TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
@@ -226,7 +226,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
 
         for(size_t i = 0; i < count; ++i)
         {
-            std::ignore = scheduler.Enqueue(tinycoro::SleepFor(clock, 1s, ss.get_token()));
+            std::ignore = scheduler.Enqueue(tinycoro::SleepFor(clock, 400ms, ss.get_token()));
         }
 
         // and we leave this to die.

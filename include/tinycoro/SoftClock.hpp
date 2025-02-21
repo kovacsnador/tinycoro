@@ -219,12 +219,17 @@ namespace tinycoro {
                                 // we are safe to make operations on 'this' pointer
                                 std::scoped_lock lock{_mtx};
 
-                                if (tp > clock_t::now() && StopRequested() == false)
+                                auto begin = _events.begin();
+                                if (begin != _events.end())
                                 {
-                                    // if the time is not over yet
-                                    // we can erase the event
-                                    _events.erase(it);
-                                    return true;
+                                    if (tp >= begin->first && StopRequested() == false)
+                                    {
+                                        // if the begin <= tp
+                                        // that means that that out iterator 
+                                        // is still valid
+                                        _events.erase(it);
+                                        return true;
+                                    }
                                 }
                             }
                             return false;
@@ -278,8 +283,7 @@ namespace tinycoro {
                     // this is a temporary container
                     // in which we copy the timed out callbacks
                     std::vector<callback_t> tempEvents;
-
-                    auto transformer = [](auto& pair) { return pair.second; };
+                    auto transformer = [](auto& pair) { return std::move(pair.second); };
 
                     for (;;)
                     {
@@ -295,7 +299,7 @@ namespace tinycoro {
                                 break;
                             }
                         }
-                        
+
                         // we have some events in the map
                         auto timePoint = clock_t::now() + _frequency;
                         if (_cv.wait_until(lock, jthreadStopToken, timePoint, [timePoint] { return timePoint <= clock_t::now(); }) == false)
