@@ -1140,6 +1140,34 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
 
+TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners_multi_waiters)
+{
+    const auto          count = GetParam();
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::BufferedChannel<size_t> channel{count};
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t value{};
+        auto   status = co_await channel.PopWait(value);
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        co_await channel.WaitForListeners(count);
+        channel.Close();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(consumer());
+        tasks.push_back(producer());
+    }
+
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+}
+
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListenersClose)
 {
     const auto          count = GetParam();

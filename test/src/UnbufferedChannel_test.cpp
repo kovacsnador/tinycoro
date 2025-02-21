@@ -765,6 +765,34 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
 }
 
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners_multi_waiters)
+{
+    const auto count = GetParam();
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto listeners = [&]() -> tinycoro::Task<void> {
+        size_t value{};
+        auto status = co_await channel.PopWait(value);
+        EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
+    };
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        co_await channel.WaitForListeners(count);
+        channel.Close();
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(listeners());
+        tasks.push_back(producer());
+    }
+
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+}
+
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
 {
     const auto count = GetParam();
