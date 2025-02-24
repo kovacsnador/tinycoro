@@ -76,15 +76,16 @@ namespace tinycoro {
             // from the parent
             bool TryCancel()
             {
-                if (std::scoped_lock lock{_mtx}; _cancellationCallback)
-                {
-                    auto result = _cancellationCallback();
+                std::unique_lock lock{_mtx};
+                // we need to reset the callback, because
+                // calling it 2 times can lead to UB...
+                auto cancelCallback = std::exchange(_cancellationCallback, nullptr);
+                lock.unlock();
 
-                    // after invoking the cancellation callback
-                    // we need to reset the callback, because
-                    // calling it 2 times can lead to UB...
-                    _cancellationCallback = nullptr;
-                    return result;
+                if (cancelCallback)
+                {
+                    // return true if cancellation was success.
+                    return cancelCallback();
                 }
                 return false;
             }
@@ -263,6 +264,16 @@ namespace tinycoro {
                     {
                         // if the stop was requested
                         // we just return an empty optional
+                        return {};
+                    }
+
+                    if(clock_t::now() >= timePoint)
+                    {
+                        // check if we already passed the
+                        // timepoint
+                        // invoke the timeout callback
+                        // immediately
+                        cb();
                         return {};
                     }
 
