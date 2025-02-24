@@ -122,9 +122,9 @@ TEST(SoftClockTest, SoftClockTest_ignore_token)
 
     tinycoro::SoftClock clock;
 
-    std::ignore = clock.RegisterWithCancellation([]() noexcept { }, 100s);
-    std::ignore = clock.RegisterWithCancellation([]() noexcept { }, clock.Now() + 100s);
-    std::ignore = clock.RegisterWithCancellation([]() noexcept { }, 100s);
+    std::ignore = clock.RegisterWithCancellation([&count]() noexcept { ++count; }, 100s);
+    std::ignore = clock.RegisterWithCancellation([&count]() noexcept { ++count; }, clock.Now() + 100s);
+    std::ignore = clock.RegisterWithCancellation([&count]() noexcept { ++count; }, 100s);
 
     // all the tokes are destoyed
     // all the events are cancelled
@@ -410,7 +410,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)
 
     tinycoro::Scheduler scheduler;
 
-    size_t c{0};
+    std::atomic<size_t> c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
         clock.Register(
@@ -590,7 +590,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token)
 
     tinycoro::Scheduler scheduler;
 
-    size_t c{0};
+    std::atomic<size_t> c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
         auto token = clock.RegisterWithCancellation(
@@ -622,7 +622,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
 
     tinycoro::Scheduler scheduler;
 
-    size_t c{0};
+    std::atomic<size_t> c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
         auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 2000ms);
@@ -655,7 +655,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel_st
 
     tinycoro::Scheduler scheduler;
 
-    size_t c{0};
+    std::atomic<size_t> c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
         auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 20s);
@@ -693,7 +693,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
 
     tinycoro::Scheduler scheduler;
 
-    size_t c{0};
+    std::atomic<size_t> c{0};
 
     auto setTimer = [&]() -> tinycoro::Task<void> {
         auto token = clock.RegisterWithCancellation([&]() noexcept { c++; }, 2000ms);
