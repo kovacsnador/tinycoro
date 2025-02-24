@@ -460,6 +460,41 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1)
     tinycoro::GetAll(scheduler, std::move(tasks));
 }
 
+TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_timedOut)
+{
+    const auto count = GetParam();
+
+    tinycoro::SoftClock clock{40ms};
+
+    tinycoro::Scheduler scheduler;
+
+    auto duration = 200ms;
+
+    auto measure = [&](auto duration) -> tinycoro::Task<void> {
+        auto start = clock.Now();
+        co_await tinycoro::SleepFor(clock, duration);
+        EXPECT_TRUE(start + duration <= clock.Now());
+    };
+
+    std::vector<tinycoro::Task<void>> tasks;
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        if(i % 2 == 0)
+        {
+            tasks.push_back(measure(duration));
+        }
+        else
+        {
+            // should be timed out
+            tasks.push_back(measure(-duration));
+        }
+        
+    }
+
+    tinycoro::GetAll(scheduler, std::move(tasks));
+}
+
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
 {
     const auto count = GetParam();
