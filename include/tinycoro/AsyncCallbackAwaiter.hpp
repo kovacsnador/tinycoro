@@ -301,7 +301,7 @@ namespace tinycoro {
 
                     return std::apply(
                         [userDataPtr]<typename... Args>(Args&&... args) {
-                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Args>(args)...) } -> std::same_as<void>; })
                             {
                                 try
                                 {
@@ -379,7 +379,7 @@ namespace tinycoro {
 
                     return std::apply(
                         [userDataPtr]<typename... Args>(Args&&... args) {
-                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Args>(args)...) } -> std::same_as<void>; })
                             {
                                 try
                                 {
