@@ -114,16 +114,47 @@ namespace tinycoro {
             // invoke callback
             _result = _asyncFunction([this]<typename... Ts>(Ts... ts) {
                 auto finalAction = Finally([this] { _event.Notify(); });
-                return _userCallback(std::forward<Ts>(ts)...);
+
+                if constexpr (requires (CallbackT cb) { { cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                {
+                    try
+                    {
+                        // if we have no return
+                        // we can handle the exception
+                        _userCallback(std::forward<Ts>(ts)...);
+                    }
+                    catch (...)
+                    {
+                        // saving the exception
+                        // and rethrow it later
+                        _exception = std::current_exception();
+                    }
+                }
+                else
+                {
+                    return _userCallback(std::forward<Ts>(ts)...);
+                }
             });
         }
 
-        [[nodiscard]] auto&& await_resume() { return std::move(_result.value()); }
+        [[nodiscard]] auto&& await_resume()
+        {
+            if (_exception)
+            {
+                // rethrow if we had an exception
+                // in the completion callback
+                std::rethrow_exception(_exception);
+            }
+
+            return std::move(_result.value());
+        }
 
     private:
         AsyncFunctionT _asyncFunction;
         CallbackT      _userCallback;
         EventT         _event;
+
+        std::exception_ptr _exception{};
 
         std::optional<ReturnT> _result;
     };
@@ -150,16 +181,45 @@ namespace tinycoro {
             // invoke callback with wrapped function
             _asyncFunction([this]<typename... Ts>(Ts... ts) {
                 auto finalAction = Finally([this] { _event.Notify(); });
-                return _userCallback(std::forward<Ts>(ts)...);
+
+                if constexpr (requires (CallbackT cb) {{ cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                {
+                    try
+                    {
+                        // if we have no return
+                        // we can handle the exception
+                        _userCallback(std::forward<Ts>(ts)...);
+                    }
+                    catch (...)
+                    {
+                        // saving the exception
+                        // and rethrow it later
+                        _exception = std::current_exception();
+                    }
+                }
+                else
+                {
+                    return _userCallback(std::forward<Ts>(ts)...);
+                }
             });
         }
 
-        void await_resume() noexcept { }
+        void await_resume() const
+        {
+            if (_exception)
+            {
+                // rethrow if we had an exception
+                // in the completion callback
+                std::rethrow_exception(_exception);
+            }
+        }
 
     private:
         AsyncFunctionT _asyncFunction;
         CallbackT      _userCallback;
         EventT         _event;
+
+        std::exception_ptr _exception{};
     };
 
     struct UserData
@@ -197,6 +257,8 @@ namespace tinycoro {
         private:
             EventT    event{};
             CallbackT userCallback;
+
+            std::exception_ptr exception{};
         };
 
     } // namespace detail
@@ -238,12 +300,43 @@ namespace tinycoro {
                     auto tuple = detail::ReplaceTupleElement<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
 
                     return std::apply(
-                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
+                        [userDataPtr]<typename... Args>(Args&&... args) {
+                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                            {
+                                try
+                                {
+                                    // if we have no return
+                                    // we can handle the exception
+                                    userDataPtr->userCallback(std::forward<Args>(args)...);
+                                }
+                                catch (...)
+                                {
+                                    // saving the exception
+                                    // and rethrow it later
+                                    userDataPtr->exception = std::current_exception();
+                                }
+                            }
+                            else
+                            {
+                                return userDataPtr->userCallback(std::forward<Args>(args)...);
+                            }
+                        },
+                        tuple);
                 },
                 std::addressof(_userData));
         }
 
-        [[nodiscard]] auto&& await_resume() { return std::move(_result.value()); }
+        [[nodiscard]] auto&& await_resume()
+        {
+            if (_userData.exception)
+            {
+                // rethrow if we had an exception
+                // in the completion callback
+                std::rethrow_exception(_userData.exception);
+            }
+
+            return std::move(_result.value());
+        }
 
     private:
         AsyncFunctionT                             _asyncFunction;
@@ -285,12 +378,41 @@ namespace tinycoro {
                     auto tuple = detail::ReplaceTupleElement<Nth>(forwardAsTuple, UserData::Get<void*>(userDataPtr));
 
                     return std::apply(
-                        [userDataPtr]<typename... Args>(Args&&... args) { return userDataPtr->userCallback(std::forward<Args>(args)...); }, tuple);
+                        [userDataPtr]<typename... Args>(Args&&... args) {
+                            if constexpr (requires (CallbackT cb) { { cb(std::forward<Ts>(ts)...) } -> std::same_as<void>; })
+                            {
+                                try
+                                {
+                                    // if we have no return
+                                    // we can handle the exception
+                                    userDataPtr->userCallback(std::forward<Args>(args)...);
+                                }
+                                catch (...)
+                                {
+                                    // saving the exception
+                                    // and rethrow it later
+                                    userDataPtr->exception = std::current_exception();
+                                }
+                            }
+                            else
+                            {
+                                return userDataPtr->userCallback(std::forward<Args>(args)...);
+                            }
+                        },
+                        tuple);
                 },
                 std::addressof(_userData));
         }
 
-        constexpr void await_resume() const noexcept { }
+        constexpr void await_resume() const
+        {
+            if (_userData.exception)
+            {
+                // rethrow if we had an exception
+                // in the completion callback
+                std::rethrow_exception(_userData.exception);
+            }
+        }
 
     private:
         AsyncFunctionT                             _asyncFunction;

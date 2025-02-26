@@ -379,6 +379,44 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter)
     EXPECT_EQ(future.get(), 42);
 }
 
+TEST_F(ExampleTest, Example_asyncCallbackAwaiter_exception)
+{
+    auto task = []() -> tinycoro::Task<int32_t> {
+        auto cb = []([[maybe_unused]] void* userData, [[maybe_unused]] int i) {
+            throw std::runtime_error("asyncCallback_exception"); // throw an exception
+        };
+
+        // wait with return value
+        auto val = co_await tinycoro::AsyncCallbackAwaiter(
+            [](auto wrappedCallback) {
+                AsyncCallbackAPIvoid(wrappedCallback, nullptr);
+                return 44;
+            },
+            cb);
+
+        EXPECT_EQ(val, 44);
+
+        co_return 42;
+    };
+
+    auto future = scheduler.Enqueue(task());
+    EXPECT_THROW(future.get(), std::runtime_error);
+}
+
+TEST_F(ExampleTest, Example_asyncCallbackAwaiter_void_exception)
+{
+    auto task = []() -> tinycoro::Task<void> {
+        auto cb = []([[maybe_unused]] void* userData, [[maybe_unused]] int i) {
+            throw std::runtime_error("asyncCallback_exception"); // throw an exception
+        };
+
+        // wait with return value
+        co_await tinycoro::AsyncCallbackAwaiter([](auto wrappedCallback) { AsyncCallbackAPIvoid(wrappedCallback, nullptr); }, cb);
+    };
+
+    EXPECT_THROW(tinycoro::GetAll(scheduler, task()), std::runtime_error);
+}
+
 TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle)
 {
     auto task = []() -> tinycoro::Task<int32_t> {
@@ -406,6 +444,35 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle)
     EXPECT_EQ(future.get(), 42);
 }
 
+TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle_exception)
+{
+    auto task = []() -> tinycoro::Task<int32_t> {
+        auto cb = [](void* userData, [[maybe_unused]] int i) {
+            auto d = static_cast<int32_t*>(userData);
+            *d     = 21;
+
+            throw std::runtime_error{"asyncCallbackAwaiter_CStyle_exception"};
+        };
+
+        auto async = [](auto wrappedCallback, void* wrappedUserData) {
+            AsyncCallbackAPIvoid(wrappedCallback, wrappedUserData);
+            return 21;
+        };
+
+        int userData{0};
+
+        auto res = co_await tinycoro::AsyncCallbackAwaiter_CStyle(async, cb, tinycoro::IndexedUserData<0>(&userData));
+
+        EXPECT_EQ(userData, 21);
+        EXPECT_EQ(res, 21);
+
+        co_return userData + res;
+    };
+
+    auto future = scheduler.Enqueue(task());
+    EXPECT_THROW(future.get(), std::runtime_error);
+}
+
 TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyleVoid)
 {
     auto task1 = []() -> tinycoro::Task<void> {
@@ -424,6 +491,28 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyleVoid)
 
     auto future = scheduler.Enqueue(task1());
     EXPECT_NO_THROW(future.get());
+}
+
+TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyleVoid_exception)
+{
+    auto task1 = []() -> tinycoro::Task<void> {
+        auto task2 = []() -> tinycoro::Task<void> {
+            auto cb = [](void* userData, [[maybe_unused]] int i) {
+                auto null = static_cast<std::nullptr_t*>(userData);
+                EXPECT_EQ(null, nullptr);
+
+                throw std::runtime_error{"asyncCallbackAwaiter_CStyleVoid_exception"};
+            };
+
+            co_await tinycoro::AsyncCallbackAwaiter_CStyle(
+                [](auto cb, auto userData) { AsyncCallbackAPIvoid(cb, userData); }, cb, tinycoro::IndexedUserData<0>(nullptr));
+        };
+
+        co_await task2();
+    };
+
+    auto future = scheduler.Enqueue(task1());
+    EXPECT_THROW(future.get(), std::runtime_error);
 }
 
 TEST_F(ExampleTest, Example_asyncCallbackAwaiterWithReturnValue)
