@@ -30,7 +30,7 @@ void Example_AnyOfDynamic(auto& scheduler)
 
     auto results = tinycoro::AnyOf(scheduler, tasks);
 
-    SyncOut() << "co_return => " << results[0].value() << ", " << results[1].value() << ", " << results[2].value() << '\n';
+    SyncOut() << "co_return => " << results[0].value() << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_DYNAMIC_H__
