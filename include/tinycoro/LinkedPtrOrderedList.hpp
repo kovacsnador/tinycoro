@@ -70,7 +70,7 @@ namespace tinycoro { namespace detail {
                 // compare with root to see if
                 // valToCompare not less that root
                 // if(_cmpFunc(valToCompare, _root->value()) == false)
-                if (valToCompare < _root->value() == false)
+                if ((valToCompare < _root->value()) == false)
                 {
                     _size--;
 
