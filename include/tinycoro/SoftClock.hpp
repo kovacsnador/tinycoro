@@ -431,7 +431,7 @@ namespace tinycoro {
             [[nodiscard]] constexpr static auto Now() noexcept
             {
                 return std::chrono::time_point_cast<DurationT>(clock_t::now());
-            };
+            }
 
         private:
             // contains the real implementation of the clock
