@@ -118,7 +118,7 @@ namespace tinycoro {
             pauseHandlerPtr->SetCancellable(true);
         }
 
-        template<typename T>
+        /*template<typename T>
         void MakeCancellable(auto coroHdl, T&& returnValue)
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
@@ -126,7 +126,7 @@ namespace tinycoro {
 
             pauseHandlerPtr->SetCancellable(true);
             coroHdl.promise().return_value(std::forward<T>(returnValue));
-        }
+        }*/
 
         void UnpauseTask(auto coroHdl)
         {

@@ -14,7 +14,7 @@ void Example_AnyOfException(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
     };
 
@@ -25,7 +25,7 @@ void Example_AnyOfException(auto& scheduler)
         {
             SyncOut() << "  Throwing exception\n";
             throw std::runtime_error("Exception throwed!");
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return 42;
     };

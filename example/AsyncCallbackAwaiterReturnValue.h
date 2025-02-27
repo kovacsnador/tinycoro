@@ -36,8 +36,8 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         co_return s.i;
     };
 
-    auto future = scheduler.Enqueue(task());
-    SyncOut() << "co_return => " << future.get() << '\n';
+    auto val = tinycoro::GetAll(scheduler, task());
+    SyncOut() << "co_return => " << *val << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ASYNC_CALLBACK_AWAITER_RETURN_VALUE_H__

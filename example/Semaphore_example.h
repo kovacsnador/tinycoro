@@ -20,7 +20,7 @@ void Example_Semaphore(tinycoro::Scheduler& scheduler)
     // So (c1 != c2 && c2 != c3 && c3 != c1)
     // possible output: c1 == 1, c2 == 2, c3 == 3
 
-    std::cout << c1 << " " << c2 << " " << c3 << '\n';
+    std::cout << *c1 << " " << *c2 << " " << *c3 << '\n';
 }
 
 #endif

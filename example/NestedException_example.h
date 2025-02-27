@@ -30,7 +30,7 @@ void Example_nestedException(auto& scheduler)
     try
     {
         auto val = future.get();
-        SyncOut() << "co_return => " << val << '\n';
+        SyncOut() << "co_return => " << val.value() << '\n';
     }
     catch (const std::exception& e)
     {

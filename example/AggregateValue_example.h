@@ -21,10 +21,10 @@ void Example_aggregateValue(auto& scheduler)
         co_return Aggregate{42, 43};
     };
 
-    auto future = scheduler.Enqueue(task());
-    auto val    = future.get();
+    auto val = tinycoro::GetAll(scheduler, task());
 
-    SyncOut() << "co_return => " << val.i << " " << val.j << '\n';
+    SyncOut() << "co_return => " << val->i << " " << val->j << '\n';
 }
+
 
 #endif //!__TINY_CORO_EXAMPLE_AGGREGATE_VALUE_H__

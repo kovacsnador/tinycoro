@@ -31,6 +31,7 @@ namespace tinycoro {
         using TaskT::GetPauseHandler;
 
         using TaskT::TaskView;
+        using TaskT::IsDone;
 
         using TaskT::SetStopSource;
         using TaskT::SetDestroyNotifier;

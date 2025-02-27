@@ -18,7 +18,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return count;
     };
@@ -26,7 +26,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
     // Nonblocking wait for other tasks
     auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
 
-    SyncOut() << "co_return => " << t1 << ", " << t2 << ", " << t3 << '\n';
+    SyncOut() << "co_return => " << *t1 << ", " << *t2 << ", " << *t3 << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_COAWAIT_H__

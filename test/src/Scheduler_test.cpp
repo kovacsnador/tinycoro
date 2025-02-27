@@ -18,6 +18,7 @@ TEST_F(SchedulerTest, SchedulerTest_done)
     using enum tinycoro::ETaskResumeState; 
 
     EXPECT_CALL(*task.mock, Resume()).Times(1);
+    EXPECT_CALL(*task.mock, IsDone()).WillOnce(testing::Return(true));
     EXPECT_CALL(*task.mock, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
     EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
     EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -37,6 +38,7 @@ TEST_F(SchedulerTest, SchedulerTest_suspended)
     using enum tinycoro::ETaskResumeState; 
 
     EXPECT_CALL(*task.mock, Resume()).Times(2);
+    EXPECT_CALL(*task.mock, IsDone()).WillOnce(testing::Return(true));
     EXPECT_CALL(*task.mock, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
     EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
     EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -57,6 +59,7 @@ TEST_F(SchedulerTest, SchedulerTest_paused)
     auto& mock = *task.mock;
 
     EXPECT_CALL(mock, Resume()).Times(3);
+    EXPECT_CALL(mock, IsDone()).Times(testing::AnyNumber());
     EXPECT_CALL(mock, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock] { mock.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock, SetPauseHandler).Times(1);
     EXPECT_CALL(mock, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -81,6 +84,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     auto& mock1 = *task1.mock;
 
     EXPECT_CALL(mock1, Resume()).Times(3);
+    EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -90,6 +94,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     auto& mock2 = *task2.mock;
 
     EXPECT_CALL(mock2, Resume()).Times(2);
+    EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
@@ -107,9 +112,9 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
 
     auto futures = scheduler.Enqueue(std::move(task1), std::move(task2), std::move(task3));
 
-    EXPECT_EQ(std::get<0>(futures).get(), 42);
-    EXPECT_EQ(std::get<1>(futures).get(), 41);
-    std::get<2>(futures).get();
+    EXPECT_EQ(std::get<0>(futures).get().value(), 42);
+    EXPECT_EQ(std::get<1>(futures).get().value(), 41);
+    EXPECT_NO_THROW(std::get<2>(futures).get());
 }
 
 TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
@@ -123,6 +128,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     auto& mock1 = *task1.mock;
 
     EXPECT_CALL(mock1, Resume()).Times(3);
+    EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -132,6 +138,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     auto& mock2 = *task2.mock;
 
     EXPECT_CALL(mock2, Resume()).Times(2);
+    EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
@@ -141,6 +148,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     auto& mock3 = *task3.mock;
 
     EXPECT_CALL(mock3, Resume()).Times(1);
+    EXPECT_CALL(mock3, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock3, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(1).WillOnce(testing::Return(40));
@@ -152,9 +160,9 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
 
     auto futures = scheduler.Enqueue(std::move(tasks));
 
-    EXPECT_EQ(futures[0].get(), 42);
-    EXPECT_EQ(futures[1].get(), 41);
-    EXPECT_EQ(futures[2].get(), 40);
+    EXPECT_EQ(futures[0].get().value(), 42);
+    EXPECT_EQ(futures[1].get().value(), 41);
+    EXPECT_EQ(futures[2].get().value(), 40);
 }
 
 TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
@@ -168,6 +176,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     auto& mock1 = *task1.mock;
 
     EXPECT_CALL(mock1, Resume()).Times(3);
+    EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock1, SetPauseHandler).Times(1);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
@@ -178,6 +187,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     auto& mock2 = *task2.mock;
 
     EXPECT_CALL(mock2, Resume()).Times(2);
+    EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock2, SetPauseHandler).Times(1);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
@@ -199,9 +209,9 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
 
     auto[t1, t2, t3] = tinycoro::GetAll(futures);
     
-    EXPECT_EQ(t1, 42);
-    EXPECT_EQ(t2, 41);
-    EXPECT_TRUE((std::same_as<tinycoro::VoidType, decltype(t3)>));
+    EXPECT_EQ(*t1, 42);
+    EXPECT_EQ(*t2, 41);
+    EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, decltype(t3)>));
 }
 
 

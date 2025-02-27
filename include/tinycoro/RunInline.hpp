@@ -209,8 +209,6 @@ namespace tinycoro {
         template <concepts::Iterable ContainerT>
         void RunInlineImplContainer(ContainerT&& container)
         {
-            //std::atomic<bool> paused{false};
-
             helper::AutoResetEvent event;
 
             for (auto& it : container)

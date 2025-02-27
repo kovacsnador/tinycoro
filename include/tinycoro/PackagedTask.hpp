@@ -12,11 +12,12 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
+		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
         template <typename T>
         concept CoroTask = std::move_constructible<T> && requires (T c) {
             { c.Resume() } -> std::same_as<void>;
+            { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
             { c.SetPauseHandler([]{}) };
@@ -70,7 +71,20 @@ namespace tinycoro {
                     }
                     else
                     {
-                        _futureState.set_value(_coro.await_resume());
+                        if(_coro.IsDone())
+                        {
+                            // are we on a last suspend point?
+                            // That means we had no cancellation before
+                            _futureState.set_value(_coro.await_resume());
+                        }
+                        else
+                        {
+                            using value_t = std::decay_t<decltype(std::declval<FutureStateT>().get_future().get())>;
+
+                            // the task got cancelled
+                            // we give back an empty optional
+                            _futureState.set_value(value_t{std::nullopt});
+                        }
                     }
                 }
             }

@@ -86,7 +86,15 @@ namespace tinycoro {
             requires concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto Enqueue(ContainerT&& tasks)
         {
-            using FutureStateType = FutureStateT<typename std::decay_t<ContainerT>::value_type::promise_type::value_type>;
+            // get the result value
+            using desiredValue_t = typename std::decay_t<ContainerT>::value_type::promise_type::value_type;
+
+            // check against void
+            // if not void we create a std::optional
+            // to support cancellation
+            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type; //std::conditional<std::same_as<desiredValue_t, void>, desiredValue_t, std::optional<desiredValue_t>>;
+
+            using FutureStateType = FutureStateT<futureValue_t>;
 
             std::vector<decltype(std::declval<FutureStateType>().get_future())> futures;
             futures.reserve(std::size(tasks));
@@ -114,7 +122,15 @@ namespace tinycoro {
             } &&  concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
         {
-            FutureStateT<typename CoroTaksT::promise_type::value_type> futureState;
+            // get the result value
+            using desiredValue_t = typename CoroTaksT::promise_type::value_type;
+
+            // check against void
+            // if not void we create a std::optional
+            // to support cancellation
+            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type; //std::conditional<std::same_as<desiredValue_t, void>, desiredValue_t, std::optional<desiredValue_t>>;
+
+            FutureStateT<futureValue_t> futureState;
 
             auto future  = futureState.get_future();
             auto address = coro.Address();

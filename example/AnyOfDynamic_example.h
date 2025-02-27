@@ -18,7 +18,7 @@ void Example_AnyOfDynamic(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return count;
     };
@@ -30,7 +30,7 @@ void Example_AnyOfDynamic(auto& scheduler)
 
     auto results = tinycoro::AnyOf(scheduler, tasks);
 
-    SyncOut() << "co_return => " << results[0] << ", " << results[1] << ", " << results[2] << '\n';
+    SyncOut() << "co_return => " << results[0].value() << ", " << results[1].value() << ", " << results[2].value() << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_DYNAMIC_H__

@@ -38,8 +38,8 @@ void Example_asyncPulling(auto& scheduler)
         co_return val;
     };
 
-    auto future = scheduler.Enqueue(task());
-    SyncOut() << "co_return => " << future.get() << '\n';
+    auto val = tinycoro::GetAll(scheduler, task());
+    SyncOut() << "co_return => " << *val << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ASYNC_PULLING_H__

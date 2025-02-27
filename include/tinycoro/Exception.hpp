@@ -70,6 +70,12 @@ namespace tinycoro
         using BaseT = std::runtime_error;
         using BaseT::BaseT;
     };
+
+    struct CancelledTaskException : std::runtime_error
+    {
+        using BaseT = std::runtime_error;
+        using BaseT::BaseT;
+    };
     
 } // namespace tinycoro
 

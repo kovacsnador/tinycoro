@@ -65,7 +65,7 @@ namespace tinycoro {
 
         if (stopToken.stop_possible() && stopToken.stop_requested())
         {
-            co_await CancellableSuspend<void>{};
+            co_await CancellableSuspend{};
         }
     }
 

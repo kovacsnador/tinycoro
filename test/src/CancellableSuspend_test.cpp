@@ -6,7 +6,7 @@
 #include "mock/CoroutineHandleMock.h"
 
 
-TEST(CancellableSuspentTest, CancellableSuspentTest_value)
+/*TEST(CancellableSuspentTest, CancellableSuspentTest_value)
 {
     int32_t val{42};
     tinycoro::CancellableSuspend suspend{val};
@@ -17,11 +17,11 @@ TEST(CancellableSuspentTest, CancellableSuspentTest_value)
 
     EXPECT_TRUE(hdl.promise().pauseHandler->IsCancellable());
     EXPECT_EQ(hdl.promise().ReturnValue(), 42);
-}
+}*/
 
-TEST(CancellableSuspentTest, CancellableSuspentTest_void)
+TEST(CancellableSuspentTest, CancellableSuspentTest)
 {
-    tinycoro::CancellableSuspend<void> suspend{};
+    tinycoro::CancellableSuspend suspend{};
 
     auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
     

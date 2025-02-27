@@ -22,9 +22,9 @@ void Example_nestedTask(auto& scheduler)
         co_return val;
     };
 
-    auto future = scheduler.Enqueue(task());
+    auto val = tinycoro::GetAll(scheduler, task());
 
-    SyncOut() << "co_return => " << future.get() << '\n';
+    SyncOut() << "co_return => " << *val << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_NESTED_TASK_H__

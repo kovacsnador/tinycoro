@@ -24,9 +24,9 @@ void Example_sleep(auto& scheduler)
         // co_return co_await sleep(1s);     // or write short like this
     };
 
-    auto future = scheduler.Enqueue(task());
+    auto val = tinycoro::GetAll(scheduler, task());
 
-    SyncOut() << "co_return => " << future.get() << '\n';
+    SyncOut() << "co_return => " << *val << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_SLEEP_H__

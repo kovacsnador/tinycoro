@@ -17,7 +17,7 @@ void Example_returnValueTask(auto& scheduler)
 
     auto val = tinycoro::GetAll(scheduler, task());
 
-    SyncOut() << "co_return => " << val << '\n';
+    SyncOut() << "co_return => " << *val << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_RETURN_VALUE_H__

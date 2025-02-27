@@ -8,34 +8,56 @@
 
 #include "mock/TaskMock.hpp"
 
-struct Ex{};
+struct Ex
+{
+};
 
 ACTION(ThrowRuntimeError)
 {
     throw std::runtime_error{"Runtime error!"};
 }
 
-template<typename FutureStateT>
+template <typename FutureStateT>
 struct PackagedTaskTest : public testing::Test
 {
     using value_type = FutureStateT;
 };
 
-using PackagedTaskTestTypes = testing::Types<std::promise<int>, std::promise<void>, std::promise<Ex>, tinycoro::FutureState<int>, tinycoro::FutureState<void>, tinycoro::FutureState<Ex>>;
+using PackagedTaskTestTypes = testing::Types<std::promise<std::optional<int>>,
+                                             std::promise<void>,
+                                             std::promise<std::optional<Ex>>,
+                                             tinycoro::FutureState<std::optional<int>>,
+                                             tinycoro::FutureState<void>,
+                                             tinycoro::FutureState<std::optional<Ex>>>;
 
 TYPED_TEST_SUITE(PackagedTaskTest, PackagedTaskTestTypes);
+
+template<typename T>
+struct GetType;
+
+template<>
+struct GetType<void>
+{
+    using value_type = void; 
+};
+
+template<typename T>
+struct GetType<std::optional<T>>
+{
+    using value_type = T; 
+};
 
 TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 {
     using PromiseT = TestFixture::value_type;
-    using ValueT = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
+    using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
 
     PromiseT promise;
-    auto future = promise.get_future();
+    auto     future = promise.get_future();
     {
-        tinycoro::test::TaskMock<ValueT> task;
+        tinycoro::test::TaskMock<typename GetType<ValueT>::value_type> task;
 
-        if constexpr (std::same_as<ValueT, Ex>)
+        if constexpr (std::same_as<ValueT, std::optional<Ex>>)
         {
             EXPECT_CALL(*task.mock, Resume()).Times(1).WillOnce(ThrowRuntimeError());
         }
@@ -45,7 +67,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
             EXPECT_CALL(*task.mock, Resume()).Times(1);
         }
 
-        if constexpr (std::same_as<ValueT, int32_t>)
+        if constexpr (std::same_as<ValueT, std::optional<int32_t>>)
         {
             EXPECT_CALL(*task.mock, await_resume()).Times(1).WillOnce(::testing::Return(42)); // Return any value you'd expect
         }
@@ -54,12 +76,14 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
             EXPECT_CALL(*task.mock, await_resume()).Times(0);
         }
 
+        EXPECT_CALL(*task.mock, IsDone).Times(::testing::AnyNumber());
+
         auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
 
         packedTask->Resume();
     }
 
-    if constexpr (std::same_as<ValueT, int32_t>)
+    if constexpr (std::same_as<ValueT, std::optional<int32_t>>)
     {
         EXPECT_EQ(future.get(), 42);
     }
@@ -69,12 +93,12 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
     }
     else
     {
-        auto futureGetter = [&future] {std::ignore = future.get(); };
+        auto futureGetter = [&future] { std::ignore = future.get(); };
         EXPECT_THROW(futureGetter(), std::runtime_error);
     }
 }
 
-template<typename T>
+template <typename T>
 struct PackagedTaskTestException : public testing::Test
 {
     using value_type = T;
@@ -87,12 +111,12 @@ TYPED_TEST_SUITE(PackagedTaskTestException, PackagedTaskTestExceptionTypes);
 TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 {
     using PromiseT = TestFixture::value_type;
-    using ValueT = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
+    using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
 
     PromiseT promise;
-    auto future = promise.get_future();
+    auto     future = promise.get_future();
     {
-        tinycoro::test::TaskMock<ValueT> task;
+        tinycoro::test::TaskMock<typename GetType<ValueT>::value_type> task;
 
         // Setting up expectations for the mock methods
         EXPECT_CALL(*task.mock, Resume()).Times(1).WillOnce(ThrowRuntimeError());

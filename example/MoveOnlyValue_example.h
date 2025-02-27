@@ -28,10 +28,9 @@ void Example_moveOnlyValue(auto& scheduler)
         co_return 42;
     };
 
-    auto future = scheduler.Enqueue(task());
-    auto val    = future.get();
+    auto val = tinycoro::GetAll(scheduler, task());
 
-    SyncOut() << "co_return => " << val.i << '\n';
+    SyncOut() << "co_return => " << val->i << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_MOVE_ONLY_VALUE_H__

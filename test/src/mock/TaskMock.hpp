@@ -14,6 +14,7 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
         MOCK_METHOD(T, await_resume, ());
         MOCK_METHOD(bool, IsPaused, (), (const noexcept));
+        MOCK_METHOD(bool, IsDone, (), (const noexcept));
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
         MOCK_METHOD(void*, Address, (), (const noexcept));
 
@@ -34,6 +35,7 @@ namespace tinycoro { namespace test {
         TaskMock()
         : mock{std::make_shared<TaskMockImpl<T>>()}
         {
+            ON_CALL(*mock, IsDone).WillByDefault(::testing::Return(true));
         }
 
         void Resume() { mock->Resume(); }
@@ -41,6 +43,8 @@ namespace tinycoro { namespace test {
         tinycoro::ETaskResumeState ResumeState() { return mock->ResumeState(); }
 
         T await_resume() { return mock->await_resume(); }
+
+        bool IsDone() { return mock->IsDone(); }
 
         void SetPauseHandler(tinycoro::PauseHandlerCallbackT func)
         {

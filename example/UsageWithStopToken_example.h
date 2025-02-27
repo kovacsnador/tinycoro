@@ -38,13 +38,11 @@ void Example_usageWithStopToken(auto& scheduler)
 
     std::stop_source source;
 
-    auto futures = scheduler.Enqueue(task1(1s, source), task2(source.get_token()));
-
-    auto results = tinycoro::GetAll(futures);
+    auto results = tinycoro::GetAll(scheduler, task1(1s, source), task2(source.get_token()));
 
     auto task2Val = std::get<1>(results);
 
-    SyncOut() << "co_return => " << task2Val << '\n';
+    SyncOut() << "co_return => " << *task2Val << '\n';
 }
 
 

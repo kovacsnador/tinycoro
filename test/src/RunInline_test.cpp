@@ -49,6 +49,7 @@ struct RunInline_TaskMockWrapper
     RunInline_TaskMockWrapper()
     : mock{std::make_shared<RunInline_TaskMock<ReturnT, PauseHandlerT>>()}
     {
+        ON_CALL(*mock, IsDone).WillByDefault(::testing::Return(true));
     }
 
     ReturnT await_resume()
@@ -225,7 +226,7 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
 
         EXPECT_CALL(*tasks[i].mock, Resume()).Times(1);
         EXPECT_CALL(*tasks[i].mock, IsPaused()).Times(1);
-        EXPECT_CALL(*tasks[i].mock, IsDone()).Times(1);
+        EXPECT_CALL(*tasks[i].mock, IsDone()).WillOnce(testing::Return(false));
         EXPECT_CALL(*tasks[i].mock, ResumeState())
         .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
@@ -521,7 +522,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
     auto consumer3 = [&]()->tinycoro::Task<>
     {
         // this task should be stopped through stopsource
-        co_await tinycoro::CancellableSuspend<void>{};
+        co_await tinycoro::CancellableSuspend{};
 
         // This code should never reached...
         i++; 

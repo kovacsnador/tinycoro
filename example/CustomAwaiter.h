@@ -53,10 +53,9 @@ void Example_CustomAwaiter(auto& scheduler)
         co_return val;
     };
 
-    auto future = scheduler.Enqueue(asyncTask());
-    auto val    = tinycoro::GetAll(future);
+    auto val = tinycoro::GetAll(scheduler, asyncTask());
 
-    SyncOut() << "co_return => " << val << '\n'; 
+    SyncOut() << "co_return => " << *val << '\n'; 
 }
 
 #endif //!__TINY_CORO_EXAMPLE_CUSTOM_AWAITER_H__

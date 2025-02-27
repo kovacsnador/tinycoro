@@ -57,11 +57,11 @@ namespace tinycoro {
             }
             else
             {
-                using opt_t = std::optional<T>;
+                using opt_t = T;
 
                 try
                 {
-                    return opt_t(std::move(f.get()));
+                    return std::move(f.get());
                 }
                 catch (...)
                 {
@@ -83,18 +83,18 @@ namespace tinycoro {
             std::rethrow_exception(exception);
         }
 
-        auto optConverter = []<typename T>(std::optional<T>& o) { return std::move(o.value()); };
+        /*auto optConverter = [](auto& o) { return std::move(o.value()); };
 
         auto resultTuple
-            = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::tuple{optConverter(args)...}; }, tupleResultOpt);
+            = std::apply([optConverter]<typename... TypesT>(TypesT&... args) { return std::tuple{optConverter(args)...}; }, tupleResultOpt);*/
 
         if constexpr (sizeof...(Ts) == 1)
         {
-            return std::move(std::get<0>(resultTuple));
+            return std::move(std::get<0>(tupleResultOpt));
         }
         else
         {
-            return resultTuple;
+            return tupleResultOpt;
         }
     }
 
@@ -145,6 +145,7 @@ namespace tinycoro {
     {
         std::exception_ptr exception;
 
+        //std::vector<typename ReturnT::value_type> results;
         std::vector<ReturnT> results;
         results.reserve(futures.size());
 

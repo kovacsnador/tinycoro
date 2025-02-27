@@ -7,8 +7,12 @@
 #include <memory>
 #include <cassert>
 #include <chrono>
+#include <optional>
 
 namespace tinycoro {
+
+    template<typename T>
+    class TD;
 
     namespace detail {
 
@@ -95,7 +99,7 @@ namespace tinycoro {
         template <typename... Ts>
         concept IsTimePoint = detail::IsTimePointT<Ts...>::value;
 
-        template<typename T>
+        template <typename T>
         concept IsNothrowInvokeable = std::is_nothrow_invocable_v<T>;
 
     } // namespace concepts
@@ -120,43 +124,61 @@ namespace tinycoro {
         DONE
     };
 
-    namespace detail { namespace helper {
+    namespace detail {
 
-        // simple auto reset event
-        struct AutoResetEvent
+        template <typename>
+        struct FutureReturnT;
+
+        template <typename T>
+        struct FutureReturnT
         {
-            AutoResetEvent() = default;
-
-            // Start with a custom flag
-            AutoResetEvent(bool flag)
-            : _flag{flag}
-            {
-            }
-
-            // sets the event
-            void Set()
-            {
-                _flag.store(true);
-                _flag.notify_all();
-            }
-
-            // Waits for the event and resets the flag
-            // to prepare for the next Set()
-            bool Wait()
-            {
-                _flag.wait(false);
-
-                bool expected{true};
-                return _flag.compare_exchange_strong(expected, false);
-            }
-
-            [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }
-
-        private:
-            std::atomic<bool> _flag{};
+            using value_type = std::optional<T>;
         };
 
-    }} // namespace detail::helper
+        template <>
+        struct FutureReturnT<void>
+        {
+            using value_type = void;
+        };
+
+        namespace helper {
+
+            // simple auto reset event
+            struct AutoResetEvent
+            {
+                AutoResetEvent() = default;
+
+                // Start with a custom flag
+                AutoResetEvent(bool flag)
+                : _flag{flag}
+                {
+                }
+
+                // sets the event
+                void Set()
+                {
+                    _flag.store(true);
+                    _flag.notify_all();
+                }
+
+                // Waits for the event and resets the flag
+                // to prepare for the next Set()
+                bool Wait()
+                {
+                    _flag.wait(false);
+
+                    bool expected{true};
+                    return _flag.compare_exchange_strong(expected, false);
+                }
+
+                [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }
+
+            private:
+                std::atomic<bool> _flag{};
+            };
+
+        } // namespace helper
+    } // namespace detail
 } // namespace tinycoro
 
 #endif // !__TINY_CORO_COMMON_HPP__
