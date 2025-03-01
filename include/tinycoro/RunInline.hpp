@@ -5,6 +5,7 @@
 #include <atomic>
 #include <concepts>
 #include <barrier>
+#include <optional>
 
 #include "Common.hpp"
 #include "PauseHandler.hpp"
@@ -22,7 +23,7 @@ namespace tinycoro {
         };
 
         template <typename ValueT, typename... TaskT>
-        concept SameAsValueType = (std::same_as<ValueT, typename TaskT::value_type> && ...);
+        concept SameAsValueType = (std::same_as<ValueT, typename std::decay_t<TaskT>::value_type> && ...);
     } // namespace concepts
 
     namespace detail {
@@ -99,19 +100,21 @@ namespace tinycoro {
                     // resume acitive coroutines
                     auto collectedStatus = std::apply([](auto&&... tasks) { return std::tuple{TryResume(tasks)...}; }, _tasks);
 
-                    // first check:
-                    // if every task is done.
+                    // 1. check:
+                    // if every task is done or in a stopped state
                     if (HasCommonState(collectedStatus, IsDoneChecker))
                     {
                         // all done
                         break;
                     }
 
-                    // second check:
-                    // if every task wether done/stopped or in pause state
+                    // 2. check:
+                    // if every task wether done/stopped
+                    // and at least one in paused state
                     if (HasCommonState(collectedStatus, NeedWaitChecker))
                     {
-                        // all in pause state or done, so we need to wait on this thread...
+                        // most tasks are finished but we have at least
+                        // one paused task, so we need to wait on this thread...
                         // Waits until somebody get's notified to resume
                         event.Wait();
                     }
@@ -120,16 +123,38 @@ namespace tinycoro {
                 auto resultConverter = [](auto& task) {
                     if constexpr (requires { { task.await_resume() } -> std::same_as<void>; })
                     {
-                        return VoidType{};
+                        std::optional<VoidType> result{};
+                        if(task.IsDone())
+                        {
+                            result = VoidType{};
+                        }
+                        return result;
                     }
                     else
                     {
-                        return task.await_resume();
+                        using return_t = std::decay_t<decltype(task)>::value_type;
+
+                        std::optional<return_t> result{};
+                        if(task.IsDone())
+                        {
+                            result = std::move(task.await_resume());
+                        }
+                        return result;
                     }
                 };
 
                 // collecting and return all the return values.
-                return std::apply([resultConverter]<typename... TypesT>(TypesT&... args) { return std::tuple{resultConverter(args)...}; }, _tasks);
+                auto resultsTuple = std::apply([resultConverter]<typename... TypesT>(TypesT&... args) { return std::tuple{resultConverter(args)...}; }, _tasks);
+
+                if constexpr (std::tuple_size_v<decltype(resultsTuple)> == 1)
+                {                    
+                    // Test if we need this std::move here....
+                    return std::move(std::get<0>(resultsTuple));
+                }
+                else
+                {
+                    return resultsTuple;
+                }
             }
 
         private:
@@ -153,43 +178,12 @@ namespace tinycoro {
         };
     } // namespace detail
 
-    // runs a simple task inline on current thread.
+
+    // runs a simple task/tasks inline on current thread.
     // Ideal if you want to run a task in a non coroutine environment,
     // and you anyway want to wait for the result. (No need for a scheduler)
-    template <concepts::LocalRunable TaskT>
-    [[nodiscard]] auto RunInline(TaskT&& task)
-    {
-        using enum ETaskResumeState;
-
-        auto pauseResumerCallback = [&task] {
-            auto pauseHandler = task.GetPauseHandler();
-            pauseHandler->Resume();
-        };
-
-        auto pauseHandler = task.SetPauseHandler(pauseResumerCallback);
-
-        ETaskResumeState state{DONE};
-
-        do
-        {
-            // resume the corouitne
-            task.Resume();
-            // after resumption getting the state
-            state = task.ResumeState();
-
-            if (state == PAUSED)
-            {
-                // wait for resumption
-                pauseHandler->AtomicWait(true);
-            }
-
-        } while (state != DONE && state != STOPPED);
-
-        return task.await_resume();
-    }
-
     template <typename... TaskT>
-        requires (sizeof...(TaskT) > 1) && (!concepts::SameAsValueType<void, TaskT...>)
+        requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
     [[nodiscard]] auto RunInline(TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
@@ -197,7 +191,7 @@ namespace tinycoro {
     }
 
     template <typename... TaskT>
-        requires (sizeof...(TaskT) > 1) && concepts::SameAsValueType<void, TaskT...>
+        requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
     void RunInline(TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
@@ -269,13 +263,24 @@ namespace tinycoro {
         detail::RunInlineImplContainer(container);
 
         // container to hold the result values.
-        std::vector<typename std::decay_t<ContainerT>::value_type::value_type> results;
+        std::vector<std::optional<typename std::decay_t<ContainerT>::value_type::value_type>> results;
         results.reserve(std::size(container));
 
         // collecting all the results from the tasks through await_resume function.
         for (auto& it : container)
         {
-            results.emplace_back(it.await_resume());
+            if(it.IsDone())
+            {
+                // if done we return the
+                // await_resume return value.
+                results.emplace_back(it.await_resume());
+            }
+            else
+            {
+                // if it was cancelled add
+                // nullopt as the result.
+                results.emplace_back(std::nullopt);
+            }
         }
 
         return results;
