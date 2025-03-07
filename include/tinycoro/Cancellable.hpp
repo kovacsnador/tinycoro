@@ -16,7 +16,7 @@ namespace tinycoro {
     class Cancellable
     {
         using stopCallback_t = std::stop_callback<std::function<void()>>;
-        using StorageT       = detail::StaticStorage<stopCallback_t, sizeof(stopCallback_t)>;
+        using StorageT       = detail::StaticStorage<stopCallback_t, sizeof(stopCallback_t), stopCallback_t>;
 
     public:
         // accepts only r-value refs
