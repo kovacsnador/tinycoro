@@ -818,8 +818,8 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
         auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
         EXPECT_TRUE(*t1 > 0);
-        EXPECT_TRUE(*t2 > 0);
-        EXPECT_TRUE(*t3 > 0);
+        EXPECT_FALSE(t2.has_value());
+        EXPECT_FALSE(t3.has_value());
 
         EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
     };

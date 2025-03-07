@@ -1442,9 +1442,9 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushWait_cancel)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{10};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&](auto i) -> tinycoro::Task<int32_t> {
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable{channel.PushWait(42u)};
-        co_return 42;
+        co_return i;
     };
 
     auto sleep = [&]() -> tinycoro::Task<int32_t> {
@@ -1455,18 +1455,27 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushWait_cancel)
     std::vector<tinycoro::Task<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
-    for ([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
-        tasks.emplace_back(task());
+        tasks.emplace_back(task(static_cast<int32_t>(it)));
     }
 
     auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(result[0].value(), 44);
 
-    for (size_t i = 11; i < result.size(); ++i)
+    size_t sizeCount{};
+    for (size_t i = 1; i < result.size(); ++i)
     {
-        EXPECT_FALSE(result[i].has_value());
+        if (result[i].has_value())
+        {
+            EXPECT_TRUE(sizeCount < channel.Size());
+            sizeCount++;
+        }
+        else
+        {
+            EXPECT_FALSE(result[i].has_value());
+        }
     }
 }
 
