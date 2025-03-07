@@ -12,7 +12,7 @@ namespace tinycoro {
         {
             auto& pauseHandler = coroHdl.promise().pauseHandler;
 
-            if(pauseHandler)
+            if (pauseHandler)
             {
                 if (stopSource.stop_requested() && pauseHandler->IsCancellable())
                 {
@@ -34,13 +34,13 @@ namespace tinycoro {
             hdlPtr->Resume();
         }
 
-        ETaskResumeState ResumeState(auto coroHdl, const auto& stopSource) const
+        [[nodiscard]] ETaskResumeState ResumeState(auto coroHdl, const auto& stopSource) const noexcept
         {
             if (coroHdl && coroHdl.done() == false)
             {
                 auto& pauseHandler = coroHdl.promise().pauseHandler;
 
-                if(pauseHandler)
+                if (pauseHandler)
                 {
                     if (stopSource.stop_requested() && pauseHandler->IsCancellable())
                     {

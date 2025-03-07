@@ -30,7 +30,9 @@ namespace tinycoro {
             // disable move and copy
             SingleEvent(SingleEvent&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
+
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
 
             void SetValue(ValueT val)
             {
@@ -93,6 +95,17 @@ namespace tinycoro {
                 return !_value.has_value();
             }
 
+            void Cancel(const awaiter_type* awaiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                if(_waiter == awaiter)
+                {
+                    // reset the waiter
+                    _waiter = nullptr;
+                    awaiter->Notify();
+                }
+            }
+
             std::optional<ValueT> _value;
 
             const awaiter_type* _waiter{nullptr};
@@ -118,16 +131,16 @@ namespace tinycoro {
                 return _singleEvent.IsReady(this);
             }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_singleEvent.Add(this) == false)
                 {
                     // coroutine is not paused, we can continue immediately
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
-                return std::noop_coroutine();
+                return true;
             }
 
             // Moving out the value.
@@ -138,9 +151,11 @@ namespace tinycoro {
                 return temp;
             }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+
+            void Cancel() noexcept { _singleEvent.Cancel(this); }
 
             void ResumeFromPause(auto parentCoro)
             {

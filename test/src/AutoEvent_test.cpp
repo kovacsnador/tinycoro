@@ -75,7 +75,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend)
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
 
-    EXPECT_EQ(awaiter.await_suspend(hdl), std::noop_coroutine());
+    EXPECT_TRUE(awaiter.await_suspend(hdl));
 
     EXPECT_FALSE(pauseCalled);
 
@@ -101,7 +101,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
     hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
 
-    EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
+    EXPECT_FALSE(awaiter.await_suspend(hdl));
 
     EXPECT_FALSE(pauseCalled);
 
@@ -176,6 +176,81 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
     }
 
     tinycoro::GetAll(scheduler, tasks);
+}
+
+TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent;
+    size_t              autoCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{autoEvent.Wait()};
+        co_return autoCount++;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return ++autoCount;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.push_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(autoEventConsumer());
+    }
+
+    auto results = tinycoro::AnyOf(scheduler, tasks);
+
+    for(size_t i = 1; i < count + 1; ++i)
+    {
+        EXPECT_FALSE(results[i].has_value());
+    }
+
+    EXPECT_EQ(results[0], 1);
+}
+
+TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOfInline)
+{
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent;
+    size_t              autoCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{autoEvent.Wait()};
+        co_return autoCount++;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return ++autoCount;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.push_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(autoEventConsumer());
+    }
+
+    auto results = tinycoro::AnyOfInline(tasks);
+
+    EXPECT_EQ(results[0], 1);
+
+    for(size_t i = 1; i <= count; ++i)
+    {
+        EXPECT_FALSE(results[i].has_value());
+    }
 }
 
 TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)

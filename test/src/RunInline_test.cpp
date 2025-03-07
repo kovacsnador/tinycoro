@@ -14,7 +14,7 @@ struct RunInline_PauseHandlerMock
     }
 
     MOCK_METHOD(void, Resume, ());
-    MOCK_METHOD(void, AtomicWait, (bool));
+    MOCK_METHOD(bool, IsCancellable, (), (const));
 
     tinycoro::PauseHandlerCallbackT cb;
 };
@@ -33,9 +33,11 @@ struct RunInline_TaskMock
     MOCK_METHOD(ReturnT, await_resume, ());
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, GetPauseHandler, ());
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(bool, IsPaused, (), (const, noexcept));
+    MOCK_METHOD(bool, IsCancelled, (), (const, noexcept));
     MOCK_METHOD(bool, IsDone, (), (const, noexcept));
 
     std::shared_ptr<PauseHandlerT> pauseHandlerMock;
@@ -67,7 +69,11 @@ struct RunInline_TaskMockWrapper
     std::shared_ptr<PauseHandlerT> SetPauseHandler(tinycoro::PauseHandlerCallbackT cb)
     {
         return mock->SetPauseHandler(cb);
+    }
 
+    void SetStopSource(auto stopSource)
+    {
+        mock->SetStopSource(stopSource);
     }
 
     void Resume()
@@ -85,6 +91,11 @@ struct RunInline_TaskMockWrapper
         return mock->IsPaused();
     }
 
+    bool IsCancelled() const noexcept
+    {
+        return mock->IsCancelled();
+    }
+
     bool IsDone() const noexcept
     {
         return mock->IsDone();
@@ -96,8 +107,6 @@ struct RunInline_TaskMockWrapper
 
 TEST(RunInlineTest, RunInlineTest_void)
 {
-    //RunInline_TaskMock<void, RunInline_PauseHandlerMock> mock;
-
     RunInline_TaskMockWrapper<void, RunInline_PauseHandlerMock> mock;
 
     EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
@@ -129,9 +138,17 @@ TEST(RunInlineTest, RunInlineTest_int32)
 
     EXPECT_CALL(*mock.mock, Resume()).Times(1);
     EXPECT_CALL(*mock.mock, IsPaused()).Times(1);
-    EXPECT_CALL(*mock.mock, IsDone()).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
-    EXPECT_CALL(*mock.mock, ResumeState()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
-    EXPECT_CALL(*mock.mock, await_resume()).Times(1).WillOnce(testing::Return(42));
+
+    EXPECT_CALL(*mock.mock, IsDone())
+        .WillOnce(testing::Return(false))
+        .WillOnce(testing::Return(true));
+    
+    EXPECT_CALL(*mock.mock, ResumeState())
+        .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+    
+    EXPECT_CALL(*mock.mock, await_resume())
+        .Times(1)
+        .WillOnce(testing::Return(42));
 
     auto val = tinycoro::RunInline(mock);
     EXPECT_EQ(42, val);
@@ -178,6 +195,34 @@ TEST(RunInlineTest, RunInlineTest_pause)
 
     auto [val, voidValue] = tinycoro::RunInline(mock, resumer());
     EXPECT_EQ(42, val);
+}
+
+TEST(RunInlineTest, RunInlineTest_cancelled)
+{
+    RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock> mock;
+
+    EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+        [&mock] (auto callback) {
+            mock.mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>(callback);
+            return mock.mock->pauseHandlerMock;
+        }
+    ));
+
+    EXPECT_CALL(*mock.mock, Resume()).Times(1);
+    EXPECT_CALL(*mock.mock, IsPaused()).Times(1);
+
+    EXPECT_CALL(*mock.mock, IsDone())
+        .WillOnce(testing::Return(false))
+        .WillOnce(testing::Return(false));
+    
+    EXPECT_CALL(*mock.mock, ResumeState())
+        .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
+
+    EXPECT_CALL(*mock.mock, await_resume()).Times(0);
+ 
+    auto val = tinycoro::RunInline(mock);
+    EXPECT_TRUE((std::same_as<decltype(val), std::optional<int32_t>>));
+    EXPECT_FALSE(val.has_value());
 }
 
 TEST(RunInlineTest, RunInlineTest_multiTasks)
@@ -268,6 +313,42 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
     auto results = tinycoro::RunInline(tasks);
     std::ranges::for_each(results, [](const auto& v) {
         EXPECT_EQ(42, v);
+    });
+}
+
+TEST(RunInlineTest, RunInlineTest_dynamicTasks_cancelled)
+{
+    std::vector<RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock>> tasks;
+
+    for(size_t i=0; i < 10; ++i)
+    {
+        tasks.emplace_back();
+
+        tasks[i].mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+
+        EXPECT_CALL(*tasks[i].mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+        [&tasks, index = i] (auto) {
+            return tasks[index].mock->pauseHandlerMock;
+        }
+        ));
+
+        EXPECT_CALL(*tasks[i].mock, Resume()).Times(1);
+        EXPECT_CALL(*tasks[i].mock, IsPaused()).Times(1);
+        
+        EXPECT_CALL(*tasks[i].mock, IsDone())
+            .WillOnce(testing::Return(false))
+            .WillOnce(testing::Return(false));
+        
+        EXPECT_CALL(*tasks[i].mock, ResumeState())
+            .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
+
+        EXPECT_CALL(*tasks[i].mock, await_resume()).Times(0);
+    }
+
+    auto results = tinycoro::RunInline(tasks);
+
+    std::ranges::for_each(results, [](const auto& v) {
+        EXPECT_FALSE(v.has_value());
     });
 }
 
@@ -464,7 +545,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_exception)
     auto func = [&]{std::ignore = tinycoro::RunInline(task1(), task2(), task3()); };
 
     EXPECT_THROW(func(), std::runtime_error);
-    EXPECT_EQ(count, 2);
+    EXPECT_EQ(count, 3);
 }
 
 TEST(RunInlineTest, RunInline_FunctionalTest_exception2)
@@ -677,4 +758,124 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_pushawait)
 
     auto fortyTwo = tinycoro::RunInline(task1());
     EXPECT_EQ(fortyTwo, 42);
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::AutoEvent event;
+
+    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{event.Wait()};
+        co_return 42;
+    };
+
+    auto sleepTask = [&]() -> tinycoro::Task<void> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+    };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+
+    // task should be cancelled
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+
+    EXPECT_TRUE(r6.has_value());
+
+    event.Set();
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_latch)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::Latch latch{1};
+
+    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{latch.Wait()};
+        co_return 42;
+    };
+
+    auto sleepTask = [&]() -> tinycoro::Task<void> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+    };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+
+    // task should be cancelled
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+
+    EXPECT_TRUE(r6.has_value());
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_dynamic)
+{
+    tinycoro::SoftClock clock;
+    tinycoro::AutoEvent event;
+
+    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{event.Wait()};
+        co_return 42;
+    };
+
+    auto sleepTask = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return 44;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    for(size_t i = 0; i < 5; ++i)
+    {
+        tasks.emplace_back(waitTask());
+    }
+
+    tasks.emplace_back(sleepTask());
+
+    auto results = tinycoro::AnyOfInline(tasks);
+
+    // task should be cancelled
+    EXPECT_FALSE(results[0].has_value());
+    EXPECT_FALSE(results[1].has_value());
+    EXPECT_FALSE(results[2].has_value());
+    EXPECT_FALSE(results[3].has_value());
+    EXPECT_FALSE(results[4].has_value());
+
+    EXPECT_EQ(results[5].value(), 44);
+
+    event.Set();
+}
+
+TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_manual)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::ManualEvent event;
+
+    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{event.Wait()};
+        co_return 42;
+    };
+
+    auto sleepTask = [&]() -> tinycoro::Task<void> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+    };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+
+    // task should be cancelled
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+
+    event.Set();
 }

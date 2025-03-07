@@ -11,9 +11,6 @@
 
 namespace tinycoro {
 
-    template<typename T>
-    class TD;
-
     namespace detail {
 
         template <typename>
@@ -102,6 +99,9 @@ namespace tinycoro {
         template <typename T>
         concept IsNothrowInvokeable = std::is_nothrow_invocable_v<T>;
 
+        template<typename T>
+        concept IsCancellableAwait = requires(T awaiter) { {awaiter.Cancel()}; };
+
     } // namespace concepts
 
     struct VoidType
@@ -138,10 +138,37 @@ namespace tinycoro {
         template <>
         struct FutureReturnT<void>
         {
-            using value_type = void;
+            using value_type = std::optional<VoidType>;//void;
         };
 
+        template<typename T>
+        struct TaskResultType
+        {
+            using value_type = std::optional<T>;
+        };
+
+        template<>
+        struct TaskResultType<void>
+        {
+            using value_type = std::optional<VoidType>;
+        };
+
+        template<typename T>
+        using TaskResult_t = TaskResultType<T>::value_type;
+
         namespace helper {
+
+            bool Contains(concepts::Linkable auto current, concepts::Linkable auto elem)
+            {
+                while(current)
+                {
+                    if(current == elem)
+                        return true;
+
+                    current = current->next;
+                }
+                return false;
+            }
 
             // simple auto reset event
             struct AutoResetEvent

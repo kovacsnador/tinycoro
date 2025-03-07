@@ -91,8 +91,6 @@ namespace tinycoro {
 
         [[nodiscard]] bool IsCancellable() const noexcept { return _cancellable.load(std::memory_order::relaxed); }
 
-        void AtomicWait(bool flag) const noexcept { _pause.wait(flag); }
-
     private:
         PauseHandlerCallbackT _resumerCallback;
 

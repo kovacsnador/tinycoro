@@ -4,6 +4,8 @@
 #include <atomic>
 
 #include "PauseHandler.hpp"
+#include "LinkedPtrStack.hpp"
+#include "AwaiterHelper.hpp"
 
 namespace tinycoro {
 
@@ -19,7 +21,7 @@ namespace tinycoro {
 
             ManualEvent(bool preSet = false)
             {
-                if(preSet)
+                if (preSet)
                 {
                     Set();
                 }
@@ -34,16 +36,12 @@ namespace tinycoro {
                 if (oldValue != this && oldValue)
                 {
                     // handle awaiters
-                    for (auto* top = static_cast<awaiter_type*>(oldValue); top;)
-                    {
-                        auto next = top->next;
-                        top->Notify();
-                        top = next;
-                    }
+                    auto top = static_cast<awaiter_type*>(oldValue);
+                    detail::IterInvoke(top, &awaiter_type::Notify);
                 }
             }
 
-            bool IsSet() const noexcept { return _state.load() == this; }
+            [[nodiscard]] bool IsSet() const noexcept { return _state.load() == this; }
 
             void Reset() noexcept
             {
@@ -51,10 +49,12 @@ namespace tinycoro {
                 _state.compare_exchange_strong(expected, nullptr);
             }
 
-            auto operator co_await() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
+
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
 
         private:
-            bool Add(awaiter_type* awaiter)
+            [[nodiscard]] bool Add(awaiter_type* awaiter)
             {
                 auto oldValue = _state.load(std::memory_order::acquire);
                 if (oldValue != this)
@@ -76,10 +76,76 @@ namespace tinycoro {
                 return false;
             }
 
+            void Cancel(awaiter_type* awaiter) noexcept
+            {
+                auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
+
+                detail::LinkedPtrStack<awaiter_type> elementsToNotify;
+
+                {
+                    std::scoped_lock lock{_mtx};
+
+                    auto expected = _state.load(std::memory_order::acquire);
+
+                    // try to get the awaiter list
+                    // out from the state
+                    while (isAwaiter(expected, this) && !_state.compare_exchange_strong(expected, nullptr))
+                    {
+                    }
+
+                    if (isAwaiter(expected, this))
+                    {
+                        // we have the awaiter list
+                        // get the top element, and check
+                        // if we still have our awaiter
+                        // in the list
+                        auto current = static_cast<awaiter_type*>(expected);
+
+                        while (current != nullptr)
+                        {
+                            // iterate ovet the elemens
+                            // and find our awaiter
+                            auto next = current->next;
+
+                            if (current != awaiter)
+                            {
+                                // if this is not our awaiter
+                                // push back into the queue
+                                if (Add(current) == false)
+                                {
+                                    // we were not able to
+                                    // register it again
+                                    // so there is no suspension..
+                                    // Notify the awaiter
+                                    elementsToNotify.push(current);
+                                }
+                            }
+                            else
+                            {
+                                // we found our awaiter
+                                // notify about the cancellation
+                                elementsToNotify.push(awaiter);
+                            }
+
+                            // go to the next element
+                            current = next;
+                        }
+                    }
+                }
+
+                // iterate over the elements
+                // which needs to be notified.
+                auto top = elementsToNotify.top();
+                detail::IterInvoke(top, &awaiter_type::Notify);
+            }
+
             // nullptr => NOT_SET and NO waiters
             // this => SET and NO waiters
             // other => NOT_SET with waiters
             std::atomic<void*> _state{nullptr};
+
+            // mutex only used for cancellation
+            std::mutex _mtx;
         };
 
         template <typename ManualEventT, typename CallbackEventT>
@@ -101,21 +167,23 @@ namespace tinycoro {
                 return _manualEvent.IsSet();
             }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_manualEvent.Add(this) == false)
                 {
                     // resume immediately
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
-                return std::noop_coroutine();
+                return true;
             }
 
             constexpr auto await_resume() noexcept { }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
+
+            void Cancel() noexcept { _manualEvent.Cancel(this); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 

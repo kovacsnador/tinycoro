@@ -23,11 +23,11 @@ struct PackagedTaskTest : public testing::Test
     using value_type = FutureStateT;
 };
 
-using PackagedTaskTestTypes = testing::Types<std::promise<std::optional<int>>,
-                                             std::promise<void>,
+using PackagedTaskTestTypes = testing::Types<std::promise<std::optional<int32_t>>,
+                                             std::promise<std::optional<tinycoro::VoidType>>,
                                              std::promise<std::optional<Ex>>,
-                                             tinycoro::FutureState<std::optional<int>>,
-                                             tinycoro::FutureState<void>,
+                                             tinycoro::FutureState<std::optional<int32_t>>,
+                                             tinycoro::FutureState<std::optional<tinycoro::VoidType>>,
                                              tinycoro::FutureState<std::optional<Ex>>>;
 
 TYPED_TEST_SUITE(PackagedTaskTest, PackagedTaskTestTypes);
@@ -36,7 +36,7 @@ template<typename T>
 struct GetType;
 
 template<>
-struct GetType<void>
+struct GetType<std::optional<tinycoro::VoidType>>
 {
     using value_type = void; 
 };
@@ -52,12 +52,14 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
     using PromiseT = TestFixture::value_type;
     using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
 
+    using TaskValueT = typename GetType<ValueT>::value_type;
+
     PromiseT promise;
     auto     future = promise.get_future();
     {
-        tinycoro::test::TaskMock<typename GetType<ValueT>::value_type> task;
+        tinycoro::test::TaskMock<TaskValueT> task;
 
-        if constexpr (std::same_as<ValueT, std::optional<Ex>>)
+        if constexpr (std::same_as<TaskValueT, Ex>)
         {
             EXPECT_CALL(*task.mock, Resume()).Times(1).WillOnce(ThrowRuntimeError());
         }
@@ -67,7 +69,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
             EXPECT_CALL(*task.mock, Resume()).Times(1);
         }
 
-        if constexpr (std::same_as<ValueT, std::optional<int32_t>>)
+        if constexpr (std::same_as<TaskValueT, int32_t>)
         {
             EXPECT_CALL(*task.mock, await_resume()).Times(1).WillOnce(::testing::Return(42)); // Return any value you'd expect
         }
@@ -83,13 +85,13 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
         packedTask->Resume();
     }
 
-    if constexpr (std::same_as<ValueT, std::optional<int32_t>>)
+    if constexpr (std::same_as<TaskValueT, int32_t>)
     {
         EXPECT_EQ(future.get(), 42);
     }
-    else if constexpr (std::same_as<ValueT, void>)
+    else if constexpr (std::same_as<TaskValueT, void>)
     {
-        EXPECT_NO_THROW(future.get());
+        EXPECT_NO_THROW(std::ignore = future.get());
     }
     else
     {
@@ -104,7 +106,7 @@ struct PackagedTaskTestException : public testing::Test
     using value_type = T;
 };
 
-using PackagedTaskTestExceptionTypes = testing::Types<std::promise<void>, tinycoro::FutureState<void>>;
+using PackagedTaskTestExceptionTypes = testing::Types<std::promise<std::optional<tinycoro::VoidType>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(PackagedTaskTestException, PackagedTaskTestExceptionTypes);
 
@@ -128,5 +130,5 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
         packedTask->Resume();
     }
 
-    EXPECT_THROW(future.get(), std::runtime_error);
+    EXPECT_THROW(std::ignore = future.get(), std::runtime_error);
 }

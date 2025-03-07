@@ -5,12 +5,12 @@
 TEST(CancellableTest, CancellableTest)
 {
     tinycoro::Scheduler scheduler{2};
-    tinycoro::Latch latch{2};
+    tinycoro::AutoEvent event;
 
     auto task1 = []()->tinycoro::Task<> { co_return; };
 
     auto taskToCancel = [&]() -> tinycoro::Task<int32_t> { 
-        co_await tinycoro::Cancellable{latch.Wait()};
+        co_await tinycoro::Cancellable{event.Wait()};
         co_return 42;
     };
 

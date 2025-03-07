@@ -46,7 +46,7 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)
     EXPECT_EQ(awaiter.next, nullptr);
 
     EXPECT_CALL(mock, TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(true));
-    EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
+    EXPECT_FALSE(awaiter.await_suspend(hdl));
 
     EXPECT_CALL(mock, Release()).Times(1);
     {
@@ -60,7 +60,7 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
     EXPECT_EQ(awaiter.next, nullptr);
 
     EXPECT_CALL(mock, TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(false));
-    EXPECT_EQ(awaiter.await_suspend(hdl), std::noop_coroutine());
+    EXPECT_TRUE(awaiter.await_suspend(hdl));
 
     EXPECT_CALL(mock, Release()).Times(1);
     {

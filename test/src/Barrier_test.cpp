@@ -502,6 +502,69 @@ TEST_P(BarrierTest, BarrierTest_functionalTest_3)
     tinycoro::GetAll(scheduler, tasks);
 }
 
+TEST(BarrierTest, BarrierTest_functionalTest_cancel_scheduler)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{10};
+
+    auto task = [&]( ) ->tinycoro::Task<int32_t> { co_await tinycoro::Cancellable{barrier.Wait()}; co_return 42; };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(scheduler, task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_TRUE(r6.has_value());
+}
+
+TEST_P(BarrierTest, BarrierTest_cancel_multi)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{count};
+
+    auto task1 = [&]( ) ->tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.Wait()}; };
+    auto task2 = [&]( ) ->tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.ArriveAndWait()}; };
+    auto task3 = [&]( ) ->tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.ArriveDropAndWait()}; };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    tasks.reserve((count * 3) + 1);
+    tasks.emplace_back(tinycoro::SleepFor(clock, 100ms));
+    for(size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(task1());
+        tasks.emplace_back(task2());
+        tasks.emplace_back(task3());
+    }
+
+    EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, tasks));
+}
+
+TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{10};
+
+    auto task = [&]( ) ->tinycoro::Task<int32_t> { co_await tinycoro::Cancellable{barrier.Wait()}; co_return 42; };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_TRUE(r6.has_value());
+}
+
 struct BarrierFunctionalTest : testing::TestWithParam<size_t>
 {
 };

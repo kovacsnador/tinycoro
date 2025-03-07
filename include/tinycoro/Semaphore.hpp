@@ -40,7 +40,9 @@ namespace tinycoro {
             // disable move and copy
             Semaphore(Semaphore&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
+
+            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
             void Release()
@@ -93,14 +95,13 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro)
             {
                 if (_semaphore.TryAcquire(this, parentCoro))
                 {
-                    return parentCoro;
+                    return false;
                 }
-
-                return std::noop_coroutine();
+                return true;
             }
 
             [[nodiscard]] constexpr auto await_resume() noexcept
@@ -108,7 +109,7 @@ namespace tinycoro {
                 return ReleaseGuard{_semaphore};
             }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 

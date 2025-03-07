@@ -92,7 +92,7 @@ namespace tinycoro {
             // check against void
             // if not void we create a std::optional
             // to support cancellation
-            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type; //std::conditional<std::same_as<desiredValue_t, void>, desiredValue_t, std::optional<desiredValue_t>>;
+            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type;
 
             using FutureStateType = FutureStateT<futureValue_t>;
 
@@ -128,7 +128,7 @@ namespace tinycoro {
             // check against void
             // if not void we create a std::optional
             // to support cancellation
-            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type; //std::conditional<std::same_as<desiredValue_t, void>, desiredValue_t, std::optional<desiredValue_t>>;
+            using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type;
 
             FutureStateT<futureValue_t> futureState;
 

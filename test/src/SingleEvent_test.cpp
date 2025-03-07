@@ -16,11 +16,11 @@ TEST(SingleEventTest, SingleEventTest_Set)
     EXPECT_TRUE(singleEvent.IsSet());
 }
 
-template<typename, typename>
+template <typename, typename>
 class PopAwaiterMock
 {
 public:
-    PopAwaiterMock(auto&, auto) {}
+    PopAwaiterMock(auto&, auto) { }
 };
 
 TEST(SingleEventTest, SingleEventTest_coawaitReturn)
@@ -79,14 +79,14 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseCalled]() { pauseCalled = true; });
+    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled]() { pauseCalled = true; });
 
     awaiter.await_suspend(hdl);
     EXPECT_FALSE(pauseCalled);
 
     auto awaiter2 = singleEvent.operator co_await();
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
 
     // allow only 1 consumer
     EXPECT_THROW(awaiter2.await_suspend(hdl2), tinycoro::SingleEventException);
@@ -105,8 +105,8 @@ struct SingleNotifierMockImpl
 
 struct SingleNotifierMock
 {
-    bool Set(auto func){ return mock->Set(func); } 
-    void Notify(){ mock->Notify(); } 
+    bool Set(auto func) { return mock->Set(func); }
+    void Notify() { mock->Notify(); }
 
     std::shared_ptr<SingleNotifierMockImpl> mock = std::make_shared<SingleNotifierMockImpl>();
 };
@@ -118,7 +118,7 @@ struct SingleEventMock
 
 TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
 {
-    SingleEventMock mock;
+    SingleEventMock    mock;
     SingleNotifierMock notifier;
 
     tinycoro::detail::SingleEventAwaiter awaiter{mock, notifier};
@@ -127,24 +127,22 @@ TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
     EXPECT_CALL(*notifier.mock, Notify()).Times(0); // no call
     EXPECT_CALL(*notifier.mock, Set).Times(2);
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
-    EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
+    EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
 TEST(SingleEventTest, SingleEventFunctionalTest_1)
 {
-    tinycoro::Scheduler scheduler{4};
+    tinycoro::Scheduler            scheduler{4};
     tinycoro::SingleEvent<int32_t> singleEvent;
 
-    auto producer = [&singleEvent]() -> tinycoro::Task<void>
-    {
+    auto producer = [&singleEvent]() -> tinycoro::Task<void> {
         singleEvent.SetValue(42);
         co_return;
     };
 
-    auto consumer = [&singleEvent]() -> tinycoro::Task<void>
-    {
+    auto consumer = [&singleEvent]() -> tinycoro::Task<void> {
         auto val = co_await singleEvent;
         EXPECT_EQ(val, 42);
     };
@@ -155,28 +153,26 @@ TEST(SingleEventTest, SingleEventFunctionalTest_1)
 TEST(SingleEventTest, SingleEventFunctionalTest_2)
 {
     // single threaded mode
-    tinycoro::Scheduler scheduler{4};
+    tinycoro::Scheduler            scheduler{4};
     tinycoro::SingleEvent<int32_t> singleEvent1;
     tinycoro::SingleEvent<int32_t> singleEvent2;
 
-    auto producer = [&]() -> tinycoro::Task<void>
-    {
+    auto producer = [&]() -> tinycoro::Task<void> {
         int32_t val{};
-        while(val < 10)
+        while (val < 10)
         {
             auto lastValue = val;
 
             singleEvent1.SetValue(val + 1);
             val = co_await singleEvent2;
-            
+
             EXPECT_EQ(lastValue + 2, val);
         }
     };
 
-    auto consumer = [&]() -> tinycoro::Task<void>
-    {
+    auto consumer = [&]() -> tinycoro::Task<void> {
         int32_t val{-1};
-        while(val < 9)
+        while (val < 9)
         {
             auto lastValue = val;
 
@@ -188,4 +184,39 @@ TEST(SingleEventTest, SingleEventFunctionalTest_2)
     };
 
     tinycoro::GetAll(scheduler, producer(), consumer());
+}
+
+TEST(SingleEventTest, SingleEventTest_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::SingleEvent<int32_t> event;
+
+    auto receiver = [&]() -> tinycoro::Task<int32_t> {
+        auto result = co_await tinycoro::Cancellable{event.Wait()};
+        co_return result;
+    };
+
+    auto [r1, r2] = tinycoro::AnyOf(scheduler, receiver(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_TRUE(r2.has_value());
+}
+
+TEST(SingleEventTest, SingleEventTest_cancel_inline)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::SingleEvent<int32_t> event;
+
+    auto receiver = [&]() -> tinycoro::Task<int32_t> {
+        auto result = co_await tinycoro::Cancellable{event.Wait()};
+        co_return result;
+    };
+
+    auto [r1, r2] = tinycoro::AnyOfInline(receiver(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_TRUE(r2.has_value());
 }

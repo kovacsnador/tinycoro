@@ -6,6 +6,7 @@
 #include "LinkedPtrStack.hpp"
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
+#include "AwaiterHelper.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -54,12 +55,7 @@ namespace tinycoro {
                     auto top = _waiters.steal();
                     lock.unlock();
 
-                    while (top)
-                    {
-                        auto next = top->next;
-                        top->Notify();
-                        top = next;
-                    }
+                    detail::IterInvoke(top, &awaiter_type::Notify);
                 }
             }
 
@@ -79,6 +75,20 @@ namespace tinycoro {
                 }
 
                 return _count;
+            }
+
+            void Cancel(awaiter_type* waiter)
+            {
+                bool erased{false};
+                {
+                    std::scoped_lock lock{_mtx};
+                    erased = _waiters.erase(waiter);
+                }
+
+                if(erased)
+                {
+                    waiter->Notify();
+                }
             }
 
             size_t             _count;
@@ -102,21 +112,23 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _latch.IsReady(); }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_latch.Add(this) == false)
                 {
                     // resume immediately
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
-                return std::noop_coroutine();
+                return true;
             }
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
+
+            void Cancel() noexcept { _latch.Cancel(this); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 

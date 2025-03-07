@@ -2,8 +2,11 @@
 #define __TINY_CORO_AUTO_EVENT_HPP__
 
 #include <atomic>
+#include <mutex>
 
 #include "PauseHandler.hpp"
+#include "LinkedPtrStack.hpp"
+#include "AwaiterHelper.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -28,29 +31,30 @@ namespace tinycoro {
             {
                 void* expected = _state.load();
 
-                if(expected == this)
+                if (expected == this)
                 {
-                    // the event is already set nothing to do
+                    // the event is already set,
+                    // nothing to do
                     return;
                 }
 
-                void* desired = this; 
-                if(expected && expected != this)
+                void* desired = this;
+                if (expected && expected != this)
                 {
-                    // we have waiter in the stack 
+                    // we have waiter in the stack
                     desired = static_cast<awaiter_type*>(expected)->next;
                 }
 
-                while(!_state.compare_exchange_strong(expected, desired))
+                while (!_state.compare_exchange_strong(expected, desired))
                 {
-                    if(expected == this)
+                    if (expected == this)
                     {
                         // The event is already set
-                        // so we can move on, nothing to do 
+                        // so we can move on, nothing to do
                         return;
                     }
 
-                    if(expected == nullptr)
+                    if (expected == nullptr)
                     {
                         // the event got unset,
                         // so we can try to set it
@@ -64,9 +68,9 @@ namespace tinycoro {
                     }
                 }
 
-                if(expected)
-                {   
-                    // finally we were able to pop an awaiter 
+                if (expected)
+                {
+                    // finally we were able to pop an awaiter
                     // so we can notify it
                     static_cast<awaiter_type*>(expected)->Notify();
                 }
@@ -79,7 +83,9 @@ namespace tinycoro {
                 return _state.load() == this;
             }
 
-            auto operator co_await() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
+
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
 
         private:
             bool IsReady() noexcept
@@ -93,21 +99,21 @@ namespace tinycoro {
             bool Add(awaiter_type* awaiter)
             {
                 void* expected = _state.load();
-                void* desired = nullptr;
+                void* desired  = nullptr;
 
-                if(expected != this)
+                if (expected != this)
                 {
                     // we have some awaiters in the stack already
                     // or the stack is empty but,
-                    // so we want to set the new awaiter on the 
+                    // so we want to set the new awaiter on the
                     // front of the stack
-                    desired = awaiter;
+                    desired       = awaiter;
                     awaiter->next = static_cast<awaiter_type*>(expected);
                 }
 
-                while(!_state.compare_exchange_strong(expected, desired))
+                while (!_state.compare_exchange_strong(expected, desired))
                 {
-                    if(expected == this)
+                    if (expected == this)
                     {
                         // the event got set,
                         // so we can try to get them.
@@ -121,22 +127,84 @@ namespace tinycoro {
                     {
                         // try to continue pushing to the front
                         // of the stack the awaiter
-                        desired = awaiter;
+                        desired       = awaiter;
                         awaiter->next = static_cast<awaiter_type*>(expected);
                     }
                 }
 
                 // check the last state before a succesfull push
-                // if the last state was 'this' that means 
+                // if the last state was 'this' that means
                 // we could just reset the event (to nullptr)
-                // so the awaiter can be resumed without suspend 
+                // so the awaiter can be resumed without suspend
                 return expected != this;
+            }
+
+            void Cancel(awaiter_type* awaiter) noexcept
+            {
+                auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
+
+                detail::LinkedPtrStack<awaiter_type> elementsToNotify;
+
+                {
+                    std::scoped_lock lock{_mtx};
+
+                    auto expected = _state.load(std::memory_order::acquire);
+
+                    // try to get the awaiter list
+                    // out from the state
+                    while (isAwaiter(expected, this) && !_state.compare_exchange_strong(expected, nullptr))
+                    {
+                    }
+
+                    if (isAwaiter(expected, this))
+                    {
+                        // we have the awaiter list
+                        // get the top element
+                        auto current = static_cast<awaiter_type*>(expected);
+
+                        while (current != nullptr)
+                        {
+                            auto next = current->next;
+
+                            if (current != awaiter)
+                            {
+                                // if this is not our awaiter
+                                // push back into the queue
+                                if (Add(current) == false)
+                                {
+                                    // we were not able to
+                                    // register it again
+                                    // so there is no suspension..
+                                    // Notify the awaiter
+                                    elementsToNotify.push(current);
+                                }
+                            }
+                            else
+                            {
+                                // we found our awaiter
+                                // notify about the cancellation
+                                elementsToNotify.push(awaiter);
+                            }
+
+                            // jump to the next element
+                            current = next; 
+                        }
+                    }
+                }
+
+                // iterate over the elements
+                // which needs to be notified.
+                auto top = elementsToNotify.top();
+                detail::IterInvoke(top, &awaiter_type::Notify);
             }
 
             // nullptr => NOT set
             // this => Set no waiters
             // other => Not set with waiters
             std::atomic<void*> _state{nullptr};
+
+            // only used for awaiter cancellation
+            std::mutex _mtx;
         };
 
         template <typename AutoEventT, typename CallbackEventT>
@@ -158,21 +226,23 @@ namespace tinycoro {
                 return _autoEvent.IsReady();
             }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_autoEvent.Add(this) == false)
                 {
                     // resume immediately
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
-                return std::noop_coroutine();
+                return true;
             }
 
             constexpr auto await_resume() noexcept { }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
+
+            void Cancel() noexcept { _autoEvent.Cancel(this); }
 
             AutoEventAwaiter* next{nullptr};
 

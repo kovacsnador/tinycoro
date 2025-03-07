@@ -19,7 +19,7 @@ class PopAwaiterMock
 public:
     PopAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept {};
+    void Notify() const noexcept { };
 
     PopAwaiterMock* next{nullptr};
 };
@@ -30,7 +30,7 @@ class PushAwaiterMock
 public:
     PushAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept {};
+    void Notify() const noexcept { };
 
     PushAwaiterMock* next{nullptr};
 };
@@ -41,7 +41,7 @@ class ListenerAwaiterMock
 public:
     ListenerAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept {};
+    void Notify() const noexcept { };
 
     ListenerAwaiterMock* next{nullptr};
 
@@ -97,13 +97,13 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_open_push)
     auto pushAwaiter1 = channel.PushWait(42);
     EXPECT_TRUE(channel.IsOpen());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(pushAwaiter1.await_suspend(hdl1));
 
     auto pushAwaiter2 = channel.PushAndCloseWait(44);
     EXPECT_TRUE(channel.IsOpen());
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(pushAwaiter2.await_suspend(hdl2));
 
     int32_t val;
@@ -128,14 +128,14 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_ready)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     int32_t val2;
     auto    popAwaiter2 = channel.PopWait(val2);
     EXPECT_FALSE(popAwaiter2.await_ready());
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter2.await_suspend(hdl2));
 
     auto pushAwaiter1 = channel.PushWait(42);
@@ -157,7 +157,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_resume)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     auto pushAwaiter = channel.PushWait(42);
@@ -176,7 +176,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_resume_last)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     auto pushAwaiter = channel.PushAndCloseWait(42);
@@ -218,10 +218,10 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_suspend
     tinycoro::UnbufferedChannel<size_t> channel;
 
     size_t val;
-    auto popAwaiter = channel.PopWait(val);
+    auto   popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     // testing the listener awaiter
@@ -236,10 +236,10 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_ready_c
     tinycoro::UnbufferedChannel<size_t> channel;
 
     size_t val;
-    auto popAwaiter = channel.PopWait(val);
+    auto   popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     // close the channel
@@ -397,16 +397,14 @@ TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_close)
 TEST(UnbufferedChannelTest, UnbufferedChannelTest_cleanup_callback_pushWait)
 {
     std::vector<size_t> coll;
-    auto cleanup = [&coll](auto& val) { coll.push_back(val); };
+    auto                cleanup = [&coll](auto& val) { coll.push_back(val); };
 
-    tinycoro::Latch latch{2};
+    tinycoro::Latch                     latch{2};
     tinycoro::UnbufferedChannel<size_t> channel{cleanup};
 
-    auto producer = [&](size_t val)->tinycoro::Task<> {
-        std::ignore = co_await channel.PushWait(val);
-    };
+    auto producer = [&](size_t val) -> tinycoro::Task<> { std::ignore = co_await channel.PushWait(val); };
 
-    auto consumer = [&](size_t expected)->tinycoro::Task<> {
+    auto consumer = [&](size_t expected) -> tinycoro::Task<> {
         size_t val;
         std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
@@ -414,25 +412,17 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cleanup_callback_pushWait)
         latch.CountDown();
     };
 
-    auto closer = [&]()->tinycoro::Task<> {
+    auto closer = [&]() -> tinycoro::Task<> {
         co_await latch;
         channel.Close();
     };
 
-    tinycoro::RunInline(
-     producer(40),
-     producer(41),
-     producer(42),
-     producer(43),
-     producer(44),
-     consumer(40),
-     consumer(41),
-     closer());
+    tinycoro::RunInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
 
     EXPECT_EQ(coll.size(), 3);
 
     size_t expected = 42;
-    for(const auto& it : coll)
+    for (const auto& it : coll)
     {
         EXPECT_EQ(expected++, it);
     }
@@ -442,21 +432,87 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_pop_awaiter_listener)
 {
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    auto waitForListeners = [&]()->tinycoro::Task<>{
-        co_await channel.WaitForListeners(3);
-    };
+    auto waitForListeners = [&]() -> tinycoro::Task<> { co_await channel.WaitForListeners(3); };
 
-    auto producer = [&](size_t val)->tinycoro::Task<>{
-        std::ignore = co_await channel.PushWait(val);
-    };
+    auto producer = [&](size_t val) -> tinycoro::Task<> { std::ignore = co_await channel.PushWait(val); };
 
-    auto consumer = [&](size_t expected)->tinycoro::Task<>{
+    auto consumer = [&](size_t expected) -> tinycoro::Task<> {
         size_t val;
         std::ignore = co_await channel.PopWait(val);
         EXPECT_EQ(val, expected);
     };
 
     tinycoro::RunInline(waitForListeners(), consumer(40), consumer(41), consumer(42), producer(40), producer(41), producer(42));
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel)
+{
+    tinycoro::Scheduler                  scheduler;
+    tinycoro::SoftClock                  clock;
+    tinycoro::UnbufferedChannel<int32_t> channel;
+
+    auto listener = [&]() -> tinycoro::Task<int32_t> {
+        int32_t val;
+        co_await tinycoro::Cancellable{channel.PopWait(val)};
+        co_return 42;
+    };
+
+    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{channel.WaitForListeners(10)}; };
+
+    auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOf(scheduler,
+                                                                listener(),
+                                                                listener(),
+                                                                listener(),
+                                                                listener(),
+                                                                listenerWaiter(),
+                                                                listenerWaiter(),
+                                                                listenerWaiter(),
+                                                                listenerWaiter(),
+                                                                tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_FALSE(r6.has_value());
+    EXPECT_FALSE(r7.has_value());
+    EXPECT_FALSE(r8.has_value());
+    EXPECT_TRUE(r9.has_value());
+}
+
+TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel_inline)
+{
+    tinycoro::SoftClock                  clock;
+    tinycoro::UnbufferedChannel<int32_t> channel;
+
+    auto listener = [&]() -> tinycoro::Task<int32_t> {
+        int32_t val;
+        co_await tinycoro::Cancellable{channel.PopWait(val)};
+        co_return 42;
+    };
+
+    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{channel.WaitForListeners(10)}; };
+
+    auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOfInline(listener(),
+                                                                      listener(),
+                                                                      listener(),
+                                                                      listener(),
+                                                                      listenerWaiter(),
+                                                                      listenerWaiter(),
+                                                                      listenerWaiter(),
+                                                                      listenerWaiter(),
+                                                                      tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_FALSE(r6.has_value());
+    EXPECT_FALSE(r7.has_value());
+    EXPECT_FALSE(r8.has_value());
+    EXPECT_TRUE(r9.has_value());
 }
 
 struct UnbufferedChannelTest : testing::TestWithParam<size_t>
@@ -584,15 +640,14 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushAndClose_multi)
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    tinycoro::Mutex mtx;
+    tinycoro::Mutex  mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-
         size_t val;
         while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
-            auto lock = co_await mtx;
+            auto lock             = co_await mtx;
             auto [iter, inserted] = allValues.insert(val);
             lock.unlock();
             EXPECT_TRUE(inserted);
@@ -622,21 +677,20 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushAndClose_multi)
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
 {
     tinycoro::SoftClock clock;
-    const auto count = GetParam();
+    const auto          count = GetParam();
 
     tinycoro::Scheduler scheduler;
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    tinycoro::Mutex mtx;
+    tinycoro::Mutex  mtx;
     std::set<size_t> allValues;
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-
         size_t val;
         while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
-            auto lock = co_await mtx;
+            auto lock             = co_await mtx;
             auto [iter, inserted] = allValues.insert(val);
             lock.unlock();
             EXPECT_TRUE(inserted);
@@ -644,25 +698,23 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_push_pop_close)
     };
 
     auto producer = [&]() -> tinycoro::Task<void> {
-
         std::remove_const_t<decltype(count)> i{};
-        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PushWait(i))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PushWait(i))
         {
             ++i;
         }
     };
 
-    auto closer = [&]() ->tinycoro::Task<void>
-    {
+    auto closer = [&]() -> tinycoro::Task<void> {
         co_await tinycoro::SleepFor(clock, 200ms);
         channel.Close();
     };
 
     tinycoro::GetAll(scheduler, consumer(), producer(), consumer(), consumer(), consumer(), consumer(), closer());
-    
+
     // check for values
     bool found{true};
-    for(std::remove_const_t<decltype(count)> i{}; i < count; ++i)
+    for (std::remove_const_t<decltype(count)> i{}; i < count; ++i)
     {
         auto f = allValues.contains(i);
         ASSERT_TRUE((found == false && f == false) || found);
@@ -674,14 +726,13 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_push)
 {
     const auto param = GetParam();
 
-    tinycoro::Scheduler scheduler;
+    tinycoro::Scheduler                 scheduler;
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    auto consumer = [&]()->tinycoro::Task<void>
-    {
+    auto consumer = [&]() -> tinycoro::Task<void> {
         size_t controlCount{0};
         size_t val;
-        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
             EXPECT_EQ(controlCount++, val);
         }
@@ -689,8 +740,8 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_push)
         EXPECT_EQ(controlCount, param);
     };
 
-    auto producer = [&]() ->tinycoro::Task<void> {
-        for(size_t i = 0; i < param; ++i)
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < param; ++i)
         {
             // just a normal blocking push
             channel.Push(i);
@@ -707,14 +758,13 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_pushAndClose)
 {
     const auto param = GetParam();
 
-    tinycoro::Scheduler scheduler;
+    tinycoro::Scheduler                 scheduler;
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    auto consumer = [&]()->tinycoro::Task<void>
-    {
+    auto consumer = [&]() -> tinycoro::Task<void> {
         size_t controlCount{0};
         size_t val;
-        while(tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
+        while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
             EXPECT_EQ(controlCount++, val);
         }
@@ -722,8 +772,8 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_pushAndClose)
         EXPECT_EQ(controlCount, param);
     };
 
-    auto producer = [&]() ->tinycoro::Task<void> {
-        for(size_t i = 0; i < param - 1; ++i)
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < param - 1; ++i)
         {
             // just a normal blocking push
             channel.Push(i);
@@ -739,14 +789,14 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_pushAndClose)
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
 {
-    const auto count = GetParam();
+    const auto          count = GetParam();
     tinycoro::Scheduler scheduler;
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
     auto listeners = [&]() -> tinycoro::Task<void> {
         size_t value{};
-        auto status = co_await channel.PopWait(value);
+        auto   status = co_await channel.PopWait(value);
         EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
     };
 
@@ -767,14 +817,14 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners_multi_waiters)
 {
-    const auto count = GetParam();
+    const auto          count = GetParam();
     tinycoro::Scheduler scheduler;
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
     auto listeners = [&]() -> tinycoro::Task<void> {
         size_t value{};
-        auto status = co_await channel.PopWait(value);
+        auto   status = co_await channel.PopWait(value);
         EXPECT_EQ(status, tinycoro::EChannelOpStatus::CLOSED);
     };
 
@@ -795,14 +845,12 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners_multi_waite
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
 {
-    const auto count = GetParam();
+    const auto          count = GetParam();
     tinycoro::Scheduler scheduler;
 
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await channel.WaitForListeners(count);
-    };
+    auto consumer = [&]() -> tinycoro::Task<void> { co_await channel.WaitForListeners(count); };
 
     auto producer = [&]() -> tinycoro::Task<void> {
         // close the channel and wake up all awaiters
@@ -818,6 +866,112 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
     tasks.push_back(producer());
 
     EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushWait_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto                          count = GetParam();
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto task = [&]() -> tinycoro::Task<int32_t> {
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable{channel.PushWait(42u)};
+        co_return 42;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return 44;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for ([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(task());
+    }
+
+    auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(result[0].value(), 44);
+
+    for (size_t i = 1; i < result.size(); ++i)
+    {
+        EXPECT_FALSE(result[i].has_value());
+    }
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto                          count = GetParam();
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto task = [&]() -> tinycoro::Task<int32_t> {
+        size_t                val{};
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable{channel.PopWait(val)};
+        co_return 42;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return 44;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for ([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(task());
+    }
+
+    auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(result[0].value(), 44);
+
+    for (size_t i = 1; i < result.size(); ++i)
+    {
+        EXPECT_FALSE(result[i].has_value());
+    }
+}
+
+TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_ListenerWait_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto                          count = GetParam();
+    tinycoro::UnbufferedChannel<size_t> channel;
+
+    auto task = [&]() -> tinycoro::Task<int32_t> { co_await tinycoro::Cancellable{channel.WaitForListeners(count + 1)}; co_return 42; };
+
+    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return 44;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for ([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(task());
+    }
+
+    auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(result[0].value(), 44);
+
+    for (size_t i = 1; i < result.size(); ++i)
+    {
+        EXPECT_FALSE(result[i].has_value());
+    }
 }
 
 // TODO listener awaiter for closing need to be tested....

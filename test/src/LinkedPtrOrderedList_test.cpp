@@ -20,7 +20,7 @@ struct ListNodeMock
     auto value() const noexcept { return val; }
 };
 
-TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_empty)
+TEST(LinkedPtrOrderedListTest, empty)
 {
     using node_t = ListNodeMock<int32_t>;
     tinycoro::detail::LinkedPtrOrderedList<node_t> list;
@@ -199,6 +199,130 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_lower_bound)
         EXPECT_EQ(range->value(), i);
         range = range->next;
     }
+}
+
+TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseFirst) {
+
+    tinycoro::detail::LinkedPtrOrderedList<ListNodeMock<int32_t>> list;
+
+    ListNodeMock<int32_t> node1{1};
+    ListNodeMock<int32_t> node2{2};
+    ListNodeMock<int32_t> node3{3};
+
+    EXPECT_EQ(list.size(), 0);
+    
+    list.insert(&node1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&node2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&node3);
+    EXPECT_EQ(list.size(), 3);
+    
+    EXPECT_TRUE(list.erase(&node1));
+    EXPECT_EQ(list.size(), 2);
+
+    auto top = list.steal();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, &node3);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseMiddle) {
+
+    tinycoro::detail::LinkedPtrOrderedList<ListNodeMock<int32_t>> list;
+
+    ListNodeMock<int32_t> node1{1};
+    ListNodeMock<int32_t> node2{2};
+    ListNodeMock<int32_t> node3{3};
+
+    EXPECT_EQ(list.size(), 0);
+    
+    list.insert(&node1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&node2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&node3);
+    EXPECT_EQ(list.size(), 3);
+    
+    EXPECT_TRUE(list.erase(&node2));
+    EXPECT_EQ(list.size(), 2);
+
+    auto top = list.steal();
+    EXPECT_EQ(top, &node1);
+    EXPECT_EQ(top->next, &node3);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseLast) {
+
+    tinycoro::detail::LinkedPtrOrderedList<ListNodeMock<int32_t>> list;
+
+    ListNodeMock<int32_t> node1{1};
+    ListNodeMock<int32_t> node2{2};
+    ListNodeMock<int32_t> node3{3};
+
+    EXPECT_EQ(list.size(), 0);
+    
+    list.insert(&node1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&node2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&node3);
+    EXPECT_EQ(list.size(), 3);
+    
+    EXPECT_TRUE(list.erase(&node3));
+    EXPECT_EQ(list.size(), 2);
+
+    auto top = list.steal();
+    EXPECT_EQ(top, &node1);
+    EXPECT_EQ(top->next, &node2);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseAll) {
+
+    tinycoro::detail::LinkedPtrOrderedList<ListNodeMock<int32_t>> list;
+
+    ListNodeMock<int32_t> node1{1};
+    ListNodeMock<int32_t> node2{2};
+    ListNodeMock<int32_t> node3{3};
+
+    EXPECT_EQ(list.size(), 0);
+    
+    list.insert(&node1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&node2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&node3);
+    EXPECT_EQ(list.size(), 3);
+    
+    EXPECT_TRUE(list.erase(&node1));
+    EXPECT_EQ(list.size(), 2);
+
+    auto top = list.begin();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, &node3);
+    EXPECT_EQ(top->next->next, nullptr);
+
+    EXPECT_TRUE(list.erase(&node3));
+    EXPECT_EQ(list.size(), 1);
+
+    top = list.begin();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, nullptr);
+
+    EXPECT_TRUE(list.erase(&node2));
+    EXPECT_EQ(list.size(), 0);
+
+    EXPECT_EQ(list.begin(), nullptr);
 }
 
 struct LinkedPtrOrderedListTest : testing::TestWithParam<int32_t>

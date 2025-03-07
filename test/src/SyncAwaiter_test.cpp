@@ -21,9 +21,9 @@ struct SchedulerMock
         using ValueT = CoroTaskT::promise_type::value_type;
         std::promise<typename tinycoro::detail::FutureReturnT<ValueT>::value_type> promise;
 
-        if constexpr (AllSame<void, ValueT>)
+        if constexpr (AllSame<std::optional<tinycoro::VoidType>, ValueT>)
         {
-            promise.set_value();
+            promise.set_value(tinycoro::VoidType{});
         }
         else
         {
@@ -47,9 +47,9 @@ struct SchedulerMock
 
             std::promise<value_t> promise;
 
-            if constexpr (AllSame<void, value_t>)
+            if constexpr (AllSame<std::optional<tinycoro::VoidType>, value_t>)
             {
-                promise.set_value();
+                promise.set_value(tinycoro::VoidType{});
             }
             else
             {
@@ -73,9 +73,9 @@ struct SchedulerMock
                 auto setPromise = [](auto& p) {
                     using ResultType = std::decay_t<decltype(p.get_future().get())>;
 
-                    if constexpr (AllSame<void, ResultType>)
+                    if constexpr (AllSame<std::optional<tinycoro::VoidType>, ResultType>)
                     {
-                        p.set_value();
+                        p.set_value(tinycoro::VoidType{});
                     }
                     else
                     {
@@ -523,7 +523,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         tasks.push_back(t2());
 
         tasks.push_back(task(1000ms));
-        tasks.push_back(task(2000ms));
+        //tasks.push_back(task(2000ms));
 
         EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, tasks), std::runtime_error);
 

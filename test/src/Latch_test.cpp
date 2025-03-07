@@ -101,7 +101,7 @@ TEST(LatchTest, LatchTest_await_suspend)
     bool pauseCalled = false;
     auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
 
-    EXPECT_EQ(awaiter.await_suspend(hdl), std::noop_coroutine());
+    EXPECT_TRUE(awaiter.await_suspend(hdl));
 
     EXPECT_FALSE(pauseCalled);
     latch.CountDown();
@@ -148,7 +148,7 @@ TEST(LatchTest, LatchAwaiter)
     bool pauseCalled = false;
     auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
 
-    EXPECT_EQ(awaiter.await_suspend(hdl), hdl);
+    EXPECT_FALSE(awaiter.await_suspend(hdl));
     EXPECT_FALSE(pauseCalled);
 }
 
@@ -180,6 +180,42 @@ TEST_P(LatchTest, LatchFunctionalTest_ArriveAndWait)
 
     tinycoro::GetAll(scheduler, tasks);
     EXPECT_EQ(count, latchCount);
+}
+
+TEST_P(LatchTest, LatchFunctionalTest_Wait_cancel)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+    tinycoro::Latch     latch{count};
+
+    auto task = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable{latch.Wait()};
+        co_return 42;
+    };
+
+    auto sleep = [&]()->tinycoro::Task<int32_t> {
+        co_await tinycoro::SleepFor(clock, 100ms);
+        co_return 44;
+    };
+
+    std::vector<tinycoro::Task<int32_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(task());
+    }
+
+    auto results = tinycoro::AnyOf(scheduler, tasks);
+
+    EXPECT_EQ(results[0], 44);
+
+    for(size_t i = 1; i < results.size(); ++i)
+    {
+        EXPECT_FALSE(results[i].has_value());
+    }
 }
 
 TEST_P(LatchTest, LatchFunctionalTest_Wait)
