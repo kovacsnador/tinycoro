@@ -23,7 +23,8 @@ void Example_AnyOf(auto& scheduler)
 
     auto [t1, t2, t3] = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s));
 
-    SyncOut() << "co_return => " << *t1 << ", " << *t2 << ", " << *t3 << '\n';
+
+    SyncOut() << "co_return => " << *t1 << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_H__

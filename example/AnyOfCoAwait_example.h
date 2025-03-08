@@ -9,7 +9,7 @@
 
 tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
 {
-    SyncOut() << "\n\nExample_AnyOf:\n";
+    SyncOut() << "\n\Example_AnyOfCoAwait:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
         SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
@@ -26,7 +26,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
     // Nonblocking wait for other tasks
     auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(1s), task1(2s), task1(3s));
 
-    SyncOut() << "co_return => " << *t1 << ", " << *t2 << ", " << *t3 << '\n';
+    SyncOut() << "co_return => " << *t1 << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_COAWAIT_H__
