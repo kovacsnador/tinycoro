@@ -767,7 +767,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled)
     tinycoro::AutoEvent event;
 
     auto waitTask = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{event.Wait()};
+        co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 
@@ -796,7 +796,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_latch)
     tinycoro::Latch latch{1};
 
     auto waitTask = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{latch.Wait()};
+        co_await tinycoro::Cancellable(latch.Wait());
         co_return 42;
     };
 
@@ -822,7 +822,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_dynamic)
     tinycoro::AutoEvent event;
 
     auto waitTask = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{event.Wait()};
+        co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 
@@ -860,7 +860,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_manual)
     tinycoro::ManualEvent event;
 
     auto waitTask = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{event.Wait()};
+        co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 

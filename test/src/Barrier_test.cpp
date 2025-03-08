@@ -515,7 +515,7 @@ TEST(BarrierTest, BarrierTest_functionalTest_cancel_scheduler)
     tinycoro::Barrier barrier{10};
 
     auto task = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{barrier.Wait()};
+        co_await tinycoro::Cancellable(barrier.Wait());
         co_return 42;
     };
 
@@ -538,9 +538,9 @@ TEST_P(BarrierTest, BarrierTest_cancel_multi)
 
     tinycoro::Barrier barrier{count};
 
-    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.Wait()}; };
-    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.ArriveAndWait()}; };
-    auto task3 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.ArriveDropAndWait()}; };
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
+    auto task3 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveDropAndWait()); };
 
     std::vector<tinycoro::Task<void>> tasks;
     tasks.reserve((count * 3) + 1);
@@ -562,8 +562,8 @@ TEST(BarrierTest, BarrierTest_preset_stopSource)
 
     std::stop_source stopSource;
 
-    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.Wait()}; };
-    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{barrier.ArriveAndWait()}; };
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
     stopSource.request_stop();
     tinycoro::AnyOfWithStopSource(scheduler, stopSource, task2(), task1());
@@ -576,7 +576,7 @@ TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
     tinycoro::Barrier barrier{10};
 
     auto task = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{barrier.Wait()};
+        co_await tinycoro::Cancellable(barrier.Wait());
         co_return 42;
     };
 

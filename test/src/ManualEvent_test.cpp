@@ -213,7 +213,7 @@ TEST_P(ManualEventTest, ManualEventTest_cancel)
     tinycoro::ManualEvent event;
 
     auto task = [&]()->tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{event.Wait()};
+        co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 

@@ -194,7 +194,7 @@ TEST(SingleEventTest, SingleEventTest_cancel)
     tinycoro::SingleEvent<int32_t> event;
 
     auto receiver = [&]() -> tinycoro::Task<int32_t> {
-        auto result = co_await tinycoro::Cancellable{event.Wait()};
+        auto result = co_await tinycoro::Cancellable(event.Wait());
         co_return result;
     };
 
@@ -211,7 +211,7 @@ TEST(SingleEventTest, SingleEventTest_cancel_inline)
     tinycoro::SingleEvent<int32_t> event;
 
     auto receiver = [&]() -> tinycoro::Task<int32_t> {
-        auto result = co_await tinycoro::Cancellable{event.Wait()};
+        auto result = co_await tinycoro::Cancellable(event.Wait());
         co_return result;
     };
 

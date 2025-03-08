@@ -21,16 +21,10 @@ namespace tinycoro {
         using StorageT       = detail::StaticStorage<stopCallback_t, sizeof(stopCallback_t), stopCallback_t>;
 
     public:
+
         // accepts only r-value refs
         Cancellable(AwaiterT&& awaiter)
         : _awaiter{std::move(awaiter)}
-        {
-        }
-
-        template<typename DeviceT>
-            requires requires(DeviceT d) { { d.Wait() } -> concepts::IsCancellableAwait; }
-        Cancellable(DeviceT& device)
-        : _awaiter{device.Wait()}   // this should be safe, extend temporary lifetime with rvalue ref (&&)
         {
         }
 

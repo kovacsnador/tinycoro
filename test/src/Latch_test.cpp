@@ -191,7 +191,7 @@ TEST_P(LatchTest, LatchFunctionalTest_Wait_cancel)
     tinycoro::Latch     latch{count};
 
     auto task = [&]() -> tinycoro::Task<int32_t> {
-        co_await tinycoro::Cancellable{latch.Wait()};
+        co_await tinycoro::Cancellable(latch.Wait());
         co_return 42;
     };
 

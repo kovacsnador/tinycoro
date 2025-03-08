@@ -10,7 +10,7 @@ TEST(CancellableTest, CancellableTest)
     auto task1 = []()->tinycoro::Task<> { co_return; };
 
     auto taskToCancel = [&]() -> tinycoro::Task<int32_t> { 
-        co_await tinycoro::Cancellable{event.Wait()};
+        co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 

@@ -453,11 +453,11 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel)
 
     auto listener = [&]() -> tinycoro::Task<int32_t> {
         int32_t val;
-        co_await tinycoro::Cancellable{channel.PopWait(val)};
+        co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
-    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{channel.WaitForListeners(10)}; };
+    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
 
     auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOf(scheduler,
                                                                 listener(),
@@ -488,11 +488,11 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel_inline)
 
     auto listener = [&]() -> tinycoro::Task<int32_t> {
         int32_t val;
-        co_await tinycoro::Cancellable{channel.PopWait(val)};
+        co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
-    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable{channel.WaitForListeners(10)}; };
+    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
 
     auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOfInline(listener(),
                                                                       listener(),
@@ -877,7 +877,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushWait_cancel)
     tinycoro::UnbufferedChannel<size_t> channel;
 
     auto task = [&]() -> tinycoro::Task<int32_t> {
-        [[maybe_unused]] auto state = co_await tinycoro::Cancellable{channel.PushWait(42u)};
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
         co_return 42;
     };
 
@@ -914,7 +914,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_cancel)
 
     auto task = [&]() -> tinycoro::Task<int32_t> {
         size_t                val{};
-        [[maybe_unused]] auto state = co_await tinycoro::Cancellable{channel.PopWait(val)};
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
@@ -949,7 +949,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_ListenerWait_cancel)
     const auto                          count = GetParam();
     tinycoro::UnbufferedChannel<size_t> channel;
 
-    auto task = [&]() -> tinycoro::Task<int32_t> { co_await tinycoro::Cancellable{channel.WaitForListeners(count + 1)}; co_return 42; };
+    auto task = [&]() -> tinycoro::Task<int32_t> { co_await tinycoro::Cancellable(channel.WaitForListeners(count + 1)); co_return 42; };
 
     auto sleep = [&]() -> tinycoro::Task<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
