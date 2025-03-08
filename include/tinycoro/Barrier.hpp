@@ -40,7 +40,7 @@ namespace tinycoro {
                 return false;
             }
 
-            template<typename T>
+            template <typename T>
             void NotifyAll(T* awaiter)
             {
                 detail::IterInvoke(awaiter, &T::Notify);
@@ -87,9 +87,12 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(); }
+            void Notify() const noexcept
+            {
+                _event.Notify();
+            }
 
-            void Cancel() noexcept { _barrier.Cancel(this); };
+            bool Cancel() noexcept { return _barrier.Cancel(this); };
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -217,21 +220,10 @@ namespace tinycoro {
             return !ready;
         }
 
-        void Cancel(awaiter_type* awaiter) noexcept
+        bool Cancel(awaiter_type* awaiter) noexcept
         {
-            bool erased{false};
-
-            {
-                std::scoped_lock lock{_mtx};
-                erased = _waiters.erase(awaiter);
-            }
-            
-            if(erased)
-            {
-                // if we could remove the awaiter
-                // we will notfy it
-                awaiter->Notify();
-            }
+            std::scoped_lock lock{_mtx};
+            return _waiters.erase(awaiter);
         }
 
         void DecrementTotal() noexcept

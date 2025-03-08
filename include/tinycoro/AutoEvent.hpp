@@ -139,11 +139,13 @@ namespace tinycoro {
                 return expected != this;
             }
 
-            void Cancel(awaiter_type* awaiter) noexcept
+            bool Cancel(awaiter_type* awaiter) noexcept
             {
                 auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
 
                 detail::LinkedPtrStack<awaiter_type> elementsToNotify;
+
+                bool erased{false};
 
                 {
                     std::scoped_lock lock{_mtx};
@@ -181,9 +183,8 @@ namespace tinycoro {
                             }
                             else
                             {
-                                // we found our awaiter
-                                // notify about the cancellation
-                                elementsToNotify.push(awaiter);
+                                // we found our awaiter,
+                                erased = true;
                             }
 
                             // jump to the next element
@@ -196,6 +197,8 @@ namespace tinycoro {
                 // which needs to be notified.
                 auto top = elementsToNotify.top();
                 detail::IterInvoke(top, &awaiter_type::Notify);
+
+                return erased;
             }
 
             // nullptr => NOT set
@@ -242,7 +245,7 @@ namespace tinycoro {
 
             void Notify() const noexcept { _event.Notify(); }
 
-            void Cancel() noexcept { _autoEvent.Cancel(this); }
+            bool Cancel() noexcept { return _autoEvent.Cancel(this); }
 
             AutoEventAwaiter* next{nullptr};
 

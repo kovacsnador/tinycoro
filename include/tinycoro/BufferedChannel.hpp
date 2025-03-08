@@ -307,9 +307,9 @@ namespace tinycoro {
                 return suspend;
             }
 
-            void Cancel(pop_awaiter_type* waiter)
+            bool Cancel(pop_awaiter_type* waiter)
             {
-                _Cancel(waiter, _popAwaiters);
+                return _Cancel(waiter, _popAwaiters);
             }
 
             [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
@@ -344,9 +344,9 @@ namespace tinycoro {
                 return true;
             }
 
-            void Cancel(listener_awaiter_type* waiter)
+            bool Cancel(listener_awaiter_type* waiter)
             {
-                _Cancel(waiter, _listenerWaiters);
+                return _Cancel(waiter, _listenerWaiters);
             }
 
             template <typename LockT>
@@ -431,9 +431,9 @@ namespace tinycoro {
                 return true;
             }
 
-            void Cancel(push_awaiter_type* waiter)
+            bool Cancel(push_awaiter_type* waiter)
             {
-                _Cancel(waiter, _pushAwaiters);
+                return _Cancel(waiter, _pushAwaiters);
             }
 
             // auto [ready, lastElement] = std::tuple<bool, bool>
@@ -487,21 +487,10 @@ namespace tinycoro {
                 detail::IterInvoke(awaiter, &T::Notify);
             }
 
-            inline void _Cancel(auto awaiter, auto& list)
+            inline bool _Cancel(auto awaiter, auto& list)
             {
-                bool erased{false};
-
-                {
-                    std::scoped_lock lock{_mtx};
-                    erased = list.erase(awaiter);
-                }
-            
-                if(erased)
-                {
-                    // if we could remove the awaiter
-                    // we will notfy it
-                    awaiter->Notify();
-                }
+                std::scoped_lock lock{_mtx};
+                return list.erase(awaiter);
             }
 
             LinkedPtrQueue<pop_awaiter_type>  _popAwaiters;
@@ -578,7 +567,7 @@ namespace tinycoro {
                 _event.Notify();
             }
 
-            void Cancel() noexcept { _channel.Cancel(this); }
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             template <typename T>
             void SetValue(T&& value, bool lastElement)
@@ -650,7 +639,7 @@ namespace tinycoro {
                 _event.Notify();
             }
 
-            void Cancel() noexcept { _channel.Cancel(this); }
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             BufferedChannelListenerAwaiter* next{nullptr};
 
@@ -742,7 +731,7 @@ namespace tinycoro {
                 _event.Notify();
             }
 
-            void Cancel() noexcept { _channel.Cancel(this); }
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             BufferedChannelPushAwaiter* next{nullptr};
 

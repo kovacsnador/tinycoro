@@ -95,15 +95,16 @@ namespace tinycoro {
                 return !_value.has_value();
             }
 
-            void Cancel(const awaiter_type* awaiter) noexcept
+            bool Cancel(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
                 if(_waiter == awaiter)
                 {
                     // reset the waiter
                     _waiter = nullptr;
-                    awaiter->Notify();
+                    return true;
                 }
+                return false;
             }
 
             std::optional<ValueT> _value;
@@ -155,7 +156,7 @@ namespace tinycoro {
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
-            void Cancel() noexcept { _singleEvent.Cancel(this); }
+            bool Cancel() noexcept { return _singleEvent.Cancel(this); }
 
             void ResumeFromPause(auto parentCoro)
             {

@@ -10,8 +10,10 @@ namespace tinycoro {
 
     // Making a single suspension point
     // explicitly cancellable
-    // Works only with Awaitables which has cancellation support. 
-    // (e.g. tinycoro::Task has NO cancellation support)
+    // Works only with Awaitables which has cancellation support.
+    //
+    // e.g. tinycoro::Task has NO cancellation support,
+    // because a task is not a cancellation point.
     template <concepts::IsCancellableAwait AwaiterT>
     class Cancellable
     {
@@ -21,9 +23,15 @@ namespace tinycoro {
     public:
         // accepts only r-value refs
         Cancellable(AwaiterT&& awaiter)
-        : _awaiter{std::addressof(awaiter)}
+        : _awaiter{std::move(awaiter)}
         {
-            assert(_awaiter);
+        }
+
+        template<typename DeviceT>
+            requires requires(DeviceT d) { { d.Wait() } -> concepts::IsCancellableAwait; }
+        Cancellable(DeviceT& device)
+        : _awaiter{device.Wait()}   // this should be safe, extend temporary lifetime with rvalue ref (&&)
+        {
         }
 
         // disable move and copy
@@ -32,25 +40,36 @@ namespace tinycoro {
         [[nodiscard]] constexpr bool await_ready() noexcept
         {
             // delegate the call to the awaiter
-            return _awaiter->await_ready();
+            return _awaiter.await_ready();
         }
 
         constexpr auto await_suspend(auto parentCoro)
         {
-            auto suspend = _awaiter->await_suspend(parentCoro);
+            auto suspend = _awaiter.await_suspend(parentCoro);
 
-            if(suspend)
+            if (suspend)
             {
-                assert(parentCoro.promise().stopSource.stop_possible());
+                auto& stopSource = parentCoro.promise().stopSource;
 
-                // make the parent coroutine cancellable
-                context::MakeCancellable(parentCoro);
-
-                if (parentCoro.promise().stopSource.stop_possible())
+                if (stopSource.stop_possible())
                 {
                     // if we have a valid stop_source
                     // we also setup a stop_callback
-                    _stopCallback.Construct<stopCallback_t>(parentCoro.promise().stopSource.get_token(), [aw = _awaiter] { aw->Cancel(); });
+                    _stopCallback.Construct<stopCallback_t>(stopSource.get_token(), [this, parentCoro] {
+                        if (_awaiter.Cancel())
+                        {
+                            // if we could cancel the awaiter
+                            // this is the first point that we actually
+                            // are able to mark the awaiter suspend as cancellable
+                            context::MakeCancellable(parentCoro);
+
+                            // after we own the awaiter and
+                            // set the cancellable flag,
+                            // we still need to notify the awaiter
+                            // to trigger further actions.
+                            _awaiter.Notify();
+                        }
+                    });
                 }
             }
 
@@ -59,13 +78,17 @@ namespace tinycoro {
 
         constexpr auto await_resume() noexcept
         {
+            // destroy the stop callback
+            // we resume the coroutine anyway
+            _stopCallback.reset();
+
             // delegate the call to the awaiter
-            return _awaiter->await_resume();
+            return _awaiter.await_resume();
         }
 
     private:
-        AwaiterT* _awaiter;
-        StorageT  _stopCallback;
+        AwaiterT&& _awaiter;
+        StorageT   _stopCallback;
     };
 
 } // namespace tinycoro

@@ -77,18 +77,10 @@ namespace tinycoro {
                 return _count;
             }
 
-            void Cancel(awaiter_type* waiter)
+            bool Cancel(awaiter_type* waiter)
             {
-                bool erased{false};
-                {
-                    std::scoped_lock lock{_mtx};
-                    erased = _waiters.erase(waiter);
-                }
-
-                if(erased)
-                {
-                    waiter->Notify();
-                }
+                std::scoped_lock lock{_mtx};
+                return _waiters.erase(waiter);
             }
 
             size_t             _count;
@@ -128,7 +120,7 @@ namespace tinycoro {
 
             void Notify() const noexcept { _event.Notify(); }
 
-            void Cancel() noexcept { _latch.Cancel(this); }
+            bool Cancel() noexcept { return _latch.Cancel(this); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 

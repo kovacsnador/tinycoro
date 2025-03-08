@@ -48,7 +48,7 @@ namespace tinycoro {
                 _notifyCallback = std::forward<T>(cb);
             }
         };
-
+        
     } // namespace detail
 
     struct PauseHandler
@@ -62,7 +62,6 @@ namespace tinycoro {
         {
             _cancellable.store(false, std::memory_order::relaxed);
             _pause.store(false, std::memory_order::relaxed);
-            _pause.notify_all();
         }
 
         [[nodiscard]] auto Pause()
@@ -98,8 +97,7 @@ namespace tinycoro {
         std::atomic<bool>     _cancellable{false};
     };
 
-    namespace context
-    {
+    namespace context {
         [[nodiscard]] auto PauseTask(auto coroHdl)
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
@@ -116,16 +114,6 @@ namespace tinycoro {
             pauseHandlerPtr->SetCancellable(true);
         }
 
-        /*template<typename T>
-        void MakeCancellable(auto coroHdl, T&& returnValue)
-        {
-            auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
-            assert(pauseHandlerPtr);
-
-            pauseHandlerPtr->SetCancellable(true);
-            coroHdl.promise().return_value(std::forward<T>(returnValue));
-        }*/
-
         void UnpauseTask(auto coroHdl)
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
@@ -141,7 +129,7 @@ namespace tinycoro {
 
             return pauseHandlerPtr;
         }
-    }
+    } // namespace context
 
 } // namespace tinycoro
 
