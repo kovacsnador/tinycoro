@@ -289,3 +289,35 @@ TEST_P(LatchTest, LatchFunctionalTest_coawait)
     EXPECT_EQ(count, latchCount_1);
     EXPECT_EQ(count, latchCount_2);
 }
+
+TEST_P(LatchTest, LatchTest_cancel_multi)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::Latch latch{count};
+
+    std::atomic<size_t> taskCount;
+
+    auto task1 = [&]() -> tinycoro::Task<size_t> { co_await tinycoro::Cancellable(latch.Wait()); co_return ++taskCount; };
+    auto task2 = [&]() -> tinycoro::Task<size_t> { co_await tinycoro::Cancellable(latch.ArriveAndWait()); co_return ++taskCount; };
+
+    auto sleep = [&]()->tinycoro::Task<size_t> { co_await tinycoro::SleepFor(clock, 50ms); co_return 44u; };
+
+    std::vector<tinycoro::Task<size_t>> tasks;
+    tasks.reserve((count * 3) + 1);
+    tasks.emplace_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(task1());
+        tasks.emplace_back(task2());
+        tasks.emplace_back(task2());
+    }
+
+    auto results = tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    auto finished = std::ranges::count_if(results | std::views::drop(1), [](const auto& it) { return it.has_value(); });
+    EXPECT_EQ(finished, taskCount);
+}

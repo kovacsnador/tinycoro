@@ -9,7 +9,7 @@
 
 tinycoro::Task<void> Example_AnyOfCoAwait(auto& scheduler)
 {
-    SyncOut() << "\n\Example_AnyOfCoAwait:\n";
+    SyncOut() << "\n\nExample_AnyOfCoAwait:\n";
 
     auto task1 = [](auto duration) -> tinycoro::Task<int32_t> {
         SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';

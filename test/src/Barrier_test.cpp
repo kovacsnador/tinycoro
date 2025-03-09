@@ -569,6 +569,20 @@ TEST(BarrierTest, BarrierTest_preset_stopSource)
     tinycoro::AnyOfWithStopSource(scheduler, stopSource, task2(), task1());
 }
 
+TEST(BarrierTest, BarrierTest_preset_stopSource_inline)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::Barrier barrier{1};
+
+    std::stop_source stopSource;
+
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
+
+    stopSource.request_stop();
+    tinycoro::AnyOfWithStopSourceInline(stopSource, task2(), task1());
+}
+
 TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
 {
     tinycoro::SoftClock clock;

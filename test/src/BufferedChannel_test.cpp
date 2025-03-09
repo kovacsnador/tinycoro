@@ -1479,6 +1479,81 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushWait_cancel)
     }
 }
 
+TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto                        count = GetParam();
+    tinycoro::BufferedChannel<size_t> channel{5};
+
+    auto producer = [&](auto i) -> tinycoro::Task<size_t> {
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
+        co_return i;
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<size_t> {
+        size_t val;
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
+        co_return val;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<size_t> {
+        co_await tinycoro::SleepFor(clock, 50ms);
+        co_return 44u;
+    };
+
+    std::vector<tinycoro::Task<size_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(producer(it));
+        tasks.emplace_back(consumer());
+    }
+
+    auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(result[0].value(), 44);
+}
+
+TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel_inline)
+{
+    tinycoro::SoftClock clock;
+
+    const auto                        count = GetParam();
+    tinycoro::BufferedChannel<size_t> channel{5};
+
+    auto producer = [&](auto i) -> tinycoro::Task<size_t> {
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
+        co_return i;
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<size_t> {
+        size_t val;
+        [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
+        co_return val;
+    };
+
+    auto sleep = [&]() -> tinycoro::Task<size_t> {
+        co_await tinycoro::SleepFor(clock, 50ms);
+        co_return 44u;
+    };
+
+    std::vector<tinycoro::Task<size_t>> tasks;
+    tasks.reserve(count + 1);
+    tasks.emplace_back(sleep());
+    for ([[maybe_unused]] auto it : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(producer(it));
+        tasks.emplace_back(consumer());
+    }
+
+    auto result = tinycoro::AnyOfInline(std::move(tasks));
+
+    EXPECT_EQ(result[0].value(), 44);
+}
+
 TEST_P(BufferedChannelTest, BufferedChannelTest_PopWait_cancel)
 {
     tinycoro::Scheduler scheduler;
