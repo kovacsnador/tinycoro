@@ -2,6 +2,8 @@
 
 #include <tinycoro/LinkedPtrStack.hpp>
 
+#include "ListCommonUtils.hpp"
+
 // Mock Node class
 struct MockNodeDS {
     MockNodeDS* next = nullptr;
@@ -213,4 +215,25 @@ TEST_F(DoubleLinkedPtrStackTest, EraseAll) {
     EXPECT_TRUE(stack.empty());
 
     EXPECT_EQ(stack.top(), nullptr);
+}
+
+struct DoubleLinkedPtrStackFunctionalTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest_reverse_erase)
+{
+    const auto count = GetParam();
+
+    tinycoro::test::ReverseCheck<MockNodeDS, tinycoro::detail::LinkedPtrStack>(count);
+}
+
+TEST_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest_erase)
+{
+    const auto count = GetParam();
+
+    tinycoro::test::OrderCheck<MockNodeDS, tinycoro::detail::LinkedPtrStack>(count);
+
 }
