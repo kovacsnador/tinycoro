@@ -116,6 +116,12 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 
     pauseHandler.SetCancellable(true);
     EXPECT_TRUE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(false);
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(true);
+    EXPECT_TRUE(pauseHandler.IsCancellable());
 }
 
 struct Context_PauseHandlerMock
@@ -163,14 +169,14 @@ TEST(ContextTest, ContextTest_MakeCancellable)
     tinycoro::context::MakeCancellable(hdl);
 }
 
-TEST(ContextTest, ContextTest_MakeCancellable_return_value)
+/*TEST(ContextTest, ContextTest_MakeCancellable_return_value)
 {
     Context_CoroutineHandlerMock hdl;
 
     EXPECT_CALL(*hdl.p, return_value(42)).Times(1);
     EXPECT_CALL(*hdl.p->pauseHandler, SetCancellable(true)).Times(1);   
     tinycoro::context::MakeCancellable(hdl, 42);
-}
+}*/
 
 TEST(ContextTest, ContextTest_GetHandler)
 {

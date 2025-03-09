@@ -29,6 +29,7 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(bool, await_suspend, (std::coroutine_handle<>));
 
     MOCK_METHOD(void, Resume, ());
+    MOCK_METHOD(bool, IsDone, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
     MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
@@ -49,6 +50,8 @@ struct TaskWrapperMock
     auto await_suspend(auto hdl) { return impl->await_suspend(hdl); }
 
     void Resume() { impl->Resume(); }
+
+    bool IsDone() { return impl->IsDone(); }
 
     [[nodiscard]] auto ResumeState() { return impl->ResumeState(); }
 
@@ -194,7 +197,7 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_destructed_coroFunction)
 
     int32_t i{};
 
-    std::future<int32_t> future;
+    std::future<std::optional<int32_t>> future;
 
     {
         auto coro = [&i]() -> tinycoro::Task<int32_t> { co_return ++i; };
@@ -213,7 +216,7 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_destructed_coroFunction_safe)
 
     int32_t i{};
 
-    std::future<int32_t> future;
+    std::future<std::optional<int32_t>> future;
 
     {
         auto coro = [](auto& i) -> tinycoro::Task<int32_t> { co_return ++i; };
@@ -270,7 +273,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_MultiTasks)
     for (auto it : results)
     {
         // no lock needed here only one consumer
-        auto [_, inserted] = set.insert(it);
+        auto [_, inserted] = set.insert(*it);
         EXPECT_TRUE(inserted);
     }
 
@@ -309,7 +312,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_coawait_task_multi)
     for (auto it : results)
     {
         // no lock needed here only one consumer
-        auto [_, inserted] = set.insert(it);
+        auto [_, inserted] = set.insert(*it);
         EXPECT_TRUE(inserted);
     }
 

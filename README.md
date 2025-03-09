@@ -43,7 +43,7 @@ tinycoro::Task<std::string> Breakfast(tinycoro::Scheduler& scheduler)
 {
     // The `SyncAwait` ensures both `Toast()` and `Caffee()` are executed concurrently.
     auto [toast, coffee] = co_await tinycoro::SyncAwait(scheduler, Toast(), Caffee());
-    co_return toast + " + " + coffee;
+    co_return *toast + " + " + *coffee;
 }
 
 ```
@@ -61,7 +61,7 @@ Finally, we create a `tinycoro::Scheduler` to manage the execution of the Breakf
     auto sec = duration_cast<std::chrono::seconds>(std::chrono::system_clock::now() - start);
 
     // Breakfast is toast + coffee, Total time 4s
-    std::cout << "Breakfast is " << breakfast << ", Total time " << sec << '\n'; 
+    std::cout << "Breakfast is " << *breakfast << ", Total time " << sec << '\n'; 
 ```
 
 ## Motivation
@@ -168,22 +168,23 @@ Now, the final coroutine looks even cleaner and more intuitive:
 tinycoro::Task<std::string> MyCoroutine()
 {
     auto data = co_await AsyncDownloadCoro("http://test.hu");
-    auto result = co_await AsyncPrepareCoro(data); // implicit exception handling here...
-    co_return result;
+    auto result = co_await AsyncPrepareCoro(*data); // implicit exception handling here...
+    co_return *result;
 }
 ```
 This approach removes all callback semantics, improves readability and maintainability, turning complex asynchronous workflows into simple, sequential code with the power of coroutines.
 
 ### `How to invoke the coroutine functions`
 
-All you need is a `tinycoro::Scheduler`. In most cases, you'll only need a single instance of the scheduler, but you can use multiple instances if necessary. The Scheduler's `Enqueue(..)` function returns a traditional `std::future`, allowing you to call the `get()` method as you normally would. In this example, the type of the returned future is `std::future<std::string>`.
+All you need is a `tinycoro::Scheduler`. In most cases, you'll only need a single instance of the scheduler, but you can use multiple instances if necessary. The Scheduler's `Enqueue(..)` function returns a traditional `std::future`, allowing you to call the `get()` method as you normally would. In this example, the type of the returned future is `std::future<std::optional<std::string>>`.
+We use `std::optinal` as the return value, because we need to handle potential task cancellations.
 ```cpp
 try
 {
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
-    std::future<std::string> future = scheduler.Enqueue(MyCoroutine());
-    std::cout << future.get() << '\n';
+    std::future<std::optional<std::string>> future = scheduler.Enqueue(MyCoroutine());
+    std::cout << future.get().value() << '\n';
 }
 catch(const std::exception& e)
 {
@@ -196,7 +197,7 @@ Alternatively, you can use helper functions to aggregate the value or values of 
 try
 {
     auto result = tinycoro::GetAll(scheduler, MyCoroutine());
-    std::cout << result << '\n';
+    std::cout << *result << '\n';
 }
 catch(const std::exception& e)
 {
@@ -272,13 +273,15 @@ This example demonstrates how to create a basic coroutine task that returns void
 
 The `Enqueue` function in the `tinycoro::Scheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
 
+If your coroutine has return value, `GetAll(...)` function will return `std::optional<>` object(s), to support possible task cancellation. If the task got cancelled, the returning `optional` will be empty.
+
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
 void Example_voidTask()
 {
     // create a scheduler
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler;
 
     auto task = []() -> tinycoro::Task<void> {
         co_return;
@@ -346,7 +349,7 @@ void Example_voidTask()
         co_return 42;
     };
 
-    int32_t val42 = tinycoro::RunInline(task())
+    std::optional<int32_t> val42 = tinycoro::RunInline(task())
 }
 ```
 
@@ -362,7 +365,7 @@ void Example_returnValueTask(tinycoro::Scheduler& scheduler)
         co_return 42;
     };
 
-    int32_t val42 = tinycoro::GetAll(scheduler, task());
+    std::optional<int32_t> val42 = tinycoro::GetAll(scheduler, task());
 }
 ```
 
@@ -414,10 +417,10 @@ void Example_nestedTask(tinycoro::Scheduler& scheduler)
         // calling co_await for nestedTask
         auto val = co_await nestedTask();
 
-        co_return val;
+        co_return *val;
     };
 
-    int32_t val42 = tinycoro::GetAll(scheduler, task());
+    auto val42 = tinycoro::GetAll(scheduler, task());
 }
 ```
 
@@ -571,6 +574,8 @@ void Example_generator()
 ### `MultiTasks`
 The tinycoro library allows you to enqueue multiple coroutine tasks simultaneously and manage their completion efficiently. The `GetAll` functionality can be used to wait for all enqueued tasks to finish.
 
+in this example `GetAll` returns a `std::tuple<>` which contains `std::optional` objects.
+
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
@@ -682,7 +687,7 @@ void Example_AnyOfVoid(tinycoro::Scheduler& scheduler)
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
             // This is a cancellable suspend. So the scheduler can cancel the task while is suspended implicitly.
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
     };
 
@@ -765,7 +770,7 @@ tinycoro::Task<std::string> Example_SyncAwait(tinycoro::Scheduler& scheduler)
     co_return std::apply(
         []<typename... Ts>(Ts&&... ts) {
             std::string result;
-            (result.append(std::forward<Ts>(ts)), ...);
+            (result.append(*ts), ...);
             return result;
         },
         tupleResult);
@@ -785,7 +790,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return count;
     };

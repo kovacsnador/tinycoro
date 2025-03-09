@@ -2,6 +2,9 @@
 
 #include <tinycoro/LinkedPtrStack.hpp>
 
+#include "ListCommonUtils.hpp"
+
+
 // Mock Node class
 struct MockNode {
     MockNode* next = nullptr;
@@ -13,7 +16,7 @@ protected:
     MockNode node1, node2, node3;
 };
 
-TEST_F(LinkedPtrStackTest, LinkedPtrStackTest_typeTest) 
+TEST_F(LinkedPtrStackTest, typeTest) 
 {
     using NodeType = decltype(stack)::value_type;
     using NodeTypePtr = tinycoro::detail::LinkedPtrStack<MockNode*>::value_type;
@@ -97,4 +100,122 @@ TEST_F(LinkedPtrStackTest, Size) {
     // call pop on empty stack
     EXPECT_EQ(nullptr, stack.pop());
     EXPECT_EQ(stack.size(), 0);
+}
+
+TEST_F(LinkedPtrStackTest, EraseFirst) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    
+    EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(stack.size(), 2);
+
+    auto top = stack.steal();
+    EXPECT_EQ(top, &node3);
+    EXPECT_EQ(top->next, &node2);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST_F(LinkedPtrStackTest, EraseMiddle) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    
+    EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(stack.size(), 2);
+
+    auto top = stack.steal();
+    EXPECT_EQ(top, &node3);
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST_F(LinkedPtrStackTest, EraseLast) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    
+    EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(stack.size(), 2);
+
+    auto top = stack.steal();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST_F(LinkedPtrStackTest, EraseAll) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    
+    EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(stack.size(), 2);
+
+    auto top = stack.top();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->next, nullptr);
+
+    EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(stack.size(), 1);
+
+    top = stack.top();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, nullptr);
+
+    EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(stack.size(), 0);
+
+    EXPECT_TRUE(stack.empty());
+
+    EXPECT_EQ(stack.top(), nullptr);
+}
+
+struct LinkedPtrStackFunctionalTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(LinkedPtrStackFunctionalTest, LinkedPtrStackFunctionalTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(LinkedPtrStackFunctionalTest, LinkedPtrStackFunctionalTest_reverse_erase)
+{
+    const auto count = GetParam();
+
+    tinycoro::test::ReverseCheck<MockNode, tinycoro::detail::LinkedPtrStack>(count);
+}
+
+TEST_P(LinkedPtrStackFunctionalTest, LinkedPtrStackFunctionalTest_erase)
+{
+    const auto count = GetParam();
+
+    tinycoro::test::OrderCheck<MockNode, tinycoro::detail::LinkedPtrStack>(count);
 }

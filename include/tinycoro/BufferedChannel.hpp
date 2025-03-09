@@ -307,6 +307,11 @@ namespace tinycoro {
                 return suspend;
             }
 
+            bool Cancel(pop_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _popAwaiters);
+            }
+
             [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
@@ -337,6 +342,11 @@ namespace tinycoro {
 
                 // suspend coroutine
                 return true;
+            }
+
+            bool Cancel(listener_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _listenerWaiters);
             }
 
             template <typename LockT>
@@ -421,6 +431,11 @@ namespace tinycoro {
                 return true;
             }
 
+            bool Cancel(push_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _pushAwaiters);
+            }
+
             // auto [ready, lastElement] = std::tuple<bool, bool>
             std::tuple<bool, bool> _SetValue(pop_awaiter_type* waiter)
             {
@@ -465,15 +480,17 @@ namespace tinycoro {
                 return {false, false};
             }
 
-            void _NotifyAll(auto* awaiter)
+            template<typename T>
+            void _NotifyAll(T* awaiter)
             {
                 // Notify all waiters
-                while (awaiter)
-                {
-                    auto next = awaiter->next;
-                    awaiter->Notify();
-                    awaiter = next;
-                }
+                detail::IterInvoke(awaiter, &T::Notify);
+            }
+
+            inline bool _Cancel(auto awaiter, auto& list)
+            {
+                std::scoped_lock lock{_mtx};
+                return list.erase(awaiter);
             }
 
             LinkedPtrQueue<pop_awaiter_type>  _popAwaiters;
@@ -544,11 +561,13 @@ namespace tinycoro {
                 return EChannelOpStatus::CLOSED;
             }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             template <typename T>
             void SetValue(T&& value, bool lastElement)
@@ -614,11 +633,13 @@ namespace tinycoro {
 
             [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             BufferedChannelListenerAwaiter* next{nullptr};
 
@@ -704,11 +725,13 @@ namespace tinycoro {
                 return {_value, _lastElement};
             }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             BufferedChannelPushAwaiter* next{nullptr};
 

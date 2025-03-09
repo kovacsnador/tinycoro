@@ -16,18 +16,15 @@ void Example_AnyOf(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return count;
     };
 
-    auto results = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s));
+    auto [t1, t2, t3] = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s));
 
-    auto t1 = std::get<0>(results);
-    auto t2 = std::get<1>(results);
-    auto t3 = std::get<2>(results);
 
-    SyncOut() << "co_return => " << t1 << ", " << t2 << ", " << t3 << '\n';
+    SyncOut() << "co_return => " << *t1 << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_ANY_OF_H__

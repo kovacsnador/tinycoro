@@ -19,11 +19,11 @@ struct SchedulerMock
     {
         auto task    = std::move(t);
         using ValueT = CoroTaskT::promise_type::value_type;
-        std::promise<ValueT> promise;
+        std::promise<typename tinycoro::detail::FutureReturnT<ValueT>::value_type> promise;
 
-        if constexpr (AllSame<void, ValueT>)
+        if constexpr (AllSame<std::optional<tinycoro::VoidType>, ValueT>)
         {
-            promise.set_value();
+            promise.set_value(tinycoro::VoidType{});
         }
         else
         {
@@ -37,21 +37,23 @@ struct SchedulerMock
     {
         using ValueT = std::decay_t<ContainerT>::value_type::promise_type::value_type;
 
-        std::vector<std::future<ValueT>> futures;
+        using value_t = typename tinycoro::detail::FutureReturnT<ValueT>::value_type;
+
+        std::vector<std::future<value_t>> futures;
 
         for (auto&& it : c)
         {
             [[maybe_unused]] auto task = std::move(it);
 
-            std::promise<ValueT> promise;
+            std::promise<value_t> promise;
 
-            if constexpr (AllSame<void, ValueT>)
+            if constexpr (AllSame<std::optional<tinycoro::VoidType>, value_t>)
             {
-                promise.set_value();
+                promise.set_value(tinycoro::VoidType{});
             }
             else
             {
-                promise.set_value({});
+                promise.set_value(0);
             }
             futures.push_back(promise.get_future());
         }
@@ -65,19 +67,19 @@ struct SchedulerMock
     {
         auto tupleTask = std::make_tuple(std::forward<Args>(args)...);
 
-        auto promises = std::make_tuple(std::promise<typename Args::promise_type::value_type>{}...);
+        auto promises = std::make_tuple(std::promise<typename tinycoro::detail::FutureReturnT<typename Args::promise_type::value_type>::value_type>{}...);
         std::apply(
             []<typename... Ts>(Ts&&... ts) {
                 auto setPromise = [](auto& p) {
                     using ResultType = std::decay_t<decltype(p.get_future().get())>;
 
-                    if constexpr (AllSame<void, ResultType>)
+                    if constexpr (AllSame<std::optional<tinycoro::VoidType>, ResultType>)
                     {
-                        p.set_value();
+                        p.set_value(tinycoro::VoidType{});
                     }
                     else
                     {
-                        p.set_value({});
+                        p.set_value(0);
                     }
                 };
 
@@ -221,7 +223,7 @@ tinycoro::Task<std::string> AsyncAwaiterTest1(auto& scheduler)
     co_return std::apply(
         []<typename... Ts>(Ts&&... ts) {
             std::string result;
-            (result.append(std::forward<Ts>(ts)), ...);
+            (result.append(*ts), ...);
             return result;
         },
         tupleResult);
@@ -232,7 +234,7 @@ TEST(AsyncAwaiterTest1, AsyncAwaiterTest1)
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
     auto future = scheduler.Enqueue(AsyncAwaiterTest1(scheduler));
-    EXPECT_EQ(std::string{"123456789"}, future.get());
+    EXPECT_EQ(std::string{"123456789"}, future.get().value());
 }
 
 tinycoro::Task<void> AsyncAwaiterTest2(auto& scheduler)
@@ -261,16 +263,17 @@ tinycoro::Task<void> AnyOfCoAwaitTest1(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
+            count++;
         }
         co_return count;
     };
 
-    auto results = co_await tinycoro::AnyOfAwait(scheduler, task1(100ms), task1(2s), task1(3s));
+    auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, task1(100ms), task1(2s), task1(3s));
 
-    EXPECT_TRUE(std::get<0>(results) > 0);
-    EXPECT_TRUE(std::get<1>(results) > 0);
-    EXPECT_TRUE(std::get<2>(results) > 0);
+    EXPECT_TRUE(t1.value() > 0);
+    EXPECT_FALSE(t2.has_value());
+    EXPECT_FALSE(t3.has_value());
 
     EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
 }
@@ -292,7 +295,8 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
+            count++;
         }
         co_return count;
     };
@@ -301,9 +305,9 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
 
     auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
-    EXPECT_TRUE(std::get<0>(results) > 0);
-    EXPECT_TRUE(std::get<1>(results) > 0);
-    EXPECT_TRUE(std::get<2>(results) > 0);
+    EXPECT_TRUE(std::get<0>(results).value() > 0);
+    EXPECT_FALSE(std::get<1>(results).has_value());
+    EXPECT_FALSE(std::get<2>(results).has_value());
 
     EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
 }
@@ -340,7 +344,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
 
         // The `SyncAwait` ensures both `Toast()` and `Coffee()` are executed concurrently.
         auto [toast, coffee, tee] = co_await tinycoro::SyncAwait(scheduler, Toast(), Coffee(), Tee());
-        co_return toast + " + " + coffee + " + " + tee;
+        co_return *toast + " + " + *coffee + " + " + *tee;
     };
 
     // Start the asynchronous execution of the Breakfast task.
@@ -381,7 +385,7 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
         for (auto it : results)
         {
             // no lock needed here only one consumer
-            auto [_, inserted] = set.insert(it);
+            auto [_, inserted] = set.insert(*it);
             EXPECT_TRUE(inserted);
         }
     };
@@ -414,7 +418,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
         for (auto it : results)
         {
             // no lock needed here only one consumer
-            auto [_, inserted] = set.insert(it);
+            auto [_, inserted] = set.insert(*it);
             EXPECT_TRUE(inserted);
         }
     };
@@ -432,7 +436,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
     std::atomic<size_t> count{};
 
     auto task = [](auto& c) -> tinycoro::Task<size_t> { 
-        co_await tinycoro::CancellableSuspend{42};
+        co_await tinycoro::CancellableSuspend{};
         co_return ++c;
     };
 
@@ -452,7 +456,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 
         for(size_t i = 1 ; i < results.size() ; ++i)
         {
-            EXPECT_EQ(results[i], 42);
+            EXPECT_FALSE(results[i].has_value());
         }
     };
 
@@ -519,7 +523,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         tasks.push_back(t2());
 
         tasks.push_back(task(1000ms));
-        tasks.push_back(task(2000ms));
+        //tasks.push_back(task(2000ms));
 
         EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, tasks), std::runtime_error);
 

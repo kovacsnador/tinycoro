@@ -12,11 +12,12 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
+		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
         template <typename T>
         concept CoroTask = std::move_constructible<T> && requires (T c) {
             { c.Resume() } -> std::same_as<void>;
+            { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
             { c.SetPauseHandler([]{}) };
@@ -60,17 +61,33 @@ namespace tinycoro {
 
             ~SchedulableBridgeImpl()
             {
-                if (_needValueSet)
+                if(_exception)
+                {   
+                    // if we had an exception we just set it
+                    _futureState.set_exception(_exception);
+                }
+                else
                 {
-                    if constexpr (requires {
-                                      { _coro.await_resume() } -> std::same_as<void>;
-                                  })
+                    using futureValue_t = std::decay_t<decltype(std::declval<FutureStateT>().get_future().get())>;
+
+                    if (_coro.IsDone())
                     {
-                        _futureState.set_value();
+                        // are we on a last suspend point?
+                        // That means we had no cancellation before
+                        if constexpr (requires { { _coro.await_resume() } -> std::same_as<void>; })
+                        {
+                            _futureState.set_value(VoidType{});
+                        }
+                        else
+                        {
+                            _futureState.set_value(_coro.await_resume());
+                        }
                     }
                     else
                     {
-                        _futureState.set_value(_coro.await_resume());
+                        // the task got cancelled
+                        // we give back an empty optional
+                        _futureState.set_value(futureValue_t{std::nullopt});
                     }
                 }
             }
@@ -83,31 +100,28 @@ namespace tinycoro {
                 }
                 catch (...)
                 {
-                    _futureState.set_exception(std::current_exception());
-                    _needValueSet = false;
+                    _exception = std::current_exception();
                 }
             }
 
             ETaskResumeState ResumeState() override
             {
                 // value already set, the coroutine should be done
-                if (_needValueSet == false)
+                if (_exception)
                 {
+                    // if there was an exception the task is done
                     return ETaskResumeState::DONE;
                 }
 
                 return _coro.ResumeState();
             }
 
-            void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override
-            {
-                _coro.SetPauseHandler(std::move(cb));
-            }
+            void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { _coro.SetPauseHandler(std::move(cb)); }
 
         private:
-            bool         _needValueSet{true};
             CoroT        _coro;
             FutureStateT _futureState;
+            std::exception_ptr _exception{};
         };
     } // namespace detail
 

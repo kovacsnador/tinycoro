@@ -87,7 +87,7 @@ namespace tinycoro {
                 std::unique_lock lock{_mtx};
                 _closed = true;
 
-                auto waiters      = _waiters.steal();
+                auto waiters      = _popAwaiters.steal();
                 auto pushAwaiters = _pushAwaiters.steal();
                 auto listenersTop = _listenerWaiters.steal();
 
@@ -131,7 +131,7 @@ namespace tinycoro {
                 push_awaiter_type pushAwaiter{*this, std::move(event), _cleanupFunction, lastElement, std::forward<Args>(args)...};
 
                 // Try to push the awaiter (with value inside) into the queue.
-                if(_Add(std::addressof(pushAwaiter), _waiters, _pushAwaiters))
+                if(_Add(std::addressof(pushAwaiter), _popAwaiters, _pushAwaiters))
                 {
                     // wait for the flag to get notified
                     latch.wait();
@@ -151,7 +151,7 @@ namespace tinycoro {
                     return true;
                 }
 
-                return waiter->value() <= _waiters.size();
+                return waiter->value() <= _popAwaiters.size();
             }
 
             [[nodiscard]] bool Add(listener_awaiter_type* waiter)
@@ -160,7 +160,7 @@ namespace tinycoro {
 
                 std::unique_lock lock{_mtx};
 
-                if (wantedListerenCount <= _waiters.size() || _closed)
+                if (wantedListerenCount <= _popAwaiters.size() || _closed)
                 {
                     // no suspend, we have enough listeners or the channel is already closed.
                     return false;
@@ -173,13 +173,28 @@ namespace tinycoro {
                 return true;
             }
 
+            bool Cancel(listener_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _listenerWaiters);
+            }
+
             bool IsReady(pop_awaiter_type* awaiter) { return _IsReady(awaiter, _pushAwaiters); }
 
-            bool Add(pop_awaiter_type* awaiter) { return _Add(awaiter, _pushAwaiters, _waiters); }
+            bool Add(pop_awaiter_type* awaiter) { return _Add(awaiter, _pushAwaiters, _popAwaiters); }
 
-            bool IsReady(push_awaiter_type* pushAwaiter) { return _IsReady(pushAwaiter, _waiters); }
+            bool Cancel(pop_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _popAwaiters);
+            }
 
-            bool Add(push_awaiter_type* pushAwaiter) { return _Add(pushAwaiter, _waiters, _pushAwaiters); }
+            bool IsReady(push_awaiter_type* pushAwaiter) { return _IsReady(pushAwaiter, _popAwaiters); }
+
+            bool Add(push_awaiter_type* pushAwaiter) { return _Add(pushAwaiter, _popAwaiters, _pushAwaiters); }
+
+            bool Cancel(push_awaiter_type* waiter)
+            {
+                return _Cancel(waiter, _pushAwaiters);
+            }
 
             template <typename T>
             bool _IsReady(T* awaiter, auto& waiters)
@@ -245,7 +260,7 @@ namespace tinycoro {
 
                 if constexpr (std::same_as<T, pop_awaiter_type>)
                 {
-                    auto listenersTop = _listenerWaiters.lower_bound(_waiters.size());
+                    auto listenersTop = _listenerWaiters.lower_bound(_popAwaiters.size());
                     lock.unlock();
 
                     // notify all if somebody waits for listerens
@@ -276,21 +291,23 @@ namespace tinycoro {
 
             bool _ExchangeValue(pop_awaiter_type* awaiter, push_awaiter_type* pushAwaiter) { return _ExchangeValue(pushAwaiter, awaiter); }
 
-            void _NotifyAll(auto* awaiter)
+            template<typename T>
+            void _NotifyAll(T* awaiter)
             {
                 // Notify all waiters
-                while (awaiter)
-                {
-                    auto next = awaiter->next;
-                    awaiter->Notify();
-                    awaiter = next;
-                }
+                detail::IterInvoke(awaiter, &T::Notify);
+            }
+
+            inline bool _Cancel(auto awaiter, auto& list)
+            {
+                std::scoped_lock lock{_mtx};
+                return list.erase(awaiter);
             }
 
             mutable std::mutex _mtx;
 
             // using Queue to maintain order of pop.
-            LinkedPtrQueue<pop_awaiter_type> _waiters;
+            LinkedPtrQueue<pop_awaiter_type> _popAwaiters;
 
             // using Queue to maintain order of values.
             LinkedPtrQueue<push_awaiter_type> _pushAwaiters;
@@ -356,11 +373,13 @@ namespace tinycoro {
                 return EChannelOpStatus::CLOSED;
             }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             template <typename T>
             void SetValue(T&& value, bool lastElement)
@@ -462,11 +481,13 @@ namespace tinycoro {
                 return {_value, _lastElement};
             }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             UnbufferedChannelPushAwaiter* next{nullptr};
 
@@ -527,11 +548,13 @@ namespace tinycoro {
 
             [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
-            void Notify()
+            void Notify() const noexcept
             {
                 // Notify scheduler to put coroutine back on CPU
                 _event.Notify();
             }
+
+            bool Cancel() noexcept { return _channel.Cancel(this); }
 
             UnbufferedChannelListenerAwaiter* next{nullptr};
 

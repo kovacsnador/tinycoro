@@ -18,7 +18,7 @@ tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
     co_return std::apply(
         []<typename... Ts>(Ts&&... ts) {
             std::string result;
-            (result.append(std::forward<Ts>(ts)), ...);
+            (result.append(*ts), ...);
             return result;
         },
         tupleResult);

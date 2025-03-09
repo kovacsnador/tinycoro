@@ -13,9 +13,16 @@ namespace tinycoro { namespace detail {
         void push(value_type* newNode) noexcept
         {
             assert(newNode);
-            assert(newNode->next == nullptr);
 
             ++_size;
+
+            if constexpr (concepts::DoubleLinkable<NodeT>)
+            {
+                if (_top)
+                    _top->prev = newNode;
+
+                newNode->prev = nullptr;
+            }
 
             newNode->next = _top;
             _top          = newNode;
@@ -29,6 +36,18 @@ namespace tinycoro { namespace detail {
             {
                 --_size;
                 _top = _top->next;
+
+                if constexpr (concepts::DoubleLinkable<NodeT>)
+                {
+                    if (_top)
+                        _top->prev = nullptr;
+
+                    // clean up the element
+                    top->prev = nullptr;
+                }
+
+                // clean up the element
+                top->next = nullptr;
             }
             return top;
         }
@@ -45,9 +64,82 @@ namespace tinycoro { namespace detail {
             return std::exchange(_top, nullptr);
         }
 
+        bool erase(value_type* elem) noexcept
+        {
+            assert(elem);
+
+            if constexpr (concepts::DoubleLinkable<NodeT>)
+            {
+                if (elem)
+                {
+                    // debug check if the elem is in list
+                    assert(detail::helper::Contains(_top, elem));
+
+                    if (elem == _top)
+                    {
+                        _top = elem->next;
+
+                        if (_top)
+                            _top->prev = nullptr;
+                    }
+                    else
+                    {
+                        if (elem->next)
+                        {
+                            elem->next->prev = elem->prev;
+                        }
+
+                        if (elem->prev)
+                        {
+                            elem->prev->next = elem->next;
+                        }
+                    }
+
+                    elem->next = nullptr;
+                    elem->prev = nullptr;
+
+                    --_size;
+                    return true;
+                }
+            }
+            else
+            {
+                if (elem)
+                {
+                    if (_top == elem)
+                    {
+                        _top = elem->next;
+
+                        --_size;
+                        return true;
+                    }
+                    else
+                    {
+                        auto current = _top;
+                        while (current && current->next)
+                        {
+                            if (current->next == elem)
+                            {
+                                // find the element
+                                // in the list
+                                current->next = elem->next;
+
+                                --_size;
+                                return true;
+                            }
+
+                            current = current->next;
+                        }
+                    }
+                }
+            }
+
+            return false;
+        }
+
     private:
         value_type* _top{nullptr};
-        size_t _size{};
+        size_t      _size{};
     };
 }} // namespace tinycoro::detail
 

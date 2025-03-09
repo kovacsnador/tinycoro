@@ -1,6 +1,8 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <algorithm>
+
 #include <tinycoro/tinycoro_all.h>
 
 #include "mock/CoroutineHandleMock.h"
@@ -9,7 +11,14 @@ struct BarrierTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(BarrierTest, BarrierTest, testing::Values(1, 5, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(BarrierTest,
+                         BarrierTest,
+                         testing::Values(1,
+                                         5,
+                                         10,
+                                         100,100,100,100,100,100,
+                                         1000,
+                                         10000));
 
 TEST_P(BarrierTest, BarrierTest_arrive)
 {
@@ -68,8 +77,8 @@ TEST(BarrierTest, BarrierTest_constructor)
     EXPECT_NO_THROW(tinycoro::Barrier{10});
     EXPECT_THROW(tinycoro::Barrier{0}, tinycoro::BarrierException);
 
-    EXPECT_NO_THROW((tinycoro::Barrier{10, [] {}}));
-    EXPECT_THROW((tinycoro::Barrier{0, [] {}}), tinycoro::BarrierException);
+    EXPECT_NO_THROW((tinycoro::Barrier{10, [] { }}));
+    EXPECT_THROW((tinycoro::Barrier{0, [] { }}), tinycoro::BarrierException);
 }
 
 using DecrementData = std::tuple<int32_t, int32_t, int32_t>;
@@ -106,11 +115,7 @@ public:
     {
     }
 
-    bool Add(auto, auto policy)
-    {
-        return barrier.Add(this, policy);
-    }
-    
+    bool Add(auto, auto policy) { return barrier.Add(this, policy); }
 
     MOCK_METHOD(void, Notify, ());
 
@@ -135,7 +140,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -151,7 +156,7 @@ TEST(BarrierTest, BarrierTest_await_suspend)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -164,7 +169,7 @@ TEST(BarrierTest, BarrierTest_await_suspend_dropWait)
 
     auto awaiter = barrier.ArriveDropAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -214,7 +219,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait_after)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -243,7 +248,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 }
 
@@ -257,7 +262,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend_ready)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] {});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -271,7 +276,7 @@ TEST(BarrierTest, BarrierTest_notifyAndComplition)
 
     auto awaiter = barrier.Wait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -391,7 +396,7 @@ TEST(BarrierTest, BarrierFewerTasksThanCount)
         number++;
         control.Arrive();
         co_await barrier.ArriveAndWait(); // Task will wait here as the barrier needs 3 arrivals
-        
+
         number += 100;
         control.Arrive();
     };
@@ -500,6 +505,103 @@ TEST_P(BarrierTest, BarrierTest_functionalTest_3)
     }
 
     tinycoro::GetAll(scheduler, tasks);
+}
+
+TEST(BarrierTest, BarrierTest_functionalTest_cancel_scheduler)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{10};
+
+    auto task = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable(barrier.Wait());
+        co_return 42;
+    };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(scheduler, task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_TRUE(r6.has_value());
+}
+
+TEST_P(BarrierTest, BarrierTest_cancel_multi)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{count};
+
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
+    auto task3 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveDropAndWait()); };
+
+    std::vector<tinycoro::Task<void>> tasks;
+    tasks.reserve((count * 3) + 1);
+    tasks.emplace_back(tinycoro::SleepFor(clock, 100ms));
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(task1());
+        tasks.emplace_back(task2());
+        tasks.emplace_back(task3());
+    }
+
+    EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, std::move(tasks)));
+}
+
+TEST(BarrierTest, BarrierTest_preset_stopSource)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::Barrier barrier{1};
+
+    std::stop_source stopSource;
+
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
+
+    stopSource.request_stop();
+    tinycoro::AnyOfWithStopSource(scheduler, stopSource, task2(), task1());
+}
+
+TEST(BarrierTest, BarrierTest_preset_stopSource_inline)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::Barrier barrier{1};
+
+    std::stop_source stopSource;
+
+    auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
+    auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
+
+    stopSource.request_stop();
+    tinycoro::AnyOfWithStopSourceInline(stopSource, task2(), task1());
+}
+
+TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
+{
+    tinycoro::SoftClock clock;
+
+    tinycoro::Barrier barrier{10};
+
+    auto task = [&]() -> tinycoro::Task<int32_t> {
+        co_await tinycoro::Cancellable(barrier.Wait());
+        co_return 42;
+    };
+
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
+
+    EXPECT_FALSE(r1.has_value());
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+    EXPECT_FALSE(r4.has_value());
+    EXPECT_FALSE(r5.has_value());
+    EXPECT_TRUE(r6.has_value());
 }
 
 struct BarrierFunctionalTest : testing::TestWithParam<size_t>

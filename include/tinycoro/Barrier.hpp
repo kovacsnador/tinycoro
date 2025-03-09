@@ -5,6 +5,7 @@
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "Finally.hpp"
+#include "AwaiterHelper.hpp"
 
 namespace tinycoro {
 
@@ -39,14 +40,10 @@ namespace tinycoro {
                 return false;
             }
 
-            void NotifyAll(auto* awaiter)
+            template <typename T>
+            void NotifyAll(T* awaiter)
             {
-                while (awaiter)
-                {
-                    auto next = awaiter->next;
-                    awaiter->Notify();
-                    awaiter = next;
-                }
+                detail::IterInvoke(awaiter, &T::Notify);
             }
 
         } // namespace local
@@ -90,7 +87,12 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept
+            {
+                _event.Notify();
+            }
+
+            bool Cancel() noexcept { return _barrier.Cancel(this); };
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -216,6 +218,12 @@ namespace tinycoro {
             }
 
             return !ready;
+        }
+
+        bool Cancel(awaiter_type* awaiter) noexcept
+        {
+            std::scoped_lock lock{_mtx};
+            return _waiters.erase(awaiter);
         }
 
         void DecrementTotal() noexcept

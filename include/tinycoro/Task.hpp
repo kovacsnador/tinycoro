@@ -109,11 +109,7 @@ namespace tinycoro {
 
         [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
-        {
-
-            return _hdl.promise().MakePauseHandler(pauseResume);
-        }
+        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
 
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
@@ -131,10 +127,7 @@ namespace tinycoro {
             _destroyNotifier.Set(std::forward<T>(cb));
         }
 
-        [[nodiscard]] address_t Address() const noexcept
-        {
-            return _hdl.address();
-        }
+        [[nodiscard]] address_t Address() const noexcept { return _hdl.address(); }
 
     private:
         void destroy()
@@ -151,8 +144,7 @@ namespace tinycoro {
 
     template <typename ReturnValueT,
               typename PromiseT,
-              template <typename, typename>
-              class AwaiterT,
+              template <typename, typename> class AwaiterT,
               typename CoroResumerT     = TaskResumer,
               typename StopSourceT      = std::stop_source,
               typename DestroyNotifierT = DestroyNotifier>
@@ -210,10 +202,7 @@ namespace tinycoro {
 
         [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
-        {
-            return _hdl.promise().MakePauseHandler(pauseResume);
-        }
+        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
 
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
@@ -233,10 +222,7 @@ namespace tinycoro {
             _destroyNotifier.Set(std::forward<T>(cb));
         }
 
-        [[nodiscard]] address_t Address() const noexcept
-        {
-            return _hdl.address();
-        }
+        [[nodiscard]] address_t Address() const noexcept { return _hdl.address(); }
 
     private:
         void destroy()

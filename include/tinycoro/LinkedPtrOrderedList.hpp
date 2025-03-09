@@ -94,6 +94,42 @@ namespace tinycoro { namespace detail {
             return nullptr;
         }
 
+        bool erase(value_type* elem) noexcept
+        {
+            assert(elem);
+
+            if (elem)
+            {
+                if (_root == elem)
+                {
+                    _root = elem->next;
+
+                    --_size;
+                    return true;
+                }
+                else
+                {
+                    auto current = _root;
+                    while (current && current->next)
+                    {
+                        if (current->next == elem)
+                        {
+                            // find the element
+                            // in the list
+                            current->next = elem->next;
+
+                            --_size;
+                            return true;
+                        }
+
+                        current = current->next;
+                    }
+                }
+            }
+            
+            return false;
+        }
+
         [[nodiscard]] value_type* steal() noexcept
         {
             _size = 0;

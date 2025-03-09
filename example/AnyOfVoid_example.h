@@ -12,7 +12,7 @@ void Example_AnyOfVoid(auto& scheduler)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
     };
 

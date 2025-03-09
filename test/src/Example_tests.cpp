@@ -73,7 +73,7 @@ TEST_F(ExampleTest, Example_moveOnlyValue)
     auto future = scheduler.Enqueue(task());
     auto val    = future.get();
 
-    EXPECT_EQ(val.i, 42);
+    EXPECT_EQ(val.value().i, 42);
 }
 
 TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
@@ -98,7 +98,7 @@ TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
     auto future = scheduler.Enqueue<tinycoro::FutureState>(task());
     auto val    = future.get();
 
-    EXPECT_EQ(val.i, 42);
+    EXPECT_EQ(val.value().i, 42);
 }
 
 TEST_F(ExampleTest, Example_aggregateValue)
@@ -114,8 +114,8 @@ TEST_F(ExampleTest, Example_aggregateValue)
     auto future = scheduler.Enqueue(task());
     auto val    = future.get();
 
-    EXPECT_EQ(val.i, 42);
-    EXPECT_EQ(val.j, 43);
+    EXPECT_EQ(val.value().i, 42);
+    EXPECT_EQ(val.value().j, 43);
 }
 
 TEST_F(ExampleTest, Example_exception)
@@ -273,9 +273,9 @@ TEST_F(ExampleTest, Example_multiTaskDifferentValues)
 
     auto voidType = std::get<0>(results);
 
-    EXPECT_TRUE((std::same_as<tinycoro::VoidType, decltype(voidType)>));
-    EXPECT_EQ(std::get<1>(results), 42);
-    EXPECT_EQ(std::get<2>(results).i, 43);
+    EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, decltype(voidType)>));
+    EXPECT_EQ(*std::get<1>(results), 42);
+    EXPECT_EQ(std::get<2>(results)->i, 43);
 }
 
 TEST_F(ExampleTest, Example_multiTaskDifferentValuesExpection)
@@ -583,7 +583,7 @@ TEST_F(ExampleTest, Example_usageWithStopToken)
 
     auto results = tinycoro::GetAll(futures);
 
-    auto task2Val = std::get<1>(results);
+    auto task2Val = std::get<1>(results).value();
 
     EXPECT_TRUE((std::same_as<int32_t, decltype(task2Val)>));
 }
@@ -593,7 +593,7 @@ TEST_F(ExampleTest, Example_AnyOfVoid)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
     };
 
@@ -608,24 +608,25 @@ TEST_F(ExampleTest, Example_AnyOf)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
+            count++;
         }
         co_return count;
     };
 
     auto results = tinycoro::AnyOf(scheduler, task1(1s), task1(2s), task1(3s));
 
-    auto t1 = std::get<0>(results);
+    auto t1 = std::get<0>(results).value();
     auto t2 = std::get<1>(results);
     auto t3 = std::get<2>(results);
 
     EXPECT_TRUE((std::same_as<int32_t, decltype(t1)>));
-    EXPECT_TRUE((std::same_as<int32_t, decltype(t2)>));
-    EXPECT_TRUE((std::same_as<int32_t, decltype(t3)>));
+    EXPECT_TRUE((std::same_as<std::optional<int32_t>, decltype(t2)>));
+    EXPECT_TRUE((std::same_as<std::optional<int32_t>, decltype(t3)>));
 
     EXPECT_TRUE(t1 > 0);
-    EXPECT_TRUE(t2 > 0);
-    EXPECT_TRUE(t3 > 0);
+    EXPECT_FALSE(t2.has_value());
+    EXPECT_FALSE(t3.has_value());
 }
 
 TEST_F(ExampleTest, Example_AnyOfDynamic)
@@ -635,7 +636,8 @@ TEST_F(ExampleTest, Example_AnyOfDynamic)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{++count};
+            co_await tinycoro::CancellableSuspend{};
+            count++;
         }
         co_return count;
     };
@@ -647,9 +649,9 @@ TEST_F(ExampleTest, Example_AnyOfDynamic)
 
     auto results = tinycoro::AnyOf(scheduler, tasks);
 
-    EXPECT_TRUE(results[0] > 0);
-    EXPECT_TRUE(results[1] > 0);
-    EXPECT_TRUE(results[2] > 0);
+    EXPECT_TRUE(results[0].value() > 0);
+    EXPECT_FALSE(results[1].has_value());
+    EXPECT_FALSE(results[2].has_value());
 }
 
 TEST_F(ExampleTest, Example_AnyOfDynamicVoid)
@@ -678,7 +680,7 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
     };
 
@@ -686,7 +688,7 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
             throw std::runtime_error("Exception throwed!");
-            co_await tinycoro::CancellableSuspend<void>{};
+            co_await tinycoro::CancellableSuspend{};
         }
         co_return 42;
     };
@@ -739,7 +741,7 @@ TEST_F(ExampleTest, ExampleOwnAwaiter)
     auto future = scheduler.Enqueue(asyncTask());
     auto val    = tinycoro::GetAll(future);
 
-    EXPECT_EQ(val, 42);
+    EXPECT_EQ(*val, 42);
 }
 
 TEST_F(ExampleTest, ExampleSyncAwait)
@@ -756,14 +758,14 @@ TEST_F(ExampleTest, ExampleSyncAwait)
         co_return std::apply(
             []<typename... Ts>(Ts&&... ts) {
                 std::string result;
-                (result.append(std::forward<Ts>(ts)), ...);
+                (result.append(*ts), ...);
                 return result;
             },
             tupleResult);
     };
 
     auto future = scheduler.Enqueue(syncAwait(scheduler));
-    EXPECT_EQ(std::string{"123123123"}, future.get());
+    EXPECT_EQ(std::string{"123123123"}, future.get().value());
 }
 
 TEST_F(ExampleTest, ExampleSyncAwaitException)
@@ -783,7 +785,7 @@ TEST_F(ExampleTest, ExampleSyncAwaitException)
         co_return std::apply(
             []<typename... Ts>(Ts&&... ts) {
                 std::string result;
-                (result.append(std::forward<Ts>(ts)), ...);
+                (result.append(*ts), ...);
                 return result;
             },
             tupleResult);
@@ -805,7 +807,8 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
             for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
             {
-                co_await tinycoro::CancellableSuspend{++count};
+                co_await tinycoro::CancellableSuspend{};
+                count++;
             }
             co_return count;
         };
@@ -814,9 +817,9 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
         auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
-        EXPECT_TRUE(t1 > 0);
-        EXPECT_TRUE(t2 > 0);
-        EXPECT_TRUE(t3 > 0);
+        EXPECT_TRUE(*t1 > 0);
+        EXPECT_FALSE(t2.has_value());
+        EXPECT_FALSE(t3.has_value());
 
         EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
     };

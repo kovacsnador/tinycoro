@@ -1,81 +1,82 @@
 #include <gtest/gtest.h>
 
-#include <tinycoro/LinkedPtrQueue.hpp>
+#include <tinycoro/LinkedPtrStack.hpp>
 
 #include "ListCommonUtils.hpp"
 
 // Mock Node class
-struct MockNodeQ {
-    MockNodeQ* next = nullptr;
+struct MockNodeDS {
+    MockNodeDS* next = nullptr;
+    MockNodeDS* prev = nullptr;
 };
 
-class LinkedPtrQueueTest : public ::testing::Test {
+class DoubleLinkedPtrStackTest : public ::testing::Test {
 protected:
-    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack;
-    MockNodeQ node1, node2, node3;
+    tinycoro::detail::LinkedPtrStack<MockNodeDS> stack;
+    MockNodeDS node1, node2, node3;
 };
 
-TEST_F(LinkedPtrQueueTest, typeTest) 
+TEST_F(DoubleLinkedPtrStackTest, typeTest) 
 {
     using NodeType = decltype(stack)::value_type;
-    using NodeTypePtr = tinycoro::detail::LinkedPtrQueue<MockNodeQ*>::value_type;
+    using NodeTypePtr = tinycoro::detail::LinkedPtrStack<MockNodeDS*>::value_type;
 
     EXPECT_TRUE((std::same_as<NodeType, NodeTypePtr>));
 }
 
 // Test: Initially, the stack should be empty
-TEST_F(LinkedPtrQueueTest, StackIsInitiallyEmpty) {
+TEST_F(DoubleLinkedPtrStackTest, StackIsInitiallyEmpty) {
     EXPECT_TRUE(stack.empty());
-    EXPECT_EQ(stack.begin(), nullptr);
+    EXPECT_EQ(stack.top(), nullptr);
 }
 
 // Test: After pushing one node, the stack should not be empty
-TEST_F(LinkedPtrQueueTest, PushOneNode) {
+TEST_F(DoubleLinkedPtrStackTest, PushOneNode) {
     stack.push(&node1);
     EXPECT_FALSE(stack.empty());
-    EXPECT_EQ(stack.begin(), &node1);
+    EXPECT_EQ(stack.top(), &node1);
 }
 
-// Test: After pushing two nodes, begin should be the most recently pushed node
-TEST_F(LinkedPtrQueueTest, PushTwoNodes) {
+// Test: After pushing two nodes, top should be the most recently pushed node
+TEST_F(DoubleLinkedPtrStackTest, PushTwoNodes) {
     stack.push(&node1);
     stack.push(&node2);
-    EXPECT_EQ(stack.begin(), &node1);
+    EXPECT_EQ(stack.top(), &node2);
 }
 
 // Test: Pop should return the last pushed node and remove it from the stack
-TEST_F(LinkedPtrQueueTest, PopRemovesTopNode) {
+TEST_F(DoubleLinkedPtrStackTest, PopRemovesTopNode) {
     stack.push(&node1);
     stack.push(&node2);
-    MockNodeQ* poppedNode = stack.pop();
+    MockNodeDS* poppedNode = stack.pop();
     
-    EXPECT_EQ(poppedNode, &node1);
-    EXPECT_EQ(stack.begin(), &node2);
+    EXPECT_EQ(poppedNode, &node2);
+    EXPECT_EQ(stack.top(), &node1);
 }
 
 // Test: Pop should return nullptr when the stack is empty
-TEST_F(LinkedPtrQueueTest, PopFromEmptyStackReturnsNull) {
+TEST_F(DoubleLinkedPtrStackTest, PopFromEmptyStackReturnsNull) {
     EXPECT_EQ(stack.pop(), nullptr);
 }
 
 // Test: Popping all nodes should make the stack empty again
-TEST_F(LinkedPtrQueueTest, PopAllNodesMakesStackEmpty) {
+TEST_F(DoubleLinkedPtrStackTest, PopAllNodesMakesStackEmpty) {
     stack.push(&node1);
     stack.push(&node2);
     stack.push(&node3);
 
     EXPECT_FALSE(stack.empty());
     
-    EXPECT_EQ(&node1, stack.pop());
-    EXPECT_EQ(&node2, stack.pop());
     EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(&node2, stack.pop());
+    EXPECT_EQ(&node1, stack.pop());
 
     EXPECT_TRUE(stack.empty());
-    EXPECT_EQ(stack.begin(), nullptr);
+    EXPECT_EQ(stack.top(), nullptr);
 }
 
 // Test: Popping all nodes should make the stack empty again
-TEST_F(LinkedPtrQueueTest, Size) {
+TEST_F(DoubleLinkedPtrStackTest, Size) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
@@ -87,13 +88,13 @@ TEST_F(LinkedPtrQueueTest, Size) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
-    EXPECT_EQ(&node1, stack.pop());
+    EXPECT_EQ(&node3, stack.pop());
     EXPECT_EQ(stack.size(), 2);
 
     EXPECT_EQ(&node2, stack.pop());
     EXPECT_EQ(stack.size(), 1);
 
-    EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(&node1, stack.pop());
     EXPECT_EQ(stack.size(), 0);
 
     // call pop on empty stack
@@ -101,7 +102,7 @@ TEST_F(LinkedPtrQueueTest, Size) {
     EXPECT_EQ(stack.size(), 0);
 }
 
-TEST_F(LinkedPtrQueueTest, EraseFirst) {
+TEST_F(DoubleLinkedPtrStackTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
@@ -116,13 +117,17 @@ TEST_F(LinkedPtrQueueTest, EraseFirst) {
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 2);
 
-    auto top = stack.begin();
-    EXPECT_EQ(top, &node2);
-    EXPECT_EQ(top->next, &node3);
+    auto top = stack.steal();
+    EXPECT_EQ(top, &node3);
+    EXPECT_EQ(top->prev, nullptr);
+
+    EXPECT_EQ(top->next, &node2);
+    EXPECT_EQ(top->next->prev, &node3);
+
     EXPECT_EQ(top->next->next, nullptr);
 }
 
-TEST_F(LinkedPtrQueueTest, EraseMiddle) {
+TEST_F(DoubleLinkedPtrStackTest, EraseMiddle) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
@@ -138,12 +143,16 @@ TEST_F(LinkedPtrQueueTest, EraseMiddle) {
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
-    EXPECT_EQ(top, &node1);
-    EXPECT_EQ(top->next, &node3);
+    EXPECT_EQ(top, &node3);
+    EXPECT_EQ(top->prev, nullptr);
+
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->prev, &node3);
+
     EXPECT_EQ(top->next->next, nullptr);
 }
 
-TEST_F(LinkedPtrQueueTest, EraseLast) {
+TEST_F(DoubleLinkedPtrStackTest, EraseLast) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
@@ -159,12 +168,16 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
-    EXPECT_EQ(top, &node1);
-    EXPECT_EQ(top->next, &node2);
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->prev, nullptr);
+
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->prev, &node2);
+
     EXPECT_EQ(top->next->next, nullptr);
 }
 
-TEST_F(LinkedPtrQueueTest, EraseAll) {
+TEST_F(DoubleLinkedPtrStackTest, EraseAll) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
@@ -179,16 +192,21 @@ TEST_F(LinkedPtrQueueTest, EraseAll) {
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(stack.size(), 2);
 
-    auto top = stack.begin();
-    EXPECT_EQ(top, &node1);
-    EXPECT_EQ(top->next, &node2);
+    auto top = stack.top();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->prev, nullptr);
+    
+    EXPECT_EQ(top->next, &node1);
+    EXPECT_EQ(top->next->prev, &node2);
+
     EXPECT_EQ(top->next->next, nullptr);
 
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 1);
 
-    top = stack.begin();
+    top = stack.top();
     EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->prev, nullptr);
     EXPECT_EQ(top->next, nullptr);
 
     EXPECT_TRUE(stack.erase(&node2));
@@ -196,25 +214,26 @@ TEST_F(LinkedPtrQueueTest, EraseAll) {
 
     EXPECT_TRUE(stack.empty());
 
-    EXPECT_EQ(stack.begin(), nullptr);
+    EXPECT_EQ(stack.top(), nullptr);
 }
 
-struct LinkedPtrQueueFunctionalTest : testing::TestWithParam<size_t>
+struct DoubleLinkedPtrStackFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(LinkedPtrQueueFunctionalTest, LinkedPtrQueueFunctionalTest, testing::Values(1, 10, 100, 1000));
+INSTANTIATE_TEST_SUITE_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest, testing::Values(1, 10, 100, 1000));
 
-TEST_P(LinkedPtrQueueFunctionalTest, LinkedPtrQueueFunctionalTest_reverse_erase)
+TEST_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest_reverse_erase)
 {
     const auto count = GetParam();
 
-    tinycoro::test::ReverseCheck<MockNodeQ, tinycoro::detail::LinkedPtrQueue>(count);
+    tinycoro::test::ReverseCheck<MockNodeDS, tinycoro::detail::LinkedPtrStack>(count);
 }
 
-TEST_P(LinkedPtrQueueFunctionalTest, LinkedPtrQueueFunctionalTest_erase)
+TEST_P(DoubleLinkedPtrStackFunctionalTest, DoubleLinkedPtrStackFunctionalTest_erase)
 {
     const auto count = GetParam();
 
-    tinycoro::test::OrderCheck<MockNodeQ, tinycoro::detail::LinkedPtrQueue>(count);
+    tinycoro::test::OrderCheck<MockNodeDS, tinycoro::detail::LinkedPtrStack>(count);
+
 }

@@ -23,7 +23,9 @@ namespace tinycoro {
             // disable move and copy
             Mutex(Mutex&&) = delete;
 
-            [[nodiscard]] auto operator co_await() { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
+
+            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
             // Checks only if the mutex is free to take.
@@ -135,23 +137,23 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _mutex.Ready(); }
 
-            constexpr std::coroutine_handle<> await_suspend(auto parentCoro)
+            constexpr bool await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_mutex.TryAcquire(this))
                 {
                     // no suspend, we held the mutex
                     ResumeFromPause(parentCoro);
-                    return parentCoro;
+                    return false;
                 }
 
                 // suspend, need to wait for the mutex
-                return std::noop_coroutine();
+                return true;
             }
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_mutex}; }
 
-            void Notify() const { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 

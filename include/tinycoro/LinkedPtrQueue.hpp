@@ -5,7 +5,7 @@
 
 namespace tinycoro { namespace detail {
 
-    template<concepts::Linkable NodeT>
+    template <concepts::Linkable NodeT>
     struct LinkedPtrQueue
     {
         using value_type = std::remove_pointer_t<NodeT>;
@@ -17,9 +17,14 @@ namespace tinycoro { namespace detail {
 
             ++_size;
 
-            if(_last)
+            if (_last)
             {
                 _last->next = newNode;
+
+                if constexpr (concepts::DoubleLinkable<NodeT>)
+                {
+                    newNode->prev = _last;
+                }
             }
             else
             {
@@ -38,11 +43,17 @@ namespace tinycoro { namespace detail {
                 --_size;
                 _first = _first->next;
 
-                if(_first == nullptr)
+                if (_first == nullptr)
                 {
                     _last = nullptr;
                 }
-
+                else
+                {
+                    if constexpr (concepts::DoubleLinkable<NodeT>)
+                    {
+                        _first->prev = nullptr;
+                    }
+                }
             }
             return top;
         }
@@ -58,6 +69,90 @@ namespace tinycoro { namespace detail {
             _size = 0;
             _last = nullptr;
             return std::exchange(_first, nullptr);
+        }
+
+        bool erase(value_type* elem)
+        {
+            if constexpr (concepts::DoubleLinkable<NodeT>)
+            {
+                if (elem)
+                {
+                    // debug check if the elem is in list
+                    assert(detail::helper::Contains(_first, elem));
+
+                    if (elem == _first)
+                    {
+                        _first = _first->next;
+
+                        if (_first)
+                        {
+                            _first->prev = nullptr;
+                        }
+                        else
+                        {
+                            _last = nullptr;
+                        }
+                    }
+                    else
+                    {
+                        if (elem->prev)
+                            elem->prev->next = elem->next;
+
+                        if (elem->next)
+                            elem->next->prev = elem->prev;
+                    }
+
+                    elem->prev = nullptr;
+                    elem->next = nullptr;
+
+                    --_size;
+
+                    return true;
+                }
+            }
+            else
+            {
+                if (elem)
+                {
+                    if (_first == elem)
+                    {
+                        _first = elem->next;
+
+                        if (_last == elem)
+                        {
+                            // so we had only one element
+                            _last = _first;
+                        }
+
+                        --_size;
+                        return true;
+                    }
+
+                    auto current = _first;
+                    while (current && current->next)
+                    {
+                        if (current->next == elem)
+                        {
+                            // find the element
+                            // in the list
+                            current->next = elem->next;
+
+                            if (_last == elem)
+                            {
+                                // we have a new last element
+                                _last = current;
+                            }
+
+                            --_size;
+                            return true;
+                        }
+
+                        current = current->next;
+                    }
+                }
+            }
+
+            return false;
         }
 
     private:

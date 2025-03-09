@@ -60,7 +60,7 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
     std::set<size_t> set;
     for (auto it : results)
     {
-        auto [_, inserted] = set.insert(it);
+        auto [_, inserted] = set.insert(*it);
         EXPECT_TRUE(inserted);
     }
 

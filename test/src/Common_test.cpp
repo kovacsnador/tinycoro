@@ -9,6 +9,7 @@
 #include <tuple>
 
 #include <tinycoro/Common.hpp>
+#include <tinycoro/LinkedPtrStack.hpp>
 
 template<typename T>
 struct Concepts_IterableTest : public testing::Test
@@ -130,4 +131,43 @@ TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_customConstructor)
     event.Set();
 
     EXPECT_TRUE(event.IsSet());
+}
+
+TEST(Helper_ContainsTest, Helper_ContainsTest)
+{
+    struct Node
+    {
+        Node* next{nullptr};
+    };
+
+    Node n1{};
+    Node n2{};
+    Node n3{};
+    Node n4{};
+
+    Node n5{};
+
+
+    tinycoro::detail::LinkedPtrStack<Node> list;
+
+    list.push(&n1);
+    list.push(&n2);
+    list.push(&n3);
+    list.push(&n4);
+
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n1));
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n2));
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n3));
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n4));
+
+    EXPECT_FALSE(tinycoro::detail::helper::Contains(list.top(), &n5));
+
+    list.erase(&n2);
+
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n1));
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n3));
+    EXPECT_TRUE(tinycoro::detail::helper::Contains(list.top(), &n4));
+
+    EXPECT_FALSE(tinycoro::detail::helper::Contains(list.top(), &n5));
+    EXPECT_FALSE(tinycoro::detail::helper::Contains(list.top(), &n2));
 }

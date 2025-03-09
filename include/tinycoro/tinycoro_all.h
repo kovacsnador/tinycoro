@@ -27,5 +27,6 @@
 #include "BoundTask.hpp"
 #include "UnbufferedChannel.hpp"
 #include "SoftClock.hpp"
+#include "Cancellable.hpp"
 
 #endif //!__TINY_CORO_TINY_CORO_ALL_H__
