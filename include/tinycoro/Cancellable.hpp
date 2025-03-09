@@ -21,10 +21,9 @@ namespace tinycoro {
         using StorageT       = detail::StaticStorage<stopCallback_t, sizeof(stopCallback_t), stopCallback_t>;
 
     public:
-
         // accepts only r-value refs
         Cancellable(AwaiterT&& awaiter)
-        : _awaiter{std::move(awaiter)}
+        : _awaiter{awaiter}
         {
         }
 
@@ -81,8 +80,8 @@ namespace tinycoro {
         }
 
     private:
-        AwaiterT&& _awaiter;
-        StorageT   _stopCallback;
+        AwaiterT& _awaiter;
+        StorageT  _stopCallback;
     };
 
 } // namespace tinycoro
