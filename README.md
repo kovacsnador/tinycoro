@@ -273,13 +273,15 @@ This example demonstrates how to create a basic coroutine task that returns void
 
 The `Enqueue` function in the `tinycoro::Scheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
 
+If your coroutine has return value, `GetAll(...)` function will return `std::optional<>` object(s), to support possible task cancellation. If the task got cancelled, the returning `optional` will be empty.
+
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
 void Example_voidTask()
 {
     // create a scheduler
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler;
 
     auto task = []() -> tinycoro::Task<void> {
         co_return;
@@ -571,6 +573,8 @@ void Example_generator()
 
 ### `MultiTasks`
 The tinycoro library allows you to enqueue multiple coroutine tasks simultaneously and manage their completion efficiently. The `GetAll` functionality can be used to wait for all enqueued tasks to finish.
+
+in this example `GetAll` returns a `std::tuple<>` which contains `std::optional` objects.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
