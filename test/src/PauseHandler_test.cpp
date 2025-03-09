@@ -116,6 +116,12 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 
     pauseHandler.SetCancellable(true);
     EXPECT_TRUE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(false);
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(true);
+    EXPECT_TRUE(pauseHandler.IsCancellable());
 }
 
 struct Context_PauseHandlerMock

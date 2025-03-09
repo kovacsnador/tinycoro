@@ -47,7 +47,7 @@ namespace tinycoro {
             {
                 _notifyCallback = std::forward<T>(cb);
             }
-        }; 
+        };
     } // namespace detail
 
     class PauseHandler
@@ -61,10 +61,7 @@ namespace tinycoro {
         {
         }
 
-        void Resume()
-        {
-            _state.store(0u, std::memory_order::relaxed);
-        }
+        void Resume() { _state.store(0u, std::memory_order::relaxed); }
 
         [[nodiscard]] auto Pause()
         {
@@ -83,17 +80,15 @@ namespace tinycoro {
         {
             assert(IsCancellable() != flag);
 
-            if(flag)
+            if (flag)
                 _state.fetch_or(c_cancelMask, std::memory_order::relaxed);
             else
                 _state.fetch_and(~c_cancelMask, std::memory_order::relaxed);
         }
 
-        [[nodiscard]] bool IsPaused() const noexcept {
-            return _state & c_pauseMask; }
+        [[nodiscard]] bool IsPaused() const noexcept { return _state & c_pauseMask; }
 
-        [[nodiscard]] bool IsCancellable() const noexcept {
-            return _state & c_cancelMask; }
+        [[nodiscard]] bool IsCancellable() const noexcept { return _state & c_cancelMask; }
 
     private:
         PauseHandlerCallbackT _resumerCallback;
