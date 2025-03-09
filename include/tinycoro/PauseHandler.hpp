@@ -47,12 +47,15 @@ namespace tinycoro {
             {
                 _notifyCallback = std::forward<T>(cb);
             }
-        };
-        
+        }; 
     } // namespace detail
 
-    struct PauseHandler
+    class PauseHandler
     {
+        static constexpr uint8_t c_pauseMask{0x01};
+        static constexpr uint8_t c_cancelMask{0x02};
+
+    public:
         PauseHandler(concepts::PauseHandlerCb auto pr)
         : _resumerCallback{pr}
         {
@@ -60,41 +63,42 @@ namespace tinycoro {
 
         void Resume()
         {
-            _cancellable.store(false, std::memory_order::relaxed);
-            _pause.store(false, std::memory_order::relaxed);
+            _state.store(0u, std::memory_order::relaxed);
         }
 
         [[nodiscard]] auto Pause()
         {
-            assert(_pause.load() == false);
-
-            _pause.store(true, std::memory_order::relaxed);
+            assert(IsPaused() == false);
+            _state.fetch_or(c_pauseMask, std::memory_order::relaxed);
             return _resumerCallback;
         }
 
         void Unpause()
         {
-            assert(_pause.load() == true);
-
-            _pause.store(false, std::memory_order::relaxed);
+            assert(IsPaused());
+            _state.fetch_and(~c_pauseMask, std::memory_order::relaxed);
         }
 
         void SetCancellable(bool flag)
         {
-            assert(_cancellable.load() == !flag);
+            assert(IsCancellable() != flag);
 
-            _cancellable.store(flag, std::memory_order::relaxed);
+            if(flag)
+                _state.fetch_or(c_cancelMask, std::memory_order::relaxed);
+            else
+                _state.fetch_and(~c_cancelMask, std::memory_order::relaxed);
         }
 
-        [[nodiscard]] bool IsPaused() const noexcept { return _pause.load(std::memory_order::relaxed); }
+        [[nodiscard]] bool IsPaused() const noexcept {
+            return _state & c_pauseMask; }
 
-        [[nodiscard]] bool IsCancellable() const noexcept { return _cancellable.load(std::memory_order::relaxed); }
+        [[nodiscard]] bool IsCancellable() const noexcept {
+            return _state & c_cancelMask; }
 
     private:
         PauseHandlerCallbackT _resumerCallback;
 
-        std::atomic<bool>     _pause{false};
-        std::atomic<bool>     _cancellable{false};
+        std::atomic<uint8_t> _state{};
     };
 
     namespace context {
