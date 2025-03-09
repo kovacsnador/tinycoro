@@ -1,4 +1,4 @@
-/*#include <gtest/gtest.h>
+#include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
 #include <future>
@@ -7,6 +7,8 @@
 
 #include <tinycoro/Future.hpp>
 #include <tinycoro/Wait.hpp>
+
+#include "tinycoro/tinycoro_all.h"
 
 template <typename T>
 class TD;
@@ -17,7 +19,13 @@ struct GetAllTest : testing::Test
     using value_type = T;
 };
 
-using GetAllTestTypes = testing::Types<std::promise<std::optional<int32_t>>, tinycoro::FutureState<std::optional<int32_t>>, std::promise<void>, tinycoro::FutureState<void>>;
+template <typename t>
+class TD;
+
+using GetAllTestTypes = testing::Types<std::promise<std::optional<int32_t>>,
+                                       tinycoro::FutureState<std::optional<int32_t>>,
+                                       std::promise<std::optional<tinycoro::VoidType>>,
+                                       tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(GetAllTest, GetAllTestTypes);
 
@@ -37,7 +45,7 @@ TYPED_TEST(GetAllTest, GetAllTest_one_Future)
     }
     else
     {
-        promise.set_value();
+        promise.set_value(tinycoro::VoidType{});
         EXPECT_NO_THROW(tinycoro::GetAll(future));
     }
 }
@@ -79,17 +87,17 @@ TYPED_TEST(GetAllTest, GetAllTest_tuple)
         p2.set_value(41);
         p3.set_value(42);
 
-        auto results = tinycoro::GetAll(tuple);
+        auto [r1, r2, r3] = tinycoro::GetAll(tuple);
 
-        EXPECT_EQ(std::get<0>(results), 40);
-        EXPECT_EQ(std::get<1>(results), 41);
-        EXPECT_EQ(std::get<2>(results), 42);
+        EXPECT_EQ(*r1, 40);
+        EXPECT_EQ(*r2, 41);
+        EXPECT_EQ(*r3, 42);
     }
     else
     {
-        p1.set_value();
-        p2.set_value();
-        p3.set_value();
+        p1.set_value(tinycoro::VoidType{});
+        p2.set_value(tinycoro::VoidType{});
+        p3.set_value(tinycoro::VoidType{});
 
         EXPECT_NO_THROW(tinycoro::GetAll(tuple));
     }
@@ -118,8 +126,8 @@ TYPED_TEST(GetAllTest, GetAllTest_tuple_exception)
     else
     {
         p1.set_exception(std::make_exception_ptr(std::runtime_error{"error"}));
-        p2.set_value();
-        p3.set_value();
+        p2.set_value(tinycoro::VoidType{});
+        p3.set_value(tinycoro::VoidType{});
 
         EXPECT_THROW(tinycoro::GetAll(tuple), std::runtime_error);
     }
@@ -151,8 +159,8 @@ TYPED_TEST(GetAllTest, GetAllTest_vector_exception)
     else
     {
         p1.set_exception(std::make_exception_ptr(std::runtime_error{"error"}));
-        p2.set_value();
-        p3.set_value();
+        p2.set_value(tinycoro::VoidType{});
+        p3.set_value(tinycoro::VoidType{});
 
         EXPECT_THROW(tinycoro::GetAll(tasks), std::runtime_error);
     }
@@ -160,9 +168,9 @@ TYPED_TEST(GetAllTest, GetAllTest_vector_exception)
 
 TEST(GetAllTest, GetAllTest_mixedValues_exception)
 {
-    std::promise<void> p1;
-    std::promise<int32_t> p2;
-    std::promise<bool> p3;
+    std::promise<std::optional<tinycoro::VoidType>> p1;
+    std::promise<std::optional<int32_t>> p2;
+    std::promise<std::optional<bool>> p3;
 
     auto tuple = std::make_tuple(p1.get_future(), p2.get_future(), p3.get_future());
 
@@ -180,7 +188,7 @@ struct GetAllTestWithTupleMixed : testing::Test
     using value_type = T;
 };
 
-using GetAllTestWithTupleMixedTypes = testing::Types<std::promise<int32_t>, std::promise<void>>;
+using GetAllTestWithTupleMixedTypes = testing::Types<std::promise<std::optional<int32_t>>, std::promise<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(GetAllTestWithTupleMixed, GetAllTestWithTupleMixedTypes);
 
@@ -190,7 +198,7 @@ struct GetAllTestWithTupleMixedFutureState : testing::Test
     using value_type = T;
 };
 
-using GetAllTestWithTupleMixedFutureStateTypes = testing::Types<tinycoro::FutureState<int32_t>, tinycoro::FutureState<void>>;
+using GetAllTestWithTupleMixedFutureStateTypes = testing::Types<tinycoro::FutureState<std::optional<int32_t>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(GetAllTestWithTupleMixedFutureState, GetAllTestWithTupleMixedFutureStateTypes);
 
@@ -223,9 +231,9 @@ void GetAllTestWithTupleMixedTestHelper()
     }
     else
     {
-        p1.set_value();
-        p2.set_value();
-        p3.set_value();
+        p1.set_value(tinycoro::VoidType{});
+        p2.set_value(tinycoro::VoidType{});
+        p3.set_value(tinycoro::VoidType{});
     }
 
     p4.set_value(S{true, 42});
@@ -241,9 +249,9 @@ void GetAllTestWithTupleMixedTestHelper()
     }
     else
     {
-        EXPECT_TRUE((std::same_as<tinycoro::VoidType, std::decay_t<decltype(std::get<0>(results))>>));
-        EXPECT_TRUE((std::same_as<tinycoro::VoidType, std::decay_t<decltype(std::get<1>(results))>>));
-        EXPECT_TRUE((std::same_as<tinycoro::VoidType, std::decay_t<decltype(std::get<2>(results))>>));
+        EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, std::decay_t<decltype(std::get<0>(results))>>));
+        EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, std::decay_t<decltype(std::get<1>(results))>>));
+        EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, std::decay_t<decltype(std::get<2>(results))>>));
     }
 
     EXPECT_EQ(std::get<3>(results).b, true);
@@ -280,7 +288,7 @@ struct AnyOfWithStopSourceTest : testing::Test
 };
 
 using AnyOfWithStopSourceTypes
-    = testing::Types<std::promise<int32_t>, std::promise<void>, tinycoro::FutureState<int32_t>, tinycoro::FutureState<void>>;
+    = testing::Types<std::promise<std::optional<int32_t>>, std::promise<std::optional<tinycoro::VoidType>>, tinycoro::FutureState<std::optional<int32_t>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(AnyOfWithStopSourceTest, GetAllTestWithTupleMixedTypes);
 
@@ -296,11 +304,11 @@ TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
         PromiseT p2;
         PromiseT p3;
 
-        if constexpr (std::same_as<void, ValueT>)
+        if constexpr (std::same_as<std::optional<tinycoro::VoidType>, ValueT>)
         {
-            p1.set_value();
-            p2.set_value();
-            p3.set_value();
+            p1.set_value(tinycoro::VoidType{});
+            p2.set_value(tinycoro::VoidType{});
+            p3.set_value(tinycoro::VoidType{});
         }
         else
         {
@@ -333,7 +341,7 @@ TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
 TEST(AnyOfTest, AnyOfWithStopSourceTest_exception)
 {
     auto cb = [] {
-        std::promise<void> promise;
+        std::promise<std::optional<tinycoro::VoidType>> promise;
         promise.set_exception(std::make_exception_ptr(std::runtime_error{"Error"}));
         return std::make_tuple(promise.get_future());
     };
@@ -386,8 +394,8 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
         std::promise<std::optional<int32_t>> p2;
         p2.set_value(43);
 
-        std::promise<void> p3;
-        p3.set_value();
+        std::promise<std::optional<tinycoro::VoidType>> p3;
+        p3.set_value(tinycoro::VoidType{});
 
         return std::make_tuple(p1.get_future(), p2.get_future(), p3.get_future());
     };
@@ -398,10 +406,10 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
 
     auto results = tinycoro::AnyOf(scheduler);
 
-    EXPECT_TRUE((std::same_as<int32_t, std::tuple_element_t<0, decltype(results)>>));
-    EXPECT_TRUE((std::same_as<int32_t, std::tuple_element_t<1, decltype(results)>>));
-    EXPECT_TRUE((std::same_as<tinycoro::VoidType, std::tuple_element_t<2, decltype(results)>>));
+    EXPECT_TRUE((std::same_as<std::optional<int32_t>, std::tuple_element_t<0, decltype(results)>>));
+    EXPECT_TRUE((std::same_as<std::optional<int32_t>, std::tuple_element_t<1, decltype(results)>>));
+    EXPECT_TRUE((std::same_as<std::optional<tinycoro::VoidType>, std::tuple_element_t<2, decltype(results)>>));
 
-    EXPECT_EQ(std::get<0>(results), 42);
-    EXPECT_EQ(std::get<1>(results), 43);
-}*/
+    EXPECT_EQ(std::get<0>(results).value(), 42);
+    EXPECT_EQ(std::get<1>(results).value(), 43);
+}
