@@ -166,8 +166,12 @@ TEST(IntrusivePtrTest, IntrusivePtrTest_const)
     
     const type& c_obj = obj;
 
+    auto obj2{obj};
+    const type& c_obj2 = obj2;
+
     EXPECT_EQ(c_obj.get()->str, std::string{"123"});
     EXPECT_EQ(c_obj->str, std::string{"123"});
+    EXPECT_EQ(c_obj2->str, std::string{"123"});
 }
 
 TEST(IntrusivePtrTest, IntrusivePtrTest_async)
