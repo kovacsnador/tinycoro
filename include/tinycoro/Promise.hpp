@@ -5,8 +5,9 @@
 #include <concepts>
 #include <stop_token>
 
-#include "tinycoro/PauseHandler.hpp"
+#include "PauseHandler.hpp"
 #include "PackedCoroHandle.hpp"
+#include "IntrusivePtr.hpp"
 
 namespace tinycoro {
 
@@ -103,7 +104,7 @@ namespace tinycoro {
         NodeT child;
         NodeT parent;
 
-        std::shared_ptr<PauseHandlerT> pauseHandler;
+        detail::IntrusivePtr<PauseHandlerT> pauseHandler;
 
         StopSourceT stopSource;
 
@@ -116,7 +117,7 @@ namespace tinycoro {
         template<typename... Args>
         auto MakePauseHandler(Args&&... args)
         {
-            pauseHandler = std::make_shared<PauseHandlerT>(std::forward<Args>(args)...);
+            pauseHandler.emplace(std::forward<Args>(args)...);
             return pauseHandler.get();
         }
     };

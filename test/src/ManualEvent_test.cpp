@@ -77,9 +77,8 @@ TEST(ManualEventTest, ManualEventTest_await_suspend)
 
     auto awaiter = event.operator co_await();
 
-    bool                                                         pauseResumerCalled = false;
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    bool pauseResumerCalled = false;
+    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
 
     event.Set();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
@@ -93,9 +92,8 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_singleConsumer)
 
     EXPECT_FALSE(awaiter1.await_ready());
 
-    bool                                                         pauseResumerCalled = false;
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    bool pauseResumerCalled = false;
+    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
 
     EXPECT_TRUE(awaiter1.await_suspend(hdl));
     EXPECT_FALSE(pauseResumerCalled);
@@ -123,9 +121,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_multiConsumer)
     auto   pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
 
     auto makeHdl = [&]() {
-        tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>(pauseResumerCallback);
-        return hdl;
+        return tinycoro::test::MakeCoroutineHdl(pauseResumerCallback);
     };
 
     EXPECT_TRUE(awaiter1.await_suspend(makeHdl()));

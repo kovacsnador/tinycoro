@@ -94,7 +94,7 @@ struct SyncAwaiterTest : testing::Test
 {
     void SetUp() override
     {
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([this] { resumerCalled = true; });
+        hdl.promise().pauseHandler.emplace([this] { resumerCalled = true; });
     }
 
 protected:

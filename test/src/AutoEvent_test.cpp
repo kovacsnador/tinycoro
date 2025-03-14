@@ -71,9 +71,8 @@ TEST(AutoEventTest, AutoEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
 
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -97,9 +96,8 @@ TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
 
     event.Set();
 
-    bool                                                            pauseCalled = false;
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
-    hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([&pauseCalled]() { pauseCalled = true; });
+    bool pauseCalled = false;
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 

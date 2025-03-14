@@ -17,7 +17,7 @@ struct AsyncCallbackAwaiterTest : public testing::Test
 
     AsyncCallbackAwaiterTest()
     {
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([this]() { pauseHandlerCalled = true; });
+        hdl.promise().pauseHandler.emplace([this]() { pauseHandlerCalled = true; });
     }
 
     bool pauseHandlerCalled{false};
