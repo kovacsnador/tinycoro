@@ -204,7 +204,7 @@ namespace tinycoro {
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
 
-        [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
+        [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
 
         [[nodiscard]] auto TaskView() const noexcept { return CoroTaskView<promise_type, awaiter_type, CoroResumerT>{_hdl, _source}; }
 

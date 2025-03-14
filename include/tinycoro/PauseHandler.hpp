@@ -8,6 +8,7 @@
 #include <atomic>
 
 #include "Common.hpp"
+#include "IntrusiveObject.hpp"
 
 namespace tinycoro {
 
@@ -50,7 +51,7 @@ namespace tinycoro {
         };
     } // namespace detail
 
-    class PauseHandler
+    class PauseHandler : public detail::IntrusiveObject<PauseHandler>
     {
         static constexpr uint8_t c_pauseMask{0x01};
         static constexpr uint8_t c_cancelMask{0x02};

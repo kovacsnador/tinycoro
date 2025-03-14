@@ -37,7 +37,7 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl(std::regular_invocable auto pauseResumerCallback)
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>(pauseResumerCallback);
+        hdl.promise().pauseHandler.emplace(pauseResumerCallback);
         return hdl;
     }
 
@@ -45,7 +45,7 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([]{});
+        hdl.promise().pauseHandler.emplace([]{});
         return hdl;
     }
 

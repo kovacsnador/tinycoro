@@ -31,7 +31,7 @@ struct SemaphoreAwaiterTest : public testing::Test
 
     void SetUp() override
     {
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([]() { /* resumer callback */ });
+        hdl.promise().pauseHandler.emplace([]() { /* resumer callback */ });
     }
 
     SemaphoreMock<value_type>                                          mock;
@@ -101,7 +101,7 @@ struct SemaphoreTest : public testing::TestWithParam<size_t>
 
     void SetUp() override
     {
-        hdl.promise().pauseHandler = std::make_shared<tinycoro::PauseHandler>([]() { /* resumer callback */ });
+        hdl.promise().pauseHandler.emplace([]() { /* resumer callback */ });
     }
 
     corohandle_type hdl;
