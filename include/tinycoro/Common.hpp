@@ -65,7 +65,45 @@ namespace tinycoro {
 
     } // namespace detail
 
+    struct VoidType
+    {
+    };
+
+    // this is the unique address type of
+    // an std::coroutine_handler::address
+    using address_t = void*;
+
+    // The pause handler callback signature
+    // used mainly by the scheduler
+    using PauseHandlerCallbackT = std::function<void()>;
+
+    enum class ETaskResumeState
+    {
+        SUSPENDED,
+        PAUSED,
+        STOPPED,
+        DONE
+    };
+
     namespace concepts {
+
+        template<typename T>
+        concept IsSchedulable =  requires (T t) {
+            { t->Resume() } -> std::same_as<void>;
+            { t->ResumeState() } -> std::same_as<ETaskResumeState>;
+            { t->SetPauseHandler([]{}) } -> std::same_as<void>;
+            typename T::element_type;
+        };
+
+        template <typename T>
+        concept IsCorouitneTask = std::move_constructible<T> && requires (T c) {
+            { c.Resume() } -> std::same_as<void>;
+            { c.IsDone() } -> std::same_as<bool>;
+            { c.await_resume() };
+            { c.ResumeState() } -> std::same_as<ETaskResumeState>;
+            { c.SetPauseHandler([] {})};
+            typename T::promise_type::value_type;
+        };
 
         template <typename T>
         concept Iterable = requires (T) {
@@ -106,26 +144,6 @@ namespace tinycoro {
         };
 
     } // namespace concepts
-
-    struct VoidType
-    {
-    };
-
-    // this is the unique address type of
-    // an std::coroutine_handler::address
-    using address_t = void*;
-
-    // The pause handler callback signature
-    // used mainly by the scheduler
-    using PauseHandlerCallbackT = std::function<void()>;
-
-    enum class ETaskResumeState
-    {
-        SUSPENDED,
-        PAUSED,
-        STOPPED,
-        DONE
-    };
 
     namespace detail {
 
