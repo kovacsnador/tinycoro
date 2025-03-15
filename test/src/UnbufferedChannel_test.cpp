@@ -270,7 +270,10 @@ TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple)
         EXPECT_EQ(status, tinycoro::EChannelOpStatus::SUCCESS);
     };
 
-    tinycoro::GetAll(scheduler, consumer(), producer());
+    for(size_t i = 0; i < 1000; ++i)
+    {
+        tinycoro::GetAll(scheduler, consumer(), producer());
+    }
 }
 
 TEST(UnbufferedChannelTest, UnbufferedChannelFunctionalTest_simple_push)

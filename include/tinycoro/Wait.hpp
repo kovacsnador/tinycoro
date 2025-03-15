@@ -8,8 +8,12 @@
 #include <type_traits>
 #include <concepts>
 #include <stop_token>
+#include <memory_resource>
+#include <array>
 
 #include "Common.hpp"
+#include "PackagedTask.hpp"
+#include "Task.hpp"
 
 namespace tinycoro {
 
@@ -31,6 +35,18 @@ namespace tinycoro {
 
     namespace detail {
         using FutureVoid_t = std::optional<VoidType>;
+
+        struct Placeholder
+        {
+            int32_t p;
+        };
+
+        using averageTask_t = detail::SchedulableBridgeImpl<tinycoro::Task<int32_t>, std::promise<int32_t>, std::pmr::polymorphic_allocator<>>;
+
+        // This is the task size.
+        // should be the same for everyone
+        constexpr size_t c_taskSize = sizeof(averageTask_t);
+
     } // namespace detail
 
     template <template <typename> class FutureT, typename... Ts>
@@ -187,13 +203,31 @@ namespace tinycoro {
         return GetAll(tuple);
     }
 
-    template <typename SchedulerT, typename... Args>
+    template <typename SchedulerT, concepts::IsCorouitneTask... Args>
         requires requires (SchedulerT s, Args... a) {
             { s.Enqueue(std::forward<Args>(a)...) };
         }
     [[nodiscard]] auto GetAll(SchedulerT& scheduler, Args&&... args)
     {
-        auto future = scheduler.Enqueue(std::forward<Args>(args)...);
+        /*constexpr size_t size = sizeof(detail::averageTask_t);
+        constexpr size_t count = sizeof...(args);
+
+        alignas(detail::averageTask_t) std::array<std::byte, sizeof(detail::averageTask_t) * (sizeof...(args) + 1)> buffer;
+        std::pmr::monotonic_buffer_resource mbf{buffer.data(), buffer.size()};
+        std::pmr::polymorphic_allocator<> allocator{&mbf};*/
+
+        auto future = scheduler.Enqueue(/*&allocator,*/ std::forward<Args>(args)...);
+        return GetAll(future);
+    }
+
+    template <typename SchedulerT, concepts::Iterable CoroContainerT>
+    [[nodiscard]] auto GetAll(SchedulerT& scheduler, CoroContainerT&& container)
+    {
+        /*alignas(averageTask_t) std::array<std::byte, sizeof(averageTask_t) * sizeof...(args)> buffer;
+        std::pmr::monotonic_buffer_resource mbf{buffer.data(), buffer.size()};
+        std::pmr::polymorphic_allocator<> allocator{&mbf};*/
+
+        auto future = scheduler.Enqueue(std::forward<CoroContainerT>(container));
         return GetAll(future);
     }
 

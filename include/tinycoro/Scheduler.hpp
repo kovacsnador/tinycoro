@@ -10,6 +10,7 @@
 #include <concepts>
 #include <assert.h>
 #include <ranges>
+#include <memory_resource>
 
 #include "Future.hpp"
 #include "Common.hpp"
@@ -22,16 +23,26 @@ using namespace std::chrono_literals;
 
 namespace tinycoro {
 
-    template <std::move_constructible TaskT>
-        requires requires (TaskT t) {
-            { t->Resume() } -> std::same_as<void>;
-            { t->ResumeState() } -> std::same_as<ETaskResumeState>;
-            { t->SetPauseHandler([]{}) } -> std::same_as<void>;
-        }
+    template <concepts::IsSchedulable TaskT, typename AllocatorT>
     class CoroThreadPool
     {
     public:
-        CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency()) { _AddWorkers(workerThreadCount); }
+        CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
+        { 
+            _AddWorkers(workerThreadCount);
+        }
+
+        CoroThreadPool(std::shared_ptr<AllocatorT> allocator)
+        : _defaultAllocator{std::move(allocator)}
+        { 
+            _AddWorkers(std::thread::hardware_concurrency());
+        }
+
+        CoroThreadPool(size_t workerThreadCount, std::shared_ptr<AllocatorT> allocator)
+        : _defaultAllocator{std::move(allocator)}
+        { 
+            _AddWorkers(workerThreadCount);
+        }
 
         ~CoroThreadPool()
         {
@@ -68,23 +79,37 @@ namespace tinycoro {
         auto GetStopToken() const noexcept { return _stopSource.get_token(); }
         auto GetStopSource() const noexcept { return _stopSource; }
 
-        template <template <typename> class FutureStateT = std::promise, concepts::NonIterable... CoroTasksT>
+        template <template <typename> class FutureStateT = std::promise, concepts::IsCorouitneTask... CoroTasksT>
             requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
         [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
         {
+            return Enqueue(_defaultAllocator, std::forward<CoroTasksT>(tasks)...);
+        }
+
+        template <template <typename> class FutureStateT = std::promise, concepts::IsCorouitneTask... CoroTasksT>
+            requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
+        [[nodiscard]] auto Enqueue(std::shared_ptr<AllocatorT>& customAllocator, CoroTasksT&&... tasks)
+        {
             if constexpr (sizeof...(CoroTasksT) == 1)
             {
-                return EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks)...);
+                return EnqueueImpl<FutureStateT>(customAllocator, std::forward<CoroTasksT>(tasks)...);
             }
             else
             {
-                return std::tuple{EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...};
+                return std::tuple{EnqueueImpl<FutureStateT>(customAllocator, std::forward<CoroTasksT>(tasks))...};
             }
         }
 
         template <template <typename> class FutureStateT = std::promise, concepts::Iterable ContainerT>
             requires concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto Enqueue(ContainerT&& tasks)
+        {
+            return Enqueue(_defaultAllocator, std::forward<ContainerT>(tasks));
+        }
+
+        template <template <typename> class FutureStateT = std::promise, concepts::Iterable ContainerT>
+            requires concepts::FutureState<FutureStateT<void>>
+        [[nodiscard]] auto Enqueue(std::shared_ptr<AllocatorT>& customAllocator, ContainerT&& tasks)
         {
             // get the result value
             using desiredValue_t = typename std::decay_t<ContainerT>::value_type::promise_type::value_type;
@@ -103,11 +128,11 @@ namespace tinycoro {
             {
                 if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
                 {
-                    futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(customAllocator, std::move(task)));
                 }
                 else
                 {
-                    futures.emplace_back(EnqueueImpl<FutureStateT>(task.TaskView()));
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(customAllocator, task.TaskView()));
                 }
             }
 
@@ -120,9 +145,9 @@ namespace tinycoro {
                 typename CoroTaksT::promise_type::value_type;
                 { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             } &&  concepts::FutureState<FutureStateT<void>>
-        [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
+        [[nodiscard]] auto EnqueueImpl(std::shared_ptr<AllocatorT>& allocator, CoroTaksT&& coro)
         {
-            // get the result value
+            // get the desired return type from task
             using desiredValue_t = typename CoroTaksT::promise_type::value_type;
 
             // check against void
@@ -139,7 +164,7 @@ namespace tinycoro {
             {
                 // not allow to enqueue tasks with uninitialized std::coroutine_handler
                 // or if the a stop is requested
-                TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState));
+                TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState), allocator);
                 task->SetPauseHandler(GeneratePauseResume(task.get()));
 
                 {
@@ -321,11 +346,14 @@ namespace tinycoro {
             cleanupLinkedPtrColl(_tasks);
         }
 
+        // default polymorphic allocator
+        std::shared_ptr<AllocatorT> _defaultAllocator;
+
         // currently active/scheduled tasks
-        detail::LinkedPtrQueue<typename TaskT::pointer> _tasks;
+        detail::LinkedPtrQueue<typename TaskT::element_type> _tasks;
 
         // tasks which are in pause state
-        detail::LinkedPtrList<typename TaskT::pointer> _pausedTasks;
+        detail::LinkedPtrList<typename TaskT::element_type> _pausedTasks;
 
         // stop_source to support safe cancellation
         std::stop_source _stopSource;
@@ -344,7 +372,7 @@ namespace tinycoro {
         std::vector<std::jthread> _workerThreads;
     };
 
-    using Scheduler = CoroThreadPool<SchedulableTask>;
+    using Scheduler = CoroThreadPool<SchedulableTask, std::pmr::polymorphic_allocator<>>;
 
 } // namespace tinycoro
 

@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include <future>
+#include <memory_resource>
 
 #include <tinycoro/PackagedTask.hpp>
 #include <tinycoro/Future.hpp>
@@ -54,6 +55,8 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 
     using TaskValueT = typename GetType<ValueT>::value_type;
 
+    auto allocator = std::make_shared<std::shared_ptr<std::pmr::polymorphic_allocator<>>>();
+
     PromiseT promise;
     auto     future = promise.get_future();
     {
@@ -80,7 +83,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 
         EXPECT_CALL(*task.mock, IsDone).Times(::testing::AnyNumber());
 
-        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
+        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise), allocator);
 
         packedTask->Resume();
     }
@@ -115,6 +118,8 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
     using PromiseT = TestFixture::value_type;
     using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
 
+    auto allocator = std::make_shared<std::shared_ptr<std::pmr::polymorphic_allocator<>>>();
+
     PromiseT promise;
     auto     future = promise.get_future();
     {
@@ -125,7 +130,7 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 
         EXPECT_CALL(*task.mock, await_resume()).Times(0); // Return any value you'd expect
 
-        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
+        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise), allocator);
 
         packedTask->Resume();
     }

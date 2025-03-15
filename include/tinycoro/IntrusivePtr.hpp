@@ -88,7 +88,7 @@ namespace tinycoro
                 this->get()->AddRef();
             }
 
-            const T* operator->() const
+            const T* operator->() const noexcept
             {
                 if(std::holds_alternative<T>(_obj))
                 {
@@ -98,7 +98,7 @@ namespace tinycoro
                 return std::get<T*>(_obj);
             }
 
-            T* operator->()
+            T* operator->() noexcept
             {
                 if(std::holds_alternative<T>(_obj))
                 {
