@@ -216,6 +216,77 @@ TEST_F(DoubleLinkedPtrQueueTest, EraseAll) {
     EXPECT_EQ(stack.begin(), nullptr);
 }
 
+TEST_F(DoubleLinkedPtrQueueTest, Concat) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    MockNodeDQ node4, node5, node6;
+    tinycoro::detail::LinkedPtrQueue<MockNodeDQ> stack2;
+
+    stack2.push(&node4);
+    stack2.push(&node5);
+    stack2.push(&node6);
+
+    stack.concat(stack2);
+    EXPECT_EQ(stack.size(), 6);
+
+    EXPECT_EQ(node3.next, &node4);
+    EXPECT_EQ(node4.prev, &node3);
+
+    size_t count{};
+    auto it = stack.steal();
+    while (it != nullptr)
+    {
+        count++;
+        it = it->next;
+    }
+    EXPECT_EQ(count, 6);    
+}
+
+TEST_F(DoubleLinkedPtrQueueTest, Concat_empty) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    tinycoro::detail::LinkedPtrQueue<MockNodeDQ> stack2;
+
+    stack.concat(stack2);
+    EXPECT_EQ(stack.size(), 3);
+
+    size_t count{};
+    auto it = stack.steal();
+    while (it != nullptr)
+    {
+        count++;
+        it = it->next;
+    }
+    EXPECT_EQ(count, 3); 
+}
+
+TEST_F(DoubleLinkedPtrQueueTest, Concat_empty_2) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    tinycoro::detail::LinkedPtrQueue<MockNodeDQ> stack2;
+
+    stack2.push(&node1);
+    stack2.push(&node2);
+    stack2.push(&node3);
+
+    stack.concat(stack2);
+    EXPECT_EQ(stack.size(), 3);
+
+    auto it = stack.steal();
+    EXPECT_EQ(it, &node1);
+    EXPECT_EQ(it->next, &node2);
+    EXPECT_EQ(it->next->next, &node3);
+    EXPECT_EQ(it->next->next->next, nullptr);
+}
+
 struct DoubleLinkedPtrQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };

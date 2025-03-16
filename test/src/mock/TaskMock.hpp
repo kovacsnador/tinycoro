@@ -31,6 +31,7 @@ namespace tinycoro { namespace test {
     struct TaskMock
     {
         using promise_type = PromiseMock<T>;
+        using value_type = T;
 
         TaskMock()
         : mock{std::make_shared<TaskMockImpl<T>>()}

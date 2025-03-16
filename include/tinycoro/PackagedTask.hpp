@@ -12,16 +12,9 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-		concept FutureState = (requires(T f) { { f.set_value() }; } || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) && requires(T f) { f.set_exception(std::exception_ptr{}); };
-
-        template <typename T>
-        concept CoroTask = std::move_constructible<T> && requires (T c) {
-            { c.Resume() } -> std::same_as<void>;
-            { c.IsDone() } -> std::same_as<bool>;
-            { c.await_resume() };
-            { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            { c.SetPauseHandler([]{}) };
-        };
+		concept FutureState = ( requires(T f) { { f.set_value() }; } 
+                                || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) 
+                            && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
     } // namespace concepts
 
@@ -46,7 +39,7 @@ namespace tinycoro {
             ISchedulableBridged* next{nullptr};
         };
 
-        template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
+        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
         class SchedulableBridgeImpl : public ISchedulableBridged
         {
         public:
@@ -61,8 +54,8 @@ namespace tinycoro {
 
             ~SchedulableBridgeImpl()
             {
-                if(_exception)
-                {   
+                if (_exception)
+                {
                     // if we had an exception we just set it
                     _futureState.set_exception(_exception);
                 }
@@ -74,7 +67,9 @@ namespace tinycoro {
                     {
                         // are we on a last suspend point?
                         // That means we had no cancellation before
-                        if constexpr (requires { { _coro.await_resume() } -> std::same_as<void>; })
+                        if constexpr (requires {
+                                          { _coro.await_resume() } -> std::same_as<void>;
+                                      })
                         {
                             _futureState.set_value(VoidType{});
                         }
@@ -119,15 +114,15 @@ namespace tinycoro {
             void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { _coro.SetPauseHandler(std::move(cb)); }
 
         private:
-            CoroT        _coro;
-            FutureStateT _futureState;
+            CoroT              _coro;
+            FutureStateT       _futureState;
             std::exception_ptr _exception{};
         };
     } // namespace detail
 
     using SchedulableTask = std::unique_ptr<detail::ISchedulableBridged>;
 
-    template <concepts::CoroTask CoroT, concepts::FutureState FutureStateT>
+    template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
         requires (!std::is_reference_v<CoroT>)
     SchedulableTask MakeSchedulableTask(CoroT&& coro, FutureStateT futureState)
     {

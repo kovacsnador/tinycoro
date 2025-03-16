@@ -22,12 +22,7 @@ using namespace std::chrono_literals;
 
 namespace tinycoro {
 
-    template <std::move_constructible TaskT>
-        requires requires (TaskT t) {
-            { t->Resume() } -> std::same_as<void>;
-            { t->ResumeState() } -> std::same_as<ETaskResumeState>;
-            { t->SetPauseHandler([]{}) } -> std::same_as<void>;
-        }
+    template <concepts::IsSchedulable TaskT>
     class CoroThreadPool
     {
     public:
@@ -68,7 +63,7 @@ namespace tinycoro {
         auto GetStopToken() const noexcept { return _stopSource.get_token(); }
         auto GetStopSource() const noexcept { return _stopSource; }
 
-        template <template <typename> class FutureStateT = std::promise, concepts::NonIterable... CoroTasksT>
+        template <template <typename> class FutureStateT = std::promise, concepts::IsCorouitneTask... CoroTasksT>
             requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
         [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
         {
@@ -87,7 +82,7 @@ namespace tinycoro {
         [[nodiscard]] auto Enqueue(ContainerT&& tasks)
         {
             // get the result value
-            using desiredValue_t = typename std::decay_t<ContainerT>::value_type::promise_type::value_type;
+            using desiredValue_t = typename std::decay_t<ContainerT>::value_type::value_type;
 
             // check against void
             // if not void we create a std::optional
@@ -115,15 +110,15 @@ namespace tinycoro {
         }
 
     private:
-        template <template<typename> class FutureStateT, typename CoroTaksT>
+        template <template<typename> class FutureStateT, concepts::IsCorouitneTask CoroTaksT>
             requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
-                typename CoroTaksT::promise_type::value_type;
+                typename CoroTaksT::value_type;
                 { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             } &&  concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
         {
             // get the result value
-            using desiredValue_t = typename CoroTaksT::promise_type::value_type;
+            using desiredValue_t = typename CoroTaksT::value_type;
 
             // check against void
             // if not void we create a std::optional
@@ -322,10 +317,10 @@ namespace tinycoro {
         }
 
         // currently active/scheduled tasks
-        detail::LinkedPtrQueue<typename TaskT::pointer> _tasks;
+        detail::LinkedPtrQueue<typename TaskT::element_type> _tasks;
 
         // tasks which are in pause state
-        detail::LinkedPtrList<typename TaskT::pointer> _pausedTasks;
+        detail::LinkedPtrList<typename TaskT::element_type> _pausedTasks;
 
         // stop_source to support safe cancellation
         std::stop_source _stopSource;

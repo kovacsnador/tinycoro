@@ -44,8 +44,7 @@ namespace tinycoro {
 
             try
             {
-                // Check if this move here is needed
-                return std::move(f.get());
+                return f.get();
             }
             catch (...)
             {

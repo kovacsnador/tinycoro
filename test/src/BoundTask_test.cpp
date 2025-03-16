@@ -39,9 +39,17 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(void*, Address, (), (const noexcept));
 };
 
+template<typename T>
+struct PromiseTypeMock
+{
+    using value_type = T;
+};
+
+template<typename T>
 struct TaskWrapperMock
 {
-    using promise_type = void;
+    using promise_type = PromiseTypeMock<T>;
+    using value_type = T;
 
     auto await_ready() { return impl->await_ready(); }
 
@@ -62,16 +70,16 @@ struct TaskWrapperMock
 
     [[nodiscard]] auto TaskView() const noexcept { return impl->TaskView(); }
 
-    template <typename T>
-    void SetStopSource(T&& arg)
+    template <typename U>
+    void SetStopSource(U&& arg)
     {
-        impl->SetStopSource(std::forward<T>(arg));
+        impl->SetStopSource(std::forward<U>(arg));
     }
 
-    template <typename T>
-    void SetDestroyNotifier(T&& cb)
+    template <typename U>
+    void SetDestroyNotifier(U&& cb)
     {
-        impl->SetDestroyNotifier(std::forward<T>(cb));
+        impl->SetDestroyNotifier(std::forward<U>(cb));
     }
 
     [[nodiscard]] auto Address() const noexcept { return impl->Address(); }
@@ -81,7 +89,7 @@ struct TaskWrapperMock
 
 TEST(BoundTaskTest, BoundTaskTest_Resume)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<int32_t> mock;
 
     EXPECT_CALL(*mock.impl, Resume).Times(1);
 
@@ -91,7 +99,7 @@ TEST(BoundTaskTest, BoundTaskTest_Resume)
 
 TEST(BoundTaskTest, BoundTaskTest_ResumeState)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, ResumeState).Times(1).WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED));
 
@@ -103,7 +111,7 @@ TEST(BoundTaskTest, BoundTaskTest_ResumeState)
 
 TEST(BoundTaskTest, BoundTaskTest_GetPauseHandler)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, GetPauseHandler).Times(1);
 
@@ -114,7 +122,7 @@ TEST(BoundTaskTest, BoundTaskTest_GetPauseHandler)
 
 TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, SetPauseHandler).Times(1);
 
@@ -127,7 +135,7 @@ TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
 
 TEST(BoundTaskTest, BoundTaskTest_TaskView)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, TaskView).Times(1);
 
@@ -138,7 +146,7 @@ TEST(BoundTaskTest, BoundTaskTest_TaskView)
 
 TEST(BoundTaskTest, BoundTaskTest_SetStopSource)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, SetStopSource).Times(1);
 
@@ -148,7 +156,7 @@ TEST(BoundTaskTest, BoundTaskTest_SetStopSource)
 
 TEST(BoundTaskTest, BoundTaskTest_SetDestroyNotifier)
 {
-    TaskWrapperMock mock;
+    TaskWrapperMock<void> mock;
 
     EXPECT_CALL(*mock.impl, SetDestroyNotifier).Times(1);
 
