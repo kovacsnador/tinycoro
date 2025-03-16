@@ -34,6 +34,34 @@ namespace tinycoro { namespace detail {
             _last = newNode;
         }
 
+        void concat(LinkedPtrQueue& other)
+        {
+            if (_first == nullptr)
+            {
+                _first = other._first;
+                _last  = other._last;
+            }
+            else
+            {
+                if constexpr (concepts::DoubleLinkable<NodeT>)
+                {
+                    if (other._first)
+                        other._first->prev = _last;
+                }
+
+                if (_last)
+                    _last->next = other._first;
+
+                if (other._last)
+                    _last = other._last;
+            }
+
+            _size += other._size;
+
+            // reset the other queue
+            std::ignore = other.steal();
+        }
+
         // Pops and return the poped node.
         [[nodiscard]] value_type* pop() noexcept
         {

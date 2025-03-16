@@ -164,6 +164,55 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(top->next->next, nullptr);
 }
 
+TEST_F(LinkedPtrQueueTest, Concat) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    MockNodeQ node4, node5, node6;
+    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack2;
+
+    stack2.push(&node4);
+    stack2.push(&node5);
+    stack2.push(&node6);
+
+    stack.concat(stack2);
+    EXPECT_EQ(stack.size(), 6);
+
+    size_t count{};
+    auto it = stack.steal();
+    while (it != nullptr)
+    {
+        count++;
+        it = it->next;
+    }
+    EXPECT_EQ(count, 6);    
+}
+
+TEST_F(LinkedPtrQueueTest, Concat_empty) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack2;
+
+    stack.concat(stack2);
+    EXPECT_EQ(stack.size(), 3);
+
+    size_t count{};
+    auto it = stack.steal();
+    while (it != nullptr)
+    {
+        count++;
+        it = it->next;
+    }
+    EXPECT_EQ(count, 3); 
+}
+
 TEST_F(LinkedPtrQueueTest, EraseAll) {
     EXPECT_EQ(stack.size(), 0);
     
