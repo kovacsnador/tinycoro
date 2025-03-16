@@ -82,7 +82,7 @@ namespace tinycoro {
         [[nodiscard]] auto Enqueue(ContainerT&& tasks)
         {
             // get the result value
-            using desiredValue_t = typename std::decay_t<ContainerT>::value_type::promise_type::value_type;
+            using desiredValue_t = typename std::decay_t<ContainerT>::value_type::value_type;
 
             // check against void
             // if not void we create a std::optional
@@ -112,13 +112,13 @@ namespace tinycoro {
     private:
         template <template<typename> class FutureStateT, concepts::IsCorouitneTask CoroTaksT>
             requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
-                typename CoroTaksT::promise_type::value_type;
+                typename CoroTaksT::value_type;
                 { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             } &&  concepts::FutureState<FutureStateT<void>>
         [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
         {
             // get the result value
-            using desiredValue_t = typename CoroTaksT::promise_type::value_type;
+            using desiredValue_t = typename CoroTaksT::value_type;
 
             // check against void
             // if not void we create a std::optional

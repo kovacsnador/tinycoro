@@ -102,7 +102,7 @@ namespace tinycoro {
             { c.await_resume() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
             { c.SetPauseHandler([] {})};
-            typename T::promise_type::value_type;
+            typename T::value_type;
         };
 
         template <typename T>
