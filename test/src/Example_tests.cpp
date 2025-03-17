@@ -25,7 +25,7 @@ void AsyncCallbackAPIvoid(std::regular_invocable<void*, int> auto cb, void* user
 
 struct ExampleTest : public testing::Test
 {
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    tinycoro::Scheduler scheduler{2};
 };
 
 TEST_F(ExampleTest, Example_voidTaskTest)

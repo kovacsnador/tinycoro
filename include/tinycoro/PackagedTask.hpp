@@ -34,6 +34,8 @@ namespace tinycoro {
 
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
 
+            virtual void ResetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
+
             // need for double linkage
             ISchedulableBridged* prev{nullptr};
             ISchedulableBridged* next{nullptr};
@@ -112,6 +114,8 @@ namespace tinycoro {
             }
 
             void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { _coro.SetPauseHandler(std::move(cb)); }
+
+            void ResetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { _coro.ResetPauseHandler(std::move(cb)); }
 
         private:
             CoroT              _coro;

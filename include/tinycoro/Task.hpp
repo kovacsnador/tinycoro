@@ -111,6 +111,8 @@ namespace tinycoro {
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
 
+        void ResetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { _hdl.promise().ResetPauseHandler(pauseResume); }
+
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
         template <typename T>
@@ -203,6 +205,8 @@ namespace tinycoro {
         [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
+
+        void ResetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { _hdl.promise().ResetPauseHandler(pauseResume); }
 
         [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
 

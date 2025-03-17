@@ -726,11 +726,14 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_push)
 {
     const auto param = GetParam();
 
-    tinycoro::Scheduler                 scheduler;
+    tinycoro::Scheduler                 scheduler{2};
     tinycoro::UnbufferedChannel<size_t> channel;
 
+    size_t controlCount{0};
+    size_t controlCount2{0};
+
     auto consumer = [&]() -> tinycoro::Task<void> {
-        size_t controlCount{0};
+        //size_t controlCount{0};
         size_t val;
         while (tinycoro::EChannelOpStatus::CLOSED != co_await channel.PopWait(val))
         {
@@ -745,6 +748,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_simple_push)
         {
             // just a normal blocking push
             channel.Push(i);
+            controlCount2++;
         }
         channel.Close();
 

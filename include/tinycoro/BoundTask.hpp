@@ -29,6 +29,7 @@ namespace tinycoro {
         using TaskT::ResumeState;
 
         using TaskT::SetPauseHandler;
+        using TaskT::ResetPauseHandler;
         using TaskT::GetPauseHandler;
 
         using TaskT::TaskView;

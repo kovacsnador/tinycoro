@@ -65,6 +65,7 @@ struct TaskWrapperMock
 
     auto SetPauseHandler(auto pauseResume) { return impl->SetPauseHandler(std::move(pauseResume)); }
 
+    auto ResetPauseHandler(auto pauseResume) { /*return impl->SetPauseHandler(std::move(pauseResume));*/ }
 
     auto GetPauseHandler() noexcept { return impl->GetPauseHandler(); }
 

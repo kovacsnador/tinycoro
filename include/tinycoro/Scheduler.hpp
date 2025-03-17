@@ -17,8 +17,9 @@
 #include "PackagedTask.hpp"
 #include "LinkedPtrList.hpp"
 #include "LinkedPtrQueue.hpp"
+#include "SchedulerWorker.hpp"
 
-using namespace std::chrono_literals;
+//using namespace std::chrono_literals;
 
 namespace tinycoro {
 
@@ -46,14 +47,14 @@ namespace tinycoro {
             // or access to invalid memory.
             for (auto& it : _workerThreads)
             {
-                if (it.joinable())
+                if (it->joinable())
                 {
-                    it.join();
+                    it->join();
                 }
             }
 
             // Make some trivial cleanup for dangling tasks
-            _CleanUpDanglingTasks();
+            //_CleanUpDanglingTasks();
         }
 
         // Disable copy and move
@@ -135,14 +136,26 @@ namespace tinycoro {
                 // not allow to enqueue tasks with uninitialized std::coroutine_handler
                 // or if the a stop is requested
                 TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState));
-                task->SetPauseHandler(GeneratePauseResume(task.get()));
+
+                _workerThreads[_nextWorker]->Push(task);
+                
+                if(++_nextWorker >= _workerThreads.size())
+                    _nextWorker = 0;
+                    
+
+                NotifyAll();
+
+                /*task->SetPauseHandler(GeneratePauseResume(task.get()));
 
                 {
                     std::scoped_lock lock{_tasksQueueMtx};
                     _tasks.push(task.release());
                 }
 
-                _cv.notify_all();
+                _cv.notify_all();*/
+
+                
+
             }
 
             return future;
@@ -150,7 +163,7 @@ namespace tinycoro {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        PauseHandlerCallbackT GeneratePauseResume(auto taskPtr)
+        /*PauseHandlerCallbackT GeneratePauseResume(auto taskPtr)
         {
             return [this, taskPtr]() {
                 if (_stopSource.stop_requested() == false)
@@ -252,7 +265,7 @@ namespace tinycoro {
                 // task is handled regarding on his resumeState
                 break;
             }
-        }
+        }*/
 
         void _AddWorkers(size_t workerThreadCount)
         {
@@ -260,7 +273,29 @@ namespace tinycoro {
 
             for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
             {
-                _workerThreads.emplace_back(
+                auto thief = [this, it]() -> TaskT::element_type* {
+
+                    _workersInitialized.wait(false);
+
+                    for (size_t i = 0; i < _workerThreads.size(); ++i)
+                    {
+                        if (i == it) 
+                            continue;  // Skip currWorker
+                        
+                        auto task = _workerThreads[i]->Pop();
+                        
+                        if(task)
+                            return task;
+                    }
+                    return nullptr;
+                };
+
+                auto globalNotifier = [this] { NotifyAll(); };
+
+                auto worker = std::make_unique<detail::SchedulerWorker<TaskT>>(_stopSource.get_token(), thief, globalNotifier);
+                _workerThreads.push_back(std::move(worker));
+
+                /*_workerThreads.emplace_back(
                     [this](std::stop_token stopToken) {
                         while (stopToken.stop_requested() == false)
                         {
@@ -296,11 +331,14 @@ namespace tinycoro {
                             }
                         }
                     },
-                    _stopSource.get_token());
+                    _stopSource.get_token());*/
             }
+
+            _workersInitialized.store(true);
+            _workersInitialized.notify_all();
         }
 
-        void _CleanUpDanglingTasks() noexcept
+        /*void _CleanUpDanglingTasks() noexcept
         {
             auto cleanupLinkedPtrColl = [](auto& coll) {
                 auto it = coll.begin();
@@ -314,6 +352,14 @@ namespace tinycoro {
 
             cleanupLinkedPtrColl(_pausedTasks);
             cleanupLinkedPtrColl(_tasks);
+        }*/
+
+        void NotifyAll()
+        {
+            for(auto& it : _workerThreads)
+            {
+                it->Notify();
+            }
         }
 
         // currently active/scheduled tasks
@@ -331,12 +377,17 @@ namespace tinycoro {
         // mutext to protect the paused tasks map
         std::mutex _pausedTasksMtx;
 
+        std::atomic<bool> _workersInitialized{false};
+
         // conditional variable used to notify
         // if we have active tasks in the queue
         std::condition_variable_any _cv;
 
         // the worker threads which are running the tasks
-        std::vector<std::jthread> _workerThreads;
+        //std::vector<std::jthread> _workerThreads;
+        std::vector<std::unique_ptr<detail::SchedulerWorker<TaskT>>> _workerThreads;
+
+        std::atomic<size_t> _nextWorker{0};
     };
 
     using Scheduler = CoroThreadPool<SchedulableTask>;
