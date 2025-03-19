@@ -177,6 +177,12 @@ namespace tinycoro {
         template <typename T>
         using TaskResult_t = TaskResultType<T>::value_type;
 
+        template<auto Number>
+        struct IsPowerOf2
+        {
+            static constexpr bool value = (Number > 0) && (Number & (Number - 1)) == 0;
+        };
+
         namespace helper {
 
             bool Contains(concepts::Linkable auto current, concepts::Linkable auto elem)
