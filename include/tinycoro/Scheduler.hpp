@@ -281,7 +281,7 @@ namespace tinycoro {
                                 _tasks.wait_for_element();
 
                                 TaskElement_t* taskPtr{nullptr};
-                                while (_tasks.try_pop(taskPtr) && stopToken.stop_requested() == false)
+                                while (stopToken.stop_requested() == false && _tasks.try_pop(taskPtr))
                                 {
                                     if (taskPtr != STOP_EVENT)
                                     {
