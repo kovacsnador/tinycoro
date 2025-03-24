@@ -180,6 +180,9 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
         EXPECT_TRUE(queue.try_pop(val));
         EXPECT_EQ(val, 3u);
 
+        // here we wait for a possible push
+        queue.wait_for_pop();
+
         EXPECT_TRUE(queue.try_pop(val));
         EXPECT_EQ(val, 4u);
     };
