@@ -101,6 +101,92 @@ TEST(AtomicQueueTest, AtomicQueueTest_empty)
     EXPECT_TRUE(queue.empty());
 }
 
+TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
+{
+    tinycoro::SoftClock clock;
+    tinycoro::Scheduler scheduler{2};
+
+    tinycoro::detail::AtomicQueue<size_t, 2> queue;
+
+    tinycoro::AutoEvent event;
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        EXPECT_TRUE(queue.try_push(1u));
+        EXPECT_TRUE(queue.try_push(2u));
+
+        event.Set();
+
+        co_await tinycoro::SleepFor(clock, 100ms);
+
+        size_t val;
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 1u);
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        co_await event;
+
+        // here we wait for a possible push
+        queue.wait_for_push();
+
+        EXPECT_TRUE(queue.try_push(3u));
+
+        size_t val;
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 2u);
+
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 3u);
+    };
+
+    tinycoro::GetAll(scheduler, producer(), consumer());
+}
+
+TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
+{
+    tinycoro::SoftClock clock;
+    tinycoro::Scheduler scheduler{2};
+
+    tinycoro::detail::AtomicQueue<size_t, 2> queue;
+
+    tinycoro::AutoEvent event;
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        EXPECT_TRUE(queue.try_push(1u));
+        EXPECT_TRUE(queue.try_push(2u));
+
+        size_t val;
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 1u);
+
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 2u);
+
+        event.Set();
+
+        co_await tinycoro::SleepFor(clock, 100ms);
+
+        EXPECT_TRUE(queue.try_push(3u));
+        EXPECT_TRUE(queue.try_push(4u));
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        co_await event;
+
+        // here we wait for a possible push
+        queue.wait_for_pop();
+
+        size_t val;
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 3u);
+
+        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_EQ(val, 4u);
+    };
+
+    tinycoro::GetAll(scheduler, producer(), consumer());
+}
+
 struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
