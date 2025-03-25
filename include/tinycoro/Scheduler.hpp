@@ -6,7 +6,6 @@
 #include <functional>
 #include <vector>
 #include <mutex>
-#include <condition_variable>
 #include <concepts>
 #include <assert.h>
 #include <ranges>
@@ -32,20 +31,7 @@ namespace tinycoro {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [&] {
-                                // try to push the close event into the task queue
-                                while (_tasks.try_push(STOP_EVENT) == false)
-                                {
-                                    // try to pop an element
-                                    // to make place for the stopEvent
-                                    TaskElement_t* taskPtr{nullptr};
-                                    if (_tasks.try_pop(taskPtr))
-                                    {
-                                        // destroy the task explicitly
-                                        TaskT taskDestroyer{taskPtr};
-                                    }
-                                }
-                            }}
+            , _stopCallback{_stopSource.get_token(), [this] { _RequestStopForQueue(); }}
             {
                 _AddWorkers(workerThreadCount);
             }
@@ -173,42 +159,39 @@ namespace tinycoro {
                 return [this, taskPtr]() {
                     if (_stopSource.stop_requested() == false)
                     {
-                        std::unique_lock pauseLock{_pausedTasksMtx};
-
-                        if (taskPtr->next == nullptr && taskPtr->prev == nullptr && _pausedTasks.begin() != taskPtr)
+                        auto expected = taskPtr->pauseState.load(std::memory_order_acquire);
+                        while (expected != EPauseState::PAUSED)
                         {
-                            // indicate that we don't need any sleep here
-                            // So notify task that it should be wakeup and put into tasks queue.
-                            // we make this with setting the next and a prev pointers to self
-                            taskPtr->next = taskPtr;
-                            taskPtr->prev = taskPtr;
-
-                            pauseLock.unlock();
-
-                            return;
+                            // If the notify callback invoked very quickly
+                            // we have here a little time window to tell to
+                            // the scheduler, that the task is ready for resumption
+                            if (taskPtr->pauseState.compare_exchange_weak(
+                                    expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
+                            {
+                                // The task is notified
+                                // in time, so we are done.
+                                return;
+                            }
                         }
-                        else
+
+                        // If we reach this point
+                        // that means that the task is already in paused state
+                        // So we need to resume it manually
                         {
-                            // wake up the task
+                            std::scoped_lock pauseLock{_pausedTasksMtx};
+                            // remove the tasks from paused tasks
                             _pausedTasks.erase(taskPtr);
-
-                            // pause lock can be released
-                            pauseLock.unlock();
-
-                            // push back to the queue
-                            // for resumption
-                            _PushTask(taskPtr, _stopSource);
                         }
+
+                        // push back to the queue
+                        // for resumption
+                        _PushTask(taskPtr, _stopSource);
                     }
                 };
             }
 
             inline void _InvokeTask(TaskT&& task)
             {
-                // reset the navigation variables
-                task->prev = nullptr;
-                task->next = nullptr;
-
                 using enum ETaskResumeState;
                 for (;;)
                 {
@@ -222,46 +205,70 @@ namespace tinycoro {
                     {
                     case SUSPENDED: {
 
-                        // push back to the queue
+                        // push back the task into the queue
                         //
                         // here potentially we could also just
                         // continue the execution of the task...
-                        _PushTask(task.release(), _stopSource);
-                        break;
-                    }
-                    case PAUSED: {
-                        std::unique_lock pauseLock{_pausedTasksMtx};
-                        if (task->next == task.get() && task->prev == task.get())
+                        if(_stopSource.stop_requested() == false)
                         {
-                            // reset the navigation
-                            // the task is already waked up
-                            task->next = nullptr;
-                            task->prev = nullptr;
+                            // no stop was requested
+                            auto taskPtr = task.release();
+                            if(_tasks.try_push(taskPtr))
+                            {
+                                // try to push back the task
+                                // if the queue is not full
+                                return;
+                            }
 
-                            pauseLock.unlock();
-
-                            // we can continue to resume this task
+                            // the queue is full
+                            // so as a shortcut
+                            // we can continue with the current task
+                            task.reset(taskPtr);
                             continue;
                         }
-                        else
-                        {
-                            // push back into the pause state
-                            _pausedTasks.push_front(task.release());
 
-                            pauseLock.unlock();
+                        // stop was requested
+                        return;
+                    }
+                    case PAUSED: {
+
+                        auto expected = task->pauseState.load(std::memory_order_acquire);
+                        if (expected != EPauseState::NOTIFIED)
+                        {
+                            auto taskPtr = task.release();
+
+                            std::scoped_lock pauseLock{_pausedTasksMtx};
+                            // push back into the pause state
+                            _pausedTasks.push_front(taskPtr);
+
+                            if (taskPtr->pauseState.compare_exchange_strong(
+                                    expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
+                            {
+                                // the task is in the paused task list
+                                // we can return
+                                return;
+                            }
+
+                            // in the meantime the task is notified for resumption
+                            // so we need to remove it from the paused task queue
+                            // and resume the task
+                            _pausedTasks.erase(taskPtr);
+
+                            // reassign the pointer
+                            // for proper destruction
+                            task.reset(taskPtr);
                         }
-                        break;
+
+                        // we can continue to resume this task
+                        continue;
                     }
                     case STOPPED:
                         [[fallthrough]];
                     case DONE:
-                        break;
+                        [[fallthrough]];
                     default:
-                        break;
+                        return;
                     }
-
-                    // task is handled regarding on his resumeState
-                    break;
                 }
             }
 
@@ -275,20 +282,30 @@ namespace tinycoro {
                 {
                     _workerThreads.emplace_back(
                         [this](std::stop_token stopToken) {
+                            
+                            TaskElement_t* taskPtr{nullptr};
                             while (stopToken.stop_requested() == false)
                             {
-                                // wait for new tasks
-                                _tasks.wait_for_element();
-
-                                TaskElement_t* taskPtr{nullptr};
-                                while (stopToken.stop_requested() == false && _tasks.try_pop(taskPtr))
+                                if(_tasks.try_pop(taskPtr))
                                 {
-                                    if (taskPtr != STOP_EVENT)
+                                    if(taskPtr == STOP_EVENT)
+                                    {
+                                        // if we popped the stop event
+                                        // out from the queue,
+                                        // we need to put back for other workers
+                                        _RequestStopForQueue();
+                                    }
+                                    else
                                     {
                                         // wrapping the task into a TaskT
                                         // to make sure, there is a  proper destruction
                                         _InvokeTask(TaskT{taskPtr});
                                     }
+                                }
+                                else
+                                {
+                                    // wait for new tasks
+                                    _tasks.wait_for_pop();
                                 }
                             }
                         },
@@ -308,15 +325,14 @@ namespace tinycoro {
                     it = next;
                 }
 
-                // clean up active tasks, which are stuck in the queue
-                TaskElement_t* taskPtr{nullptr};
-                while (_tasks.try_pop(taskPtr))
-                {
-                    TaskT destroyer{taskPtr};
-                }
+                // Clean up active tasks, which are stuck in the queue.
+                //
+                // We already made a _TaskCleanUp() before
+                // this is just for safety reasons...
+                _TaskCleanUp();
             }
 
-            bool _PushTask(TaskElement_t* taskPtr, const std::stop_source& stopSource)
+            bool _PushTask(TaskElement_t* taskPtr, const std::stop_source& stopSource) noexcept
             {
                 while (stopSource.stop_requested() == false)
                 {
@@ -326,6 +342,11 @@ namespace tinycoro {
                         // into the tasks queue
                         return true;
                     }
+                    else
+                    {
+                        // wait until we have space in the queue
+                        _tasks.wait_for_push();
+                    }
                 }
 
                 // make sure that the task
@@ -334,6 +355,41 @@ namespace tinycoro {
                 TaskT destroyer{taskPtr};
 
                 return false;
+            }
+
+            void _RequestStopForQueue() noexcept
+            {
+                // this is necessary to trigger/wake up
+                // wait_for_push() waiters
+                //
+                // this should happen before we push
+                // the STOP_EVENT into the queue,
+                // because this could also remove the
+                // STOP_EVENT from the queue...
+                _TaskCleanUp();
+
+                // try to push the close event into the task queue
+                while (_tasks.try_push(STOP_EVENT) == false)
+                {
+                    // try to pop an element
+                    // to make place for the stopEvent
+                    TaskElement_t* taskPtr{nullptr};
+                    if (_tasks.try_pop(taskPtr))
+                    {
+                        // destroy the task explicitly
+                        TaskT taskDestroyer{taskPtr};
+                    }
+                }
+            }
+
+            void _TaskCleanUp() noexcept
+            {
+                // clean up active tasks, which are stuck in the queue
+                TaskElement_t* taskPtr{nullptr};
+                while (_tasks.try_pop(taskPtr))
+                {
+                    TaskT destroyer{taskPtr};
+                }
             }
 
             // With this variable we indicate that
@@ -346,13 +402,13 @@ namespace tinycoro {
             // tasks which are in pause state
             detail::LinkedPtrList<TaskElement_t> _pausedTasks;
 
+            // mutext to protect the paused tasks map
+            std::mutex _pausedTasksMtx;
+
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
 
             std::stop_callback<std::function<void()>> _stopCallback;
-
-            // mutext to protect the paused tasks map
-            std::mutex _pausedTasksMtx;
 
             // the worker threads which are running the tasks
             std::vector<std::jthread> _workerThreads;

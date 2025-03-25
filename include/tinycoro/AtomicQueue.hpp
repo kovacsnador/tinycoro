@@ -11,17 +11,18 @@ namespace tinycoro { namespace detail {
     // This is a multi-producer multi-consumer
     // lockfree queue.
     // Inside uses a ringbuffer therefor SIZE need to be a power of 2.
-    template <typename T, uint32_t SIZE>
+    template <typename T, uint64_t SIZE>
         requires detail::IsPowerOf2<SIZE>::value
     class AtomicQueue
     {
     public:
         using value_type = T;
+        using sequence_t = uint64_t;
 
         AtomicQueue()
         : _buffer{std::make_unique<Element[]>(SIZE)}
         {
-            for (uint32_t i = 0; i < SIZE; ++i)
+            for (uint64_t i = 0; i < SIZE; ++i)
             {
                 auto elem = _buffer.get() + i;
                 elem->_sequence.store(i, std::memory_order_relaxed);
@@ -41,11 +42,10 @@ namespace tinycoro { namespace detail {
                 auto pos  = _head.load(std::memory_order_relaxed);
                 auto elem = _buffer.get() + (pos & BUFFER_MASK);
                 auto seq  = elem->_sequence.load(std::memory_order_acquire);
-                auto diff = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos);
 
-                if (diff == 0)
+                if (seq == pos)
                 {
-                    if (_head.compare_exchange_strong(pos, pos + 1))
+                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
                     {
                         // found the right place
                         // pushing the value into the queue
@@ -63,7 +63,7 @@ namespace tinycoro { namespace detail {
                         return true;
                     }
                 }
-                else if (diff < 0)
+                else if (pos > seq)
                 {
                     // the queue is full
                     // push failed
@@ -84,22 +84,26 @@ namespace tinycoro { namespace detail {
                 auto pos  = _tail.load(std::memory_order_relaxed);
                 auto elem = _buffer.get() + (pos & BUFFER_MASK);
                 auto seq  = elem->_sequence.load(std::memory_order_acquire);
-                auto diff = static_cast<intptr_t>(seq) - static_cast<intptr_t>(pos + 1);
 
-                if (diff == 0)
+                if (seq == pos + 1)
                 {
                     // we found the right place
                     // try to access the underlying element...
-                    if (_tail.compare_exchange_strong(pos, pos + 1))
+                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
                     {
                         // we got exclusive access to the element
                         data = std::move(elem->_value);
 
                         elem->_sequence.store(pos + SIZE, std::memory_order_release);
+
+                        // notify the waiters
+                        // that a value is popped
+                        _tail.notify_all();
+
                         return true;
                     }
                 }
-                else if (diff < 0)
+                else if (seq < pos + 1)
                 {
                     // the queue is empty
                     // no element can be popped
@@ -111,9 +115,9 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
-        // wait for new element
+        // wait for new element to pop
         // if the queue is empty
-        void wait_for_element() const noexcept
+        void wait_for_pop() const noexcept
         {
             auto head = _head.load(std::memory_order_relaxed);
             auto tail = _tail.load(std::memory_order_relaxed);
@@ -126,26 +130,39 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        void wait_for_push() const noexcept
+        {
+            auto head = _head.load(std::memory_order_relaxed);
+            auto tail = _tail.load(std::memory_order_relaxed);
+
+            if ((head - SIZE) == tail)
+            {
+                // if the queue is full
+                // we wait until someone pops an element
+                _tail.wait(tail);
+            }
+        }
+
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
 
     private:
         struct Element
         {
-            std::atomic<uint32_t> _sequence{};
+            std::atomic<sequence_t> _sequence{};
             value_type            _value{};
         };
 
         // the buffer mask. Should be for examle 0xFFFFF
-        static constexpr uint32_t BUFFER_MASK{SIZE - 1};
+        static constexpr sequence_t BUFFER_MASK{SIZE - 1};
 
         // the pointer of the ringbuffer
         alignas(CACHELINE_SIZE) std::unique_ptr<Element[]> _buffer;
 
         // the last push position of an element
-        alignas(CACHELINE_SIZE) std::atomic<uint32_t> _head{};
+        alignas(CACHELINE_SIZE) std::atomic<sequence_t> _head{};
 
         // the following element to pop
-        alignas(CACHELINE_SIZE) std::atomic<uint32_t> _tail{};
+        alignas(CACHELINE_SIZE) std::atomic<sequence_t> _tail{};
     };
 
 }} // namespace tinycoro::detail
