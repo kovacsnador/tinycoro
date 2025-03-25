@@ -325,7 +325,10 @@ namespace tinycoro {
                     it = next;
                 }
 
-                // clean up active tasks, which are stuck in the queue
+                // Clean up active tasks, which are stuck in the queue.
+                //
+                // We already made a _TaskCleanUp() before
+                // this is just for safety reasons...
                 _TaskCleanUp();
             }
 
@@ -356,6 +359,15 @@ namespace tinycoro {
 
             void _RequestStopForQueue() noexcept
             {
+                // this is necessary to trigger/wake up
+                // wait_for_push() waiters
+                //
+                // this should happen before we push
+                // the STOP_EVENT into the queue,
+                // because this could also remove the
+                // STOP_EVENT from the queue...
+                _TaskCleanUp();
+
                 // try to push the close event into the task queue
                 while (_tasks.try_push(STOP_EVENT) == false)
                 {
@@ -368,8 +380,6 @@ namespace tinycoro {
                         TaskT taskDestroyer{taskPtr};
                     }
                 }
-
-                _TaskCleanUp();
             }
 
             void _TaskCleanUp() noexcept
