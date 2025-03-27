@@ -104,6 +104,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     auto& mock3 = *task3.mock;
 
     EXPECT_CALL(mock3, Resume()).Times(1);
+    EXPECT_CALL(mock3, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock3, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(0);
@@ -198,6 +199,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     auto& mock3 = *task3.mock;
 
     EXPECT_CALL(mock3, Resume());
+    EXPECT_CALL(mock3, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock3, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
     EXPECT_CALL(mock3, SetPauseHandler).Times(1);
     EXPECT_CALL(mock3, await_resume).Times(0);

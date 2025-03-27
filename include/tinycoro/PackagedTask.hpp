@@ -3,6 +3,7 @@
 
 #include <concepts>
 #include <variant>
+#include <atomic>
 
 #include "Common.hpp"
 #include "Exception.hpp"
@@ -19,6 +20,15 @@ namespace tinycoro {
     } // namespace concepts
 
     namespace detail {
+
+        enum class EPauseState
+        {
+            IDLE,
+            PAUSED,
+
+            NOTIFIED,
+        };
+
         class ISchedulableBridged
         {
         public:
@@ -39,6 +49,8 @@ namespace tinycoro {
             // need for double linkage
             ISchedulableBridged* prev{nullptr};
             ISchedulableBridged* next{nullptr};
+
+            std::atomic<EPauseState> pauseState{EPauseState::IDLE};
         };
 
         template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
@@ -93,6 +105,9 @@ namespace tinycoro {
             {
                 try
                 {
+                    // reset the pause state by every resume.
+                    pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+
                     _coro.Resume();
                 }
                 catch (...)
