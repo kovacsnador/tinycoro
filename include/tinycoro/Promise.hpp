@@ -120,12 +120,6 @@ namespace tinycoro {
             pauseHandler.emplace(std::forward<Args>(args)...);
             return pauseHandler.get();
         }
-
-        template<typename... Args>
-        void ResetPauseHandler(Args&&... args)
-        {
-            pauseHandler->ResetCallback(std::forward<Args>(args)...);
-        }
     };
 
     template <typename ReturnerT>

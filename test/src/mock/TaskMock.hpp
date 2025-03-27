@@ -53,10 +53,6 @@ namespace tinycoro { namespace test {
             mock->pauseCallback = func;
         }
 
-        void ResetPauseHandler(tinycoro::PauseHandlerCallbackT func)
-        {
-        }
-
         void* Address() const noexcept
         {
             return mock->Address();

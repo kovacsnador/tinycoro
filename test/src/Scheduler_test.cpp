@@ -40,7 +40,7 @@ TEST_F(SchedulerTest, SchedulerTest_suspended)
     EXPECT_CALL(*task.mock, Resume()).Times(2);
     EXPECT_CALL(*task.mock, IsDone()).WillOnce(testing::Return(true));
     EXPECT_CALL(*task.mock, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
+    EXPECT_CALL(*task.mock, SetPauseHandler).Times(2);
     EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(*task.mock, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));
 
@@ -61,7 +61,7 @@ TEST_F(SchedulerTest, SchedulerTest_paused)
     EXPECT_CALL(mock, Resume()).Times(3);
     EXPECT_CALL(mock, IsDone()).Times(testing::AnyNumber());
     EXPECT_CALL(mock, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock] { mock.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock, SetPauseHandler).Times(2);
     EXPECT_CALL(mock, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock, IsPaused).Times(0);
     EXPECT_CALL(mock, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
@@ -86,7 +86,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock1, Resume()).Times(3);
     EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock1, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock1, SetPauseHandler).Times(2);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
     EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
@@ -96,7 +96,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks)
     EXPECT_CALL(mock2, Resume()).Times(2);
     EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock2, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock2, SetPauseHandler).Times(2);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
     EXPECT_CALL(mock2, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));
@@ -131,7 +131,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock1, Resume()).Times(3);
     EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock1, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock1, SetPauseHandler).Times(2);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
     EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
@@ -141,7 +141,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_dynmic)
     EXPECT_CALL(mock2, Resume()).Times(2);
     EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock2, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock2, SetPauseHandler).Times(2);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
     EXPECT_CALL(mock2, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));
@@ -179,7 +179,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock1, Resume()).Times(3);
     EXPECT_CALL(mock1, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock1, ResumeState()).Times(3).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Invoke([&mock1] { mock1.pauseCallback(); return PAUSED; })).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock1, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock1, SetPauseHandler).Times(2);
     EXPECT_CALL(mock1, await_resume).Times(1).WillOnce(testing::Return(42));
     EXPECT_CALL(mock1, IsPaused).Times(0);
     EXPECT_CALL(mock1, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));;
@@ -190,7 +190,7 @@ TEST_F(SchedulerTest, SchedulerTest_multiTasks_Wait)
     EXPECT_CALL(mock2, Resume()).Times(2);
     EXPECT_CALL(mock2, IsDone()).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock2, ResumeState()).Times(2).WillOnce(testing::Return(SUSPENDED)).WillOnce(testing::Return(DONE));
-    EXPECT_CALL(mock2, SetPauseHandler).Times(1);
+    EXPECT_CALL(mock2, SetPauseHandler).Times(2);
     EXPECT_CALL(mock2, await_resume).Times(1).WillOnce(testing::Return(41));
     EXPECT_CALL(mock2, IsPaused).Times(0);
     EXPECT_CALL(mock2, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));

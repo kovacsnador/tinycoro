@@ -143,13 +143,20 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        void clear() noexcept
+        {
+            auto head = _head.load(std::memory_order_relaxed);
+            _tail.store(head, std::memory_order_relaxed);
+            _tail.notify_all();
+        }
+
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
 
     private:
         struct Element
         {
             std::atomic<sequence_t> _sequence{};
-            value_type            _value{};
+            value_type              _value{};
         };
 
         // the buffer mask. Should be for examle 0xFFFFF
