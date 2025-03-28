@@ -9,6 +9,55 @@
 #include "Common.hpp"
 
 namespace tinycoro { namespace detail {
+
+    namespace helper {
+        // With this variable we indicate that
+        // a stop purposed by the scheduler
+        static constexpr std::nullptr_t SCHEDULER_STOP_EVENT{nullptr};
+
+        bool PushTask(auto task, auto& queue, const auto& stopToken) noexcept
+        {
+            while (stopToken.stop_requested() == false)
+            {
+                if (queue.try_push(std::move(task)))
+                {
+                    // the task is pushed
+                    // into the tasks queue
+                    return true;
+                }
+                else
+                {
+                    // wait until we have space in the queue
+                    queue.wait_for_push();
+                }
+            }
+
+            return false;
+        }
+
+        void RequestStopForQueue(auto& queue) noexcept
+        {
+            // this is necessary to trigger/wake up
+            // wait_for_push() waiters
+            //
+            // this should happen before we push
+            // the SCHEDULER_STOP_EVENT into the queue,
+            // because this could also remove the
+            // SCHEDULER_STOP_EVENT from the queue if we invoke
+            // after SCHEDULER_STOP_EVENT push...
+            queue.clear();
+
+            // try to push the close event into the task queue
+            while (queue.try_push(SCHEDULER_STOP_EVENT) == false)
+            {
+                // clear the queue and try push
+                // SCHEDULER_STOP_EVENT again
+                queue.clear();
+            }
+        }
+
+    } // namespace helper
+
     template <typename QueueT, typename TaskT>
     class SchedulerWorker
     {
@@ -22,6 +71,12 @@ namespace tinycoro { namespace detail {
         {
         }
 
+        ~SchedulerWorker()
+        {
+            if(joinable())
+                join();
+        }
+
         void join()
         {
             // join the thread
@@ -33,10 +88,6 @@ namespace tinycoro { namespace detail {
 
         auto joinable() { return _thread.joinable(); }
 
-        // With this variable we indicate that
-        // a stop purposed by the scheduler
-        static constexpr std::nullptr_t STOP_EVENT{nullptr};
-
     private:
         void Run(std::stop_token stopToken)
         {
@@ -47,15 +98,16 @@ namespace tinycoro { namespace detail {
                 TaskT task{nullptr};
                 if (_sharedTasks.try_pop(task))
                 {
-                    if (task == STOP_EVENT)
+                    if (task == helper::SCHEDULER_STOP_EVENT)
                     {
                         // if we popped the stop event
                         // out from the queue,
                         // we need to put back for other workers
-                        _RequestStopForQueue();
+                        helper::RequestStopForQueue(_sharedTasks);
                     }
                     else
                     {
+                        // Invoke the task.
                         // wrapping the task into a TaskT
                         // to make sure, there is a  proper destruction
                         _InvokeTask(std::move(task));
@@ -102,7 +154,7 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
-                    _PushTask(TaskT{taskPtr}, _stopToken);
+                    helper::PushTask(TaskT{taskPtr}, _sharedTasks, _stopToken);
                 }
             };
         }
@@ -133,7 +185,7 @@ namespace tinycoro { namespace detail {
                     if (_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
-                        //auto taskPtr = task.release();
+                        // auto taskPtr = task.release();
                         if (_sharedTasks.try_push(std::move(task)))
                         {
                             // try to push back the task
@@ -199,7 +251,7 @@ namespace tinycoro { namespace detail {
             while (_cachedTasks.empty() == false)
             {
                 // get the first task from the cache
-                auto taskPtr = _cachedTasks.begin();
+                auto  taskPtr = _cachedTasks.begin();
                 TaskT task{taskPtr};
                 if (_sharedTasks.try_push(std::move(task)))
                 {
@@ -215,6 +267,8 @@ namespace tinycoro { namespace detail {
                     //
                     // we need to release here the taskPtr
                     // because it stays in the cached queue
+                    // and otherwise it got just destroyed
+                    // in the "TaskT task" destructor.
                     task.release();
                     break;
                 }
@@ -240,84 +294,7 @@ namespace tinycoro { namespace detail {
             // clean up dangling cahced tasks
             // after stop was requested
             cleanup(_cachedTasks);
-
-            // Clean up active tasks, which are stuck in the queue.
-            //
-            // We already made a _CleanUpSharedTasks() call before
-            // this is just for safety reasons...
-            //_CleanUpSharedTasks();
         }
-
-        bool _PushTask(TaskT task, const auto& stopToken) noexcept
-        {
-            while (stopToken.stop_requested() == false)
-            {
-                if (_sharedTasks.try_push(std::move(task)))
-                {
-                    // the task is pushed
-                    // into the tasks queue
-                    return true;
-                }
-                else
-                {
-                    // wait until we have space in the queue
-                    _sharedTasks.wait_for_push();
-                }
-            }
-
-            // make sure that the task
-            // is properly destroyed
-            // after a failing push call
-            //TaskT destroyer{taskPtr};
-
-            return false;
-        }
-
-        void _RequestStopForQueue() noexcept
-        {
-            // this is necessary to trigger/wake up
-            // wait_for_push() waiters
-            //
-            // this should happen before we push
-            // the STOP_EVENT into the queue,
-            // because this could also remove the
-            // STOP_EVENT from the queue...
-            //_CleanUpSharedTasks();
-            _sharedTasks.clear();
-
-            // try to push the close event into the task queue
-            while (_sharedTasks.try_push(STOP_EVENT) == false)
-            {
-                // clear the queue and try
-                // again with STOP_EVENT
-                _sharedTasks.clear();
-
-                // try to pop an element
-                // to make place for the stopEvent
-                /*TaskElement_t* taskPtr{nullptr};
-                if (_sharedTasks.try_pop(taskPtr))
-                {
-                    // destroy the task explicitly
-                    TaskT taskDestroyer{taskPtr};
-                }*/
-            }
-        }
-
-        /*void _CleanUpSharedTasks() noexcept
-        {
-            // clean up active tasks, which are stuck in the queue
-            TaskElement_t* taskPtr{nullptr};
-            while (_sharedTasks.try_pop(taskPtr))
-            {
-                TaskT destroyer{taskPtr};
-            }
-
-            while(_sharedTasks.empty() == false)
-            {
-                TaskT destroyer;
-                std::ignore = _sharedTasks
-            }
-        }*/
 
         // the queue which contains all the active tasks
         QueueT& _sharedTasks;
@@ -329,7 +306,10 @@ namespace tinycoro { namespace detail {
         detail::LinkedPtrList<typename TaskT::element_type> _pausedTasks;
 
         // Cache for tasks which could not be push back
-        // immediately into the shared _task queue.
+        // immediately into the shared task queue.
+        //
+        // It's intented to mimic the basic task rotation
+        // even with a full shared tasks queue.
         detail::LinkedPtrQueue<typename TaskT::element_type> _cachedTasks;
 
         // The scheduler stop token
