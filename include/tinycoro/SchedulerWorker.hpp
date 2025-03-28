@@ -34,8 +34,9 @@ namespace tinycoro { namespace detail {
 
             return false;
         }
-
-        void RequestStopForQueue(auto& queue) noexcept
+        
+        template<typename QueueT>
+        void RequestStopForQueue(QueueT& queue) noexcept
         {
             // this is necessary to trigger/wake up
             // wait_for_push() waiters
@@ -45,14 +46,25 @@ namespace tinycoro { namespace detail {
             // because this could also remove the
             // SCHEDULER_STOP_EVENT from the queue if we invoke
             // after SCHEDULER_STOP_EVENT push...
-            queue.clear();
+            //queue.clear();
+            while(queue.full())
+            {
+                typename QueueT::value_type task{nullptr};
+                if(queue.try_pop(task))
+                {
+                    // erase at least 1 element
+                    break;
+                }
+            }
 
             // try to push the close event into the task queue
             while (queue.try_push(SCHEDULER_STOP_EVENT) == false)
             {
                 // clear the queue and try push
                 // SCHEDULER_STOP_EVENT again
-                queue.clear();
+                //queue.clear();
+                typename QueueT::value_type task{nullptr};
+                queue.try_pop(task);
             }
         }
 
