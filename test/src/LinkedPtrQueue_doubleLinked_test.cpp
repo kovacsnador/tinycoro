@@ -49,6 +49,9 @@ TEST_F(DoubleLinkedPtrQueueTest, PopRemovesTopNode) {
     stack.push(&node1);
     stack.push(&node2);
     MockNodeDQ* poppedNode = stack.pop();
+
+    EXPECT_EQ(poppedNode->next, nullptr);
+    EXPECT_EQ(poppedNode->prev, nullptr);
     
     EXPECT_EQ(poppedNode, &node1);
     EXPECT_EQ(stack.begin(), &node2);
@@ -68,8 +71,16 @@ TEST_F(DoubleLinkedPtrQueueTest, PopAllNodesMakesStackEmpty) {
     EXPECT_FALSE(stack.empty());
     
     EXPECT_EQ(&node1, stack.pop());
+    EXPECT_EQ(node1.next, nullptr);
+    EXPECT_EQ(node1.prev, nullptr);
+
     EXPECT_EQ(&node2, stack.pop());
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
+
     EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(node3.next, nullptr);
+    EXPECT_EQ(node3.prev, nullptr);
 
     EXPECT_TRUE(stack.empty());
     EXPECT_EQ(stack.begin(), nullptr);
@@ -115,6 +126,8 @@ TEST_F(DoubleLinkedPtrQueueTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
+    EXPECT_EQ(node1.prev, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.begin();
@@ -140,6 +153,8 @@ TEST_F(DoubleLinkedPtrQueueTest, EraseMiddle) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -165,6 +180,8 @@ TEST_F(DoubleLinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(node3.next, nullptr);
+    EXPECT_EQ(node3.prev, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -175,6 +192,52 @@ TEST_F(DoubleLinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(top->next->prev, &node1);
 
     EXPECT_EQ(top->next->next, nullptr);
+}
+
+TEST_F(DoubleLinkedPtrQueueTest, push_front) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
+
+    stack.push_front(&node2);
+    EXPECT_EQ(node2.next, &node1);
+    EXPECT_EQ(node2.prev, nullptr);
+
+    EXPECT_EQ(stack.pop(), &node2);
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
+
+    stack.push_front(&node2);
+    EXPECT_EQ(node2.next, &node1);
+    EXPECT_EQ(node2.prev, nullptr);
+
+    EXPECT_EQ(stack.pop(), &node2);
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
+}
+
+TEST_F(DoubleLinkedPtrQueueTest, push_front_first_elem) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
+    EXPECT_EQ(node1.prev, nullptr);
+
+    stack.push_front(&node1);
+    EXPECT_EQ(node1.next, &node2);
+    EXPECT_EQ(node1.prev, nullptr);
+
+    EXPECT_EQ(stack.pop(), &node1);
 }
 
 TEST_F(DoubleLinkedPtrQueueTest, EraseAll) {

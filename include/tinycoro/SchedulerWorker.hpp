@@ -185,11 +185,10 @@ namespace tinycoro { namespace detail {
                     if (_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
-                        // auto taskPtr = task.release();
                         if (_sharedTasks.try_push(std::move(task)))
                         {
-                            // try to push back the task
-                            // if the queue is not full
+                            // push succeed
+                            // we simply return
                             return;
                         }
 
@@ -251,25 +250,16 @@ namespace tinycoro { namespace detail {
             while (_cachedTasks.empty() == false)
             {
                 // get the first task from the cache
-                auto  taskPtr = _cachedTasks.begin();
+                auto  taskPtr = _cachedTasks.pop();
                 TaskT task{taskPtr};
-                if (_sharedTasks.try_push(std::move(task)))
+                if (_sharedTasks.try_push(std::move(task)) == false)
                 {
-                    // pop out the task if
-                    // we could push into the
-                    // shared queue
-                    std::ignore = _cachedTasks.pop();
-                }
-                else
-                {
-                    // if the push failed
-                    // we stop and exit
-                    //
-                    // we need to release here the taskPtr
-                    // because it stays in the cached queue
-                    // and otherwise it got just destroyed
-                    // in the "TaskT task" destructor.
-                    task.release();
+                    // If the push fails,  
+                    // we stop and exit.  
+                    //  
+                    // The task is pushed back to the front of the cache  
+                    // to help preserve the task order at least partially...
+                    _cachedTasks.push_front(task.release());
                     break;
                 }
             }

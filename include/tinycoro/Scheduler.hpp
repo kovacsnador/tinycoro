@@ -23,7 +23,7 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <concepts::IsSchedulable TaskT, std::unsigned_integral auto CACHE_SIZE>
+        template <concepts::IsSchedulable TaskT, uint64_t CACHE_SIZE>
         class CoroThreadPool
         {
             using TaskElement_t = typename TaskT::element_type;
@@ -182,7 +182,7 @@ namespace tinycoro {
     } // namespace detail
 
     // Custom scheduler with custom cache size
-    template <std::unsigned_integral auto CACHE_SIZE>
+    template <uint64_t CACHE_SIZE>
     using CustomScheduler = detail::CoroThreadPool<SchedulableTask, CACHE_SIZE>;
 
     using Scheduler = detail::CoroThreadPool<SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;

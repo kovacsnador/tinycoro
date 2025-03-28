@@ -252,3 +252,34 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
         // This test is intended to be checked with sanitizers
     }
 }
+
+TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
+{
+    const auto count = GetParam();
+
+    tinycoro::CustomScheduler<4> scheduler;
+    tinycoro::SoftClock clock;
+
+    // iterative task
+    auto task = [](auto duration) -> tinycoro::Task<void> {
+        for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
+        {
+            co_await tinycoro::CancellableSuspend{};
+        }
+    };
+
+    const auto duration = 10s;
+
+    std::vector<tinycoro::Task<void>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    {
+        tasks.emplace_back(task(duration));
+    }
+    tasks.push_back(task(10ms));
+
+    auto start = std::chrono::system_clock::now();
+    tinycoro::AnyOf(scheduler, tasks);
+
+    EXPECT_TRUE(std::chrono::system_clock::now() - start < duration);
+}
