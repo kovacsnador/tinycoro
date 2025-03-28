@@ -104,6 +104,8 @@ namespace tinycoro { namespace detail {
                 {
                     _root = elem->next;
 
+                    elem->next = nullptr;
+
                     --_size;
                     return true;
                 }
@@ -117,6 +119,8 @@ namespace tinycoro { namespace detail {
                             // find the element
                             // in the list
                             current->next = elem->next;
+
+                            elem->next = nullptr;
 
                             --_size;
                             return true;

@@ -67,6 +67,8 @@ struct PauseHandlerMock
 
     [[nodiscard]] bool IsPaused() const noexcept { return pause.load(); }
 
+    void ResetCallback(auto) noexcept { }
+
     tinycoro::PauseHandlerCallbackT pauseResume;
     std::atomic<bool>               pause{true};
 };

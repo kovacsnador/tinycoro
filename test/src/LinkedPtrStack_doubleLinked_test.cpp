@@ -68,8 +68,16 @@ TEST_F(DoubleLinkedPtrStackTest, PopAllNodesMakesStackEmpty) {
     EXPECT_FALSE(stack.empty());
     
     EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(node3.next, nullptr);
+    EXPECT_EQ(node3.prev, nullptr);
+
     EXPECT_EQ(&node2, stack.pop());
+    EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(node2.prev, nullptr);
+
     EXPECT_EQ(&node1, stack.pop());
+    EXPECT_EQ(node1.next, nullptr);
+    EXPECT_EQ(node1.prev, nullptr);
 
     EXPECT_TRUE(stack.empty());
     EXPECT_EQ(stack.top(), nullptr);

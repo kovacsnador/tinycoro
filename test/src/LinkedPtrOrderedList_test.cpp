@@ -305,6 +305,7 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseAll) {
     EXPECT_EQ(list.size(), 3);
     
     EXPECT_TRUE(list.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
     EXPECT_EQ(list.size(), 2);
 
     auto top = list.begin();
@@ -313,10 +314,12 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_EraseAll) {
     EXPECT_EQ(top->next->next, nullptr);
 
     EXPECT_TRUE(list.erase(&node3));
+    EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(list.size(), 1);
 
     top = list.begin();
     EXPECT_EQ(top, &node2);
+    EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(top->next, nullptr);
 
     EXPECT_TRUE(list.erase(&node2));

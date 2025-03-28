@@ -50,6 +50,7 @@ TEST_F(LinkedPtrStackTest, PopRemovesTopNode) {
     stack.push(&node2);
     MockNode* poppedNode = stack.pop();
     
+    EXPECT_EQ(poppedNode->next, nullptr);
     EXPECT_EQ(poppedNode, &node2);
     EXPECT_EQ(stack.top(), &node1);
 }
@@ -68,8 +69,13 @@ TEST_F(LinkedPtrStackTest, PopAllNodesMakesStackEmpty) {
     EXPECT_FALSE(stack.empty());
     
     EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(node3.next, nullptr);
+
     EXPECT_EQ(&node2, stack.pop());
+    EXPECT_EQ(node2.next, nullptr);
+    
     EXPECT_EQ(&node1, stack.pop());
+    EXPECT_EQ(node1.next, nullptr);
 
     EXPECT_TRUE(stack.empty());
     EXPECT_EQ(stack.top(), nullptr);
@@ -115,6 +121,7 @@ TEST_F(LinkedPtrStackTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -136,6 +143,7 @@ TEST_F(LinkedPtrStackTest, EraseMiddle) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -157,6 +165,7 @@ TEST_F(LinkedPtrStackTest, EraseLast) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();

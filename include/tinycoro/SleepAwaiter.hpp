@@ -9,6 +9,8 @@
 #include "CancellableSuspend.hpp"
 #include "AutoEvent.hpp"
 
+using namespace std::chrono_literals;
+
 namespace tinycoro {
 
     namespace concepts {

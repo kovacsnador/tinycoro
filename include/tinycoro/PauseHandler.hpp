@@ -64,6 +64,11 @@ namespace tinycoro {
 
         void Resume() { _state.store(0u, std::memory_order::relaxed); }
 
+        void ResetCallback(concepts::PauseHandlerCb auto pr)
+        {
+            _resumerCallback = std::move(pr);
+        }
+
         [[nodiscard]] auto Pause()
         {
             assert(IsPaused() == false);

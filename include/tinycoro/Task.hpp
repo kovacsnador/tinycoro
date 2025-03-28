@@ -109,7 +109,23 @@ namespace tinycoro {
 
         [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
+        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
+        {
+
+            auto& pauseHandler = _hdl.promise().pauseHandler;
+            if (pauseHandler)
+            {
+                // pause handler is already initialized
+                pauseHandler->ResetCallback(std::move(pauseResume));
+            }
+            else
+            {
+                // pause handler need to be initialized
+                _hdl.promise().MakePauseHandler(std::move(pauseResume));
+            }
+
+            return pauseHandler.get();
+        }
 
         [[nodiscard]] auto GetPauseHandler() noexcept { return _hdl.promise().pauseHandler; }
 
@@ -202,7 +218,23 @@ namespace tinycoro {
 
         [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) { return _hdl.promise().MakePauseHandler(pauseResume); }
+        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume)
+        {
+
+            auto& pauseHandler = _hdl.promise().pauseHandler;
+            if (pauseHandler)
+            {
+                // pause handler is already initialized
+                pauseHandler->ResetCallback(std::move(pauseResume));
+            }
+            else
+            {
+                // pause handler need to be initialized
+                _hdl.promise().MakePauseHandler(std::move(pauseResume));
+            }
+
+            return pauseHandler.get();
+        }
 
         [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
 
