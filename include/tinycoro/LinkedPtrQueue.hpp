@@ -93,7 +93,7 @@ namespace tinycoro { namespace detail {
             std::ignore = other.steal();
         }
 
-        // Pops and return the poped node.
+        // Pops and return the popped node.
         [[nodiscard]] value_type* pop() noexcept
         {
             auto top = _first;

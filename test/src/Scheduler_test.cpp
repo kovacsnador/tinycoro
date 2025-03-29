@@ -221,7 +221,7 @@ struct SchedulerFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(SchedulerFunctionalTest, SchedulerFunctionalTest, testing::Values(1, 10, 100, 1000, 10000, 1000, 1000, 1000));
+INSTANTIATE_TEST_SUITE_P(SchedulerFunctionalTest, SchedulerFunctionalTest, testing::Values(5, 10, 100, 1000, 10000, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 100, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 1000));
 
 
 TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
@@ -232,7 +232,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
     tinycoro::SoftClock clock;
 
     {
-        tinycoro::Scheduler scheduler;
+        tinycoro::CustomScheduler<128> scheduler;
 
         ss = scheduler.GetStopSource();
 
@@ -257,22 +257,24 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
 {
     const auto count = GetParam();
 
-    tinycoro::CustomScheduler<4> scheduler;
-    tinycoro::SoftClock clock;
+    tinycoro::CustomScheduler<2> scheduler{};
+
+    std::atomic<size_t> cc{};
 
     // iterative task
-    auto task = [](auto duration) -> tinycoro::Task<void> {
+    auto task = [&](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
             co_await tinycoro::CancellableSuspend{};
         }
+        cc++;
     };
 
     const auto duration = 10s;
 
     std::vector<tinycoro::Task<void>> tasks;
     tasks.reserve(count);
-    for([[maybe_unused]] auto _ : std::views::iota(0u, count))
+    for([[maybe_unused]] auto _ : std::views::iota(3u, count))
     {
         tasks.emplace_back(task(duration));
     }
@@ -282,4 +284,5 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
     tinycoro::AnyOf(scheduler, tasks);
 
     EXPECT_TRUE(std::chrono::system_clock::now() - start < duration);
+    EXPECT_EQ(cc, 1);
 }

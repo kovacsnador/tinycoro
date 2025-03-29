@@ -162,7 +162,7 @@ namespace tinycoro { namespace detail {
             value_type              _value{};
         };
 
-        // the buffer mask. Should be for examle 0xFFFFF
+        // the buffer mask. Should be for example 0xFFFFF
         static constexpr sequence_t BUFFER_MASK{SIZE - 1};
 
         // the pointer of the ringbuffer

@@ -259,7 +259,8 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
     auto producer = [&]() -> tinycoro::Task<void> {
         for (auto i : std::views::iota(0u, count))
         {
-            while(queue.try_push(i) == false);
+            while (queue.try_push(i) == false)
+                ;
         }
 
         co_return;
@@ -279,13 +280,13 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
         co_return c;
     };
 
-    auto [v1, v2, v3, v4, v5, v6, v7, v8] = tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+    auto [v1, v2, v3, v4, v5, v6, v7, v8]
+        = tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
 
     auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
     EXPECT_EQ(count * 8, sum);
 }
-
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_together)
 {
@@ -298,11 +299,13 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     auto producer = [&]() -> tinycoro::Task<void> {
         for (auto i : std::views::iota(0u, count))
         {
-            while(queue.try_push(i) == false);
+            while (queue.try_push(i) == false)
+                ;
         }
 
         // indicated last value...
-        while(queue.try_push(std::numeric_limits<size_t>::max()) == false);
+        while (queue.try_push(std::numeric_limits<size_t>::max()) == false)
+            ;
 
         co_return;
     };
@@ -312,9 +315,9 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
         for (;;)
         {
             size_t val;
-            if(queue.try_pop(val))
+            if (queue.try_pop(val))
             {
-                if(val == std::numeric_limits<size_t>::max())
+                if (val == std::numeric_limits<size_t>::max())
                 {
                     // last value popped
                     break;
@@ -326,19 +329,79 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     };
 
     auto [v9, v10, v11, v12, v13, v14, v15, v16, v1, v2, v3, v4, v5, v6, v7, v8] = tinycoro::GetAll(scheduler,
-                     producer(),
-                     producer(),
-                     producer(),
-                     producer(),
-                     producer(),
-                     producer(),
-                     producer(),
-                     producer(),
-                     consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    producer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer(),
+                                                                                                    consumer());
 
     EXPECT_TRUE(queue.empty());
 
     auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
     EXPECT_EQ(count * 8, sum);
+}
+
+TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler                      scheduler{8};
+    tinycoro::detail::AtomicQueue<size_t, 2> queue;
+
+    std::atomic<size_t> totalCount{};
+
+    auto producer = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i <= count; ++i)
+        {
+            while (queue.try_push(i) == false)
+            {
+                queue.wait_for_push();
+            }
+            totalCount++;
+        }
+        co_return;
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<void> {
+        for (;;)
+        {
+            size_t val;
+            if (queue.try_pop(val) == false)
+            {
+                queue.wait_for_pop();
+            }
+            else
+            {
+                totalCount--;
+                if(val == count)
+                    co_return;
+            }
+        }
+
+        co_return;
+    };
+
+    tinycoro::GetAll(scheduler,
+                     producer(),
+                     producer(),
+                     producer(),
+                     producer(),
+                     consumer(),
+                     consumer(),
+                     consumer(),
+                     consumer());
+
+    EXPECT_EQ(totalCount, 0);
 }

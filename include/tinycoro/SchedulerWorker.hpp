@@ -34,8 +34,8 @@ namespace tinycoro { namespace detail {
 
             return false;
         }
-        
-        template<typename QueueT>
+
+        template <typename QueueT>
         void RequestStopForQueue(QueueT& queue) noexcept
         {
             // this is necessary to trigger/wake up
@@ -46,11 +46,10 @@ namespace tinycoro { namespace detail {
             // because this could also remove the
             // SCHEDULER_STOP_EVENT from the queue if we invoke
             // after SCHEDULER_STOP_EVENT push...
-            //queue.clear();
-            while(queue.full())
+            while (queue.full())
             {
                 typename QueueT::value_type task{nullptr};
-                if(queue.try_pop(task))
+                if (queue.try_pop(task))
                 {
                     // erase at least 1 element
                     break;
@@ -62,7 +61,6 @@ namespace tinycoro { namespace detail {
             {
                 // clear the queue and try push
                 // SCHEDULER_STOP_EVENT again
-                //queue.clear();
                 typename QueueT::value_type task{nullptr};
                 queue.try_pop(task);
             }
@@ -85,7 +83,7 @@ namespace tinycoro { namespace detail {
 
         ~SchedulerWorker()
         {
-            if(joinable())
+            if (joinable())
                 join();
         }
 
@@ -95,7 +93,7 @@ namespace tinycoro { namespace detail {
             _thread.join();
 
             // cleans up every task
-            _CleanUpDanglingTasks();
+            //_CleanUpDanglingTasks();
         }
 
         auto joinable() { return _thread.joinable(); }
@@ -105,32 +103,51 @@ namespace tinycoro { namespace detail {
         {
             while (stopToken.stop_requested() == false)
             {
-                _TryToUploadCachedTasks();
-
-                TaskT task{nullptr};
-                if (_sharedTasks.try_pop(task))
+                TaskT task;
+                if (_sharedTasks.try_pop(task) == false)
                 {
-                    if (task == helper::SCHEDULER_STOP_EVENT)
+                    // if we could not pop an element
+                    // from the queue, we try to upload
+                    // some cached tasks
+                    _TryToUploadCachedTasks();
+
+                    if (_cachedTasks.empty())
                     {
-                        // if we popped the stop event
-                        // out from the queue,
-                        // we need to put back for other workers
-                        helper::RequestStopForQueue(_sharedTasks);
+                        // the cache is empty, so we can 
+                        // wait safely for new tasks...
+                        _sharedTasks.wait_for_pop();
+                        continue;
                     }
                     else
                     {
-                        // Invoke the task.
-                        // wrapping the task into a TaskT
-                        // to make sure, there is a  proper destruction
-                        _InvokeTask(std::move(task));
+                        // get the task from the cache
+                        task.reset(_cachedTasks.pop());
                     }
                 }
-                else if (stopToken.stop_requested() == false)
+                else
                 {
-                    // wait for new tasks
-                    _sharedTasks.wait_for_pop();
+                    // most likely this is a good timepoint
+                    // to upload some cached tasks...
+                    _TryToUploadCachedTasks();
+                }
+
+                if (task == helper::SCHEDULER_STOP_EVENT)
+                {
+                    // if we popped the stop event
+                    // out from the queue,
+                    // we need to put back for other workers
+                    helper::RequestStopForQueue(_sharedTasks);
+                }
+                else
+                {
+                    // Invoke the task.
+                    // wrapping the task into a TaskT
+                    // to make sure, there is a  proper destruction
+                    _InvokeTask(std::move(task));
                 }
             }
+
+            _CleanUpDanglingTasks();
         }
 
         // Generates the pause resume callback
@@ -171,7 +188,7 @@ namespace tinycoro { namespace detail {
             };
         }
 
-        void _InvokeTask(TaskT&& task)
+        void _InvokeTask(TaskT task)
         {
             // sets the corrent pause resume callback
             // before any resumption
@@ -244,7 +261,8 @@ namespace tinycoro { namespace detail {
                         task.reset(taskPtr);
                     }
 
-                    // we can continue to resume this task
+                    // we can continue with the current task
+                    // it is already notified for resumption
                     continue;
                 }
                 case STOPPED:
@@ -262,14 +280,18 @@ namespace tinycoro { namespace detail {
             while (_cachedTasks.empty() == false)
             {
                 // get the first task from the cache
-                auto  taskPtr = _cachedTasks.pop();
+                auto taskPtr = _cachedTasks.pop();
+
+                assert(taskPtr != nullptr);
+                assert(taskPtr->next == nullptr);
+
                 TaskT task{taskPtr};
                 if (_sharedTasks.try_push(std::move(task)) == false)
                 {
-                    // If the push fails,  
-                    // we stop and exit.  
-                    //  
-                    // The task is pushed back to the front of the cache  
+                    // If the push fails,
+                    // we stop and exit.
+                    //
+                    // The task is pushed back to the front of the cache
                     // to help preserve the task order at least partially...
                     _cachedTasks.push_front(task.release());
                     break;
@@ -289,13 +311,25 @@ namespace tinycoro { namespace detail {
                 }
             };
 
-            // clean up dangling paused tasks
-            // after stop was requested
-            cleanup(_pausedTasks);
+            {
+                std::scoped_lock lock{_pausedTasksMtx};
+                // clean up dangling paused tasks
+                // after stop was requested
+                cleanup(_pausedTasks);
+            }
 
             // clean up dangling cahced tasks
             // after stop was requested
             cleanup(_cachedTasks);
+
+            // destroys all the shared tasks
+            // asynchronously, so all workers at
+            // the same time.
+            while (_sharedTasks.empty() == false)
+            {
+                TaskT destroyer{nullptr};
+                _sharedTasks.try_pop(destroyer);
+            }
         }
 
         // the queue which contains all the active tasks
