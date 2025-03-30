@@ -69,10 +69,10 @@ namespace tinycoro { namespace detail {
 
     } // namespace helper
 
-    template <typename QueueT, typename TaskT>
+    template <typename QueueT>
     class SchedulerWorker
     {
-        using TaskElement_t = typename TaskT::element_type;
+        using Task_t = typename QueueT::value_type;
 
     public:
         SchedulerWorker(QueueT& taskQueue, std::stop_token stopToken)
@@ -113,7 +113,7 @@ namespace tinycoro { namespace detail {
         {
             while (stopToken.stop_requested() == false)
             {
-                TaskT task;
+                Task_t task;
                 if (_sharedTasks.try_pop(task) == false)
                 {
                     // if we could not pop an element
@@ -151,7 +151,7 @@ namespace tinycoro { namespace detail {
                 else
                 {
                     // Invoke the task.
-                    // wrapping the task into a TaskT
+                    // wrapping the task into a Task_t
                     // to make sure, there is a  proper destruction
                     _InvokeTask(std::move(task));
                 }
@@ -195,12 +195,12 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
-                    helper::PushTask(TaskT{taskPtr}, _sharedTasks, _stopToken);
+                    helper::PushTask(Task_t{taskPtr}, _sharedTasks, _stopToken);
                 }
             };
         }
 
-        void _InvokeTask(TaskT task)
+        void _InvokeTask(Task_t task)
         {
             // sets the corrent pause resume callback
             // before any resumption
@@ -297,7 +297,7 @@ namespace tinycoro { namespace detail {
                 assert(taskPtr != nullptr);
                 assert(taskPtr->next == nullptr);
 
-                TaskT task{taskPtr};
+                Task_t task{taskPtr};
                 if (_sharedTasks.try_push(std::move(task)) == false)
                 {
                     // If the push fails,
@@ -319,7 +319,7 @@ namespace tinycoro { namespace detail {
             while (it != nullptr)
             {
                 auto  next = it->next;
-                TaskT destroyer{it};
+                Task_t destroyer{it};
                 it = next;
             }
         }
@@ -331,14 +331,14 @@ namespace tinycoro { namespace detail {
         std::mutex _pausedTasksMtx;
 
         // tasks which are in pause state
-        detail::LinkedPtrList<typename TaskT::element_type> _pausedTasks;
+        detail::LinkedPtrList<typename Task_t::element_type> _pausedTasks;
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.
         //
         // It's intented to mimic the basic task rotation
         // even with a full shared tasks queue.
-        detail::LinkedPtrQueue<typename TaskT::element_type> _cachedTasks;
+        detail::LinkedPtrQueue<typename Task_t::element_type> _cachedTasks;
 
         // The scheduler stop token
         std::stop_token _stopToken;

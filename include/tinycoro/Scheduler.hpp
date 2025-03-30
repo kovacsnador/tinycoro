@@ -171,7 +171,7 @@ namespace tinycoro {
             std::stop_callback<std::function<void()>> _stopCallback;
 
             // Specialize the worker (thread) type
-            using Worker_t = SchedulerWorker<decltype(_sharedTasks), TaskT>;
+            using Worker_t = SchedulerWorker<decltype(_sharedTasks)>;
 
             // the worker threads which are running the tasks
             std::vector<std::unique_ptr<Worker_t>> _workerThreads;
