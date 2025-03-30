@@ -147,6 +147,10 @@ namespace tinycoro { namespace detail {
                     // out from the queue,
                     // we need to put back for other workers
                     helper::RequestStopForQueue(_sharedTasks);
+
+                    // stop was requested we exit
+                    // from the working loop
+                    break;
                 }
                 else
                 {

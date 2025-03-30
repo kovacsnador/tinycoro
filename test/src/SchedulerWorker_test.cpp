@@ -48,28 +48,37 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     queue.try_push(std::move(task));
 
     latch.wait();
-    ss.request_stop();
+    queue.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT);
 }
 
-TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
+struct SchedulerWorkerTest : testing::TestWithParam<size_t>
 {
-    std::latch       latch{2};
-    std::stop_source ss;
+};
 
-    std::unique_ptr<Schedubable> task = std::make_unique<Schedubable>();
+INSTANTIATE_TEST_SUITE_P(SchedulerWorkerTest, SchedulerWorkerTest, testing::Values(1, 10, 100));
 
-    EXPECT_CALL(task->mock, Resume).WillRepeatedly([&] { latch.count_down(); });
-    EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
-    EXPECT_CALL(task->mock, ResumeState)
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED))
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
+{
+    for (size_t i = 0; i < GetParam(); ++i)
+    {
+        std::latch       latch{2};
+        std::stop_source ss;
 
-    tinycoro::detail::AtomicQueue<std::unique_ptr<tinycoro::detail::ISchedulableBridged>, 128> queue;
+        std::unique_ptr<Schedubable> task = std::make_unique<Schedubable>();
 
-    tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
+        EXPECT_CALL(task->mock, Resume).WillRepeatedly([&] { latch.count_down(); });
+        EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
+        EXPECT_CALL(task->mock, ResumeState)
+            .WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED))
+            .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
-    queue.try_push(std::move(task));
+        tinycoro::detail::AtomicQueue<std::unique_ptr<tinycoro::detail::ISchedulableBridged>, 128> queue;
 
-    latch.wait();
-    ss.request_stop();
+        tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
+
+        queue.try_push(std::move(task));
+
+        latch.wait();
+        queue.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT);
+    }
 }
