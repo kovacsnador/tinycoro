@@ -816,7 +816,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners)
         tasks.push_back(listeners());
     }
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
 }
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners_multi_waiters)
@@ -844,7 +844,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListeners_multi_waite
         tasks.push_back(producer());
     }
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
 }
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
@@ -869,7 +869,7 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_waitForListenersClose)
     }
     tasks.push_back(producer());
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, tasks));
+    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
 }
 
 TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_PushWait_cancel)

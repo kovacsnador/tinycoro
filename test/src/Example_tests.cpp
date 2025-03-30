@@ -36,15 +36,6 @@ TEST_F(ExampleTest, Example_voidTaskTest)
     EXPECT_NO_THROW(future.get());
 }
 
-TEST_F(ExampleTest, Example_taskView)
-{
-    auto task = []() -> tinycoro::Task<void> { co_return; };
-
-    auto coro = task();
-
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, coro.TaskView()));
-}
-
 TEST_F(ExampleTest, Example_returnValueTask)
 {
     auto task = []() -> tinycoro::Task<int32_t> { co_return 42; };
@@ -248,7 +239,7 @@ TEST_F(ExampleTest, Example_multiTasksDynamic)
     tasks.push_back(task2());
     tasks.push_back(task3());
 
-    auto futures = scheduler.Enqueue(tasks);
+    auto futures = scheduler.Enqueue(std::move(tasks));
     auto results = tinycoro::GetAll(futures);
 
     EXPECT_EQ(results[0], 41);
@@ -647,7 +638,7 @@ TEST_F(ExampleTest, Example_AnyOfDynamic)
     tasks.push_back(task1(2s));
     tasks.push_back(task1(3s));
 
-    auto results = tinycoro::AnyOf(scheduler, tasks);
+    auto results = tinycoro::AnyOf(scheduler, std::move(tasks));
 
     EXPECT_TRUE(results[0].value() > 0);
     EXPECT_FALSE(results[1].has_value());
@@ -672,7 +663,7 @@ TEST_F(ExampleTest, Example_AnyOfDynamicVoid)
     tasks.push_back(task1(20ms));
     tasks.push_back(task1(30ms));
 
-    EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, tasks));
+    EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, std::move(tasks)));
 }
 
 TEST_F(ExampleTest, Example_AnyOfVoidException)

@@ -217,7 +217,6 @@ catch(const std::exception& e)
 * [Examples](#examples)
     - [Scheduler](#scheduler)
     - [Task](#task)
-    - [TaskView](#taskview)
     - [BoundTask](#boundtask)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
@@ -296,23 +295,6 @@ void Example_voidTask()
 }
 ```
 For simplicity, if you want to return void, you can also write `tinycoro::Task<>`. The default template parameter here is `void``. 
-
-### `TaskView`
-If you don't want to give full ownership of a coroutine to the scheduler, you can use TaskView, which allows you to retain control over the coroutine's lifecycle while still scheduling it for execution.
-
-```cpp
-#include <tinycoro/tinycoro_all.h>
-
-void Example_taskView(tinycoro::Scheduler& scheduler)
-{
-    auto task = []() -> tinycoro::Task<void> {
-        co_return;
-    };
-
-    auto coro   = task();
-    tinycoro::GetAll(scheduler, coro.TaskView());
-}
-```
 
 ### `BoundTask`
 If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::BoundTask<>`, which is a specialized task that encapsulates both the `tinycoro::Task<>` and the coroutine function. This ensures that the task cannot outlive its coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.

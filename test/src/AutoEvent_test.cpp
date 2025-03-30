@@ -148,7 +148,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest)
     }
     tasks.push_back(autoEventProducer());
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 }
 
 TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
@@ -173,7 +173,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
         tasks.push_back(autoEventConsumer());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 
     EXPECT_EQ(count, autoCount);
 }
@@ -239,7 +239,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel)
         tasks.push_back(autoEventConsumer());
     }
 
-    auto results = tinycoro::AnyOf(scheduler, tasks);
+    auto results = tinycoro::AnyOf(scheduler, std::move(tasks));
 
     for(size_t i = 1; i < count + 1; ++i)
     {
@@ -316,7 +316,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
 
     // Signal the event
     event.Set();
-    tinycoro::AnyOf(scheduler, tasks);
+    tinycoro::AnyOf(scheduler, std::move(tasks));
 
     // Only one waiter should have been resumed
     EXPECT_EQ(counter, 1);
@@ -347,7 +347,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 
     // Since event is auto-resetting, each Set should trigger only one waiter
     EXPECT_EQ(counter, GetParam());

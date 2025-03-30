@@ -7,16 +7,6 @@
 
 #include "mock/CoroutineHandleMock.h"
 
-template<typename T>
-struct IsTaskView : std::false_type
-{
-};
-
-template<typename PromiseT, typename AwaiterT, typename CoroResumerT, typename StopSourceT>
-struct IsTaskView<tinycoro::CoroTaskView<PromiseT, AwaiterT, CoroResumerT, StopSourceT>> : std::true_type
-{
-};
-
 TEST(TaskTest, TaskTest_void)
 {
     auto task = []()->tinycoro::Task<void> { co_return; }();
@@ -27,8 +17,6 @@ TEST(TaskTest, TaskTest_void)
     task.Resume();
 
     EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
-    EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
-
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
 
@@ -50,7 +38,6 @@ TEST(TaskTest, TaskTest_int)
     task.Resume();
 
     EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
-    EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
 
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
@@ -136,5 +123,4 @@ TEST(CoroTaskTest, CoroTaskTest)
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
     
-    EXPECT_TRUE(IsTaskView<decltype(task.TaskView())>::value);
 }

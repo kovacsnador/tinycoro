@@ -54,7 +54,7 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
         tasks.push_back(task());
     }
 
-    auto results = tinycoro::GetAll(scheduler, tasks);
+    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;
