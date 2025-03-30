@@ -81,19 +81,29 @@ namespace tinycoro { namespace detail {
         {
         }
 
+        // disable copy and move
+        SchedulerWorker(SchedulerWorker&&) = delete;
+
         ~SchedulerWorker()
         {
             if (joinable())
+            {
                 join();
+            }
+                
+            // only in the destructor is cleaned up
+            // the paused task container.
+            //
+            // at this point all the other workers are done,
+            // and nobody can resume a paused task
+            // so we can clean up here safely
+            _Cleanup(_pausedTasks);
         }
 
         void join()
         {
             // join the thread
             _thread.join();
-
-            // cleans up every task
-            //_CleanUpDanglingTasks();
         }
 
         auto joinable() { return _thread.joinable(); }
@@ -113,7 +123,7 @@ namespace tinycoro { namespace detail {
 
                     if (_cachedTasks.empty())
                     {
-                        // the cache is empty, so we can 
+                        // the cache is empty, so we can
                         // wait safely for new tasks...
                         _sharedTasks.wait_for_pop();
                         continue;
@@ -299,28 +309,22 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        void _Cleanup(auto& tasks)
+        {
+            auto it = tasks.begin();
+            while (it != nullptr)
+            {
+                auto  next = it->next;
+                TaskT destroyer{it};
+                it = next;
+            }
+        }
+
         void _CleanUpDanglingTasks() noexcept
         {
-            auto cleanup = [](auto tasks) {
-                auto it = tasks.begin();
-                while (it != nullptr)
-                {
-                    auto  next = it->next;
-                    TaskT destroyer{it};
-                    it = next;
-                }
-            };
-
-            {
-                std::scoped_lock lock{_pausedTasksMtx};
-                // clean up dangling paused tasks
-                // after stop was requested
-                cleanup(_pausedTasks);
-            }
-
             // clean up dangling cahced tasks
             // after stop was requested
-            cleanup(_cachedTasks);
+            _Cleanup(_cachedTasks);
 
             // destroys all the shared tasks
             // asynchronously, so all workers at
