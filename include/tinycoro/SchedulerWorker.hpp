@@ -15,9 +15,9 @@ namespace tinycoro { namespace detail {
         // a stop purposed by the scheduler
         static constexpr std::nullptr_t SCHEDULER_STOP_EVENT{nullptr};
 
-        bool PushTask(auto task, auto& queue, const auto& stopToken) noexcept
+        bool PushTask(auto task, auto& queue, const auto& stopObject) noexcept
         {
-            while (stopToken.stop_requested() == false)
+            while (stopObject.stop_requested() == false)
             {
                 if (queue.try_push(std::move(task)))
                 {
@@ -59,10 +59,11 @@ namespace tinycoro { namespace detail {
             // try to push the close event into the task queue
             while (queue.try_push(SCHEDULER_STOP_EVENT) == false)
             {
-                // clear the queue and try push
-                // SCHEDULER_STOP_EVENT again
+                // try to remove one element
+                // in order to make place for
+                // SCHEDULER_STOP_EVENT
                 typename QueueT::value_type destroyer{nullptr};
-                queue.try_pop(destroyer);
+                std::ignore = queue.try_pop(destroyer);
             }
         }
 
@@ -88,9 +89,12 @@ namespace tinycoro { namespace detail {
         {
             if (joinable())
             {
+                // this is here just for
+                // safety reasons, join should be called
+                // from the owner scheduler.
                 join();
             }
-                
+
             // only in the destructor is cleaned up
             // the paused task container.
             //
@@ -100,13 +104,9 @@ namespace tinycoro { namespace detail {
             _Cleanup(_pausedTasks);
         }
 
-        void join()
-        {
-            // join the thread
-            _thread.join();
-        }
+        void join() { _thread.join(); }
 
-        auto joinable() { return _thread.joinable(); }
+        [[nodiscard]] auto joinable() const noexcept { return _thread.joinable(); }
 
     private:
         void Run(std::stop_token stopToken)
