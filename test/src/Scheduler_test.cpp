@@ -281,7 +281,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
     tasks.push_back(task(10ms));
 
     auto start = std::chrono::system_clock::now();
-    tinycoro::AnyOf(scheduler, tasks);
+    tinycoro::AnyOf(scheduler, std::move(tasks));
 
     EXPECT_TRUE(std::chrono::system_clock::now() - start < duration);
     EXPECT_EQ(cc, 1);

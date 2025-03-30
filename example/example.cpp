@@ -26,7 +26,6 @@
 #include "NestedTask_example.h"
 #include "ReturnValueTask_example.h"
 #include "Sleep_example.h"
-#include "TaskView_example.h"
 #include "UsageWithStopToken_example.h"
 #include "VoidTask_example.h"
 
@@ -44,8 +43,6 @@ int main()
     tinycoro::Scheduler scheduler;
     {
         Example_voidTask(scheduler);
-
-        Example_taskView(scheduler);
 
         Example_returnValueTask(scheduler);
 

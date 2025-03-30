@@ -28,7 +28,7 @@ void Example_AnyOfDynamic(auto& scheduler)
     tasks.push_back(task1(2s));
     tasks.push_back(task1(3s));
 
-    auto results = tinycoro::AnyOf(scheduler, tasks);
+    auto results = tinycoro::AnyOf(scheduler, std::move(tasks));
 
     SyncOut() << "co_return => " << results[0].value() << '\n';
 }

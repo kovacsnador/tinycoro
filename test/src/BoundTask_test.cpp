@@ -20,9 +20,6 @@ struct TaskWrapperMockImpl
     struct PauseHandlerMock
     {
     };
-    struct TaskViewMock
-    {
-    };
 
     MOCK_METHOD(void, await_ready, ());
     MOCK_METHOD(void, await_resume, ());
@@ -33,7 +30,6 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
     MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
-    MOCK_METHOD(TaskViewMock, TaskView, (), (const, noexcept));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, SetDestroyNotifier, (std::function<void()>));
     MOCK_METHOD(void*, Address, (), (const noexcept));
@@ -66,8 +62,6 @@ struct TaskWrapperMock
     auto SetPauseHandler(auto pauseResume) { return impl->SetPauseHandler(std::move(pauseResume)); }
 
     auto GetPauseHandler() noexcept { return impl->GetPauseHandler(); }
-
-    [[nodiscard]] auto TaskView() const noexcept { return impl->TaskView(); }
 
     template <typename U>
     void SetStopSource(U&& arg)
@@ -129,18 +123,6 @@ TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
 
     auto pauseHandler = taskWrapper.SetPauseHandler(std::function<void()>{});
     EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
-}
-
-
-TEST(BoundTaskTest, BoundTaskTest_TaskView)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, TaskView).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    auto                taskView = taskWrapper.TaskView();
-    EXPECT_TRUE((std::same_as<decltype(taskView), TaskWrapperMockImpl::TaskViewMock>));
 }
 
 TEST(BoundTaskTest, BoundTaskTest_SetStopSource)
@@ -273,7 +255,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_MultiTasks)
         tasks.push_back(tinycoro::MakeBound(coro));
     }
 
-    auto results = tinycoro::GetAll(scheduler, tasks);
+    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;
@@ -312,7 +294,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_coawait_task_multi)
         tasks.push_back(tinycoro::MakeBound(coro));
     }
 
-    auto results = tinycoro::GetAll(scheduler, tasks);
+    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;

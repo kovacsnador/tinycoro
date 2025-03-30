@@ -83,7 +83,7 @@ namespace tinycoro {
             }
 
             template <template <typename> class FutureStateT = std::promise, concepts::Iterable ContainerT>
-                requires concepts::FutureState<FutureStateT<void>>
+                requires concepts::FutureState<FutureStateT<void>> && (!std::is_reference_v<ContainerT>)
             [[nodiscard]] auto Enqueue(ContainerT&& tasks)
             {
                 // get the result value
@@ -101,14 +101,8 @@ namespace tinycoro {
 
                 for (auto&& task : tasks)
                 {
-                    if constexpr (std::is_rvalue_reference_v<decltype(tasks)>)
-                    {
-                        futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
-                    }
-                    else
-                    {
-                        futures.emplace_back(EnqueueImpl<FutureStateT>(task.TaskView()));
-                    }
+                    // register tasks and collect all the futures
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
                 }
 
                 return futures;

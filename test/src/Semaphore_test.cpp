@@ -214,7 +214,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
     EXPECT_EQ(count, param);
 }
 
@@ -243,7 +243,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_double)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
     EXPECT_EQ(count, param * 2);
 }
 
@@ -279,7 +279,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
     EXPECT_TRUE(max <= 4);
 }
 

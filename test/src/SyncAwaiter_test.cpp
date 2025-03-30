@@ -376,7 +376,7 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
             tasks.push_back(task());
         }
 
-        auto results = co_await tinycoro::SyncAwait(scheduler, tasks);
+        auto results = co_await tinycoro::SyncAwait(scheduler, std::move(tasks));
 
         EXPECT_EQ(results.size(), count);
 
@@ -411,7 +411,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
             tasks.push_back(task());
         }
 
-        auto results = co_await tinycoro::AnyOfAwait(scheduler, tasks);
+        auto results = co_await tinycoro::AnyOfAwait(scheduler, std::move(tasks));
 
         // check for unique values
         std::set<size_t> set;
@@ -448,7 +448,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
             tasks.push_back(task(count));
         }
 
-        auto results = co_await tinycoro::AnyOfAwait(scheduler, tasks);
+        auto results = co_await tinycoro::AnyOfAwait(scheduler, std::move(tasks));
 
         EXPECT_EQ(count, 1);
         EXPECT_EQ(results.size(), size);
@@ -491,7 +491,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
         tasks.push_back(task(1000ms));
         tasks.push_back(task(2000ms));
 
-        co_await tinycoro::AnyOfAwait(scheduler, tasks);
+        co_await tinycoro::AnyOfAwait(scheduler, std::move(tasks));
 
         EXPECT_EQ(count, 1);
     };
@@ -525,7 +525,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         tasks.push_back(task(1000ms));
         //tasks.push_back(task(2000ms));
 
-        EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, tasks), std::runtime_error);
+        EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, std::move(tasks)), std::runtime_error);
 
         EXPECT_EQ(count, 0);
     };

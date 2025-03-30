@@ -318,7 +318,7 @@ TEST_P(BarrierTest, BarrierFunctionalTest_1)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 
     EXPECT_EQ(number, 0);
 }
@@ -504,7 +504,7 @@ TEST_P(BarrierTest, BarrierTest_functionalTest_3)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 }
 
 TEST(BarrierTest, BarrierTest_functionalTest_cancel_scheduler)
@@ -649,7 +649,7 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
     }
     tasks.push_back(worker());
 
-    tinycoro::GetAll(scheduler, tasks);
+    tinycoro::GetAll(scheduler, std::move(tasks));
 }
 
 TEST(BarrierTest, BarrierTest_completionException)
