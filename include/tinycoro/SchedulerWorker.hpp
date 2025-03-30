@@ -48,8 +48,8 @@ namespace tinycoro { namespace detail {
             // after SCHEDULER_STOP_EVENT push...
             while (queue.full())
             {
-                typename QueueT::value_type task{nullptr};
-                if (queue.try_pop(task))
+                typename QueueT::value_type destroyer{nullptr};
+                if (queue.try_pop(destroyer))
                 {
                     // erase at least 1 element
                     break;
@@ -61,8 +61,8 @@ namespace tinycoro { namespace detail {
             {
                 // clear the queue and try push
                 // SCHEDULER_STOP_EVENT again
-                typename QueueT::value_type task{nullptr};
-                queue.try_pop(task);
+                typename QueueT::value_type destroyer{nullptr};
+                queue.try_pop(destroyer);
             }
         }
 
@@ -95,7 +95,7 @@ namespace tinycoro { namespace detail {
             // the paused task container.
             //
             // at this point all the other workers are done,
-            // and nobody can resume a paused task
+            // and nobody can resume a paused task (at least not from this scheduler...)
             // so we can clean up here safely
             _Cleanup(_pausedTasks);
         }
@@ -157,7 +157,9 @@ namespace tinycoro { namespace detail {
                 }
             }
 
-            _CleanUpDanglingTasks();
+            // clean up all the local cached tasks
+            // this can be done asynchronously...
+            _Cleanup(_cachedTasks);
         }
 
         // Generates the pause resume callback
@@ -205,7 +207,7 @@ namespace tinycoro { namespace detail {
             task->SetPauseHandler(GeneratePauseResume(task.get()));
 
             using enum ETaskResumeState;
-            for (;;)
+            while (_stopToken.stop_requested() == false)
             {
                 // resume the task
                 task->Resume();
@@ -311,28 +313,14 @@ namespace tinycoro { namespace detail {
 
         void _Cleanup(auto& tasks)
         {
+            // iterates over the elements
+            // and destroys it
             auto it = tasks.begin();
             while (it != nullptr)
             {
                 auto  next = it->next;
                 TaskT destroyer{it};
                 it = next;
-            }
-        }
-
-        void _CleanUpDanglingTasks() noexcept
-        {
-            // clean up dangling cahced tasks
-            // after stop was requested
-            _Cleanup(_cachedTasks);
-
-            // destroys all the shared tasks
-            // asynchronously, so all workers at
-            // the same time.
-            while (_sharedTasks.empty() == false)
-            {
-                TaskT destroyer{nullptr};
-                _sharedTasks.try_pop(destroyer);
             }
         }
 
