@@ -143,16 +143,26 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        /*void clear() noexcept
+        {
+            auto head = _head.load(std::memory_order_relaxed);
+            _tail.store(head, std::memory_order_relaxed);
+            _tail.notify_all();
+        }*/
+
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
+
+        [[nodiscard]] bool full() const noexcept { return _head.load(std::memory_order_relaxed) - SIZE == _tail.load(std::memory_order_relaxed); }
+
 
     private:
         struct Element
         {
             std::atomic<sequence_t> _sequence{};
-            value_type            _value{};
+            value_type              _value{};
         };
 
-        // the buffer mask. Should be for examle 0xFFFFF
+        // the buffer mask. Should be for example 0xFFFFF
         static constexpr sequence_t BUFFER_MASK{SIZE - 1};
 
         // the pointer of the ringbuffer

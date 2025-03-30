@@ -34,6 +34,37 @@ namespace tinycoro { namespace detail {
             _last = newNode;
         }
 
+        void push_front(value_type* newNode) noexcept
+        {
+            assert(newNode);
+            assert(newNode->next == nullptr);
+
+            ++_size;
+
+            if (_first)
+            {
+                newNode->next = _first;
+
+                if constexpr (concepts::DoubleLinkable<NodeT>)
+                {
+                    _first->prev = newNode;
+                }
+
+                _first = newNode;
+            }
+            else
+            {
+                _first = newNode;
+                _last = newNode;
+            }
+
+            if constexpr (concepts::DoubleLinkable<NodeT>)
+            {
+                newNode->prev = nullptr;
+            }
+        }
+
+
         void concat(LinkedPtrQueue& other)
         {
             if (_first == nullptr)
@@ -62,7 +93,7 @@ namespace tinycoro { namespace detail {
             std::ignore = other.steal();
         }
 
-        // Pops and return the poped node.
+        // Pops and return the popped node.
         [[nodiscard]] value_type* pop() noexcept
         {
             auto top = _first;
@@ -82,6 +113,8 @@ namespace tinycoro { namespace detail {
                         _first->prev = nullptr;
                     }
                 }
+
+                top->next = nullptr;
             }
             return top;
         }
@@ -152,6 +185,8 @@ namespace tinycoro { namespace detail {
                             _last = _first;
                         }
 
+                        elem->next = nullptr;
+
                         --_size;
                         return true;
                     }
@@ -170,6 +205,8 @@ namespace tinycoro { namespace detail {
                                 // we have a new last element
                                 _last = current;
                             }
+
+                            elem->next = nullptr;
 
                             --_size;
                             return true;

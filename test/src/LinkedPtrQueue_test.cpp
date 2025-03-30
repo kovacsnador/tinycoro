@@ -49,6 +49,8 @@ TEST_F(LinkedPtrQueueTest, PopRemovesTopNode) {
     stack.push(&node2);
     MockNodeQ* poppedNode = stack.pop();
     
+    EXPECT_EQ(poppedNode->next, nullptr);
+
     EXPECT_EQ(poppedNode, &node1);
     EXPECT_EQ(stack.begin(), &node2);
 }
@@ -114,6 +116,7 @@ TEST_F(LinkedPtrQueueTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.begin();
@@ -135,6 +138,7 @@ TEST_F(LinkedPtrQueueTest, EraseMiddle) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -156,6 +160,7 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
     auto top = stack.steal();
@@ -191,6 +196,43 @@ TEST_F(LinkedPtrQueueTest, Concat) {
         it = it->next;
     }
     EXPECT_EQ(count, 6);    
+}
+
+TEST_F(LinkedPtrQueueTest, push_front) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    EXPECT_TRUE(stack.erase(&node2));
+    EXPECT_EQ(node2.next, nullptr);
+
+    stack.push_front(&node2);
+    EXPECT_EQ(node2.next, &node1);
+
+    EXPECT_EQ(stack.pop(), &node2);
+
+    stack.push_front(&node2);
+    EXPECT_EQ(node2.next, &node1);
+
+    EXPECT_EQ(stack.pop(), &node2);
+}
+
+TEST_F(LinkedPtrQueueTest, push_front_first_elem) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+    
+    EXPECT_TRUE(stack.erase(&node1));
+    EXPECT_EQ(node1.next, nullptr);
+
+    stack.push_front(&node1);
+    EXPECT_EQ(node1.next, &node2);
+
+    EXPECT_EQ(stack.pop(), &node1);
 }
 
 TEST_F(LinkedPtrQueueTest, Concat_empty) {

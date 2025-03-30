@@ -17,7 +17,7 @@ INSTANTIATE_TEST_SUITE_P(BarrierTest,
                                          5,
                                          10,
                                          100,100,100,100,100,100,
-                                         1000,
+                                         100,100,100,100,100,100,
                                          10000));
 
 TEST_P(BarrierTest, BarrierTest_arrive)
@@ -536,7 +536,7 @@ TEST_P(BarrierTest, BarrierTest_cancel_multi)
     tinycoro::Scheduler scheduler;
     tinycoro::SoftClock clock;
 
-    tinycoro::Barrier barrier{count};
+    tinycoro::Barrier barrier{count * 3};
 
     auto task1 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.Wait()); };
     auto task2 = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
