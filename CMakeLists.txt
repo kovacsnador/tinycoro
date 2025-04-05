@@ -32,8 +32,8 @@ endif()
 
 if (WithASAN)
     message("Setting sanitizers...")
-    add_compile_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
-    add_link_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
+    add_compile_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak, -fsanitize=thread)
+    add_link_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak, -fsanitize=thread)
 
     set(ENV{LSAN_OPTIONS} "verbosity=2:log_threads=1")
 endif()
