@@ -10,6 +10,7 @@
 #include <stop_token>
 
 #include "Common.hpp"
+#include "UnsafeFuture.hpp"
 
 namespace tinycoro {
 
@@ -21,7 +22,6 @@ namespace tinycoro {
         template <typename T>
         concept Future = requires (T t) {
             { t.get() };
-            { t.valid() } -> std::same_as<bool>;
         };
 
         template <typename... Ts>
@@ -192,7 +192,7 @@ namespace tinycoro {
         }
     [[nodiscard]] auto GetAll(SchedulerT& scheduler, Args&&... args)
     {
-        auto future = scheduler.Enqueue(std::forward<Args>(args)...);
+        auto future = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...);
         return GetAll(future);
     }
 
@@ -201,7 +201,7 @@ namespace tinycoro {
     {
         (tasks.SetStopSource(source), ...);
 
-        auto futures = scheduler.Enqueue(std::forward<CoroTasksT>(tasks)...);
+        auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroTasksT>(tasks)...);
         return GetAll(futures);
     }
 
@@ -210,7 +210,7 @@ namespace tinycoro {
     {
         std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
 
-        auto futures = scheduler.Enqueue(std::forward<CoroContainerT>(tasks));
+        auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroContainerT>(tasks));
         return GetAll(futures);
     }
 

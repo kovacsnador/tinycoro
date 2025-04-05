@@ -11,7 +11,6 @@
 #include <ranges>
 #include <cstddef>
 
-#include "Future.hpp"
 #include "Common.hpp"
 #include "PauseHandler.hpp"
 #include "PackagedTask.hpp"
