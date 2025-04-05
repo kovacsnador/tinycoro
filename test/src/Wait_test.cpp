@@ -5,7 +5,7 @@
 #include <utility>
 #include <concepts>
 
-#include <tinycoro/Future.hpp>
+#include <tinycoro/UnsafeFuture.hpp>
 #include <tinycoro/Wait.hpp>
 
 #include "tinycoro/tinycoro_all.h"
@@ -23,9 +23,9 @@ template <typename t>
 class TD;
 
 using GetAllTestTypes = testing::Types<std::promise<std::optional<int32_t>>,
-                                       tinycoro::FutureState<std::optional<int32_t>>,
+                                       tinycoro::unsafe::Promise<std::optional<int32_t>>,
                                        std::promise<std::optional<tinycoro::VoidType>>,
-                                       tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
+                                       tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(GetAllTest, GetAllTestTypes);
 
@@ -198,7 +198,7 @@ struct GetAllTestWithTupleMixedFutureState : testing::Test
     using value_type = T;
 };
 
-using GetAllTestWithTupleMixedFutureStateTypes = testing::Types<tinycoro::FutureState<std::optional<int32_t>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
+using GetAllTestWithTupleMixedFutureStateTypes = testing::Types<tinycoro::unsafe::Promise<std::optional<int32_t>>, tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(GetAllTestWithTupleMixedFutureState, GetAllTestWithTupleMixedFutureStateTypes);
 
@@ -272,13 +272,19 @@ TYPED_TEST(GetAllTestWithTupleMixedFutureState, GetAllTest_tuple_mixedTypes_std_
     using PromiseT = TestFixture::value_type;
     using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
 
-    GetAllTestWithTupleMixedTestHelper<tinycoro::FutureState, PromiseT, ValueT>();
+    GetAllTestWithTupleMixedTestHelper<tinycoro::unsafe::Promise, PromiseT, ValueT>();
 }
 
 template <typename ReturnT>
 struct SchedulerTestMock
 {
-    MOCK_METHOD(ReturnT, Enqueue, ());
+    template<template<typename> class PromiseT>
+    auto Enqueue()
+    {
+        return EnqueueMethod();
+    }
+
+    MOCK_METHOD(ReturnT, EnqueueMethod, ());
 };
 
 template <typename T>
@@ -288,7 +294,7 @@ struct AnyOfWithStopSourceTest : testing::Test
 };
 
 using AnyOfWithStopSourceTypes
-    = testing::Types<std::promise<std::optional<int32_t>>, std::promise<std::optional<tinycoro::VoidType>>, tinycoro::FutureState<std::optional<int32_t>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
+    = testing::Types<std::promise<std::optional<int32_t>>, std::promise<std::optional<tinycoro::VoidType>>, tinycoro::unsafe::Promise<std::optional<int32_t>>, tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(AnyOfWithStopSourceTest, GetAllTestWithTupleMixedTypes);
 
@@ -322,7 +328,7 @@ TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
 
     if constexpr (requires { std::ignore = tinycoro::AnyOfWithStopSource(scheduler, stopSource); })
@@ -348,7 +354,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_exception)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
     EXPECT_THROW(tinycoro::AnyOf(scheduler), std::runtime_error);
 }
 
@@ -362,7 +368,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
     auto result = tinycoro::AnyOf(scheduler);
 
@@ -380,7 +386,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t_exception)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
     EXPECT_THROW([&scheduler]{std::ignore = tinycoro::AnyOf(scheduler);}(), std::runtime_error);
 }
@@ -402,7 +408,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
 
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
-    EXPECT_CALL(scheduler, Enqueue).WillOnce(testing::Invoke(cb));
+    EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
     auto results = tinycoro::AnyOf(scheduler);
 

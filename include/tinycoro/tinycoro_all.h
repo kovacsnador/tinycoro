@@ -7,7 +7,6 @@
 #include "Task.hpp"
 #include "Exception.hpp"
 #include "Finally.hpp"
-#include "Future.hpp"
 #include "Generator.hpp"
 #include "PackagedTask.hpp"
 #include "Scheduler.hpp"

@@ -4,7 +4,7 @@
 #include <future>
 
 #include <tinycoro/PackagedTask.hpp>
-#include <tinycoro/Future.hpp>
+#include <tinycoro/UnsafeFuture.hpp>
 
 #include "mock/TaskMock.hpp"
 
@@ -26,9 +26,9 @@ struct PackagedTaskTest : public testing::Test
 using PackagedTaskTestTypes = testing::Types<std::promise<std::optional<int32_t>>,
                                              std::promise<std::optional<tinycoro::VoidType>>,
                                              std::promise<std::optional<Ex>>,
-                                             tinycoro::FutureState<std::optional<int32_t>>,
-                                             tinycoro::FutureState<std::optional<tinycoro::VoidType>>,
-                                             tinycoro::FutureState<std::optional<Ex>>>;
+                                             tinycoro::unsafe::Promise<std::optional<int32_t>>,
+                                             tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>,
+                                             tinycoro::unsafe::Promise<std::optional<Ex>>>;
 
 TYPED_TEST_SUITE(PackagedTaskTest, PackagedTaskTestTypes);
 
@@ -106,7 +106,7 @@ struct PackagedTaskTestException : public testing::Test
     using value_type = T;
 };
 
-using PackagedTaskTestExceptionTypes = testing::Types<std::promise<std::optional<tinycoro::VoidType>>, tinycoro::FutureState<std::optional<tinycoro::VoidType>>>;
+using PackagedTaskTestExceptionTypes = testing::Types<std::promise<std::optional<tinycoro::VoidType>>, tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>>;
 
 TYPED_TEST_SUITE(PackagedTaskTestException, PackagedTaskTestExceptionTypes);
 
