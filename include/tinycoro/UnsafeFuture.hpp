@@ -19,7 +19,9 @@ namespace tinycoro {
         template <typename ValueT>
         struct SharedState
         {
-            enum struct EState : int32_t
+            // Don't change the order here
+            // it is important for get()
+            enum struct EState : uint8_t
             {
                 UNSET         = 0,
                 SETTING       = 1,
@@ -97,7 +99,7 @@ namespace tinycoro {
 
                 _state.store(state(), std::memory_order_release);
 
-                // we are notify only one waiter
+                // we are notifying only one waiter,
                 // this is for performance reason
                 //
                 // in our scenario this is perfectly safe
