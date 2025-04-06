@@ -15,12 +15,12 @@ namespace tinycoro {
         {
         }
 
-        ReleaseGuard(ReleaseGuard&& other)
+        ReleaseGuard(ReleaseGuard&& other) noexcept
         : _device{std::exchange(other._device, nullptr)}
         {
         }
 
-        ReleaseGuard& operator=(ReleaseGuard&& other)
+        ReleaseGuard& operator=(ReleaseGuard&& other) noexcept
         {
             unlock();
             _device = std::exchange(other._device, nullptr);

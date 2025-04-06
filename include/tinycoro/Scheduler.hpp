@@ -121,7 +121,7 @@ namespace tinycoro {
                 // check against void
                 // if not void we create a std::optional
                 // to support cancellation
-                using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type;
+                using futureValue_t = typename detail::FutureReturnT<desiredValue_t>::value_type;
 
                 FutureStateT<futureValue_t> futureState;
 

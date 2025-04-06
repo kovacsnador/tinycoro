@@ -41,7 +41,7 @@ namespace tinycoro {
     {
         static constexpr auto value = NthArgument;
 
-        IndexedArgument(T d)
+        explicit IndexedArgument(T d)
         : data{d}
         {
         }

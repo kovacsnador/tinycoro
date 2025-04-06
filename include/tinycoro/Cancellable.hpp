@@ -22,7 +22,7 @@ namespace tinycoro {
 
     public:
         // accepts only r-value refs
-        Cancellable(AwaiterT&& awaiter)
+        explicit Cancellable(AwaiterT&& awaiter)
         : _awaiter{awaiter}
         {
         }

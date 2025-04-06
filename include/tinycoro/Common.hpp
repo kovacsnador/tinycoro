@@ -175,7 +175,7 @@ namespace tinycoro {
         };
 
         template <typename T>
-        using TaskResult_t = TaskResultType<T>::value_type;
+        using TaskResult_t = typename TaskResultType<T>::value_type;
 
         template<auto Number>
         struct IsPowerOf2
@@ -203,7 +203,7 @@ namespace tinycoro {
                 AutoResetEvent() = default;
 
                 // Start with a custom flag
-                AutoResetEvent(bool flag)
+                explicit AutoResetEvent(bool flag)
                 : _flag{flag}
                 {
                 }
@@ -211,7 +211,7 @@ namespace tinycoro {
                 // sets the event
                 void Set()
                 {
-                    _flag.store(true);
+                    _flag.store(true, std::memory_order_release);
                     _flag.notify_all();
                 }
 
@@ -222,7 +222,7 @@ namespace tinycoro {
                     _flag.wait(false);
 
                     bool expected{true};
-                    return _flag.compare_exchange_strong(expected, false);
+                    return _flag.compare_exchange_strong(expected, false, std::memory_order_release, std::memory_order_relaxed);
                 }
 
                 [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }

@@ -32,7 +32,7 @@ namespace tinycoro {
             CancellationToken() = default;
 
             // allow move construction
-            CancellationToken(CancellationToken&& other)
+            CancellationToken(CancellationToken&& other) noexcept
             {
                 std::scoped_lock lock{_mtx, other._mtx};
                 _cancellationCallback       = std::move(other._cancellationCallback);
@@ -40,7 +40,7 @@ namespace tinycoro {
             }
 
             // allow move assignment
-            CancellationToken& operator=(CancellationToken&& other)
+            CancellationToken& operator=(CancellationToken&& other) noexcept
             {
                 if (this != std::addressof(other))
                 {

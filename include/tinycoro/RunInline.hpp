@@ -203,7 +203,7 @@ namespace tinycoro {
                     }
                     else
                     {
-                        using return_t = T::value_type;
+                        using return_t = typename T::value_type;
 
                         TaskResult_t<return_t> result{};
                         if (task.IsDone())

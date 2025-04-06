@@ -83,7 +83,7 @@ namespace tinycoro {
         template <typename U>
         auto yield_value(U&& v)
         {
-            _value = std::forward<U>(v);
+            _value.emplace(std::forward<U>(v));
             return AwaiterT{};
         }
 

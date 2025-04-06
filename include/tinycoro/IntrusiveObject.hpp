@@ -20,7 +20,7 @@ namespace tinycoro { namespace detail {
             _refCount.notify_all();
         }
 
-        auto Wait(uint32_t val) const
+        [[nodiscard]] auto Wait(uint32_t val) const noexcept
         {
             _refCount.wait(val, std::memory_order_relaxed);
             return _refCount.load(std::memory_order_relaxed);
@@ -34,7 +34,7 @@ namespace tinycoro { namespace detail {
 
     public:
 
-        auto RefCount() const { return _refCount.load(std::memory_order_relaxed); }
+        [[nodiscard]] auto RefCount() const noexcept { return _refCount.load(std::memory_order_relaxed); }
 
     private:
         std::atomic<uint32_t> _refCount{};

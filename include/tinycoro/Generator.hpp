@@ -110,9 +110,9 @@ namespace tinycoro {
 
             ~GeneratorT() { destroy(); }
 
-            auto begin() const { return GeneratorIterator<PromiseT>{_hdl}; }
+            [[nodiscard]] auto begin() const { return GeneratorIterator<PromiseT>{_hdl}; }
 
-            auto end() const { return typename GeneratorIterator<PromiseT>::Sentinel{}; }
+            [[nodiscard]] auto end() const { return typename GeneratorIterator<PromiseT>::Sentinel{}; }
 
         private:
             void destroy()
@@ -124,7 +124,6 @@ namespace tinycoro {
                 }
             }
 
-        private:
             CoroHandleType _hdl;
         };
     } // namespace detail
