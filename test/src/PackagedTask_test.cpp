@@ -80,7 +80,7 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 
         EXPECT_CALL(*task.mock, IsDone).Times(::testing::AnyNumber());
 
-        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
+        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise));
 
         packedTask->Resume();
     }
@@ -125,7 +125,7 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 
         EXPECT_CALL(*task.mock, await_resume()).Times(0); // Return any value you'd expect
 
-        auto packedTask = tinycoro::MakeSchedulableTask(std::move(task), std::move(promise));
+        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise));
 
         packedTask->Resume();
     }

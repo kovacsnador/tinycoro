@@ -12,8 +12,8 @@ namespace tinycoro {
     template <typename CoroutineFunctionT, typename TaskT>
     struct BoundTask : private TaskT
     {
-        using promise_type  = TaskT::promise_type;
-        using value_type = promise_type::value_type;
+        using promise_type  = typename TaskT::promise_type;
+        using value_type = typename promise_type::value_type;
 
         explicit BoundTask(CoroutineFunctionT function, TaskT task)
         : TaskT{std::move(task)}

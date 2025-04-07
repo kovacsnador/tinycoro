@@ -53,6 +53,9 @@ namespace tinycoro
                 }
             }
 
+            // in this case we need other
+            // as a simple reference instead of a const&,
+            // becasue we need to increment the ref count.
             IntrusivePtr& operator=(IntrusivePtr& other)
             {
                 if(std::holds_alternative<T>(_obj))

@@ -121,7 +121,7 @@ namespace tinycoro {
                 // check against void
                 // if not void we create a std::optional
                 // to support cancellation
-                using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type;
+                using futureValue_t = typename detail::FutureReturnT<desiredValue_t>::value_type;
 
                 FutureStateT<futureValue_t> futureState;
 
@@ -170,15 +170,15 @@ namespace tinycoro {
             std::vector<std::unique_ptr<Worker_t>> _workerThreads;
         };
 
-        static constexpr uint32_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
+        static constexpr uint64_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
 
     } // namespace detail
 
     // Custom scheduler with custom cache size
     template <uint64_t CACHE_SIZE>
-    using CustomScheduler = detail::CoroThreadPool<SchedulableTask, CACHE_SIZE>;
+    using CustomScheduler = detail::CoroThreadPool<detail::SchedulableTask, CACHE_SIZE>;
 
-    using Scheduler = detail::CoroThreadPool<SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;
+    using Scheduler = detail::CoroThreadPool<detail::SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;
 
 } // namespace tinycoro
 

@@ -240,10 +240,10 @@ TEST_P(ManualEventTest, ManualEventTest_cancel)
     }
 }
 
-TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel)
+TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_custom_cache_size)
 {
     const auto          count = GetParam();
-    tinycoro::Scheduler scheduler;
+    tinycoro::CustomScheduler<64> scheduler;
     tinycoro::SoftClock clock;
 
     tinycoro::ManualEvent event{true};

@@ -72,14 +72,14 @@ namespace tinycoro {
         [[nodiscard]] auto Pause()
         {
             assert(IsPaused() == false);
-            _state.fetch_or(c_pauseMask, std::memory_order::relaxed);
+            _state.fetch_or(c_pauseMask, std::memory_order_release);
             return _resumerCallback;
         }
 
         void Unpause()
         {
             assert(IsPaused());
-            _state.fetch_and(~c_pauseMask, std::memory_order::relaxed);
+            _state.fetch_and(~c_pauseMask, std::memory_order_release);
         }
 
         void SetCancellable(bool flag)
@@ -87,9 +87,9 @@ namespace tinycoro {
             assert(IsCancellable() != flag);
 
             if (flag)
-                _state.fetch_or(c_cancelMask, std::memory_order::relaxed);
+                _state.fetch_or(c_cancelMask, std::memory_order_release);
             else
-                _state.fetch_and(~c_cancelMask, std::memory_order::relaxed);
+                _state.fetch_and(~c_cancelMask, std::memory_order_release);
         }
 
         [[nodiscard]] bool IsPaused() const noexcept { return _state & c_pauseMask; }
