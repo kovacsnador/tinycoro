@@ -6,6 +6,7 @@
 #include <cstddef>
 
 #include "LinkedPtrQueue.hpp"
+#include "AtomicPtrStack.hpp"
 #include "Common.hpp"
 
 namespace tinycoro { namespace detail {
@@ -101,7 +102,7 @@ namespace tinycoro { namespace detail {
             // at this point all the other workers are done,
             // and nobody can resume a paused task (at least not from this scheduler...)
             // so we can clean up here safely
-            _Cleanup(_pausedTasks);
+            _Cleanup(_pausedTasks.begin());
         }
 
         void join() { _thread.join(); }
@@ -161,9 +162,13 @@ namespace tinycoro { namespace detail {
                 }
             }
 
+            // close the notified cache
+            // and make a proper task cleanup here
+            _Cleanup(_notifiedCachedTasks.close());
+
             // clean up all the local cached tasks
             // this can be done asynchronously...
-            _Cleanup(_cachedTasks);
+            _Cleanup(_cachedTasks.begin());
         }
 
         // Generates the pause resume callback
@@ -199,7 +204,32 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
-                    helper::PushTask(Task_t{taskPtr}, _sharedTasks, _stopToken);
+                    //helper::PushTask(Task_t{taskPtr}, _sharedTasks, _stopToken);
+
+                    Task_t task{taskPtr};
+
+                    if (_stopToken.stop_requested() == false)
+                    {
+                        // no stop was requested
+                        if (_sharedTasks.try_push(std::move(task)))
+                        {
+                            // push succeed
+                            // we simply return
+                            return;
+                        }
+
+                        // the queue is full
+                        // so we are saving this task,
+                        // and trying to push back into the
+                        // shared tasks queue later
+                        if(_notifiedCachedTasks.try_push(task.release()) == false)
+                        {
+                            // the _notifiedCachedTasks stack is closed
+                            // so reassign the value to the RAII task object
+                            // for proper destruction.
+                            task.reset(taskPtr);
+                        }
+                    }
                 }
             };
         }
@@ -293,6 +323,16 @@ namespace tinycoro { namespace detail {
 
         void _TryToUploadCachedTasks()
         {
+            // copy notified task to the cached tasks
+            auto taskPtr = _notifiedCachedTasks.steal();
+            while(taskPtr)
+            {
+                auto next = taskPtr->next;
+                taskPtr->next = nullptr;
+                _cachedTasks.push(taskPtr);
+                taskPtr = next;
+            }
+
             while (_cachedTasks.empty() == false)
             {
                 // get the first task from the cache
@@ -315,16 +355,15 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        void _Cleanup(auto& tasks)
+        void _Cleanup(auto taskPtr)
         {
             // iterates over the elements
             // and destroys it
-            auto it = tasks.begin();
-            while (it != nullptr)
+            while (taskPtr)
             {
-                auto  next = it->next;
-                Task_t destroyer{it};
-                it = next;
+                auto  next = taskPtr->next;
+                Task_t destroyer{taskPtr};
+                taskPtr = next;
             }
         }
 
@@ -343,6 +382,14 @@ namespace tinycoro { namespace detail {
         // It's intented to mimic the basic task rotation
         // even with a full shared tasks queue.
         detail::LinkedPtrQueue<typename Task_t::element_type> _cachedTasks;
+
+        // this pending task are waiting for resume.
+        //
+        // The tasks here were in paused state,
+        // but already notified for resumption.
+        // There was no place in the sharedTask queue
+        // so we save them here to garantie task continuation execuion 
+        detail::AtomicPtrStack<typename Task_t::element_type> _notifiedCachedTasks;
 
         // The scheduler stop token
         std::stop_token _stopToken;
