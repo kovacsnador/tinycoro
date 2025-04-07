@@ -133,17 +133,18 @@ namespace tinycoro {
             FutureStateT       _futureState;
             std::exception_ptr _exception{};
         };
+
+        using SchedulableTask = std::unique_ptr<detail::ISchedulableBridged>;
+
+        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
+            requires (!std::is_reference_v<CoroT>)
+        SchedulableTask MakeSchedulableTask(CoroT&& coro, FutureStateT futureState)
+        {
+            using BridgeType = detail::SchedulableBridgeImpl<CoroT, FutureStateT>;
+            return std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
+        }
+
     } // namespace detail
-
-    using SchedulableTask = std::unique_ptr<detail::ISchedulableBridged>;
-
-    template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
-        requires (!std::is_reference_v<CoroT>)
-    SchedulableTask MakeSchedulableTask(CoroT&& coro, FutureStateT futureState)
-    {
-        using BridgeType = detail::SchedulableBridgeImpl<CoroT, FutureStateT>;
-        return std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
-    }
 
 } // namespace tinycoro
 

@@ -173,7 +173,7 @@ namespace tinycoro { namespace detail {
             return [this, taskPtr]() {
                 if (_stopToken.stop_requested() == false)
                 {
-                    auto expected = taskPtr->pauseState.load(std::memory_order_acquire);
+                    auto expected = taskPtr->pauseState.load(std::memory_order_relaxed);
                     while (expected != EPauseState::PAUSED)
                     {
                         // If the notify callback invoked very quickly
