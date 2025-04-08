@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_FINALLY_HPP__
-#define __TINY_CORO_FINALLY_HPP__
+#ifndef TINY_CORO_FINALLY_HPP
+#define TINY_CORO_FINALLY_HPP
 
 #include <utility>
 #include <type_traits>
@@ -58,4 +58,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_FINALLY_HPP__
+#endif // TINY_CORO_FINALLY_HPP

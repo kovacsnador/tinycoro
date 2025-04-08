@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_STATIC_STORAGE_HPP__
-#define __TINY_CORO_STATIC_STORAGE_HPP__
+#ifndef TINY_CORO_STATIC_STORAGE_HPP
+#define TINY_CORO_STATIC_STORAGE_HPP
 
 #include <concepts>
 #include <memory>
@@ -101,4 +101,4 @@ namespace tinycoro { namespace detail {
 
 }} // namespace tinycoro::detail
 
-#endif //!__TINY_CORO_STATIC_STORAGE_HPP__
+#endif // TINY_CORO_STATIC_STORAGE_HPP

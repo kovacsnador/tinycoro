@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_LATCH_HPP__
-#define __TINY_CORO_LATCH_HPP__
+#ifndef TINY_CORO_LATCH_HPP
+#define TINY_CORO_LATCH_HPP
 
 #include <mutex>
 
@@ -142,4 +142,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_LATCH_HPP__
+#endif // TINY_CORO_LATCH_HPP

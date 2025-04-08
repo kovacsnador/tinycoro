@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SLEEP_AWAITER_HPP__
-#define __TINY_CORO_SLEEP_AWAITER_HPP__
+#ifndef TINY_CORO_SLEEP_AWAITER_HPP
+#define TINY_CORO_SLEEP_AWAITER_HPP
 
 #include <type_traits>
 #include <chrono>
@@ -90,4 +90,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SLEEP_AWAITER_HPP__
+#endif // TINY_CORO_SLEEP_AWAITER_HPP

@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_ATOMIC_QUEUE_HPP__
-#define __TINY_CORO_ATOMIC_QUEUE_HPP__
+#ifndef TINY_CORO_ATOMIC_QUEUE_HPP
+#define TINY_CORO_ATOMIC_QUEUE_HPP
 
 #include <concepts>
 
@@ -177,4 +177,4 @@ namespace tinycoro { namespace detail {
 
 }} // namespace tinycoro::detail
 
-#endif //!__TINY_CORO_ATOMIC_QUEUE_HPP__
+#endif // TINY_CORO_ATOMIC_QUEUE_HPP

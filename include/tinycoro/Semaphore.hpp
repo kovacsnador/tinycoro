@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SEMAPHORE_H__
-#define __TINY_CORO_SEMAPHORE_H__
+#ifndef TINY_CORO_SEMAPHORE_HPP
+#define TINY_CORO_SEMAPHORE_HPP
 
 #include <mutex>
 #include <coroutine>
@@ -126,4 +126,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SEMAPHORE_H__
+#endif // TINY_CORO_SEMAPHORE_HPP

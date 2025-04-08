@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_BUFFERED_CHANNEL_HPP__
-#define __TINY_CORO_BUFFERED_CHANNEL_HPP__
+#ifndef TINY_CORO_BUFFERED_CHANNEL_HPP
+#define TINY_CORO_BUFFERED_CHANNEL_HPP
 
 #include <mutex>
 #include <queue>
@@ -771,4 +771,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_BUFFERED_CHANNEL_HPP__
+#endif // TINY_CORO_BUFFERED_CHANNEL_HPP

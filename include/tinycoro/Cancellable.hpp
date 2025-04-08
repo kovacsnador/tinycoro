@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_CANCELLABLE_HPP__
-#define __TINY_CORO_CANCELLABLE_HPP__
+#ifndef TINY_CORO_CANCELLABLE_HPP
+#define TINY_CORO_CANCELLABLE_HPP
 
 #include "PauseHandler.hpp"
 #include "Finally.hpp"
@@ -86,4 +86,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_CANCELLABLE_HPP__
+#endif // TINY_CORO_CANCELLABLE_HPP

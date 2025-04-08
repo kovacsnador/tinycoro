@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_AWAITER_HELPER_HPP__
-#define __TINY_CORO_AWAITER_HELPER_HPP__
+#ifndef TINY_CORO_AWAITER_HELPER_HPP
+#define TINY_CORO_AWAITER_HELPER_HPP
 
 #include "Common.hpp"
 
@@ -23,4 +23,4 @@ namespace tinycoro
 } // namespace tinycoro
 
 
-#endif //!__TINY_CORO_AWAITER_HELPER_HPP__
+#endif // TINY_CORO_AWAITER_HELPER_HPP

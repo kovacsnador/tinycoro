@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SYNC_AWAIT_HPP__
-#define __TINY_CORO_SYNC_AWAIT_HPP__
+#ifndef TINY_CORO_SYNC_AWAIT_HPP
+#define TINY_CORO_SYNC_AWAIT_HPP
 
 #include <cassert>
 #include <functional>
@@ -215,4 +215,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SYNC_AWAIT_HPP__
+#endif // TINY_CORO_SYNC_AWAIT_HPP

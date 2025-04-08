@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_MUTEX_HPP__
-#define __TINY_CORO_MUTEX_HPP__
+#ifndef TINY_CORO_MUTEX_HPP
+#define TINY_CORO_MUTEX_HPP
 
 #include <atomic>
 
@@ -176,4 +176,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_MUTEX_HPP__
+#endif // TINY_CORO_MUTEX_HPP

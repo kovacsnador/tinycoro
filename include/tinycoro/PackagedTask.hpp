@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_PACKAGED_TASK_HPP__
-#define __TINY_CORO_PACKAGED_TASK_HPP__
+#ifndef TINY_CORO_PACKAGED_TASK_HPP
+#define TINY_CORO_PACKAGED_TASK_HPP
 
 #include <concepts>
 #include <variant>
@@ -148,4 +148,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_PACKAGED_TASK_HPP__
+#endif // TINY_CORO_PACKAGED_TASK_HPP

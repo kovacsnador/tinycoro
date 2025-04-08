@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_ATOMIC_PTR_STACK_HPP__
-#define __TINY_CORO_ATOMIC_PTR_STACK_HPP__
+#ifndef TINY_CORO_ATOMIC_PTR_STACK_HPP
+#define TINY_CORO_ATOMIC_PTR_STACK_HPP
 
 #include <atomic>
 #include <type_traits>
@@ -102,4 +102,4 @@ namespace tinycoro { namespace detail {
 
 }} // namespace tinycoro::detail
 
-#endif //__TINY_CORO_ATOMIC_PTR_STACK_HPP__
+#endif //TINY_CORO_ATOMIC_PTR_STACK_HPP

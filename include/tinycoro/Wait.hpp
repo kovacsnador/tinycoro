@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_WAIT_HPP__
-#define __TINY_CORO_WAIT_HPP__
+#ifndef TINY_CORO_WAIT_HPP
+#define TINY_CORO_WAIT_HPP
 
 #include <algorithm>
 #include <tuple>
@@ -228,4 +228,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_WAIT_HPP__
+#endif // TINY_CORO_WAIT_HPP

@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_TASK_RESUMER_HPP__
-#define __TINY_CORO_TASK_RESUMER_HPP__
+#ifndef TINY_CORO_TASK_RESUMER_HPP
+#define TINY_CORO_TASK_RESUMER_HPP
 
 #include "Common.hpp"
 #include "PackedCoroHandle.hpp"
@@ -58,4 +58,4 @@ namespace tinycoro {
     };
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_TASK_RESUMER_HPP__
+#endif // TINY_CORO_TASK_RESUMER_HPP

@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_SOFT_CLOCK_HPP__
-#define __TINY_CORO_SOFT_CLOCK_HPP__
+#ifndef TINY_CORO_SOFT_CLOCK_HPP
+#define TINY_CORO_SOFT_CLOCK_HPP
 
 #include <thread>
 #include <chrono>
@@ -445,4 +445,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_SOFT_CLOCK_HPP__
+#endif // TINY_CORO_SOFT_CLOCK_HPP

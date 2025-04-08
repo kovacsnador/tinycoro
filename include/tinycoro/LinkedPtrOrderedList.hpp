@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP__
-#define __TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP__
+#ifndef TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP
+#define TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP
 
 #include <functional>
 
@@ -153,4 +153,4 @@ namespace tinycoro { namespace detail {
 
 }} // namespace tinycoro::detail
 
-#endif //!__TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP__
+#endif // TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP

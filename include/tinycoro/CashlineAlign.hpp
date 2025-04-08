@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_CASHLINE_ALIGN_HPP__
-#define __TINY_CORO_CASHLINE_ALIGN_HPP__
+#ifndef TINY_CORO_CASHLINE_ALIGN_HPP
+#define TINY_CORO_CASHLINE_ALIGN_HPP
 
 #include <new> // std::hardware_destructive_interference_size
 
@@ -19,4 +19,4 @@ namespace tinycoro { namespace detail {
 
 }} // namespace tinycoro::detail
 
-#endif //!__TINY_CORO_CASHLINE_ALIGN_HPP__
+#endif // TINY_CORO_CASHLINE_ALIGN_HPP

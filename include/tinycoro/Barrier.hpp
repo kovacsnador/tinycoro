@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_BARRIER_HPP__
-#define __TINY_CORO_BARRIER_HPP__
+#ifndef TINY_CORO_BARRIER_HPP
+#define TINY_CORO_BARRIER_HPP
 
 #include "LinkedPtrStack.hpp"
 #include "PauseHandler.hpp"
@@ -246,4 +246,4 @@ namespace tinycoro {
     };
 
 } // namespace tinycoro
-#endif //!__TINY_CORO_BARRIER_HPP__
+#endif // TINY_CORO_BARRIER_HPP

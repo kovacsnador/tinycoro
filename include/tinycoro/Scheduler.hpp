@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_CORO_SCHEDULER_HPP__
-#define __TINY_CORO_CORO_SCHEDULER_HPP__
+#ifndef TINY_CORO_CORO_SCHEDULER_HPP
+#define TINY_CORO_CORO_SCHEDULER_HPP
 
 #include <thread>
 #include <future>
@@ -182,4 +182,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif // !__TINY_CORO_CORO_SCHEDULER_HPP__
+#endif // !TINY_CORO_CORO_SCHEDULER_HPP

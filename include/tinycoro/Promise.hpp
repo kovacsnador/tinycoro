@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_PROMISE_HPP__
-#define __TINY_CORO_PROMISE_HPP__
+#ifndef TINY_CORO_PROMISE_HPP
+#define TINY_CORO_PROMISE_HPP
 
 #include <type_traits>
 #include <concepts>
@@ -154,4 +154,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_PROMISE_HPP__
+#endif // TINY_CORO_PROMISE_HPP
