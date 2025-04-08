@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_INTRUSIVE_PTR_HPP__
-#define __TINY_CORO_INTRUSIVE_PTR_HPP__
+#ifndef TINY_CORO_INTRUSIVE_PTR_HPP
+#define TINY_CORO_INTRUSIVE_PTR_HPP
 
 #include <variant>
 
@@ -136,4 +136,4 @@ namespace tinycoro
 } // namespace tinycoro
 
 
-#endif //!__TINY_CORO_INTRUSIVE_PTR_HPP__
+#endif // TINY_CORO_INTRUSIVE_PTR_HPP

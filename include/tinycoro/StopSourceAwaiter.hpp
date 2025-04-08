@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_STOP_SOURCE_AWAITER_HPP__
-#define __TINY_CORO_STOP_SOURCE_AWAITER_HPP__
+#ifndef TINY_CORO_STOP_SOURCE_AWAITER_HPP
+#define TINY_CORO_STOP_SOURCE_AWAITER_HPP
 
 #include <stop_token>
 
@@ -58,4 +58,4 @@ namespace tinycoro
 } // namespace tinycoro
 
 
-#endif //!__TINY_CORO_STOP_SOURCE_AWAITER_HPP__
+#endif // TINY_CORO_STOP_SOURCE_AWAITER_HPP

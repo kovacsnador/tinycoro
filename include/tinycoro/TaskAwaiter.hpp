@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_TASK_AWAITER_HPP__
-#define __TINY_CORO_TASK_AWAITER_HPP__
+#ifndef TINY_CORO_TASK_AWAITER_HPP
+#define TINY_CORO_TASK_AWAITER_HPP
 
 namespace tinycoro
 {
@@ -54,4 +54,4 @@ namespace tinycoro
 } // namespace tinycoro
 
 
-#endif //!__TINY_CORO_TASK_AWAITER_HPP__
+#endif // TINY_CORO_TASK_AWAITER_HPP

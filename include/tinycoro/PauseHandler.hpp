@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_PAUSE_HANDLER_HPP__
-#define __TINY_CORO_PAUSE_HANDLER_HPP__
+#ifndef TINY_CORO_PAUSE_HANDLER_HPP
+#define TINY_CORO_PAUSE_HANDLER_HPP
 
 #include <functional>
 #include <memory>
@@ -138,4 +138,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_PAUSE_HANDLER_HPP__
+#endif // TINY_CORO_PAUSE_HANDLER_HPP

@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_LINEKD_PTR_STACK_HPP__
-#define __TINY_CORO_LINEKD_PTR_STACK_HPP__
+#ifndef TINY_CORO_LINEKD_PTR_STACK_HPP
+#define TINY_CORO_LINEKD_PTR_STACK_HPP
 
 #include "Common.hpp"
 
@@ -147,4 +147,4 @@ namespace tinycoro { namespace detail {
     };
 }} // namespace tinycoro::detail
 
-#endif //!__TINY_CORO_LINEKD_PTR_STACK_HPP__
+#endif // TINY_CORO_LINEKD_PTR_STACK_HPP

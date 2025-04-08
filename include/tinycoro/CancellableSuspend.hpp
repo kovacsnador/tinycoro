@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_CANCELLABLE_AWAITER_HPP__
-#define __TINY_CORO_CANCELLABLE_AWAITER_HPP__
+#ifndef TINY_CORO_CANCELLABLE_AWAITER_HPP
+#define TINY_CORO_CANCELLABLE_AWAITER_HPP
 
 #include <coroutine>
 
@@ -21,4 +21,4 @@ namespace tinycoro {
     
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_CANCELLABLE_AWAITER_HPP__
+#endif //TINY_CORO_CANCELLABLE_AWAITER_HPP

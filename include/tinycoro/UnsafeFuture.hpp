@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_PROMISE_FUTURE_HPP__
-#define __TINY_CORO_PROMISE_FUTURE_HPP__
+#ifndef TINY_CORO_PROMISE_FUTURE_HPP
+#define TINY_CORO_PROMISE_FUTURE_HPP
 
 #include <variant>
 #include <exception>
@@ -190,4 +190,4 @@ namespace tinycoro {
     } // namespace unsafe
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_PROMISE_FUTURE_HPP__
+#endif // TINY_CORO_PROMISE_FUTURE_HPP

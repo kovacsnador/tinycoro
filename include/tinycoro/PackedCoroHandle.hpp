@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP__
-#define __TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP__
+#ifndef TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP
+#define TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP
 
 #include <coroutine>
 #include <concepts>
@@ -147,4 +147,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP__
+#endif // TINY_CORO_DETAIL_PACKED_CORO_HANDLE_HPP

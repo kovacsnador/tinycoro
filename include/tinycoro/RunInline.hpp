@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_RUN_INLINE_HPP__
-#define __TINY_CORO_RUN_INLINE_HPP__
+#ifndef TINY_CORO_RUN_INLINE_HPP
+#define TINY_CORO_RUN_INLINE_HPP
 
 #include <type_traits>
 #include <atomic>
@@ -449,4 +449,4 @@ namespace tinycoro {
 
 } // namespace tinycoro
 
-#endif //!__TINY_CORO_RUN_INLINE_HPP__
+#endif // TINY_CORO_RUN_INLINE_HPP

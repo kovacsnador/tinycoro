@@ -1,5 +1,5 @@
-#ifndef __TINY_CORO_TINY_CORO_ALL_H__
-#define __TINY_CORO_TINY_CORO_ALL_H__
+#ifndef TINY_CORO_TINY_CORO_ALL_H
+#define TINY_CORO_TINY_CORO_ALL_H
 
 #include "AsyncCallbackAwaiter.hpp"
 #include "CancellableSuspend.hpp"
@@ -28,4 +28,4 @@
 #include "SoftClock.hpp"
 #include "Cancellable.hpp"
 
-#endif //!__TINY_CORO_TINY_CORO_ALL_H__
+#endif // TINY_CORO_TINY_CORO_ALL_H
