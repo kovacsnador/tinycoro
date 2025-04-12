@@ -21,13 +21,22 @@ struct SchedubableMock
     MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
 };
 
-struct Schedubable : tinycoro::detail::ISchedulableBridged
+using IScheduler = tinycoro::detail::ISchedulableBridged<tinycoro::DefaultAllocator_t>;
+
+struct Schedubable : IScheduler
 {
+    Schedubable()
+    : IScheduler{alloc}
+    {
+    }
+
     void                       Resume() override { mock.Resume(); };
     tinycoro::ETaskResumeState ResumeState() override { return mock.ResumeState(); };
     void                       SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { mock.SetPauseHandler(cb); };
 
     SchedubableMock mock;
+
+    tinycoro::DefaultAllocator_t alloc{};
 };
 
 TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
@@ -35,13 +44,13 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     std::latch       latch{1};
     std::stop_source ss;
 
-    std::unique_ptr<Schedubable> task = std::make_unique<Schedubable>();
+    std::unique_ptr<Schedubable, std::function<void(IScheduler*)>> task{new Schedubable, [](auto p) { delete p; }};
 
     EXPECT_CALL(task->mock, Resume).WillOnce([&] { latch.count_down(); });
     EXPECT_CALL(task->mock, SetPauseHandler);
     EXPECT_CALL(task->mock, ResumeState).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
-    tinycoro::detail::AtomicQueue<std::unique_ptr<tinycoro::detail::ISchedulableBridged>, 128> queue;
+    tinycoro::detail::AtomicQueue<std::unique_ptr<IScheduler, std::function<void(IScheduler*)>>, 128> queue;
 
     tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
 
@@ -64,7 +73,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         std::latch       latch{2};
         std::stop_source ss;
 
-        std::unique_ptr<Schedubable> task = std::make_unique<Schedubable>();
+        std::unique_ptr<Schedubable, std::function<void(IScheduler*)>> task{new Schedubable, [](auto p) { delete p; }};
 
         EXPECT_CALL(task->mock, Resume).WillRepeatedly([&] { latch.count_down(); });
         EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
@@ -72,7 +81,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
             .WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED))
             .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
-        tinycoro::detail::AtomicQueue<std::unique_ptr<tinycoro::detail::ISchedulableBridged>, 128> queue;
+        tinycoro::detail::AtomicQueue<std::unique_ptr<IScheduler, std::function<void(IScheduler*)>>, 128> queue;
 
         tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
 

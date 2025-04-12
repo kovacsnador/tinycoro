@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <memory_resource>
 #include <future>
 
 #include <tinycoro/PackagedTask.hpp>
@@ -80,7 +81,9 @@ TYPED_TEST(PackagedTaskTest, PackagedTaskTest_int)
 
         EXPECT_CALL(*task.mock, IsDone).Times(::testing::AnyNumber());
 
-        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise));
+        std::pmr::polymorphic_allocator<std::byte> allocator;
+
+        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise), allocator);
 
         packedTask->Resume();
     }
@@ -125,7 +128,9 @@ TYPED_TEST(PackagedTaskTestException, PackagedTaskTest_void_exception)
 
         EXPECT_CALL(*task.mock, await_resume()).Times(0); // Return any value you'd expect
 
-        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise));
+        std::pmr::polymorphic_allocator<std::byte> allocator;
+
+        auto packedTask = tinycoro::detail::MakeSchedulableTask(std::move(task), std::move(promise), allocator);
 
         packedTask->Resume();
     }

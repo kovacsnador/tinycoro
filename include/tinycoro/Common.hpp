@@ -87,11 +87,13 @@ namespace tinycoro {
 
     namespace concepts {
 
-        template<typename T>
-        concept IsSchedulable =  requires (T t) {
+        template <typename T>
+        concept IsSchedulable = requires (T t) {
             { t->Resume() } -> std::same_as<void>;
             { t->ResumeState() } -> std::same_as<ETaskResumeState>;
-            { t->SetPauseHandler([]{}) } -> std::same_as<void>;
+            {
+                t->SetPauseHandler([] { })
+            } -> std::same_as<void>;
             typename T::element_type;
         };
 
@@ -101,7 +103,9 @@ namespace tinycoro {
             { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            { c.SetPauseHandler([] {})};
+            {
+                c.SetPauseHandler([] { })
+            };
             typename T::value_type;
         };
 
@@ -143,6 +147,11 @@ namespace tinycoro {
             { awaiter.Notify() };
         };
 
+        template <typename T>
+        concept IsAllocator = requires (T alloc, int val) {
+            { alloc.template new_object<int>(42) } -> std::same_as<int*>;
+            { alloc.delete_object(&val) };
+        };
     } // namespace concepts
 
     namespace detail {
@@ -177,7 +186,7 @@ namespace tinycoro {
         template <typename T>
         using TaskResult_t = typename TaskResultType<T>::value_type;
 
-        template<auto Number>
+        template <auto Number>
         struct IsPowerOf2
         {
             static constexpr bool value = (Number > 0) && (Number & (Number - 1)) == 0;

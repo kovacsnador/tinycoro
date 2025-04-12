@@ -51,7 +51,7 @@ namespace tinycoro {
     template <typename... Args>
     struct AsyncAwaiterT;
 
-    template <typename SchedulerT, typename EventT, typename FuturesT, concepts::NonIterable... Args>
+    template <typename SchedulerT, typename EventT, typename FuturesT, concepts::IsCorouitneTask... Args>
     struct AsyncAwaiterT<SchedulerT, EventT, FuturesT, Args...> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
     {
         AsyncAwaiterT(SchedulerT& scheduler, EventT event, Args&&... args)
@@ -113,7 +113,7 @@ namespace tinycoro {
     template <typename... Args>
     struct AsyncAnyOfAwaiterT;
 
-    template <typename SchedulerT, typename StopSourceT, typename EventT, typename FuturesT, concepts::NonIterable... Args>
+    template <typename SchedulerT, typename StopSourceT, typename EventT, typename FuturesT, concepts::IsCorouitneTask... Args>
     struct AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, EventT, FuturesT, Args...> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
     {
         AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, Args&&... args)
@@ -184,7 +184,7 @@ namespace tinycoro {
         return AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FuturesType, ContainerT>{scheduler, {}, std::forward<ContainerT>(container)};
     }
 
-    template <typename SchedulerT, concepts::NonIterable... Args>
+    template <typename SchedulerT, concepts::IsCorouitneTask... Args>
     [[nodiscard]] auto SyncAwait(SchedulerT& scheduler, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
@@ -199,7 +199,7 @@ namespace tinycoro {
             scheduler, std::move(stopSource), {}, std::forward<ContainerT>(container)};
     }
 
-    template <typename SchedulerT, typename StopSourceT, concepts::NonIterable... Args>
+    template <typename SchedulerT, typename StopSourceT, concepts::IsCorouitneTask... Args>
     [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));

@@ -4,6 +4,7 @@
 #include <concepts>
 #include <variant>
 #include <atomic>
+#include <memory>
 
 #include "Common.hpp"
 #include "Exception.hpp"
@@ -29,10 +30,14 @@ namespace tinycoro {
             NOTIFIED,
         };
 
+        template<typename AllocatorT>
         class ISchedulableBridged
         {
         public:
-            ISchedulableBridged() = default;
+            ISchedulableBridged(AllocatorT& alloc)
+            : allocator{alloc}
+            {
+            }
 
             // disable copy and move
             ISchedulableBridged(ISchedulableBridged&&) = delete;
@@ -45,18 +50,23 @@ namespace tinycoro {
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
 
             // need for double linkage
-            ISchedulableBridged* prev{nullptr};
-            ISchedulableBridged* next{nullptr};
+            ISchedulableBridged<AllocatorT>* prev{nullptr};
+            ISchedulableBridged<AllocatorT>* next{nullptr};
 
             std::atomic<EPauseState> pauseState{EPauseState::IDLE};
+
+            // custom allocator, getting directly
+            // from the scheduler
+            AllocatorT& allocator;
         };
 
-        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
-        class SchedulableBridgeImpl : public ISchedulableBridged
+        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT, typename AllocatorT>
+        class SchedulableBridgeImpl : public ISchedulableBridged<AllocatorT>
         {
         public:
-            SchedulableBridgeImpl(CoroT&& coro, FutureStateT&& futureState)
-            : _coro{std::move(coro)}
+            SchedulableBridgeImpl(CoroT&& coro, FutureStateT&& futureState, AllocatorT& alloc)
+            : ISchedulableBridged<AllocatorT>{alloc}
+            , _coro{std::move(coro)}
             , _futureState{std::move(futureState)}
             {
             }
@@ -99,12 +109,12 @@ namespace tinycoro {
                 }
             }
 
-            void Resume() override
+            inline void Resume() override
             {
                 try
                 {
                     // reset the pause state by every resume.
-                    pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+                    this->pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
 
                     _coro.Resume();
                 }
@@ -134,14 +144,26 @@ namespace tinycoro {
             std::exception_ptr _exception{};
         };
 
-        using SchedulableTask = std::unique_ptr<detail::ISchedulableBridged>;
-
-        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
-            requires (!std::is_reference_v<CoroT>)
-        SchedulableTask MakeSchedulableTask(CoroT&& coro, FutureStateT futureState)
+        struct AllocatorDeleter
         {
-            using BridgeType = detail::SchedulableBridgeImpl<CoroT, FutureStateT>;
-            return std::make_unique<BridgeType>(std::move(coro), std::move(futureState));
+            template<typename T>
+            constexpr inline void operator()(T* ptr) noexcept
+            {
+                auto& alloc = ptr->allocator;
+                alloc.delete_object(ptr);
+            }
+        };
+
+        template<concepts::IsAllocator AllocatorT>
+        using SchedulableTask = std::unique_ptr<ISchedulableBridged<AllocatorT>, AllocatorDeleter>;
+
+        template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT, typename AllocatorT>
+            requires (!std::is_reference_v<CoroT>)
+        SchedulableTask<AllocatorT> MakeSchedulableTask(CoroT&& coro, FutureStateT futureState, AllocatorT& allocator)
+        {
+            using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT, AllocatorT>;
+            auto ptr = allocator.template new_object<BridgeType>(std::move(coro), std::move(futureState), allocator);
+            return SchedulableTask<AllocatorT>{ptr};
         }
 
     } // namespace detail

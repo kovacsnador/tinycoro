@@ -4,7 +4,7 @@
 
 #include "mock/TaskMock.hpp"
 
-static void* dummyAddress = reinterpret_cast<void*>(0xDEADBEEF); 
+static void* dummyAddress = reinterpret_cast<void*>(0xDEADBEEF);
 
 struct SchedulerTest : public testing::Test
 {
@@ -26,6 +26,29 @@ TEST_F(SchedulerTest, SchedulerTest_done)
 
 
     auto future = scheduler.Enqueue(std::move(task));
+    auto val = future.get();
+
+    EXPECT_EQ(val, 42);
+}
+
+TEST_F(SchedulerTest, SchedulerTest_custom_allocator)
+{
+    tinycoro::DefaultAllocator_t allocator{std::pmr::new_delete_resource()};
+    tinycoro::Scheduler scheduler2{allocator, 4};
+
+    tinycoro::test::TaskMock<int32_t> task;
+
+    using enum tinycoro::ETaskResumeState; 
+
+    EXPECT_CALL(*task.mock, Resume()).Times(1);
+    EXPECT_CALL(*task.mock, IsDone()).WillOnce(testing::Return(true));
+    EXPECT_CALL(*task.mock, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
+    EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
+    EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
+    EXPECT_CALL(*task.mock, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));
+
+
+    auto future = scheduler2.Enqueue(std::move(task));
     auto val = future.get();
 
     EXPECT_EQ(val, 42);

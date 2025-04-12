@@ -49,7 +49,7 @@ namespace tinycoro { namespace detail {
             // after SCHEDULER_STOP_EVENT push...
             while (queue.full())
             {
-                typename QueueT::value_type destroyer{nullptr};
+                typename QueueT::value_type destroyer{};
                 if (queue.try_pop(destroyer))
                 {
                     // erase at least 1 element
@@ -63,7 +63,7 @@ namespace tinycoro { namespace detail {
                 // try to remove one element
                 // in order to make place for
                 // SCHEDULER_STOP_EVENT
-                typename QueueT::value_type destroyer{nullptr};
+                typename QueueT::value_type destroyer{};
                 std::ignore = queue.try_pop(destroyer);
             }
         }
