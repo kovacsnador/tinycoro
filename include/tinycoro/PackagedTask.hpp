@@ -46,6 +46,8 @@ namespace tinycoro {
 
             virtual void             Resume()      = 0;
             virtual ETaskResumeState ResumeState() = 0;
+            virtual size_t SizeInByte() = 0;
+
 
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
 
@@ -124,6 +126,11 @@ namespace tinycoro {
                 }
             }
 
+            size_t SizeInByte() override
+            {
+                return sizeof(*this);
+            }
+
             ETaskResumeState ResumeState() override
             {
                 // value already set, the coroutine should be done
@@ -150,7 +157,13 @@ namespace tinycoro {
             constexpr inline void operator()(T* ptr) noexcept
             {
                 auto& alloc = ptr->allocator;
-                alloc.delete_object(ptr);
+                auto size = ptr->SizeInByte();
+
+                // destroy the real object
+                std::destroy_at(ptr);
+
+                // deallocate the memory
+                alloc.deallocate_bytes(ptr, size, alignof(T));
             }
         };
 

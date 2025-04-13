@@ -33,6 +33,7 @@ struct Schedubable : IScheduler
     void                       Resume() override { mock.Resume(); };
     tinycoro::ETaskResumeState ResumeState() override { return mock.ResumeState(); };
     void                       SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { mock.SetPauseHandler(cb); };
+    size_t                     SizeInByte() override { return sizeof(*this); };
 
     SchedubableMock mock;
 
