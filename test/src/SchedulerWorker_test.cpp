@@ -14,6 +14,52 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
     EXPECT_FALSE(tinycoro::detail::helper::PushTask(2, queue, ss));
 }
 
+TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
+{
+    int32_t val{42};
+
+    tinycoro::detail::AtomicQueue<int32_t*, 2> queue;
+    EXPECT_TRUE(queue.try_push(&val));
+    EXPECT_TRUE(queue.try_push(&val));
+
+    EXPECT_TRUE(queue.full());
+
+    tinycoro::detail::helper::RequestStopForQueue(queue);
+
+    int32_t* ptr;
+    EXPECT_TRUE(queue.try_pop(ptr));
+    EXPECT_EQ(*ptr, val);
+    
+    EXPECT_TRUE(queue.try_pop(ptr));
+    EXPECT_EQ(ptr, nullptr);
+}
+
+struct AtomicQueueMock
+{
+    using value_type = int32_t*;
+
+    MOCK_METHOD(bool, try_pop, (int32_t*));
+    MOCK_METHOD(bool, try_push, (int32_t*));
+    MOCK_METHOD(bool, full, ());
+};
+
+TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
+{
+    AtomicQueueMock mock;
+
+    EXPECT_CALL(mock, full).WillOnce(testing::Return(true));
+    
+    EXPECT_CALL(mock, try_pop)
+        .WillOnce(testing::Return(true))
+        .WillOnce(testing::Return(true));
+
+    EXPECT_CALL(mock, try_push)
+        .WillOnce(testing::Return(false))
+        .WillOnce(testing::Return(true));
+
+    tinycoro::detail::helper::RequestStopForQueue(mock);
+}
+
 struct SchedubableMock
 {
     MOCK_METHOD(void, Resume, ());

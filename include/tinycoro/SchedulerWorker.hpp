@@ -204,10 +204,7 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
-                    //helper::PushTask(Task_t{taskPtr}, _sharedTasks, _stopToken);
-
                     Task_t task{taskPtr};
-
                     if (_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
