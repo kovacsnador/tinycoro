@@ -28,7 +28,7 @@ namespace tinycoro {
         {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
-            : _allocator{&_syncPoolResource}
+            : _allocator{&_defaultPoolResource}
             , _stopSource{}
             , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
             {
@@ -168,7 +168,12 @@ namespace tinycoro {
             //
             // this improves overall speed in the scheduler,
             // but can have a bigger footprint in the memory.
-            std::pmr::synchronized_pool_resource _syncPoolResource{};
+            std::pmr::synchronized_pool_resource _defaultPoolResource{};
+
+            // The dedicated allocator for the scheduler.
+            //
+            // Can be passed as argument through construction,
+            // in that case we igone the _defaultPoolResource.
             AllocatorT _allocator;
 
             // currently active/scheduled tasks

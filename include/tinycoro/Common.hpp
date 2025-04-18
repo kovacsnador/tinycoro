@@ -148,10 +148,12 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept IsAllocator = requires (T alloc, int val) {
-            { alloc.template new_object<int>(42) } -> std::same_as<int*>;
-            { alloc.delete_object(&val) };
+        concept IsAllocator = 
+            requires (T alloc, int val) {
+                { alloc.template new_object<int>(42) } -> std::same_as<int*>;
+                { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
         };
+
     } // namespace concepts
 
     namespace detail {

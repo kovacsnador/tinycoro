@@ -54,6 +54,59 @@ TEST_F(SchedulerTest, SchedulerTest_custom_allocator)
     EXPECT_EQ(val, 42);
 }
 
+struct AllocatorMockWrapper;
+
+struct AllocatorMock
+{
+    MOCK_METHOD(void*, new_object, ());
+    MOCK_METHOD(void, deallocate_bytes, (void*, size_t, size_t));
+};
+
+struct AllocatorMockWrapper
+{
+    template<typename T, typename... Args>
+    T* new_object(Args&&... args)
+    {
+        mockPtr->new_object();
+        return allocator.new_object<T>(std::forward<Args>(args)...);
+    }
+
+    void deallocate_bytes(auto ptr, size_t size, size_t align)
+    {
+        mockPtr->deallocate_bytes(ptr, size, align);
+        allocator.deallocate_bytes(ptr, size, align);
+    }
+
+    std::shared_ptr<AllocatorMock> mockPtr{std::make_shared<AllocatorMock>()};
+    std::pmr::polymorphic_allocator<std::byte> allocator;
+};
+
+TEST_F(SchedulerTest, SchedulerTest_own_type_allocator)
+{
+    AllocatorMockWrapper mock{};
+    tinycoro::CustomScheduler<128, AllocatorMockWrapper> scheduler2{mock, 4};
+
+    EXPECT_CALL(*mock.mockPtr, new_object).Times(1);
+    EXPECT_CALL(*mock.mockPtr, deallocate_bytes).Times(1);
+
+    tinycoro::test::TaskMock<int32_t> task;
+
+    using enum tinycoro::ETaskResumeState; 
+
+    EXPECT_CALL(*task.mock, Resume()).Times(1);
+    EXPECT_CALL(*task.mock, IsDone()).WillOnce(testing::Return(true));
+    EXPECT_CALL(*task.mock, ResumeState()).Times(1).WillOnce(testing::Return(DONE));
+    EXPECT_CALL(*task.mock, SetPauseHandler).Times(1);
+    EXPECT_CALL(*task.mock, await_resume).Times(1).WillOnce(testing::Return(42));
+    EXPECT_CALL(*task.mock, Address).Times(1).WillRepeatedly(testing::Return(dummyAddress));
+
+
+    auto future = scheduler2.Enqueue(std::move(task));
+    auto val = future.get();
+
+    EXPECT_EQ(val, 42);
+}
+
 TEST_F(SchedulerTest, SchedulerTest_suspended)
 {
     tinycoro::test::TaskMock<int32_t> task;
