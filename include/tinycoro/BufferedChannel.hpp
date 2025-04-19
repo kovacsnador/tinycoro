@@ -12,7 +12,6 @@
 #include "Exception.hpp"
 #include "ChannelOpStatus.hpp"
 #include "LinkedPtrQueue.hpp"
-#include "LinkedPtrStack.hpp"
 #include "LinkedPtrOrderedList.hpp"
 
 namespace tinycoro {

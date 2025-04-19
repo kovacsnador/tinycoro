@@ -7,7 +7,6 @@
 
 #include "ChannelOpStatus.hpp"
 #include "PauseHandler.hpp"
-#include "LinkedPtrStack.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrOrderedList.hpp"
 
