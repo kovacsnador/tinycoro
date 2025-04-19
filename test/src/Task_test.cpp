@@ -87,7 +87,7 @@ struct PromiseMock
 
 struct CoroResumerMock
 {
-    void operator()([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
+    void Resume([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
     {
     }
 

@@ -110,7 +110,7 @@ namespace tinycoro {
 
         ~CoroTask() { destroy(); }
 
-        void Resume() { std::invoke(_coroResumer, _hdl, _source); }
+        inline void Resume() { _coroResumer.Resume(_hdl, _source); }
 
         [[nodiscard]] auto ResumeState() { return _coroResumer.ResumeState(_hdl, _source); }
 

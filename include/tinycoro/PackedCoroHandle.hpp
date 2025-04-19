@@ -36,7 +36,7 @@ namespace tinycoro {
 
             std::coroutine_handle<> Handle() const override { return _hdl; }
 
-            void Resume() const override
+            inline void Resume() const override
             {
                 if(_hdl)
                 {
@@ -131,7 +131,7 @@ namespace tinycoro {
             return std::noop_coroutine();
         }
 
-        void Resume() const
+        inline void Resume() const
         {
             if (_pimpl)
             {

@@ -196,7 +196,7 @@ namespace tinycoro {
         return GetAll(future);
     }
 
-    template <typename SchedulerT, typename StopSourceT, concepts::NonIterable... CoroTasksT>
+    template <typename SchedulerT, typename StopSourceT, concepts::IsCorouitneTask... CoroTasksT>
     [[nodiscard]] auto AnyOfWithStopSource(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
     {
         (tasks.SetStopSource(source), ...);
@@ -214,7 +214,7 @@ namespace tinycoro {
         return GetAll(futures);
     }
 
-    template <typename StopSourceT = std::stop_source, typename SchedulerT, concepts::NonIterable... CoroTasksT>
+    template <typename StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... CoroTasksT>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroTasksT&&... tasks)
     {
         return AnyOfWithStopSource(scheduler, StopSourceT{}, std::forward<CoroTasksT>(tasks)...);
