@@ -34,8 +34,9 @@ namespace tinycoro {
         class ISchedulableBridged
         {
         public:
-            ISchedulableBridged(AllocatorT& alloc)
+            ISchedulableBridged(AllocatorT& alloc, size_t size)
             : allocator{alloc}
+            , sizeInByte{size}
             {
             }
 
@@ -46,7 +47,6 @@ namespace tinycoro {
 
             virtual void             Resume()      = 0;
             virtual ETaskResumeState ResumeState() = 0;
-            virtual size_t SizeInByte() = 0;
 
 
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
@@ -60,6 +60,9 @@ namespace tinycoro {
             // custom allocator, getting directly
             // from the scheduler
             AllocatorT& allocator;
+
+            // contains the size of the derived object
+            const size_t sizeInByte;
         };
 
         template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT, typename AllocatorT>
@@ -67,7 +70,7 @@ namespace tinycoro {
         {
         public:
             SchedulableBridgeImpl(CoroT&& coro, FutureStateT&& futureState, AllocatorT& alloc)
-            : ISchedulableBridged<AllocatorT>{alloc}
+            : ISchedulableBridged<AllocatorT>{alloc, sizeof(*this)}
             , _coro{std::move(coro)}
             , _futureState{std::move(futureState)}
             {
@@ -126,11 +129,6 @@ namespace tinycoro {
                 }
             }
 
-            size_t SizeInByte() override
-            {
-                return sizeof(*this);
-            }
-
             ETaskResumeState ResumeState() override
             {
                 // value already set, the coroutine should be done
@@ -157,7 +155,7 @@ namespace tinycoro {
             constexpr inline void operator()(T* ptr) noexcept
             {
                 auto& alloc = ptr->allocator;
-                auto size = ptr->SizeInByte();
+                const auto size = ptr->sizeInByte;
 
                 // destroy the real object
                 std::destroy_at(ptr);
