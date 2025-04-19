@@ -64,7 +64,7 @@ namespace tinycoro {
               typename CoroResumerT     = TaskResumer,
               typename StopSourceT      = std::stop_source,
               typename DestroyNotifierT = DestroyNotifier>
-    struct CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
+    struct [[nodiscard]] CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
     {
         using SelfType = CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
 
