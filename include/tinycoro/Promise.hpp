@@ -50,11 +50,7 @@ namespace tinycoro {
         template <typename U>
         void return_value(U&& v)
         {
-            if constexpr (requires { _value.emplace(std::forward<U>(v)); })
-            {
-                _value.emplace(std::forward<U>(v));
-            }
-            else if constexpr (requires { _value = std::forward<U>(v); })
+            if constexpr (requires { _value = std::forward<U>(v); })
             {
                 _value = std::forward<U>(v);
             }
