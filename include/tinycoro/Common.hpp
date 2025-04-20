@@ -89,8 +89,7 @@ namespace tinycoro {
 
         template <typename T>
         concept IsSchedulable = requires (T t) {
-            { t->Resume() } -> std::same_as<void>;
-            { t->ResumeState() } -> std::same_as<ETaskResumeState>;
+            { t->Resume() } -> std::same_as<ETaskResumeState>;
             {
                 t->SetPauseHandler([] { })
             } -> std::same_as<void>;
