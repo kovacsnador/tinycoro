@@ -30,7 +30,7 @@ namespace tinycoro {
             NOTIFIED,
         };
 
-        template<typename AllocatorT>
+        template <typename AllocatorT>
         class ISchedulableBridged
         {
         public:
@@ -45,9 +45,7 @@ namespace tinycoro {
 
             virtual ~ISchedulableBridged() = default;
 
-            virtual void             Resume()      = 0;
-            virtual ETaskResumeState ResumeState() = 0;
-
+            virtual ETaskResumeState Resume() = 0;
 
             virtual void SetPauseHandler(tinycoro::PauseHandlerCallbackT) = 0;
 
@@ -88,8 +86,6 @@ namespace tinycoro {
                 }
                 else
                 {
-                    using futureValue_t = std::decay_t<decltype(std::declval<FutureStateT>().get_future().get())>;
-
                     if (_coro.IsDone())
                     {
                         // are we on a last suspend point?
@@ -109,36 +105,36 @@ namespace tinycoro {
                     {
                         // the task got cancelled
                         // we give back an empty optional
-                        _futureState.set_value(futureValue_t{std::nullopt});
+                        _futureState.set_value(std::nullopt);
                     }
                 }
             }
 
-            inline void Resume() override
+            [[nodiscard]] inline ETaskResumeState Resume() override
             {
-                try
+                if (_exception == nullptr)
                 {
-                    // reset the pause state by every resume.
-                    this->pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+                    // no exception happend so far
+                    try
+                    {
+                        // reset the pause state by every resume.
+                        this->pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
 
-                    _coro.Resume();
-                }
-                catch (...)
-                {
-                    _exception = std::current_exception();
-                }
-            }
+                        // resume the coroutine
+                        _coro.Resume();
 
-            ETaskResumeState ResumeState() override
-            {
-                // value already set, the coroutine should be done
-                if (_exception)
-                {
-                    // if there was an exception the task is done
-                    return ETaskResumeState::DONE;
+                        // return the coroutine current state
+                        return _coro.ResumeState();
+                    }
+                    catch (...)
+                    {
+                        // save the exception for later
+                        _exception = std::current_exception();
+                    }
                 }
 
-                return _coro.ResumeState();
+                // if there was an exception the task is done
+                return ETaskResumeState::DONE;
             }
 
             void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { _coro.SetPauseHandler(std::move(cb)); }
@@ -151,11 +147,11 @@ namespace tinycoro {
 
         struct AllocatorDeleter
         {
-            template<typename T>
+            template <typename T>
             constexpr inline void operator()(T* ptr) noexcept
             {
-                auto& alloc = ptr->allocator;
-                const auto size = ptr->sizeInByte;
+                auto&      alloc = ptr->allocator;
+                const auto size  = ptr->sizeInByte;
 
                 // destroy the real object
                 std::destroy_at(ptr);
@@ -165,7 +161,7 @@ namespace tinycoro {
             }
         };
 
-        template<concepts::IsAllocator AllocatorT>
+        template <concepts::IsAllocator AllocatorT>
         using SchedulableTask = std::unique_ptr<ISchedulableBridged<AllocatorT>, AllocatorDeleter>;
 
         template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT, typename AllocatorT>
@@ -173,7 +169,7 @@ namespace tinycoro {
         SchedulableTask<AllocatorT> MakeSchedulableTask(CoroT&& coro, FutureStateT futureState, AllocatorT& allocator)
         {
             using BridgeType = SchedulableBridgeImpl<CoroT, FutureStateT, AllocatorT>;
-            auto ptr = allocator.template new_object<BridgeType>(std::move(coro), std::move(futureState), allocator);
+            auto ptr         = allocator.template new_object<BridgeType>(std::move(coro), std::move(futureState), allocator);
             return SchedulableTask<AllocatorT>{ptr};
         }
 

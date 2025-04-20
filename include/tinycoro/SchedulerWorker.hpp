@@ -240,11 +240,10 @@ namespace tinycoro { namespace detail {
             using enum ETaskResumeState;
             while (_stopToken.stop_requested() == false)
             {
-                // resume the task
-                task->Resume();
-
-                // get the resume state from the coroutine or corouitne child
-                auto resumeState = task->ResumeState();
+                // resume the task and
+                // get the resume state from the
+                // coroutine or his child
+                auto resumeState = task->Resume();
 
                 switch (resumeState)
                 {

@@ -219,7 +219,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel)
     const auto count = GetParam();
 
     tinycoro::AutoEvent autoEvent;
-    size_t              autoCount{};
+    int32_t              autoCount{};
 
     auto autoEventConsumer = [&]() -> tinycoro::Task<int32_t> {
         co_await tinycoro::Cancellable(autoEvent.Wait());
@@ -256,7 +256,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOfInline)
     const auto count = GetParam();
 
     tinycoro::AutoEvent autoEvent;
-    size_t              autoCount{};
+    int32_t              autoCount{};
 
     auto autoEventConsumer = [&]() -> tinycoro::Task<int32_t> {
         co_await tinycoro::Cancellable(autoEvent.Wait());

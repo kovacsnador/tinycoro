@@ -70,70 +70,61 @@ namespace tinycoro { namespace detail {
 
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
-                if (elem)
+                if (elem == _top)
                 {
-                    // debug check if the elem is in list
-                    assert(detail::helper::Contains(_top, elem));
+                    _top = elem->next;
 
-                    if (elem == _top)
+                    if (_top)
+                        _top->prev = nullptr;
+                }
+                else
+                {
+                    if (elem->next)
                     {
-                        _top = elem->next;
-
-                        if (_top)
-                            _top->prev = nullptr;
+                        elem->next->prev = elem->prev;
                     }
-                    else
+
+                    if (elem->prev)
                     {
-                        if (elem->next)
-                        {
-                            elem->next->prev = elem->prev;
-                        }
-
-                        if (elem->prev)
-                        {
-                            elem->prev->next = elem->next;
-                        }
+                        elem->prev->next = elem->next;
                     }
+                }
+
+                elem->next = nullptr;
+                elem->prev = nullptr;
+
+                --_size;
+                return true;
+            }
+            else
+            {
+                if (_top == elem)
+                {
+                    _top = elem->next;
 
                     elem->next = nullptr;
-                    elem->prev = nullptr;
 
                     --_size;
                     return true;
                 }
-            }
-            else
-            {
-                if (elem)
+                else
                 {
-                    if (_top == elem)
+                    auto current = _top;
+                    while (current && current->next)
                     {
-                        _top = elem->next;
-
-                        elem->next = nullptr;
-
-                        --_size;
-                        return true;
-                    }
-                    else
-                    {
-                        auto current = _top;
-                        while (current && current->next)
+                        if (current->next == elem)
                         {
-                            if (current->next == elem)
-                            {
-                                // find the element
-                                // in the list
-                                current->next = elem->next;
+                            // find the element
+                            // in the list
+                            current->next = elem->next;
 
-                                elem->next = nullptr;
+                            elem->next = nullptr;
 
-                                --_size;
-                                return true;
-                            }
-
-                            current = current->next;
+                            --_size;
+                            return true;
                         }
+
+                        current = current->next;
                     }
                 }
             }
