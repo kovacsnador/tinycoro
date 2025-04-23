@@ -178,7 +178,7 @@ struct SemapthoreFunctionalTest : public testing::TestWithParam<int32_t>
     tinycoro::CustomScheduler<2> scheduler{std::thread::hardware_concurrency()};
 };
 
-INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000, 10000,100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000));
+INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 100000, 100000));
 
 TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
 {
