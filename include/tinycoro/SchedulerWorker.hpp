@@ -115,33 +115,67 @@ namespace tinycoro { namespace detail {
             while (stopToken.stop_requested() == false)
             {
                 Task_t task;
-                if (_sharedTasks.try_pop(task) == false)
+                if (_sharedTasks.try_pop(task))
                 {
-                    // if we could not pop an element
-                    // from the queue, we try to upload
-                    // some cached tasks
-                    _TryToUploadCachedTasks();
-
-                    if (_cachedTasks.empty())
-                    {
-                        // the cache is empty, so we can
-                        // wait safely for new tasks...
-                        _sharedTasks.wait_for_pop();
-                        continue;
-                    }
-                    else
-                    {
-                        // get the task from the cache
-                        task.reset(_cachedTasks.pop());
-                    }
-                }
-                else
-                {
+                    // we could pop an element from the queue
+                    //
                     // most likely this is a good timepoint
                     // to upload some cached tasks...
                     _TryToUploadCachedTasks();
                 }
+                else
+                {
+                    // there was no tasks in the queue
+                    //
+                    // try to change the state to WAITING...
+                    auto expected = EPopWaitingState::IDLE;
+                    while (_popState.compare_exchange_weak(expected, EPopWaitingState::WAITING, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        // this is a spin exchange
+                        //
+                        // no issue here because the state should
+                        // not stay to long in RESUMING
+                        expected = EPopWaitingState::IDLE;
+                    }
 
+                    if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
+                    {
+                        // the all the caches are empty, we can
+                        // wait safely for new tasks...
+                        //
+                        // now if some tasks need resumption
+                        // they will directly be pushed into the sharedTasks queue.
+                        // (not in the cache)
+                        _sharedTasks.wait_for_pop();
+
+                        // waiting finished, possibly new tasks
+                        // are arrived in the queue
+                        _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+                        continue;
+                    }
+
+                    // waiting finished, reset it
+                    _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+
+                    // most likely we have something in the cache.
+                    //
+                    // try to upload them
+                    _TryToUploadCachedTasks();
+
+                    if (_cachedTasks.empty())
+                    {
+                        // cache was empty, that means
+                        // we were able to upload the task
+                        // into the sharedTasks queue.
+                        continue;
+                    }
+
+                    // get the task from the cache
+                    task.reset(_cachedTasks.pop());
+                }
+
+                // If we reach that point, that means
+                // we successfully popped the next task
                 if (task == helper::SCHEDULER_STOP_EVENT)
                 {
                     // if we popped the stop event
@@ -215,16 +249,55 @@ namespace tinycoro { namespace detail {
                             return;
                         }
 
-                        // the queue is full
-                        // so we are saving this task,
-                        // and trying to push back into the
-                        // shared tasks queue later
-                        if(_notifiedCachedTasks.try_push(task.release()) == false)
+                        // In rare cases where the scheduler cache size is very small,
+                        // it may happen that after inserting the task into the _notifiedCachedTasks
+                        // queue, all workers are waiting due to an empty _sharedTasks queue.
+                        //
+                        // To prevent this scenario, we use the _popState just
+                        // to indicate, if the owner worker is in a pop waiting state
+                        // (waiting for new tasks). If so, we try directly to upload the task
+                        // (which is waiting for resumption)
+                        // into the sharedTasks queue. In order to wake up the worker,
+                        // and guarantie the forward motion in the scheduler.
+                        while (_stopToken.stop_requested() == false)
                         {
-                            // the _notifiedCachedTasks stack is closed
-                            // so reassign the value to the RAII task object
-                            // for proper destruction.
-                            task.reset(taskPtr);
+                            // we try to set the _popState to RESUMIMG
+                            // to indicate that we have a task, which need
+                            // to be resumed.
+                            auto expected = EPopWaitingState::IDLE;
+                            if (_popState.compare_exchange_weak(
+                                    expected, EPopWaitingState::RESUMIMG, std::memory_order_release, std::memory_order_relaxed))
+                            {
+                                // if the previous state was IDLE
+                                // our worker is not waiting
+                                // so we can safely put our task into the
+                                // _notifiedCachedTasks queue.
+                                auto failed = !_notifiedCachedTasks.try_push(task.release());
+
+                                // set the state back to IDLE, to allow others to continue
+                                _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+
+                                if (failed)
+                                {
+                                    // the _notifiedCachedTasks stack is closed
+                                    // so reassign the value to the RAII task object
+                                    // for proper destruction.
+                                    task.reset(taskPtr);
+                                }
+
+                                return;
+                            }
+                            else
+                            {
+                                // Worker is in a waiting state.
+                                // Try to wake up.
+                                if (_sharedTasks.try_push(std::move(task)))
+                                {
+                                    // push succeed
+                                    // we simply return
+                                    return;
+                                }
+                            }
                         }
                     }
                 }
@@ -321,9 +394,9 @@ namespace tinycoro { namespace detail {
         {
             // copy notified task to the cached tasks
             auto taskPtr = _notifiedCachedTasks.steal();
-            while(taskPtr)
+            while (taskPtr)
             {
-                auto next = taskPtr->next;
+                auto next     = taskPtr->next;
                 taskPtr->next = nullptr;
                 _cachedTasks.push(taskPtr);
                 taskPtr = next;
@@ -357,7 +430,7 @@ namespace tinycoro { namespace detail {
             // and destroys it
             while (taskPtr)
             {
-                auto  next = taskPtr->next;
+                auto   next = taskPtr->next;
                 Task_t destroyer{taskPtr};
                 taskPtr = next;
             }
@@ -365,6 +438,17 @@ namespace tinycoro { namespace detail {
 
         // the queue which contains all the active tasks
         QueueT& _sharedTasks;
+
+        enum class EPopWaitingState : uint8_t
+        {
+            IDLE, // idle state
+            WAITING, // worker is waiting for tasks
+            RESUMIMG // want to resume task from pause
+        };
+
+        // Used to indicate if the worker is waiting for new task.
+        // (need for task resumption after pause)
+        std::atomic<EPopWaitingState> _popState{EPopWaitingState::IDLE};
 
         // mutext to protect the paused tasks map
         std::mutex _pausedTasksMtx;
@@ -379,12 +463,11 @@ namespace tinycoro { namespace detail {
         // even with a full shared tasks queue.
         detail::LinkedPtrQueue<typename Task_t::element_type> _cachedTasks;
 
-        // this pending task are waiting for resume.
+        // These pending tasks are waiting to be resumed.
         //
-        // The tasks here were in paused state,
-        // but already notified for resumption.
-        // There was no place in the sharedTask queue
-        // so we save them here to garantie task continuation execuion 
+        // The tasks were in a paused state and have already been notified for resumption.
+        // However, there was no space in the sharedTask queue,
+        // so we store them here to guarantee their continued execution.
         detail::AtomicPtrStack<typename Task_t::element_type> _notifiedCachedTasks;
 
         // The scheduler stop token

@@ -173,10 +173,12 @@ TEST_P(SemaphoreTest, SemaphoreTest_counter_param)
 
 struct SemapthoreFunctionalTest : public testing::TestWithParam<int32_t>
 {
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    //tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+
+    tinycoro::CustomScheduler<2> scheduler{std::thread::hardware_concurrency()};
 };
 
-INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000,1000, 10000,100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000, 100000));
 
 TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
 {
