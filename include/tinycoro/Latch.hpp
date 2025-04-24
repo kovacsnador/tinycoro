@@ -28,7 +28,7 @@ namespace tinycoro {
                 }
             }
 
-            // disabe move and copy
+            // disable move and copy
             Latch(Latch&&) = delete;
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };

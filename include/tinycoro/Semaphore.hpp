@@ -45,7 +45,7 @@ namespace tinycoro {
             [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
-            void Release()
+            void Release() noexcept
             {
                 std::unique_lock lock{_mtx};
 
@@ -60,7 +60,7 @@ namespace tinycoro {
                 }
             }
 
-            auto TryAcquire(awaitable_type* awaiter, auto parentCoro)
+            auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -95,7 +95,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-            constexpr auto await_suspend(auto parentCoro)
+            constexpr auto await_suspend(auto parentCoro) noexcept
             {
                 if (_semaphore.TryAcquire(this, parentCoro))
                 {

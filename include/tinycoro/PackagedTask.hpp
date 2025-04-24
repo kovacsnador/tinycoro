@@ -90,9 +90,7 @@ namespace tinycoro {
                     {
                         // are we on a last suspend point?
                         // That means we had no cancellation before
-                        if constexpr (requires {
-                                          { _coro.await_resume() } -> std::same_as<void>;
-                                      })
+                        if constexpr (requires { { _coro.await_resume() } -> std::same_as<void>; })
                         {
                             _futureState.set_value(VoidType{});
                         }

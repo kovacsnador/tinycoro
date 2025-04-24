@@ -23,7 +23,10 @@ namespace tinycoro { namespace detail {
             else
             {
                 _first = newNode;
+                _first->next = nullptr;
             }
+
+            _first->prev = nullptr;
 
             ++_size;
         }
@@ -61,12 +64,12 @@ namespace tinycoro { namespace detail {
         }
 
         [[nodiscard]] value_type* begin() const noexcept { return _first; }
-        [[nodiscard]] bool empty() const noexcept { return !_first; }
-        [[nodiscard]] auto size() const noexcept { return _size; }
+        [[nodiscard]] bool        empty() const noexcept { return !_first; }
+        [[nodiscard]] auto        size() const noexcept { return _size; }
 
     private:
         value_type* _first{nullptr};
-        size_t _size{};
+        size_t      _size{};
     };
 
 }} // namespace tinycoro::detail
