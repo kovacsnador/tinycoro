@@ -753,7 +753,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_pushawait)
         auto [val1, val2] = tinycoro::RunInline(consumer(), producer());
 
         EXPECT_TRUE((std::same_as<decltype(val2), std::optional<tinycoro::VoidType>>));
-        co_return val1;
+        co_return val1.value();
     };
 
     auto fortyTwo = tinycoro::RunInline(task1());

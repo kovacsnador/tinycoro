@@ -129,7 +129,7 @@ namespace tinycoro { namespace detail {
                     //
                     // try to change the state to WAITING...
                     auto expected = EPopWaitingState::IDLE;
-                    while (_popState.compare_exchange_weak(expected, EPopWaitingState::WAITING, std::memory_order_release, std::memory_order_relaxed))
+                    while (_popState.compare_exchange_weak(expected, EPopWaitingState::WAITING, std::memory_order_release, std::memory_order_relaxed) == false)
                     {
                         // this is a spin exchange
                         //
