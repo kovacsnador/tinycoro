@@ -261,12 +261,12 @@ namespace tinycoro { namespace detail {
                         // and guarantie the forward motion in the scheduler.
                         while (_stopToken.stop_requested() == false)
                         {
-                            // we try to set the _popState to RESUMIMG
+                            // we try to set the _popState to RESUMING
                             // to indicate that we have a task, which need
                             // to be resumed.
                             auto expected = EPopWaitingState::IDLE;
                             if (_popState.compare_exchange_weak(
-                                    expected, EPopWaitingState::RESUMIMG, std::memory_order_release, std::memory_order_relaxed))
+                                    expected, EPopWaitingState::RESUMING, std::memory_order_release, std::memory_order_relaxed))
                             {
                                 // if the previous state was IDLE
                                 // our worker is not waiting
@@ -407,7 +407,7 @@ namespace tinycoro { namespace detail {
             // The worker thread may pick it up immediately and finish it very quickly.
             // (Most likely, the resumer thread is preempted or yielded by the OS.)
             // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-            while (_popState.load(std::memory_order_acquire) == EPopWaitingState::RESUMIMG);
+            while (_popState.load(std::memory_order_acquire) == EPopWaitingState::RESUMING);
 
             while (_cachedTasks.empty() == false)
             {
@@ -450,7 +450,7 @@ namespace tinycoro { namespace detail {
         {
             IDLE, // idle state
             WAITING, // worker is waiting for tasks
-            RESUMIMG // want to resume task from pause
+            RESUMING // want to resume task from pause
         };
 
         // Used to indicate if the worker is waiting for new task.
