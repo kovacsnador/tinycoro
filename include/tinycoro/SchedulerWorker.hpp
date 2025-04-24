@@ -170,16 +170,6 @@ namespace tinycoro { namespace detail {
                         continue;
                     }
 
-                    // Can't start a new task if we are in the RESUMING state.
-                    // This can cause a heap-use-after-free in GeneratePauseResume (line 278).
-                    //
-                    // The problem is as follows:
-                    // We want to resume a paused task by pushing it into the _notifiedCachedTasks queue.
-                    // The worker thread may pick it up immediately and finish it very quickly.
-                    // (Most likely, the resumer thread is preempted or yielded by the OS.)
-                    // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-                    while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMIMG);
-
                     // get the task from the cache
                     task.reset(_cachedTasks.pop());
                 }
@@ -412,6 +402,16 @@ namespace tinycoro { namespace detail {
                 _cachedTasks.push(taskPtr);
                 taskPtr = next;
             }
+
+            // Can't start a new task if we are in the RESUMING state.
+            // This can cause a heap-use-after-free in GeneratePauseResume (line 278).
+            //
+            // The problem is as follows:
+            // We want to resume a paused task by pushing it into the _notifiedCachedTasks queue.
+            // The worker thread may pick it up immediately and finish it very quickly.
+            // (Most likely, the resumer thread is preempted or yielded by the OS.)
+            // As a result, the task may complete before the GeneratePauseResume callback has even finished.
+            while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMIMG);
 
             while (_cachedTasks.empty() == false)
             {
