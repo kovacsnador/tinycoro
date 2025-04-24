@@ -411,7 +411,7 @@ namespace tinycoro { namespace detail {
             // The worker thread may pick it up immediately and finish it very quickly.
             // (Most likely, the resumer thread is preempted or yielded by the OS.)
             // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-            while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMIMG);
+            while (_popState.load(std::memory_order_acquire) == EPopWaitingState::RESUMIMG);
 
             while (_cachedTasks.empty() == false)
             {
