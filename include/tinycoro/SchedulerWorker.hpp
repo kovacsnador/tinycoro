@@ -272,11 +272,7 @@ namespace tinycoro { namespace detail {
                                 // our worker is not waiting
                                 // so we can safely put our task into the
                                 // _notifiedCachedTasks queue.
-                                auto failed = !_notifiedCachedTasks.try_push(task.release());
-
-                                std::this_thread::sleep_for(std::chrono::milliseconds(100));
-
-                                if (failed)
+                                if (_notifiedCachedTasks.try_push(task.release()) == false)
                                 {
                                     // the _notifiedCachedTasks stack is closed
                                     // so reassign the value to the RAII task object
