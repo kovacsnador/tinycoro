@@ -178,7 +178,7 @@ namespace tinycoro { namespace detail {
                     // The worker thread may pick it up immediately and finish it very quickly.
                     // (Most likely, the resumer thread is preempted or yielded by the OS.)
                     // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-                    //while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMIMG);
+                    while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMIMG);
 
                     // get the task from the cache
                     task.reset(_cachedTasks.pop());
@@ -286,9 +286,6 @@ namespace tinycoro { namespace detail {
 
                                 std::this_thread::sleep_for(std::chrono::milliseconds(100));
 
-                                // set the state back to IDLE, to allow others to countinue
-                                _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
-
                                 if (failed)
                                 {
                                     // the _notifiedCachedTasks stack is closed
@@ -297,6 +294,8 @@ namespace tinycoro { namespace detail {
                                     task.reset(taskPtr);
                                 }
 
+                                // set the state back to IDLE, to allow others to countinue
+                                _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
                                 return;
                             }
                             else
