@@ -4,7 +4,7 @@
 #include <thread>
 #include <future>
 #include <functional>
-#include <vector>
+#include <list>
 #include <mutex>
 #include <concepts>
 #include <assert.h>
@@ -62,9 +62,9 @@ namespace tinycoro {
                 // or access to invalid memory, if the code is extended in the future.
                 for (auto& it : _workerThreads)
                 {
-                    if (it->joinable())
+                    if (it.joinable())
                     {
-                        it->join();
+                        it.join();
                     }
                 }
             }
@@ -154,11 +154,9 @@ namespace tinycoro {
             {
                 assert(workerThreadCount >= 1);
 
-                _workerThreads.reserve(workerThreadCount);
-
                 for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
                 {
-                    _workerThreads.emplace_back(std::make_unique<Worker_t>(_sharedTasks, _stopSource.get_token()));
+                    _workerThreads.emplace_back(_sharedTasks, _stopSource.get_token());
                 }
             }
 
@@ -190,7 +188,7 @@ namespace tinycoro {
             using Worker_t = SchedulerWorker<decltype(_sharedTasks)>;
 
             // the worker threads which are running the tasks
-            std::vector<std::unique_ptr<Worker_t>> _workerThreads;
+            std::list<Worker_t> _workerThreads;
         };
 
         static constexpr uint64_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
