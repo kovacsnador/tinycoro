@@ -110,7 +110,7 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto joinable() const noexcept { return _thread.joinable(); }
 
     private:
-        void Run(std::stop_token stopToken)
+        void Run(std::stop_token stopToken) noexcept
         {
             while (stopToken.stop_requested() == false)
             {
@@ -199,7 +199,7 @@ namespace tinycoro { namespace detail {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        PauseHandlerCallbackT GeneratePauseResume(auto taskPtr)
+        PauseHandlerCallbackT GeneratePauseResume(auto taskPtr) noexcept
         {
             return [this, taskPtr]() {
                 if (_stopToken.stop_requested() == false)
@@ -293,7 +293,7 @@ namespace tinycoro { namespace detail {
             };
         }
 
-        inline void _InvokeTask(Task_t task)
+        inline void _InvokeTask(Task_t task) noexcept
         {
             // sets the corrent pause resume callback
             // before any resumption
@@ -343,9 +343,11 @@ namespace tinycoro { namespace detail {
                     {
                         auto taskPtr = task.release();
 
-                        std::scoped_lock pauseLock{_pausedTasksMtx};
+                        std::unique_lock pauseLock{_pausedTasksMtx};
                         // push back into the pause state
                         _pausedTasks.push_front(taskPtr);
+
+                        pauseLock.unlock();
 
                         if (taskPtr->pauseState.compare_exchange_strong(
                                 expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
@@ -355,10 +357,13 @@ namespace tinycoro { namespace detail {
                             return;
                         }
 
+                        pauseLock.lock();
                         // in the meantime the task is notified for resumption
                         // so we need to remove it from the paused task queue
                         // and resume the task
                         _pausedTasks.erase(taskPtr);
+
+                        pauseLock.unlock();
 
                         // reassign the pointer
                         // and continue with this task
@@ -379,7 +384,7 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        inline void _TryToUploadCachedTasks()
+        inline void _TryToUploadCachedTasks() noexcept
         {
             // copy notified task to the cached tasks
             auto taskPtr = _notifiedCachedTasks.steal();
@@ -456,12 +461,9 @@ namespace tinycoro { namespace detail {
         }
 
         // Exits the pop waiting state
-        inline void _WaitingRelease() noexcept
-        {
-            _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
-        }
+        inline void _WaitingRelease() noexcept { _popState.store(EPopWaitingState::IDLE, std::memory_order_release); }
 
-        void _Cleanup(auto taskPtr)
+        void _Cleanup(auto taskPtr) noexcept
         {
             // iterates over the elements
             // and destroys it
