@@ -127,16 +127,8 @@ namespace tinycoro { namespace detail {
                 {
                     // there was no tasks in the queue
                     //
-                    // try to change the state to WAITING...
-                    auto expected = EPopWaitingState::IDLE;
-                    while (_popState.compare_exchange_weak(expected, EPopWaitingState::WAITING, std::memory_order_release, std::memory_order_relaxed) == false)
-                    {
-                        // this is a spin exchange
-                        //
-                        // no issue here because the state should
-                        // not stay to long in RESUMING
-                        expected = EPopWaitingState::IDLE;
-                    }
+                    // Step in the "waiting for pop" state
+                    _WaitingAquire();
 
                     if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
                     {
@@ -150,12 +142,12 @@ namespace tinycoro { namespace detail {
 
                         // waiting finished, possibly new tasks
                         // are arrived in the queue
-                        _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+                        _WaitingRelease();
                         continue;
                     }
 
                     // waiting finished, reset it
-                    _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+                    _WaitingRelease();
 
                     // most likely we have something in the cache.
                     //
@@ -301,7 +293,7 @@ namespace tinycoro { namespace detail {
             };
         }
 
-        void _InvokeTask(Task_t task)
+        inline void _InvokeTask(Task_t task)
         {
             // sets the corrent pause resume callback
             // before any resumption
@@ -387,7 +379,7 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        void _TryToUploadCachedTasks()
+        inline void _TryToUploadCachedTasks()
         {
             // copy notified task to the cached tasks
             auto taskPtr = _notifiedCachedTasks.steal();
@@ -407,7 +399,11 @@ namespace tinycoro { namespace detail {
             // The worker thread may pick it up immediately and finish it very quickly.
             // (Most likely, the resumer thread is preempted or yielded by the OS.)
             // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-            while (_popState.load(std::memory_order_acquire) == EPopWaitingState::RESUMING);
+            while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMING)
+            {
+                // friendly spinning
+                std::this_thread::yield();
+            }
 
             while (_cachedTasks.empty() == false)
             {
@@ -429,6 +425,40 @@ namespace tinycoro { namespace detail {
                     break;
                 }
             }
+        }
+
+        // Enters the pop waiting state
+        inline void _WaitingAquire() noexcept
+        {
+            // Change the state to WAITING...
+            for (;;)
+            {
+                auto expected = EPopWaitingState::IDLE;
+                if (_popState.compare_exchange_strong(expected, EPopWaitingState::WAITING, std::memory_order_release, std::memory_order_relaxed))
+                {
+                    // we set the flag to WAITING
+                    return;
+                }
+
+                // wait until the state is not IDLE
+                while (_popState.load(std::memory_order_relaxed) != EPopWaitingState::IDLE)
+                {
+                    // friendly spinning
+                    // yield back the contol to the OS scheduler
+                    //
+                    // No special backoff logic here.
+                    // Not necessary right now,
+                    // because it's not expected
+                    // to wait here long.
+                    std::this_thread::yield();
+                }
+            }
+        }
+
+        // Exits the pop waiting state
+        inline void _WaitingRelease() noexcept
+        {
+            _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
         }
 
         void _Cleanup(auto taskPtr)
