@@ -12,6 +12,8 @@
 #include "AsyncCallbackAwaiter_example.h"
 #include "AsyncPulling_example.h"
 
+#include "AutoEvent_example.h"
+
 #include "Exception_example.h"
 #include "Generator_example.h"
 #include "MoveOnlyValue_example.h"
@@ -69,6 +71,8 @@ int main()
         Example_multiTaskDifferentValues(scheduler);
 
         Example_sleep(scheduler);
+
+        Example_AutoEvent(scheduler);
 
         Example_asyncPulling(scheduler);
 
