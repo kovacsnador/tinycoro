@@ -8,9 +8,10 @@ namespace tinycoro {
 
     struct TaskResumer
     {
-        static inline void Resume(auto coroHdl, const auto& stopSource)
+        static inline void Resume(auto coroHdl)
         {
             auto& pauseHandler = coroHdl.promise().pauseHandler;
+            const auto& stopSource = coroHdl.promise().stopSource;
 
             if (pauseHandler)
             {
@@ -34,11 +35,12 @@ namespace tinycoro {
             hdlPtr->Resume();
         }
 
-        [[nodiscard]] static inline ETaskResumeState ResumeState(auto coroHdl, const auto& stopSource) noexcept
+        [[nodiscard]] static inline ETaskResumeState ResumeState(auto coroHdl) noexcept
         {
             if (coroHdl && coroHdl.done() == false)
             {
                 auto& pauseHandler = coroHdl.promise().pauseHandler;
+                const auto& stopSource = coroHdl.promise().stopSource;
 
                 if (pauseHandler)
                 {

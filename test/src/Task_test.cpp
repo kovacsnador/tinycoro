@@ -87,11 +87,11 @@ struct PromiseMock
 
 struct CoroResumerMock
 {
-    void Resume([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
+    void Resume([[maybe_unused]] auto hdl)
     {
     }
 
-    auto ResumeState([[maybe_unused]] auto hdl, [[maybe_unused]] const auto& stopSource)
+    auto ResumeState([[maybe_unused]] auto hdl)
     {
         return tinycoro::ETaskResumeState::PAUSED;
     }
