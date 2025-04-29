@@ -115,7 +115,7 @@ namespace tinycoro {
 
         auto final_suspend() noexcept { return FinalAwaiterT{}; }
 
-        void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
+        [[noreturn]] constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 
         template <typename... Args>
         auto MakePauseHandler(Args&&... args)
