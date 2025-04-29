@@ -8,6 +8,11 @@ template<typename T>
 struct PromiseMock
 {
     T stopSource;
+
+    auto& StopSource() noexcept
+    {
+        return stopSource;
+    }
 };
 
 TEST(StopSourceAwaiterTest, StopSourceAwaiterTest)
@@ -18,17 +23,24 @@ TEST(StopSourceAwaiterTest, StopSourceAwaiterTest)
 
     EXPECT_EQ(ssa.await_ready(), false);
 
-    auto mockHdl = ssa.await_suspend(hdl);
-    EXPECT_TRUE((std::same_as<decltype(mockHdl), decltype(hdl)>));
+    EXPECT_FALSE(ssa.await_suspend(hdl));
 
     auto stopSource = ssa.await_resume();
     EXPECT_TRUE((std::same_as<decltype(stopSource), std::stop_source>));
+
+    EXPECT_TRUE(stopSource.stop_possible());
 }
 
 template<typename T>
 struct PromiseMockNoState
 {
     T stopSource{std::nostopstate};
+
+    auto& StopSource() noexcept
+    {
+        stopSource = {};
+        return stopSource;
+    }
 };
 
 TEST(StopSourceAwaiterTest, StopSourceAwaiterTest_nostate)
@@ -39,10 +51,12 @@ TEST(StopSourceAwaiterTest, StopSourceAwaiterTest_nostate)
 
     EXPECT_EQ(ssa.await_ready(), false);
 
-    EXPECT_THROW(ssa.await_suspend(hdl), tinycoro::StopSourceAwaiterException);
+    EXPECT_FALSE(ssa.await_suspend(hdl));
 
     auto stopSource = ssa.await_resume();
     EXPECT_TRUE((std::same_as<decltype(stopSource), std::stop_source>));
+
+    EXPECT_TRUE(stopSource.stop_possible());
 }
 
 TEST(StopSourceAwaiterTest, StopTokenAwaiterTest)
@@ -53,11 +67,12 @@ TEST(StopSourceAwaiterTest, StopTokenAwaiterTest)
 
     EXPECT_EQ(ssa.await_ready(), false);
 
-    auto mockHdl = ssa.await_suspend(hdl);
-    EXPECT_TRUE((std::same_as<decltype(mockHdl), decltype(hdl)>));
+    EXPECT_FALSE(ssa.await_suspend(hdl));
 
     auto stopToken = ssa.await_resume();
     EXPECT_TRUE((std::same_as<decltype(stopToken), std::stop_token>));
+
+    EXPECT_TRUE(stopToken.stop_possible());
 }
 
 TEST(StopSourceAwaiterTest, StopTokenAwaiterTest_nostate)
@@ -68,8 +83,10 @@ TEST(StopSourceAwaiterTest, StopTokenAwaiterTest_nostate)
 
     EXPECT_EQ(ssa.await_ready(), false);
 
-    EXPECT_THROW(ssa.await_suspend(hdl), tinycoro::StopSourceAwaiterException);
+    EXPECT_FALSE(ssa.await_suspend(hdl));
 
     auto stopToken = ssa.await_resume();
     EXPECT_TRUE((std::same_as<decltype(stopToken), std::stop_token>));
+
+    EXPECT_TRUE(stopToken.stop_possible());
 }

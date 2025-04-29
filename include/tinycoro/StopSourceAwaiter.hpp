@@ -5,57 +5,51 @@
 
 #include "Exception.hpp"
 
-namespace tinycoro
-{
-    template<typename StopSourceT = std::stop_source>
+namespace tinycoro {
+    template <typename StopSourceT = std::stop_source>
     struct StopSourceAwaiter
     {
-        StopSourceT* stopSource;
-
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr auto await_suspend(auto parentCoro)
-        { 
-            stopSource = std::addressof(parentCoro.promise().stopSource);
+        constexpr bool await_suspend(auto parentCoro)
+        {
+            auto& stopSource = parentCoro.promise().StopSource();
+            assert(stopSource.stop_possible());
 
-            if(stopSource->stop_possible() == false)
-            {
-                throw StopSourceAwaiterException{"No stop state. Need AnyOf context"};
-            }
+            _stopSource = std::addressof(stopSource);
 
-            return parentCoro;
+            // no suspend
+            return false;
         }
 
-        constexpr auto await_resume() const noexcept {
-            return *stopSource;
-        }
+        constexpr auto await_resume() const noexcept { return *_stopSource; }
+
+    private:
+        StopSourceT* _stopSource;
     };
 
-    template<typename StopSourceT = std::stop_source>
+    template <typename StopSourceT = std::stop_source>
     struct StopTokenAwaiter
     {
-        StopSourceT* stopSource;
-
         [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-        constexpr auto await_suspend(auto parentCoro)
-        { 
-            stopSource = std::addressof(parentCoro.promise().stopSource);
+        constexpr bool await_suspend(auto parentCoro)
+        {
+            auto& stopSource = parentCoro.promise().StopSource();
+            assert(stopSource.stop_possible());
 
-            if(stopSource->stop_possible() == false)
-            {
-                throw StopSourceAwaiterException{"No stop state. Need AnyOf context"};
-            }
+            _stopSource = std::addressof(stopSource);
 
-            return parentCoro;
+            // no suspend
+            return false;
         }
 
-        constexpr auto await_resume() const noexcept {
-            return stopSource->get_token();
-        }
+        constexpr auto await_resume() const noexcept { return _stopSource->get_token(); }
+
+    private:
+        StopSourceT* _stopSource;
     };
-    
-} // namespace tinycoro
 
+} // namespace tinycoro
 
 #endif // TINY_CORO_STOP_SOURCE_AWAITER_HPP

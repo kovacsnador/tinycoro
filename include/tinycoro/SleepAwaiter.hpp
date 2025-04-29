@@ -65,7 +65,7 @@ namespace tinycoro {
     {
         co_await SleepUntil(softClock, timePoint, stopToken);
 
-        if (stopToken.stop_possible() && stopToken.stop_requested())
+        if (stopToken.stop_requested())
         {
             co_await CancellableSuspend{};
         }

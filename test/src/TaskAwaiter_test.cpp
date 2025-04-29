@@ -88,6 +88,11 @@ struct PromiseMock
     StopSourceMock stopSource;
     PauseHdlMock pauseHandler;
 
+    auto& StopSource() noexcept
+    {
+        return stopSource;
+    }
+
     ValueT&& ReturnValue() { return std::move(value); }
 
     ValueT value;
@@ -100,6 +105,11 @@ struct PromiseMock<void>
     HandleMock<void> parent;
     StopSourceMock stopSource;
     PauseHdlMock pauseHandler;
+
+    auto& StopSource() noexcept
+    {
+        return stopSource;
+    }
 };
 
 template<typename ValueT, template<typename, typename> class AwaiterT>
