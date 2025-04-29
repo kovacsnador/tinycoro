@@ -42,28 +42,26 @@ namespace tinycoro {
 
             if (suspend)
             {
-                auto& stopSource = parentCoro.promise().stopSource;
+                auto& stopSource = parentCoro.promise().StopSource();
+                assert(stopSource.stop_possible());
 
-                if (stopSource.stop_possible())
-                {
-                    // if we have a valid stop_source
-                    // we also setup a stop_callback
-                    _stopCallback.Construct<stopCallback_t>(stopSource.get_token(), [this, parentCoro] {
-                        if (_awaiter.Cancel())
-                        {
-                            // if we could cancel the awaiter
-                            // this is the first point that we actually
-                            // are able to mark the awaiter suspend as cancellable
-                            context::MakeCancellable(parentCoro);
+                // now we have a valid stop_source
+                // we also setup a stop_callback
+                _stopCallback.Construct<stopCallback_t>(stopSource.get_token(), [this, parentCoro] {
+                    if (_awaiter.Cancel())
+                    {
+                        // if we could cancel the awaiter
+                        // this is the first point that we actually
+                        // are able to mark the awaiter suspend as cancellable
+                        context::MakeCancellable(parentCoro);
 
-                            // after we own the awaiter and
-                            // set the cancellable flag,
-                            // we still need to notify the awaiter
-                            // to trigger further actions.
-                            _awaiter.Notify();
-                        }
-                    });
-                }
+                        // after we own the awaiter and
+                        // set the cancellable flag,
+                        // we still need to notify the awaiter
+                        // to trigger further actions.
+                        _awaiter.Notify();
+                    }
+                });
             }
 
             return suspend;

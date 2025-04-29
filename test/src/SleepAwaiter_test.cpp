@@ -5,28 +5,16 @@
 
 #include <tinycoro/tinycoro_all.h>
 
+using namespace std::chrono_literals;
+
 struct SleepAwaiterTest : testing::Test
 {
+    tinycoro::SoftClock clock;
     tinycoro::Scheduler scheduler{4};
 };
 
-/*tinycoro::Task<void> SleepTask(auto duration)
-{ 
-    co_await tinycoro::SleepFor(clock, duration);
-};
-
-tinycoro::Task<void> SleepTaskCustom(auto duration)
-{
-    auto stopToken = co_await tinycoro::StopTokenAwaiter{};
-    co_await tinycoro::SleepFor(clock, duration, stopToken);
-};*/
-
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest)
 {
-    tinycoro::SoftClock clock;
-
-    using namespace std::chrono_literals;
-
     auto timeout = 200ms;
 
     auto start  = std::chrono::system_clock::now();
@@ -39,9 +27,6 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt)
 {
-    tinycoro::SoftClock clock;
-    using namespace std::chrono_literals;
-
     auto timeout1 = 200ms;
     auto timeout2 = 10000ms; // this should interrupt
 
@@ -57,9 +42,6 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_custom_stopToken)
 {
-    tinycoro::SoftClock clock;
-    using namespace std::chrono_literals;
-
     auto timeout1 = 200ms;
     auto timeout2 = 10000ms; // this should interrupt
 
@@ -75,9 +57,6 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_custom_stopToken)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable)
 {
-    tinycoro::SoftClock clock;
-    using namespace std::chrono_literals;
-
     std::atomic<int32_t> count{};
 
     auto sleepTaskCancellable = [&](auto duration) -> tinycoro::Task<void> {
@@ -102,9 +81,6 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable)
 
 TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable_custom_stopToken)
 {
-    using namespace std::chrono_literals;
-
-    tinycoro::SoftClock clock;
     std::atomic<int32_t> count{};
 
     auto sleepTaskCancellable = [&](auto duration) -> tinycoro::Task<void> {
@@ -127,6 +103,81 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_cancellable_custom_stopToken)
     EXPECT_TRUE(start + timeout2 > end);
 
     EXPECT_EQ(count, 1);
+}
+
+TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_sleep)
+{
+    std::atomic<int32_t> count{};
+    std::stop_source stopSource;
+
+    auto sleepInterruptTask = [&](auto duration) -> tinycoro::Task<void> {
+        co_await tinycoro::SleepFor(clock, duration, stopSource.get_token());
+        ++count;
+    };
+
+    auto stopRequester = [&]() -> tinycoro::Task<void> {
+        stopSource.request_stop();
+        co_return;
+    };
+
+    auto timeout1 = 2s;
+    auto timeout2 = 10s;
+
+    auto start  = std::chrono::system_clock::now();
+
+    tinycoro::GetAll(scheduler, stopRequester(), sleepInterruptTask(timeout1), sleepInterruptTask(timeout2));
+
+    auto end = std::chrono::system_clock::now();
+
+    EXPECT_TRUE(start + timeout1 > end);
+    EXPECT_TRUE(start + timeout2 > end);
+
+    // both sould interrupt the sleep
+    // (but don't cancel the parent coroutine)
+    // and increase the value
+    EXPECT_EQ(count, 2);
+}
+
+TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_sleep_cancellable)
+{
+    std::atomic<int32_t> count{};
+    std::stop_source stopSource;
+
+    tinycoro::AutoEvent event;
+
+    auto sleepInterruptTask = [&](auto duration) -> tinycoro::Task<void> {
+
+        // save the stop source in the global variable
+        stopSource = co_await tinycoro::StopSourceAwaiter{};
+
+        event.Set();
+
+        co_await tinycoro::SleepForCancellable(clock, duration);
+        ++count;
+    };
+
+    auto stopRequester = [&]() -> tinycoro::Task<void> {
+        co_await event;
+        
+        // request a stop
+        stopSource.request_stop();
+        co_return;
+    };
+
+    auto timeout1 = 2s;
+
+    auto start = std::chrono::system_clock::now();
+
+    tinycoro::GetAll(scheduler, stopRequester(), sleepInterruptTask(timeout1));
+
+    auto end = std::chrono::system_clock::now();
+
+    EXPECT_TRUE(start + timeout1 > end);
+
+    // both sould interrupt the sleep
+    // (but don't cancel the parent coroutine)
+    // and increase the value
+    EXPECT_EQ(count, 0);
 }
 
 TEST(IsDurationTest, IsDurationTest)

@@ -30,7 +30,7 @@ TEST(CancellableTest, CancellableTest_mock_await_suspend)
     CancellableAwaiter_Mock mock;
     auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
 
-    auto stopSource = hdl.promise().stopSource;
+    auto stopSource = hdl.promise().StopSource();
 
     EXPECT_CALL(mock, await_suspend).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock, Cancel).WillOnce(testing::Return(true));
@@ -47,7 +47,7 @@ TEST(CancellableTest, CancellableTest_mock_await_suspend_false)
     CancellableAwaiter_Mock mock;
     auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
 
-    auto stopSource = hdl.promise().stopSource;
+    auto stopSource = hdl.promise().StopSource();
 
     EXPECT_CALL(mock, await_suspend).Times(1).WillOnce(testing::Return(false));
     EXPECT_CALL(mock, Cancel).Times(0);

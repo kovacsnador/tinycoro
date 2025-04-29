@@ -15,7 +15,7 @@ namespace tinycoro
             auto hdl                   = coroTask->_hdl;
             parentCoro.promise().child = hdl;
             hdl.promise().parent       = parentCoro;
-            hdl.promise().stopSource   = parentCoro.promise().stopSource;
+            hdl.promise().stopSource   = parentCoro.promise().StopSource();
             hdl.promise().pauseHandler = parentCoro.promise().pauseHandler;
             return hdl;
         }

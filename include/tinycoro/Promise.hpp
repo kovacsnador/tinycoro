@@ -96,17 +96,20 @@ namespace tinycoro {
     template <concepts::Awaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT, typename NodeT = PackedCoroHandle>
     struct PromiseBase
     {
-        PromiseBase()          = default;
+        PromiseBase() = default;
 
         // disable nove and copy
-        PromiseBase(PromiseBase&&)      = delete;
+        PromiseBase(PromiseBase&&) = delete;
 
         NodeT child;
         NodeT parent;
 
         detail::IntrusivePtr<PauseHandlerT> pauseHandler;
 
-        StopSourceT stopSource;
+        // at the beginning we not initialize
+        // the stop source here, the initialization
+        // will be delayed, until we actually need this object
+        StopSourceT stopSource{std::nostopstate};
 
         auto initial_suspend() { return std::suspend_always{}; }
 
@@ -114,11 +117,24 @@ namespace tinycoro {
 
         void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
 
-        template<typename... Args>
+        template <typename... Args>
         auto MakePauseHandler(Args&&... args)
         {
             pauseHandler.emplace(std::forward<Args>(args)...);
             return pauseHandler.get();
+        }
+
+        // Getting the corresponding stop source,
+        // and make sure it is initialized
+        auto& StopSource() noexcept
+        {
+            if (stopSource.stop_possible() == false)
+            {
+                // initialize stop source
+                // if it has no state yet
+                stopSource = {};
+            }
+            return stopSource;
         }
     };
 
@@ -138,13 +154,19 @@ namespace tinycoro {
     struct PromiseT;
 
     template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
-    struct PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT
+    struct PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>,
+                                                                            public ReturnerT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
 
-    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, PromiseYielderConcept YielderT, typename PauseHandlerT, typename StopSourceT>
-    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
+    template <concepts::Awaiter      FinalAwaiterT,
+              PromiseReturnerConcept ReturnerT,
+              PromiseYielderConcept  YielderT,
+              typename PauseHandlerT,
+              typename StopSourceT>
+    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT>
+    : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
     {
         auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
     };
