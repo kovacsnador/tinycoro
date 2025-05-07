@@ -1,179 +1,151 @@
-#ifndef TINY_CORO_PROMISE_HPP
-#define TINY_CORO_PROMISE_HPP
+#ifndef TINY_CORO_PROMISE_NEW_HPP
+#define TINY_CORO_PROMISE_NEW_HPP
 
-#include <type_traits>
-#include <concepts>
-#include <stop_token>
+#include <coroutine>
+#include <future>
 
+#include "PromiseBase.hpp"
 #include "PauseHandler.hpp"
-#include "PackedCoroHandle.hpp"
-#include "IntrusivePtr.hpp"
 
 namespace tinycoro {
+    namespace detail {
 
-    namespace concepts {
+        struct FinalAwaiter
+        {
+            [[nodiscard]] bool await_ready() const noexcept { return false; }
 
-        template <typename T>
-        concept Awaiter = requires (T t) {
-            { t.await_ready() };
-            { t.await_suspend(std::coroutine_handle<>{}) };
-            { t.await_resume() };
+            [[nodiscard]] std::coroutine_handle<> await_suspend(auto hdl) noexcept
+            {
+                auto& promise = hdl.promise();
+
+                if (promise.parent)
+                {
+                    using promise_t = std::remove_pointer_t<decltype(promise.parent)>;
+
+                    promise.parent->child = nullptr;
+                    return std::coroutine_handle<promise_t>::from_promise(*promise.parent);
+                }
+
+                return std::noop_coroutine();
+            }
+
+            void await_resume() const noexcept { }
         };
 
-    } // namespace concepts
-
-    struct FinalAwaiter
-    {
-        [[nodiscard]] bool await_ready() const noexcept { return false; }
-
-        [[nodiscard]] std::coroutine_handle<> await_suspend(auto hdl) noexcept
+        template <typename ValueT>
+        struct PromiseReturnValue
         {
-            auto& promise = hdl.promise();
+            using value_type = ValueT;
 
-            if (promise.parent)
+            PromiseReturnValue() = default;
+
+            template <typename U>
+            void return_value(U&& v)
             {
-                promise.parent.Child() = nullptr;
-                return promise.parent.Handle();
+                if constexpr (requires { _value = std::forward<U>(v); })
+                {
+                    _value = std::forward<U>(v);
+                }
+                else
+                {
+                    // to support aggregate initialization
+                    _value = decltype(_value){std::in_place, std::forward<U>(v)};
+                }
             }
 
-            return std::noop_coroutine();
-        }
+            auto&& ReturnValue() { return std::move(_value.value()); }
 
-        void await_resume() const noexcept { }
-    };
+        private:
+            std::optional<value_type> _value{};
+        };
 
-    template <typename ValueT>
-    struct PromiseReturnValue
-    {
-        using value_type = ValueT;
-
-        template <typename U>
-        void return_value(U&& v)
+        template <>
+        struct PromiseReturnValue<void>
         {
-            if constexpr (requires { _value = std::forward<U>(v); })
+            using value_type = void;
+
+            void return_void() { }
+        };
+
+        template <typename ValueT, concepts::IsAwaiter AwaiterT>
+        struct PromiseYieldValue
+        {
+            using value_type = ValueT;
+
+            template <typename U>
+            auto yield_value(U&& v)
             {
-                _value = std::forward<U>(v);
+                _value.emplace(std::forward<U>(v));
+                return AwaiterT{};
             }
-            else
-            {
-                // to support aggregate initialization
-                _value = decltype(_value){std::in_place, std::forward<U>(v)};
-            }
-        }
 
-        auto&& ReturnValue() { return std::move(_value.value()); }
+            const auto& YieldValue() const { return _value.value(); }
 
-    private:
-        std::optional<value_type> _value{};
-    };
+        private:
+            std::optional<value_type> _value{};
+        };
 
-    template <>
-    struct PromiseReturnValue<void>
-    {
-        using value_type = void;
+        template <typename ReturnerT>
+        concept PromiseReturnerConcept = requires (ReturnerT r) {
+            { r.return_void() };
+        } || requires (ReturnerT r) {
+            { r.return_value(std::declval<typename ReturnerT::value_type>()) };
+        };
 
-        void return_void() { }
-    };
+        template <typename YielderT>
+        concept PromiseYielderConcept = requires (YielderT y) {
+            { y.yield_value(std::declval<typename YielderT::value_type>()) };
+        };
 
-    template <typename ValueT, concepts::Awaiter AwaiterT>
-    struct PromiseYieldValue
-    {
-        using value_type = ValueT;
+        template <typename... Types>
+        struct PromiseT;
 
-        template <typename U>
-        auto yield_value(U&& v)
+        // IMPORTANT: The PromiseBase base class must be the first base class
+        // from which the derived promise type inherits.
+        // The reason is due to alignment within the coroutine frame.
+        // The coroutine promise is laid out in memory according to the
+        // most derived type, but if we have a base class like this,
+        // it is only safe to use PromiseBase if it appears first
+        // in the inheritance list.
+        //
+        // So with this PromiseBase, we can convert any derived promise
+        // to std::coroutine_handle<PromiseBase>.
+        // It is used inside the scheduler logic.
+        template <concepts::IsAwaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
+        struct PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT>
+        : public PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT
         {
-            _value.emplace(std::forward<U>(v));
-            return AwaiterT{};
-        }
+            using PromiseBase_t = PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>;
 
-        const auto& YieldValue() const { return _value.value(); }
+            auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
 
-    private:
-        std::optional<value_type> _value{};
-    };
+            ~PromiseT() { this->Finish(); }
+        };
 
-    template <concepts::Awaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT, typename NodeT = PackedCoroHandle>
-    struct PromiseBase
-    {
-        PromiseBase() = default;
-
-        // disable nove and copy
-        PromiseBase(PromiseBase&&) = delete;
-
-        NodeT child;
-        NodeT parent;
-
-        detail::IntrusivePtr<PauseHandlerT> pauseHandler;
-
-        // at the beginning we not initialize
-        // the stop source here, the initialization
-        // will be delayed, until we actually need this object
-        StopSourceT stopSource{std::nostopstate};
-
-        auto initial_suspend() { return std::suspend_always{}; }
-
-        auto final_suspend() noexcept { return FinalAwaiterT{}; }
-
-        [[noreturn]] constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
-
-        template <typename... Args>
-        auto MakePauseHandler(Args&&... args)
+        template <concepts::IsAwaiter    FinalAwaiterT,
+                  PromiseReturnerConcept ReturnerT,
+                  PromiseYielderConcept  YielderT,
+                  typename PauseHandlerT,
+                  typename StopSourceT>
+        struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT>
+        : public PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
         {
-            pauseHandler.emplace(std::forward<Args>(args)...);
-            return pauseHandler.get();
-        }
+            using PromiseBase_t = PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>;
 
-        // Getting the corresponding stop source,
-        // and make sure it is initialized
-        auto& StopSource() noexcept
-        {
-            if (stopSource.stop_possible() == false)
-            {
-                // initialize stop source
-                // if it has no state yet
-                stopSource = {};
-            }
-            return stopSource;
-        }
-    };
+            auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
 
-    template <typename ReturnerT>
-    concept PromiseReturnerConcept = requires (ReturnerT r) {
-        { r.return_void() };
-    } || requires (ReturnerT r) {
-        { r.return_value(std::declval<typename ReturnerT::value_type>()) };
-    };
+            ~PromiseT() { this->Finish(); }
+        };
 
-    template <typename YielderT>
-    concept PromiseYielderConcept = requires (YielderT y) {
-        { y.yield_value(std::declval<typename YielderT::value_type>()) };
-    };
-
-    template <typename... Types>
-    struct PromiseT;
-
-    template <concepts::Awaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
-    struct PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT> : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>,
-                                                                            public ReturnerT
-    {
-        auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
-    };
-
-    template <concepts::Awaiter      FinalAwaiterT,
-              PromiseReturnerConcept ReturnerT,
-              PromiseYielderConcept  YielderT,
-              typename PauseHandlerT,
-              typename StopSourceT>
-    struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT>
-    : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
-    {
-        auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
-    };
+    } // namespace detail
 
     template <typename ReturnValueT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
-    using Promise = PromiseT<FinalAwaiter, PromiseReturnValue<ReturnValueT>, PauseHandlerT, StopSourceT>;
+    using Promise = detail::PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT>, PauseHandlerT, StopSourceT>;
+
+    namespace detail {
+        using CommonPromise = Promise<void>::PromiseBase_t;
+    } // namespace detail
 
 } // namespace tinycoro
 
-#endif // TINY_CORO_PROMISE_HPP
+#endif // TINY_CORO_PROMISE_NEW_HPP

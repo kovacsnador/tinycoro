@@ -15,11 +15,6 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
-            { t.IsPaused() } -> std::same_as<bool>;
-        };
-
-        template <typename T>
         concept PauseHandlerCb = std::regular_invocable<T>;
 
     } // namespace concepts
@@ -49,6 +44,7 @@ namespace tinycoro {
                 _notifyCallback = std::forward<T>(cb);
             }
         };
+
     } // namespace detail
 
     class PauseHandler : public detail::IntrusiveObject<PauseHandler>
@@ -62,12 +58,13 @@ namespace tinycoro {
         {
         }
 
-        void Resume() { _state.store(0u, std::memory_order::relaxed); }
-
-        void ResetCallback(concepts::PauseHandlerCb auto pr)
+        void Resume()
         {
-            _resumerCallback = std::move(pr);
+            _state.store(0u, std::memory_order::relaxed);
+            //pauseState.store(EPauseState::IDLE, std::memory_order::relaxed);
         }
+
+        void ResetCallback(concepts::PauseHandlerCb auto pr) { _resumerCallback = std::move(pr); }
 
         [[nodiscard]] auto Pause()
         {
@@ -95,6 +92,9 @@ namespace tinycoro {
         [[nodiscard]] bool IsPaused() const noexcept { return _state & c_pauseMask; }
 
         [[nodiscard]] bool IsCancellable() const noexcept { return _state & c_cancelMask; }
+
+        // Pause state needed by the scheduler.
+        //std::atomic<EPauseState> pauseState{EPauseState::IDLE};
 
     private:
         PauseHandlerCallbackT _resumerCallback;

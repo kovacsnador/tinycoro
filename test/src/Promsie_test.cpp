@@ -11,7 +11,7 @@ TEST(PromiseTest, PromiseTest_void)
     EXPECT_TRUE(requires { promise.return_void(); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
     EXPECT_TRUE((std::same_as<std::suspend_always, decltype(promise.initial_suspend())>));
-    EXPECT_TRUE((std::same_as<tinycoro::FinalAwaiter, decltype(promise.final_suspend())>));
+    EXPECT_TRUE((std::same_as<tinycoro::detail::FinalAwaiter, decltype(promise.final_suspend())>));
 
     EXPECT_TRUE((std::same_as<std::coroutine_handle<decltype(promise)>, decltype(promise.get_return_object())>));
 }
@@ -29,7 +29,7 @@ TEST(PromiseTest, PromiseTest_int)
     EXPECT_TRUE((std::same_as<std::coroutine_handle<decltype(promise)>, decltype(promise.get_return_object())>));
 
     EXPECT_TRUE((std::same_as<std::suspend_always, decltype(promise.initial_suspend())>));
-    EXPECT_TRUE((std::same_as<tinycoro::FinalAwaiter, decltype(promise.final_suspend())>));
+    EXPECT_TRUE((std::same_as<tinycoro::detail::FinalAwaiter, decltype(promise.final_suspend())>));
 }
 
 TEST(PromiseTest, PromiseTest_MoveOnly)
@@ -48,6 +48,9 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
     };
 
     tinycoro::Promise<MoveOnly> promise;
+
+    std::cout << sizeof(promise) << '\n';
+
     EXPECT_TRUE(requires { promise.return_value(MoveOnly{12}); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -60,7 +63,7 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
     EXPECT_TRUE((std::same_as<std::coroutine_handle<decltype(promise)>, decltype(promise.get_return_object())>));
 
     EXPECT_TRUE((std::same_as<std::suspend_always, decltype(promise.initial_suspend())>));
-    EXPECT_TRUE((std::same_as<tinycoro::FinalAwaiter, decltype(promise.final_suspend())>));
+    EXPECT_TRUE((std::same_as<tinycoro::detail::FinalAwaiter, decltype(promise.final_suspend())>));
 }
 
 struct FinalAwaiterMock
@@ -72,7 +75,7 @@ struct FinalAwaiterMock
 
 TEST(PromiseTest, PromiseTest_FinalAwaiter)
 {
-    tinycoro::PromiseT<FinalAwaiterMock, tinycoro::PromiseReturnValue<int32_t>, tinycoro::PauseHandler, std::stop_source> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t>, tinycoro::PauseHandler, std::stop_source> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 

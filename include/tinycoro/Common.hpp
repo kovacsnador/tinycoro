@@ -8,6 +8,7 @@
 #include <cassert>
 #include <chrono>
 #include <optional>
+#include <coroutine>
 
 namespace tinycoro {
 
@@ -77,12 +78,20 @@ namespace tinycoro {
     // used mainly by the scheduler
     using PauseHandlerCallbackT = std::function<void()>;
 
-    enum class ETaskResumeState
+    enum class ETaskResumeState : uint8_t
     {
         SUSPENDED,
         PAUSED,
         STOPPED,
         DONE
+    };
+
+    enum class EPauseState : uint8_t
+    {
+        IDLE,
+        PAUSED,
+
+        NOTIFIED,
     };
 
     namespace concepts {
@@ -101,6 +110,7 @@ namespace tinycoro {
             { c.Resume() } -> std::same_as<void>;
             { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
+            { c.Release() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
             {
                 c.SetPauseHandler([] { })
@@ -147,11 +157,27 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept IsAllocator = 
-            requires (T alloc, int val) {
-                { alloc.template new_object<int>(42) } -> std::same_as<int*>;
-                { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
+        concept IsAllocator = requires (T alloc, int val) {
+            { alloc.template new_object<int>(42) } -> std::same_as<int*>;
+            { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
         };
+
+        template <typename T>
+        concept IsAwaiter = requires (T t) {
+            { t.await_ready() };
+            { t.await_suspend(std::coroutine_handle<>{}) };
+            { t.await_resume() };
+        };
+
+        template <typename T>
+        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
+            { t.IsPaused() } -> std::same_as<bool>;
+        };
+
+        template <typename T>
+		concept FutureState = ( requires(T f) { { f.set_value() }; } 
+                                || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) 
+                            && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
     } // namespace concepts
 
