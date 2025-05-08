@@ -10,6 +10,14 @@
 
 namespace tinycoro { namespace detail {
 
+    // This is the Schedulable task which is used
+    // by the scheudler.
+    //
+    //
+    // Provides a simple wrapper around the
+    // std:coroutine_handle<>, and implements some
+    // smart pointer identic API, but only for
+    // compatibility reasons.
     template <typename PromiseT, typename CoroResumerT = TaskResumer, typename StopSourceT = std::stop_source>
     class SchedulableTaskT
     {
@@ -175,8 +183,11 @@ namespace tinycoro { namespace detail {
     }
 
     // The schedulable task factory function.
+    //
+    // Intented to save and connect the future state
+    // (e.g std::promise<>) object with the corouitne itself.
     template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
-        requires (!std::is_reference_v<CoroT>)
+        requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
     auto MakeSchedulableTask(CoroT&& coro, FutureStateT&& futureState)
     {
         // create std::corouitne_handle with

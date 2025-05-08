@@ -245,7 +245,7 @@ namespace tinycoro {
                 }
 
                 // sets the event
-                void Set()
+                void Set() noexcept
                 {
                     _flag.store(true, std::memory_order_release);
                     _flag.notify_all();
@@ -253,12 +253,10 @@ namespace tinycoro {
 
                 // Waits for the event and resets the flag
                 // to prepare for the next Set()
-                bool Wait()
+                bool Wait() noexcept
                 {
                     _flag.wait(false);
-
-                    bool expected{true};
-                    return _flag.compare_exchange_strong(expected, false, std::memory_order_release, std::memory_order_relaxed);
+                    return _flag.exchange(false, std::memory_order_release);
                 }
 
                 [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }
