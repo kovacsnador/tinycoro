@@ -36,7 +36,7 @@ namespace tinycoro { namespace detail {
         AnyObject() = default;
 
         template <typename ObjectT>
-            requires (!std::same_as<AnyObject, ObjectT>)
+            requires (!std::same_as<AnyObject, std::remove_reference_t<ObjectT>>)
         AnyObject(ObjectT&& obj)
         : _anyObj{std::make_unique<ObjectBridgeImpl<ObjectT>>(std::forward<ObjectT>(obj))}
         {
@@ -46,7 +46,7 @@ namespace tinycoro { namespace detail {
         AnyObject(AnyObject&&)            = default;
         AnyObject& operator=(AnyObject&&) = default;
 
-        [[nodiscard]] constexpr operator bool() const noexcept { return _anyObj != nullptr; }
+        [[nodiscard]] operator bool() const noexcept { return _anyObj != nullptr; }
 
     private:
         std::unique_ptr<IObjectBridge> _anyObj;
