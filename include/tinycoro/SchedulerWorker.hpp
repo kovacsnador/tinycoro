@@ -199,10 +199,15 @@ namespace tinycoro { namespace detail {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
+        template<typename PromiseT>
+        PauseHandlerCallbackT GeneratePauseResume(PromiseT* promisePtr) noexcept
         {
-            return [this, promisePtr]() {
-                if (_stopToken.stop_requested() == false)
+            auto callback = [] (void* selfPtr, void* promise, [[maybe_unused]] void* _) {
+
+                auto* self = static_cast<SchedulerWorker*>(selfPtr);
+                auto* promisePtr = static_cast<PromiseT*>(promise);
+
+                if (self->_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
                     while (expected != EPauseState::PAUSED)
@@ -223,18 +228,18 @@ namespace tinycoro { namespace detail {
                     // that means that the task is already in paused state
                     // So we need to resume it manually
                     {
-                        std::scoped_lock pauseLock{_pausedTasksMtx};
+                        std::scoped_lock pauseLock{self->_pausedTasksMtx};
                         // remove the tasks from paused tasks
-                        _pausedTasks.erase(promisePtr);
+                        self->_pausedTasks.erase(promisePtr);
                     }
 
                     // push back to the queue
                     // for resumption
                     Task_t task{promisePtr};
-                    if (_stopToken.stop_requested() == false)
+                    if (self->_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
-                        if (_sharedTasks.try_push(std::move(task)))
+                        if (self->_sharedTasks.try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -251,20 +256,20 @@ namespace tinycoro { namespace detail {
                         // (which is waiting for resumption)
                         // into the sharedTasks queue. In order to wake up the worker,
                         // and guarantie the forward motion in the scheduler.
-                        while (_stopToken.stop_requested() == false)
+                        while (self->_stopToken.stop_requested() == false)
                         {
                             // we try to set the _popState to RESUMING
                             // to indicate that we have a task, which need
                             // to be resumed.
                             auto expected = EPopWaitingState::IDLE;
-                            if (_popState.compare_exchange_weak(
+                            if (self->_popState.compare_exchange_weak(
                                     expected, EPopWaitingState::RESUMING, std::memory_order_release, std::memory_order_relaxed))
                             {
                                 // if the previous state was IDLE
                                 // our worker is not waiting
                                 // so we can safely put our task into the
                                 // _notifiedCachedTasks queue.
-                                if (_notifiedCachedTasks.try_push(task.release()) == false)
+                                if (self->_notifiedCachedTasks.try_push(task.release()) == false)
                                 {
                                     // the _notifiedCachedTasks stack is closed
                                     // so reassign the value to the RAII task object
@@ -273,14 +278,14 @@ namespace tinycoro { namespace detail {
                                 }
 
                                 // set the state back to IDLE, to allow others to countinue
-                                _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+                                self->_popState.store(EPopWaitingState::IDLE, std::memory_order_release);
                                 return;
                             }
                             else
                             {
                                 // Worker is in a waiting state.
                                 // Try to wake up.
-                                if (_sharedTasks.try_push(std::move(task)))
+                                if (self->_sharedTasks.try_push(std::move(task)))
                                 {
                                     // push succeed
                                     // we simply return
@@ -291,6 +296,8 @@ namespace tinycoro { namespace detail {
                     }
                 }
             };
+
+            return {callback, this, promisePtr, nullptr};
         }
 
         inline void _InvokeTask(Task_t task) noexcept

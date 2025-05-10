@@ -140,7 +140,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -156,7 +156,7 @@ TEST(BarrierTest, BarrierTest_await_suspend)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -169,7 +169,7 @@ TEST(BarrierTest, BarrierTest_await_suspend_dropWait)
 
     auto awaiter = barrier.ArriveDropAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -219,7 +219,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait_after)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -248,7 +248,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 }
 
@@ -262,7 +262,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend_ready)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -276,7 +276,7 @@ TEST(BarrierTest, BarrierTest_notifyAndComplition)
 
     auto awaiter = barrier.Wait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 

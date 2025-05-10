@@ -78,7 +78,8 @@ TEST(ManualEventTest, ManualEventTest_await_suspend)
     auto awaiter = event.operator co_await();
 
     bool pauseResumerCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseResumerCalled);
+    auto hdl = tinycoro::test::MakeCoroutineHdl(cb);
 
     event.Set();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
@@ -93,7 +94,8 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_singleConsumer)
     EXPECT_FALSE(awaiter1.await_ready());
 
     bool pauseResumerCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseResumerCalled);
+    auto hdl = tinycoro::test::MakeCoroutineHdl(cb);
 
     EXPECT_TRUE(awaiter1.await_suspend(hdl));
     EXPECT_FALSE(pauseResumerCalled);
@@ -118,10 +120,16 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_multiConsumer)
     EXPECT_FALSE(awaiter3.await_ready());
 
     size_t pauseResumerCalled   = 0;
-    auto   pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
+    //auto   pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
 
     auto makeHdl = [&]() {
-        return tinycoro::test::MakeCoroutineHdl(pauseResumerCallback);
+
+        auto cb = [](void* valPtr, void*, void*) {
+            auto* val = static_cast<size_t*>(valPtr);
+            (*val)++;
+        };
+
+        return tinycoro::test::MakeCoroutineHdl(tinycoro::PauseHandlerCallbackT{cb, &pauseResumerCalled, nullptr, nullptr});
     };
 
     EXPECT_TRUE(awaiter1.await_suspend(makeHdl()));

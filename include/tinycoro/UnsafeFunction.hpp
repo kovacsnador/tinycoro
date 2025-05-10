@@ -27,6 +27,18 @@ namespace tinycoro { namespace detail {
         , _args{std::forward<A>(args)...}
         {
         }
+
+        UnsafeFunction(std::nullptr_t)
+        {
+        }
+
+        UnsafeFunction& operator=(std::nullptr_t)
+        {
+            _funcPtr = nullptr;
+            _args = {};
+
+            return *this;
+        }
         
         inline auto operator()() const
         {

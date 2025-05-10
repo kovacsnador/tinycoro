@@ -43,13 +43,6 @@ namespace tinycoro {
             };
 
             return detail::UnsafeFunction<void(void*)>{func, this};
-
-            /*return [this] {
-                if (this->_counter.fetch_sub(1) == 1)
-                {
-                    this->_event.Notify();
-                }
-            };*/
         }
 
         SchedulerT&          _scheduler;

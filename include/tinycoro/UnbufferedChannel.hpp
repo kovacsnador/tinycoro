@@ -120,9 +120,12 @@ namespace tinycoro {
                 // prepare a special event for notification
                 detail::PauseCallbackEvent event;
 
-                event.Set([&latch] {
-                    latch.count_down();
-                });
+                auto func = [](void* latchPtr, void*, void*) {
+                    auto* latch = static_cast<std::latch*>(latchPtr);
+                    latch->count_down();
+                };
+
+                event.Set(tinycoro::PauseHandlerCallbackT{func, &latch, nullptr, nullptr});
 
                 // create a custom push awaiter.
                 // The channel is here unnecessary (first parameter), because non of the

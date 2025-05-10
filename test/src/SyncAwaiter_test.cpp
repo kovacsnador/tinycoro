@@ -94,7 +94,8 @@ struct SyncAwaiterTest : testing::Test
 {
     void SetUp() override
     {
-        hdl.promise().pauseHandler.emplace([this] { resumerCalled = true; });
+        auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&resumerCalled);
+        hdl.promise().pauseHandler.emplace(cb);
     }
 
 protected:

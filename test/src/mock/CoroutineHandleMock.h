@@ -33,6 +33,17 @@ namespace tinycoro { namespace test {
         std::shared_ptr<PromiseT> _promise;
     };
 
+    template<typename ValueT, ValueT ASSIGN>
+    tinycoro::PauseHandlerCallbackT MakePauseResumeCallback(ValueT* valPtr)
+    {
+        auto callback = [](void* valPtr, void*, void*) {
+            auto* val = static_cast<ValueT*>(valPtr);
+            *val = ASSIGN;
+        };
+
+        return {callback, valPtr, nullptr, nullptr};
+    }
+
     template<typename T = void>
     auto MakeCoroutineHdl(std::regular_invocable auto pauseResumerCallback)
     {
@@ -45,7 +56,7 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace([]{});
+        hdl.promise().pauseHandler.emplace(tinycoro::PauseHandlerCallbackT{});
         return hdl;
     }
 

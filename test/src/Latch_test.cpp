@@ -99,7 +99,8 @@ TEST(LatchTest, LatchTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
+    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseCalled);
+    auto hdl         = tinycoro::test::MakeCoroutineHdl(cb);
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -146,7 +147,8 @@ TEST(LatchTest, LatchAwaiter)
     tinycoro::detail::LatchAwaiter awaiter{mock, eventMock};
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
+    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseCalled);
+    auto hdl         = tinycoro::test::MakeCoroutineHdl(cb);
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
     EXPECT_FALSE(pauseCalled);

@@ -10,6 +10,8 @@
 #include <optional>
 #include <coroutine>
 
+#include "UnsafeFunction.hpp"
+
 namespace tinycoro {
 
     namespace detail {
@@ -76,7 +78,7 @@ namespace tinycoro {
 
     // The pause handler callback signature
     // used mainly by the scheduler
-    using PauseHandlerCallbackT = std::function<void()>;
+    using PauseHandlerCallbackT = detail::UnsafeFunction<void(void*, void*, void*)>; //std::function<void()>;
 
     enum class ETaskResumeState : uint8_t
     {
@@ -99,9 +101,7 @@ namespace tinycoro {
         template <typename T>
         concept IsSchedulable = requires (T t) {
             { t->Resume() } -> std::same_as<ETaskResumeState>;
-            {
-                t->SetPauseHandler([] { })
-            } -> std::same_as<void>;
+            { t->SetPauseHandler(PauseHandlerCallbackT{}) } -> std::same_as<void>;
             typename T::element_type;
         };
 
@@ -112,9 +112,7 @@ namespace tinycoro {
             { c.await_resume() };
             { c.Release() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            {
-                c.SetPauseHandler([] { })
-            };
+            { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             typename T::value_type;
         };
 

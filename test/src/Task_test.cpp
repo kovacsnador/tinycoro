@@ -17,7 +17,7 @@ TEST(TaskTest, TaskTest_void)
     task.Resume();
 
     EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
-    auto pauseResumeCallback = []{};
+    auto pauseResumeCallback = tinycoro::PauseHandlerCallbackT{};
     task.SetPauseHandler(pauseResumeCallback);
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
@@ -39,7 +39,7 @@ TEST(TaskTest, TaskTest_int)
 
     EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
 
-    auto pauseResumeCallback = []{};
+    auto pauseResumeCallback = tinycoro::PauseHandlerCallbackT{};
     task.SetPauseHandler(pauseResumeCallback);
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
@@ -125,7 +125,7 @@ TEST(CoroTaskTest, CoroTaskTest)
 
     EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::PAUSED);
 
-    auto pauseResumeCallback = []{};
+    auto pauseResumeCallback = tinycoro::PauseHandlerCallbackT{};
     task.SetPauseHandler(pauseResumeCallback);
     
 }
