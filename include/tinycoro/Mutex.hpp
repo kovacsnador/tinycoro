@@ -5,6 +5,7 @@
 
 #include "PauseHandler.hpp"
 #include "ReleaseGuard.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -123,7 +124,7 @@ namespace tinycoro {
         };
 
         template <typename MutexT, typename EventT>
-        class MutexAwaiter
+        class MutexAwaiter : public detail::SingleLinkable<MutexAwaiter<MutexT, EventT>>
         {
         public:
             MutexAwaiter(MutexT& mutex, EventT event)
@@ -162,8 +163,6 @@ namespace tinycoro {
                 _event.Set(nullptr);
                 context::UnpauseTask(parentCoro);
             }
-
-            MutexAwaiter* next{nullptr};
 
         private:
             MutexT& _mutex;

@@ -8,6 +8,7 @@
 #include "PauseHandler.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "ReleaseGuard.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
 
@@ -81,7 +82,7 @@ namespace tinycoro {
         };
 
         template <typename SemaphoreT, typename EventT>
-        class SemaphoreAwaiter
+        class SemaphoreAwaiter : public detail::SingleLinkable<SemaphoreAwaiter<SemaphoreT, EventT>>
         {
         public:
             SemaphoreAwaiter(SemaphoreT& semaphore, EventT event)
@@ -112,8 +113,6 @@ namespace tinycoro {
             void Notify() const noexcept { _event.Notify(); }
 
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
-
-            SemaphoreAwaiter* next{nullptr};
 
         private:
             SemaphoreT& _semaphore;

@@ -10,6 +10,7 @@
 #include "IntrusivePtr.hpp"
 #include "AnyObject.hpp"
 #include "UnsafeFunction.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -108,7 +109,7 @@ namespace tinycoro { namespace detail {
     // to std::coroutine_handle<PromiseBase>.
     // It is used inside the scheduler logic.
     template <std::unsigned_integral auto BUFFER_SIZE, concepts::IsAwaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT>
-    struct PromiseBase
+    struct PromiseBase : detail::DoubleLinkable<PromiseBase<BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>>
     {
         static_assert(BUFFER_SIZE >= PROMISE_BASE_BUFFER_SIZE, "PromiseBase: Buffer size is too small to hold the promise object.");
 
@@ -120,10 +121,6 @@ namespace tinycoro { namespace detail {
 
         // Disallow copy and move
         PromiseBase(PromiseBase&&) = delete;
-
-        // to support lists
-        PromiseBase* next{nullptr};
-        PromiseBase* prev{nullptr};
 
         PromiseBase* child{nullptr};
         PromiseBase* parent{nullptr};
@@ -185,7 +182,6 @@ namespace tinycoro { namespace detail {
         void SetStopSource(T&& arg)
         {
             stopSource        = std::forward<T>(arg);
-            //triggerStopOnExit = true;
         }
 
         template <std::regular_invocable T>
