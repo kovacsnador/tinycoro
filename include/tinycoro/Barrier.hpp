@@ -6,6 +6,7 @@
 #include "Exception.hpp"
 #include "Finally.hpp"
 #include "AwaiterHelper.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
 
@@ -60,7 +61,7 @@ namespace tinycoro {
         };
 
         template <typename BarrierT, typename EventT>
-        class BarrierAwaiter
+        class BarrierAwaiter : public detail::SingleLinkable<BarrierAwaiter<BarrierT, EventT>>
         {
         public:
             BarrierAwaiter(BarrierT& barrier, EventT event, EBarrierAwaiterState policy)
@@ -101,8 +102,6 @@ namespace tinycoro {
                 _event.Set(nullptr);
                 context::UnpauseTask(parentCoro);
             }
-
-            BarrierAwaiter* next{nullptr};
 
         private:
             BarrierT& _barrier;

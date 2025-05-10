@@ -9,7 +9,7 @@ struct MutexTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000));
+INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000, 100'000));
 
 template <typename, typename>
 class PopAwaiterMock
@@ -71,7 +71,7 @@ struct MutexStressTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(MutexStressTest, MutexStressTest, testing::Values(100, 1'000, 10'000));
+INSTANTIATE_TEST_SUITE_P(MutexStressTest, MutexStressTest, testing::Values(100, 1'000, 10'000, 100'000));
 
 TEST_P(MutexStressTest, MutexFunctionalStressTest_1)
 {

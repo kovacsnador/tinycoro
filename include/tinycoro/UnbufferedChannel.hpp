@@ -9,6 +9,7 @@
 #include "PauseHandler.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrOrderedList.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -323,7 +324,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        class UnbufferedChannelPopAwaiter
+        class UnbufferedChannelPopAwaiter : public detail::SingleLinkable<UnbufferedChannelPopAwaiter<ChannelT, EventT, ValueT>>
         {
         public:
             UnbufferedChannelPopAwaiter(ChannelT& channel, EventT event, ValueT& value)
@@ -390,8 +391,6 @@ namespace tinycoro {
                 _set         = true;
             }
 
-            UnbufferedChannelPopAwaiter* next{nullptr};
-
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -413,7 +412,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        class UnbufferedChannelPushAwaiter
+        class UnbufferedChannelPushAwaiter : public detail::SingleLinkable<UnbufferedChannelPushAwaiter<ChannelT, EventT, ValueT>>
         {
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
@@ -488,8 +487,6 @@ namespace tinycoro {
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
-            UnbufferedChannelPushAwaiter* next{nullptr};
-
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -516,7 +513,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT>
-        class UnbufferedChannelListenerAwaiter
+        class UnbufferedChannelListenerAwaiter : public detail::SingleLinkable<UnbufferedChannelListenerAwaiter<ChannelT, EventT>>
         {
         public:
             UnbufferedChannelListenerAwaiter(ChannelT& channel, EventT event, size_t count)
@@ -554,8 +551,6 @@ namespace tinycoro {
             }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
-
-            UnbufferedChannelListenerAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }

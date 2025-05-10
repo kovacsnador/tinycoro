@@ -90,7 +90,7 @@ namespace tinycoro {
         };
 
         template <typename LatchT, typename CallbackEventT>
-        class LatchAwaiter
+        class LatchAwaiter : public detail::SingleLinkable<LatchAwaiter<LatchT, CallbackEventT>>
         {
         public:
             LatchAwaiter(LatchT& latch, CallbackEventT event)
@@ -129,8 +129,6 @@ namespace tinycoro {
                 _event.Set(nullptr);
                 context::UnpauseTask(parentCoro);
             }
-
-            LatchAwaiter* next{nullptr};
 
         private:
             LatchT&        _latch;

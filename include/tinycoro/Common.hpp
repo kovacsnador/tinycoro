@@ -8,6 +8,7 @@
 #include <cassert>
 #include <chrono>
 #include <optional>
+#include <coroutine>
 
 namespace tinycoro {
 
@@ -77,7 +78,7 @@ namespace tinycoro {
     // used mainly by the scheduler
     using PauseHandlerCallbackT = std::function<void()>;
 
-    enum class ETaskResumeState
+    enum class ETaskResumeState : uint8_t
     {
         SUSPENDED,
         PAUSED,
@@ -85,14 +86,20 @@ namespace tinycoro {
         DONE
     };
 
+    enum class EPauseState : uint8_t
+    {
+        IDLE,
+        PAUSED,
+
+        NOTIFIED,
+    };
+
     namespace concepts {
 
         template <typename T>
         concept IsSchedulable = requires (T t) {
             { t->Resume() } -> std::same_as<ETaskResumeState>;
-            {
-                t->SetPauseHandler([] { })
-            } -> std::same_as<void>;
+            { t->SetPauseHandler(PauseHandlerCallbackT{}) } -> std::same_as<void>;
             typename T::element_type;
         };
 
@@ -101,10 +108,9 @@ namespace tinycoro {
             { c.Resume() } -> std::same_as<void>;
             { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
+            { c.Release() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            {
-                c.SetPauseHandler([] { })
-            };
+            { c.SetPauseHandler(PauseHandlerCallbackT{}) };
             typename T::value_type;
         };
 
@@ -147,11 +153,27 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept IsAllocator = 
-            requires (T alloc, int val) {
-                { alloc.template new_object<int>(42) } -> std::same_as<int*>;
-                { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
+        concept IsAllocator = requires (T alloc, int val) {
+            { alloc.template new_object<int>(42) } -> std::same_as<int*>;
+            { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
         };
+
+        template <typename T>
+        concept IsAwaiter = requires (T t) {
+            { t.await_ready() };
+            { t.await_suspend(std::coroutine_handle<>{}) };
+            { t.await_resume() };
+        };
+
+        template <typename T>
+        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
+            { t.IsPaused() } -> std::same_as<bool>;
+        };
+
+        template <typename T>
+		concept FutureState = ( requires(T f) { { f.set_value() }; } 
+                                || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) 
+                            && requires(T f) { f.set_exception(std::exception_ptr{}); };
 
     } // namespace concepts
 
@@ -219,7 +241,7 @@ namespace tinycoro {
                 }
 
                 // sets the event
-                void Set()
+                void Set() noexcept
                 {
                     _flag.store(true, std::memory_order_release);
                     _flag.notify_all();
@@ -227,12 +249,10 @@ namespace tinycoro {
 
                 // Waits for the event and resets the flag
                 // to prepare for the next Set()
-                bool Wait()
+                bool Wait() noexcept
                 {
                     _flag.wait(false);
-
-                    bool expected{true};
-                    return _flag.compare_exchange_strong(expected, false, std::memory_order_release, std::memory_order_relaxed);
+                    return _flag.exchange(false, std::memory_order_release);
                 }
 
                 [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }

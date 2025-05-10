@@ -13,6 +13,7 @@
 #include "ChannelOpStatus.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrOrderedList.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
 
@@ -510,7 +511,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        class BufferedChannelPopAwaiter
+        class BufferedChannelPopAwaiter : public detail::SingleLinkable<BufferedChannelPopAwaiter<ChannelT, EventT, ValueT>>
         {
         public:
             BufferedChannelPopAwaiter(ChannelT& channel, EventT event, ValueT& v)
@@ -578,8 +579,6 @@ namespace tinycoro {
                 _set         = true;
             }
 
-            BufferedChannelPopAwaiter* next{nullptr};
-
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -601,7 +600,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT>
-        class BufferedChannelListenerAwaiter
+        class BufferedChannelListenerAwaiter  : public detail::SingleLinkable<BufferedChannelListenerAwaiter<ChannelT, EventT>>
         {
         public:
             BufferedChannelListenerAwaiter(ChannelT& channel, EventT event, size_t count)
@@ -640,8 +639,6 @@ namespace tinycoro {
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
-            BufferedChannelListenerAwaiter* next{nullptr};
-
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -657,7 +654,7 @@ namespace tinycoro {
         };
 
         template <typename ChannelT, typename EventT, typename ValueT>
-        class BufferedChannelPushAwaiter
+        class BufferedChannelPushAwaiter : public detail::SingleLinkable<BufferedChannelPushAwaiter<ChannelT, EventT, ValueT>>
         {
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
@@ -731,8 +728,6 @@ namespace tinycoro {
             }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
-
-            BufferedChannelPushAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }

@@ -81,6 +81,11 @@ struct PromiseMock
         return pauseHandler.get();
     }
 
+    void SetStopSource(auto source)
+    {
+        stopSource = source;
+    }
+
     std::shared_ptr<PauseHandlerMock> pauseHandler;
     std::stop_source stopSource{};
 };

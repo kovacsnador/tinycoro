@@ -14,31 +14,21 @@
 
 #include "Common.hpp"
 #include "PauseHandler.hpp"
-#include "PackagedTask.hpp"
 #include "LinkedPtrList.hpp"
 #include "AtomicQueue.hpp"
 #include "SchedulerWorker.hpp"
+#include "SchedulableTask.hpp"
 
 namespace tinycoro {
 
     namespace detail {
 
-        template <concepts::IsSchedulable TaskT, uint64_t CACHE_SIZE, concepts::IsAllocator AllocatorT>
+        template <typename TaskT, uint64_t CACHE_SIZE>
         class CoroThreadPool
         {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
-            : _allocator{&_defaultPoolResource}
-            , _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
-            {
-                _AddWorkers(workerThreadCount);
-            }
-
-            // Thread pool with custom allocator
-            CoroThreadPool(AllocatorT allocator, size_t workerThreadCount = std::thread::hardware_concurrency())
-            : _allocator{std::move(allocator)}
-            , _stopSource{}
+            : _stopSource{}
             , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
             {
                 _AddWorkers(workerThreadCount);
@@ -82,11 +72,11 @@ namespace tinycoro {
             {
                 if constexpr (sizeof...(CoroTasksT) == 1)
                 {
-                    return EnqueueImpl<FutureStateT>(_allocator, std::forward<CoroTasksT>(tasks)...);
+                    return EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks)...);
                 }
                 else
                 {
-                    return std::tuple{EnqueueImpl<FutureStateT>(_allocator, std::forward<CoroTasksT>(tasks))...};
+                    return std::tuple{EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...};
                 }
             }
 
@@ -110,7 +100,7 @@ namespace tinycoro {
                 for (auto&& task : tasks)
                 {
                     // register tasks and collect all the futures
-                    futures.emplace_back(EnqueueImpl<FutureStateT>(_allocator, std::move(task)));
+                    futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
                 }
 
                 return futures;
@@ -118,11 +108,8 @@ namespace tinycoro {
 
         private:
             template <template<typename> class FutureStateT, concepts::IsCorouitneTask CoroTaksT>
-            requires (!std::is_reference_v<CoroTaksT>) && requires (CoroTaksT c) {
-                typename CoroTaksT::value_type;
-                { c.SetPauseHandler(PauseHandlerCallbackT{}) };
-            } &&  concepts::FutureState<FutureStateT<void>>
-        [[nodiscard]] auto EnqueueImpl(AllocatorT& allocator, CoroTaksT&& coro)
+            requires (!std::is_reference_v<CoroTaksT>) &&  concepts::FutureState<FutureStateT<void>>
+        [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
             {
                 // get the result value
                 using desiredValue_t = typename CoroTaksT::value_type;
@@ -141,7 +128,8 @@ namespace tinycoro {
                 {
                     // not allow to enqueue tasks with uninitialized std::coroutine_handler
                     // or if the a stop is requested
-                    TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState), allocator);
+                    //TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState), allocator);
+                    auto task = MakeSchedulableTask(std::move(coro), std::move(futureState));
 
                     // push the task into the queue
                     helper::PushTask(std::move(task), _sharedTasks, _stopSource);
@@ -159,20 +147,6 @@ namespace tinycoro {
                     _workerThreads.emplace_back(_sharedTasks, _stopSource.get_token());
                 }
             }
-
-            // as a default setup for the scheduler,
-            // we use a pmr synchronized_pool_resource
-            // with an allocator.
-            //
-            // this improves overall speed in the scheduler,
-            // but can have a bigger footprint in the memory.
-            std::pmr::synchronized_pool_resource _defaultPoolResource{};
-
-            // The dedicated allocator for the scheduler.
-            //
-            // Can be passed as argument through construction,
-            // in that case we igone the _defaultPoolResource.
-            AllocatorT _allocator;
 
             // currently active/scheduled tasks
             detail::AtomicQueue<TaskT, CACHE_SIZE> _sharedTasks;
@@ -195,13 +169,11 @@ namespace tinycoro {
 
     } // namespace detail
 
-    using DefaultAllocator_t = std::pmr::polymorphic_allocator<std::byte>;
-
     // Custom scheduler with custom cache size
-    template <uint64_t CACHE_SIZE = detail::DEFAULT_SCHEDULER_CACHE_SIZE, typename AllocatorT = DefaultAllocator_t>
-    using CustomScheduler = detail::CoroThreadPool<detail::SchedulableTask<AllocatorT>, CACHE_SIZE, AllocatorT>;
+    template <uint64_t CACHE_SIZE = detail::DEFAULT_SCHEDULER_CACHE_SIZE>
+    using CustomScheduler = detail::CoroThreadPool<detail::SchedulableTask, CACHE_SIZE>;
 
-    using Scheduler = detail::CoroThreadPool<detail::SchedulableTask<DefaultAllocator_t>, detail::DEFAULT_SCHEDULER_CACHE_SIZE, DefaultAllocator_t>;
+    using Scheduler = detail::CoroThreadPool<detail::SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;
 
 } // namespace tinycoro
 

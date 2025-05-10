@@ -83,8 +83,8 @@ struct HandleMock<void>
 template<typename ValueT>
 struct PromiseMock
 {
-    HandleMock<ValueT> child;
-    HandleMock<ValueT> parent;
+    PromiseMock<ValueT>* child;
+    PromiseMock<ValueT>* parent;
     StopSourceMock stopSource;
     PauseHdlMock pauseHandler;
 
@@ -101,8 +101,8 @@ struct PromiseMock
 template<>
 struct PromiseMock<void>
 {
-    HandleMock<void> child;
-    HandleMock<void> parent;
+    PromiseMock<void>* child;
+    PromiseMock<void>* parent;
     StopSourceMock stopSource;
     PauseHdlMock pauseHandler;
 
@@ -160,10 +160,10 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_int)
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(parent._hdl.promise().child.value, 42);
+    EXPECT_EQ(parent._hdl.promise().child->value, 42);
 
-    EXPECT_EQ(task._hdl.promise().parent.pauseHandler.val, parent._hdl.promise().pauseHandler.val);
-    EXPECT_EQ(task._hdl.promise().parent.stopSource.val, parent._hdl.promise().stopSource.val);
+    EXPECT_EQ(task._hdl.promise().parent->pauseHandler.val, parent._hdl.promise().pauseHandler.val);
+    EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
 }
 
 TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_void)
@@ -174,6 +174,6 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_void)
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(task._hdl.promise().parent.pauseHandler.val, parent._hdl.promise().pauseHandler.val);
-    EXPECT_EQ(task._hdl.promise().parent.stopSource.val, parent._hdl.promise().stopSource.val);
+    EXPECT_EQ(task._hdl.promise().parent->pauseHandler.val, parent._hdl.promise().pauseHandler.val);
+    EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
 }

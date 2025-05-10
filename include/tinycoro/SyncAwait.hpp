@@ -8,6 +8,7 @@
 
 #include "PauseHandler.hpp"
 #include "Wait.hpp"
+#include "UnsafeFunction.hpp"
 
 namespace tinycoro {
 
@@ -33,12 +34,22 @@ namespace tinycoro {
     protected:
         auto MakeDestroyNotifier()
         {
-            return [this] {
+            auto func = [](void* self) {
+                auto* awaiter = static_cast<decltype(this)>(self);
+                if (awaiter->_counter.fetch_sub(1) == 1)
+                {
+                    awaiter->_event.Notify();
+                }
+            };
+
+            return detail::UnsafeFunction<void(void*)>{func, this};
+
+            /*return [this] {
                 if (this->_counter.fetch_sub(1) == 1)
                 {
                     this->_event.Notify();
                 }
-            };
+            };*/
         }
 
         SchedulerT&          _scheduler;

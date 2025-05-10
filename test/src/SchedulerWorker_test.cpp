@@ -29,7 +29,7 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
     int32_t* ptr;
     EXPECT_TRUE(queue.try_pop(ptr));
     EXPECT_EQ(*ptr, val);
-    
+
     EXPECT_TRUE(queue.try_pop(ptr));
     EXPECT_EQ(ptr, nullptr);
 }
@@ -48,14 +48,10 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
     AtomicQueueMock mock;
 
     EXPECT_CALL(mock, full).WillOnce(testing::Return(true));
-    
-    EXPECT_CALL(mock, try_pop)
-        .WillOnce(testing::Return(true))
-        .WillOnce(testing::Return(true));
 
-    EXPECT_CALL(mock, try_push)
-        .WillOnce(testing::Return(false))
-        .WillOnce(testing::Return(true));
+    EXPECT_CALL(mock, try_pop).WillOnce(testing::Return(true)).WillOnce(testing::Return(true));
+
+    EXPECT_CALL(mock, try_push).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
 
     tinycoro::detail::helper::RequestStopForQueue(mock);
 }
@@ -64,24 +60,25 @@ struct SchedubableMock
 {
     MOCK_METHOD(tinycoro::ETaskResumeState, Resume, ());
 
+    MOCK_METHOD(std::atomic<tinycoro::EPauseState>&, PauseState, ());
+
     MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
 };
 
-using IScheduler = tinycoro::detail::ISchedulableBridged<tinycoro::DefaultAllocator_t>;
-
-struct Schedubable : IScheduler
+struct Schedubable
 {
-    Schedubable()
-    : IScheduler{alloc, sizeof(*this)}
-    {
-    }
+    tinycoro::ETaskResumeState Resume() { return mock.Resume(); };
 
-    tinycoro::ETaskResumeState Resume() override { return mock.Resume(); };
-    void                       SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) override { mock.SetPauseHandler(cb); };
+    void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) { mock.SetPauseHandler(cb); };
+
+    auto& PauseState() { return mock.PauseState(); }
 
     SchedubableMock mock;
 
-    tinycoro::DefaultAllocator_t alloc{};
+    Schedubable* next;
+    Schedubable* prev;
+
+    std::atomic<tinycoro::EPauseState> pauseState{tinycoro::EPauseState::IDLE};
 };
 
 TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
@@ -89,12 +86,15 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     std::latch       latch{1};
     std::stop_source ss;
 
-    std::unique_ptr<Schedubable, std::function<void(IScheduler*)>> task{new Schedubable, [](auto p) { delete p; }};
+    std::unique_ptr<Schedubable> task{new Schedubable};
 
-    EXPECT_CALL(task->mock, Resume).WillOnce([&] { latch.count_down(); return tinycoro::ETaskResumeState::DONE; });
+    EXPECT_CALL(task->mock, Resume).WillOnce([&] {
+        latch.count_down();
+        return tinycoro::ETaskResumeState::DONE;
+    });
     EXPECT_CALL(task->mock, SetPauseHandler);
 
-    tinycoro::detail::AtomicQueue<std::unique_ptr<IScheduler, std::function<void(IScheduler*)>>, 128> queue;
+    tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
 
     tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
 
@@ -117,14 +117,20 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         std::latch       latch{2};
         std::stop_source ss;
 
-        std::unique_ptr<Schedubable, std::function<void(IScheduler*)>> task{new Schedubable, [](auto p) { delete p; }};
+        std::unique_ptr<Schedubable> task{new Schedubable};
 
         EXPECT_CALL(task->mock, Resume)
-            .WillOnce([&] { latch.count_down(); return tinycoro::ETaskResumeState::SUSPENDED; })
-            .WillOnce([&] { latch.count_down(); return tinycoro::ETaskResumeState::DONE; });
+            .WillOnce([&] {
+                latch.count_down();
+                return tinycoro::ETaskResumeState::SUSPENDED;
+            })
+            .WillOnce([&] {
+                latch.count_down();
+                return tinycoro::ETaskResumeState::DONE;
+            });
         EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
 
-        tinycoro::detail::AtomicQueue<std::unique_ptr<IScheduler, std::function<void(IScheduler*)>>, 128> queue;
+        tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
 
         tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
 

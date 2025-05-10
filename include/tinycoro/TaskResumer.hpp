@@ -2,16 +2,19 @@
 #define TINY_CORO_TASK_RESUMER_HPP
 
 #include "Common.hpp"
-#include "PackedCoroHandle.hpp"
 
 namespace tinycoro {
 
     struct TaskResumer
     {
-        static inline void Resume(auto coroHdl)
+        template<typename PromiseT>
+        static inline void Resume(PromiseT& promise)
         {
-            auto& pauseHandler = coroHdl.promise().pauseHandler;
-            const auto& stopSource = coroHdl.promise().stopSource;
+            auto& pauseHandler = promise.pauseHandler;
+            const auto& stopSource = promise.stopSource;
+
+            // reset the pause state by every resume.
+            promise.pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
 
             if (pauseHandler)
             {
@@ -24,23 +27,36 @@ namespace tinycoro {
                 pauseHandler->Resume();
             }
 
-            PackedCoroHandle  hdl{coroHdl};
-            PackedCoroHandle* hdlPtr = std::addressof(hdl);
+            // check for child type
+            using promise_base_t = std::remove_pointer_t<decltype(promise.child)>; 
 
-            while (*hdlPtr && hdlPtr->Child())
+            // find the last child
+            promise_base_t* promisePtr = std::addressof(promise);
+            while (promisePtr && promisePtr->child)
             {
-                hdlPtr = std::addressof(hdlPtr->Child());
+                promisePtr = promisePtr->child;
             }
 
-            hdlPtr->Resume();
+            // resume the coroutine
+            auto handle = std::coroutine_handle<promise_base_t>::from_promise(*promisePtr);
+            handle.resume();
         }
 
-        [[nodiscard]] static inline ETaskResumeState ResumeState(auto coroHdl) noexcept
+        [[nodiscard]] static inline ETaskResumeState ResumeState(auto handle) noexcept
         {
-            if (coroHdl && coroHdl.done() == false)
+            if (handle && handle.done() == false)
             {
-                auto& pauseHandler = coroHdl.promise().pauseHandler;
-                const auto& stopSource = coroHdl.promise().stopSource;
+                auto& promise = handle.promise();
+
+                if(promise.exception)
+                {   
+                    // if there was an unhandled
+                    // exception the task is done
+                    return ETaskResumeState::DONE; 
+                }
+
+                const auto& pauseHandler = promise.pauseHandler;
+                const auto& stopSource = promise.stopSource;
 
                 if (pauseHandler)
                 {

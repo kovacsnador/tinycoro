@@ -7,6 +7,7 @@
 #include "PauseHandler.hpp"
 #include "LinkedPtrStack.hpp"
 #include "AwaiterHelper.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -211,7 +212,7 @@ namespace tinycoro {
         };
 
         template <typename AutoEventT, typename CallbackEventT>
-        class AutoEventAwaiter
+        class AutoEventAwaiter : public detail::SingleLinkable<AutoEventAwaiter<AutoEventT, CallbackEventT>>
         {
         public:
             AutoEventAwaiter(AutoEventT& autoEvent, CallbackEventT event)
@@ -246,8 +247,6 @@ namespace tinycoro {
             void Notify() const noexcept { _event.Notify(); }
 
             bool Cancel() noexcept { return _autoEvent.Cancel(this); }
-
-            AutoEventAwaiter* next{nullptr};
 
         private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }

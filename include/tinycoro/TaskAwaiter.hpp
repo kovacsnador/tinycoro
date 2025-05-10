@@ -1,8 +1,7 @@
 #ifndef TINY_CORO_TASK_AWAITER_HPP
 #define TINY_CORO_TASK_AWAITER_HPP
 
-namespace tinycoro
-{
+namespace tinycoro {
     template <typename CoroTaskT>
     struct AwaiterBase
     {
@@ -12,11 +11,14 @@ namespace tinycoro
         {
             auto* coroTask = reinterpret_cast<CoroTaskT*>(this);
 
-            auto hdl                   = coroTask->_hdl;
-            parentCoro.promise().child = hdl;
-            hdl.promise().parent       = parentCoro;
-            hdl.promise().stopSource   = parentCoro.promise().StopSource();
-            hdl.promise().pauseHandler = parentCoro.promise().pauseHandler;
+            auto& parentPromise = parentCoro.promise();
+            auto  hdl           = coroTask->_hdl;
+            auto& promise       = hdl.promise();
+
+            parentPromise.child  = std::addressof(promise);
+            promise.parent       = std::addressof(parentPromise);
+            promise.stopSource   = parentPromise.StopSource();
+            promise.pauseHandler = parentPromise.pauseHandler;
             return hdl;
         }
     };
@@ -50,8 +52,7 @@ namespace tinycoro
 
         constexpr void await_resume() noexcept { }
     };
-    
-} // namespace tinycoro
 
+} // namespace tinycoro
 
 #endif // TINY_CORO_TASK_AWAITER_HPP
