@@ -24,7 +24,7 @@ namespace tinycoro {
         struct PauseCallbackEvent
         {
         private:
-            std::function<void()> _notifyCallback;
+            PauseHandlerCallbackT _notifyCallback;
 
         public:
             void Notify() const

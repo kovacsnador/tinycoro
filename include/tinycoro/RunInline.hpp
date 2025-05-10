@@ -18,7 +18,7 @@ namespace tinycoro {
         concept LocalRunable = requires (T t) {
             { t.await_resume() };
             { t.GetPauseHandler() };
-            { t.SetPauseHandler([] {}) };
+            { t.SetPauseHandler(PauseHandlerCallbackT{}) };
             { t.Resume() } -> std::same_as<void>;
             { t.ResumeState() } -> std::same_as<ETaskResumeState>;
         };
