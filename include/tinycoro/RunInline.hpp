@@ -18,7 +18,7 @@ namespace tinycoro {
         concept LocalRunable = requires (T t) {
             { t.await_resume() };
             { t.GetPauseHandler() };
-            { t.SetPauseHandler(PauseHandlerCallbackT{}) };
+            { t.SetPauseHandler([] {}) };
             { t.Resume() } -> std::same_as<void>;
             { t.ResumeState() } -> std::same_as<ETaskResumeState>;
         };
@@ -30,18 +30,14 @@ namespace tinycoro {
     namespace detail {
 
         template <typename TaskT, typename EventT, typename StopTokenT>
-        void SetPauseResumerCallback(TaskT& task, EventT& event, StopTokenT& stopToken)
+        void SetPauseResumerCallback(TaskT& task, EventT& event, StopTokenT stopToken)
         {
-            auto pauseResumerCallback = [](void* taskPtr, void* eventPtr, void* stopTokenPtr) {
-                auto* task      = static_cast<TaskT*>(taskPtr);
-                auto* event     = static_cast<EventT*>(eventPtr);
-                auto* stopToken = static_cast<StopTokenT*>(stopTokenPtr);
-
-                auto pauseHandler = task->GetPauseHandler();
+            auto pauseResumerCallback = [&task, &event, stopToken] {
+                auto pauseHandler = task.GetPauseHandler();
 
                 // checking if the task is cancelled
                 auto isTaskCancelled = [&stopToken, &pauseHandler]() {
-                    if (stopToken->stop_requested())
+                    if(stopToken.stop_requested())
                     {
                         return pauseHandler->IsCancellable();
                     }
@@ -58,11 +54,11 @@ namespace tinycoro {
 
                 // sets the event, that means theres is a task
                 // which is ready for resumption.
-                event->Set();
+                event.Set();
             };
 
             // setup the resumer callback
-            task.SetPauseHandler(PauseHandlerCallbackT{pauseResumerCallback, std::addressof(task), std::addressof(event), std::addressof(stopToken)});
+            task.SetPauseHandler(pauseResumerCallback);
         }
 
         // check if the task is finished

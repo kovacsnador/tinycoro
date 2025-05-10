@@ -17,11 +17,7 @@ struct AsyncCallbackAwaiter_CStyleTest : public testing::Test
 
     AsyncCallbackAwaiter_CStyleTest()
     {
-        tinycoro::PauseHandlerCallbackT resumeCallback{[](void* selfPtr, void*, void*) {
-            auto* self = static_cast<AsyncCallbackAwaiter_CStyleTest*>(selfPtr);
-            self->pauseHandlerCalled = true; }, this, nullptr, nullptr };
-
-        hdl.promise().pauseHandler.emplace(resumeCallback);
+        hdl.promise().pauseHandler.emplace([this]() { pauseHandlerCalled = true; });
     }
 
     bool pauseHandlerCalled{false};

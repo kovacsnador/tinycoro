@@ -76,8 +76,8 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
     tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
 
     bool called = false;
-    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&called);
-    hdl.promise().pauseHandler.emplace(cb);
+
+    hdl.promise().pauseHandler.emplace([&called](){ called = true; });
 
     auto pauseResumerCallback = tinycoro::context::PauseTask(hdl);
 
@@ -91,12 +91,13 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
 TEST(PauseHandlerTest, PauseHandlerTest_pause)
 {
     bool called = false;
-    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&called);
 
-    tinycoro::PauseHandler pauseHandler{cb};
+    std::function<void()> func = [&called]{ called = true; };
+
+    tinycoro::PauseHandler pauseHandler{func};
 
     auto res = pauseHandler.Pause();
-    EXPECT_TRUE((std::same_as<tinycoro::PauseHandlerCallbackT, decltype(res)>));
+    EXPECT_TRUE((std::same_as<decltype(func), decltype(res)>));
 
     EXPECT_TRUE(pauseHandler.IsPaused());
     EXPECT_FALSE(pauseHandler.IsCancellable());
@@ -109,7 +110,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 {
-    tinycoro::PauseHandler pauseHandler{tinycoro::PauseHandlerCallbackT{}};
+    tinycoro::PauseHandler pauseHandler{[]{}};
 
     EXPECT_FALSE(pauseHandler.IsCancellable());
 

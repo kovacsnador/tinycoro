@@ -79,15 +79,14 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseCalled);
-    auto hdl         = tinycoro::test::MakeCoroutineHdl(cb);
+    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled]() { pauseCalled = true; });
 
     awaiter.await_suspend(hdl);
     EXPECT_FALSE(pauseCalled);
 
     auto awaiter2 = singleEvent.operator co_await();
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl();
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
 
     // allow only 1 consumer
     EXPECT_THROW(awaiter2.await_suspend(hdl2), tinycoro::SingleEventException);
@@ -128,7 +127,7 @@ TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
     EXPECT_CALL(*notifier.mock, Notify()).Times(0); // no call
     EXPECT_CALL(*notifier.mock, Set).Times(2);
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl();
+    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }

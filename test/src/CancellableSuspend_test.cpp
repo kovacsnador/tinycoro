@@ -23,7 +23,7 @@ TEST(CancellableSuspentTest, CancellableSuspentTest)
 {
     tinycoro::CancellableSuspend suspend{};
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl();
+    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
     
     suspend.await_suspend(hdl);
 

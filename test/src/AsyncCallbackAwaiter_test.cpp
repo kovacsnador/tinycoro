@@ -17,14 +17,7 @@ struct AsyncCallbackAwaiterTest : public testing::Test
 
     AsyncCallbackAwaiterTest()
     {
-        auto func = [](void* selfPtr, void*, void*) {
-            auto self = static_cast<AsyncCallbackAwaiterTest*>(selfPtr);
-            self->pauseHandlerCalled = true;
-        };
-
-        tinycoro::PauseHandlerCallbackT callback{func, this, nullptr, nullptr};
-
-        hdl.promise().pauseHandler.emplace(callback);
+        hdl.promise().pauseHandler.emplace([this]() { pauseHandlerCalled = true; });
     }
 
     bool pauseHandlerCalled{false};

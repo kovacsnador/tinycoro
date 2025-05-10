@@ -8,10 +8,6 @@
 
 TEST(AutoEventTest, AutoEventTest_set)
 {
-    std::cout << sizeof(tinycoro::Promise<int32_t>) << '\n';
-    std::cout << sizeof(tinycoro::PauseHandler) << '\n';
-
-
     tinycoro::AutoEvent event;
 
     EXPECT_FALSE(event.IsSet());
@@ -75,8 +71,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseCalled);
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>(cb);
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
 
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
@@ -102,8 +97,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
     event.Set();
 
     bool pauseCalled = false;
-    auto cb = tinycoro::test::MakePauseResumeCallback<bool, true>(&pauseCalled);
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>(cb);
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 

@@ -243,13 +243,7 @@ namespace tinycoro {
 
                 // create custom event for the push_awaiter
                 PauseCallbackEvent event;
-
-                auto func = [](void* latchPtr, void*, void*) {
-                    auto latch = static_cast<std::latch*>(latchPtr);
-                    latch->count_down();
-                };
-
-                event.Set(tinycoro::PauseHandlerCallbackT{func, &latch, nullptr, nullptr});
+                event.Set([&latch] { latch.count_down(); });
 
                 // create custom push_awaiter for inline waiting
                 // The channel is here unnecessary (first parameter), because non of the

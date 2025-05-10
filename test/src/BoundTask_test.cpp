@@ -28,10 +28,10 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(bool, IsDone, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
-    MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
     MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
-    MOCK_METHOD(void, SetDestroyNotifier, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(void, SetDestroyNotifier, (std::function<void()>));
     MOCK_METHOD(void*, Address, (), (const noexcept));
     MOCK_METHOD(void*, Release, (), (noexcept));
 };
@@ -124,7 +124,7 @@ TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
 
-    auto pauseHandler = taskWrapper.SetPauseHandler(tinycoro::PauseHandlerCallbackT{});
+    auto pauseHandler = taskWrapper.SetPauseHandler(std::function<void()>{});
     EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
 }
 
@@ -145,7 +145,7 @@ TEST(BoundTaskTest, BoundTaskTest_SetDestroyNotifier)
     EXPECT_CALL(*mock.impl, SetDestroyNotifier).Times(1);
 
     tinycoro::BoundTask taskWrapper{[] {}, mock};
-    taskWrapper.SetDestroyNotifier(tinycoro::PauseHandlerCallbackT{});
+    taskWrapper.SetDestroyNotifier([] {});
 }
 
 TEST(BoundTaskTest, BoundTaskFunctionalTest_SingleBoundTask)
