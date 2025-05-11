@@ -159,7 +159,7 @@ namespace tinycoro { namespace detail {
         static constexpr sequence_t BUFFER_MASK{SIZE - 1};
 
         // the pointer of the ringbuffer
-        alignas(CACHELINE_SIZE) std::unique_ptr<Element[]> _buffer;
+        std::unique_ptr<Element[]> _buffer;
 
         // the last push position of an element
         alignas(CACHELINE_SIZE) std::atomic<sequence_t> _head{};

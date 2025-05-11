@@ -48,8 +48,6 @@ namespace tinycoro {
 
         CoroTask(CoroTask&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
-        , _triggerStopOnExit{std::exchange(other._triggerStopOnExit, false)}
-        , _destroyNotifier{std::move(other._destroyNotifier)}
         {
         }
 
@@ -58,9 +56,7 @@ namespace tinycoro {
             if (std::addressof(other) != this)
             {
                 destroy();
-                _hdl             = std::exchange(other._hdl, nullptr);
-                _triggerStopOnExit = std::exchange(other._triggerStopOnExit, false);
-                _destroyNotifier = std::move(other._destroyNotifier);
+                _hdl = std::exchange(other._hdl, nullptr);
             }
             return *this;
         }
@@ -68,9 +64,9 @@ namespace tinycoro {
         ~CoroTask() { destroy(); }
 
         // Resumes the coroutine
-        inline void Resume() { _coroResumer.Resume(_hdl/*, _source*/); }
+        inline void Resume() { _coroResumer.Resume(_hdl.promise()); }
 
-        [[nodiscard]] auto ResumeState() noexcept { return _coroResumer.ResumeState(_hdl/*, _source*/); }
+        [[nodiscard]] auto ResumeState() noexcept { return _coroResumer.ResumeState(_hdl); }
 
         [[nodiscard]] bool IsPaused() const noexcept { return _hdl.promise().pauseHandler->IsPaused(); }
 
@@ -100,39 +96,27 @@ namespace tinycoro {
             requires std::constructible_from<StopSourceT, T>
         void SetStopSource(T&& arg)
         {
-            _hdl.promise().stopSource = std::forward<T>(arg);
-            _triggerStopOnExit = true;
+            _hdl.promise().SetStopSource(std::forward<T>(arg));
         }
 
         template <std::regular_invocable T>
         void SetDestroyNotifier(T&& cb) noexcept
         {
-            _destroyNotifier = std::forward<T>(cb);
+            _hdl.promise().SetDestroyNotifier(std::forward<T>(cb));
         }
 
         [[nodiscard]] address_t Address() const noexcept { return _hdl.address(); }
+
+        // Release the coroutine_handle object
+        auto Release() noexcept { return std::exchange(_hdl, nullptr); }
 
     private:
         void destroy() noexcept
         {
             if (_hdl)
             {
-                if(_triggerStopOnExit)
-                {
-                    // only trigger stop, if the
-                    // stop_source was set explicitly.
-                    _hdl.promise().stopSource.request_stop();
-                }
-
                 _hdl.destroy();
                 _hdl = nullptr;
-
-                if (_destroyNotifier)
-                {
-                    // notify others that the task
-                    // is destroyed.
-                    _destroyNotifier();
-                }
             }
         }
 
@@ -142,15 +126,6 @@ namespace tinycoro {
 
         // The underlying coroutine_handle
         coro_hdl_type _hdl;
-
-        // In case this is "true", the stop source
-        // was explicitly set and need to be triggered
-        // in the destroy().
-        bool _triggerStopOnExit{false};
-
-        // callback to notify others if
-        // the coroutine is destroyed.
-        std::function<void()> _destroyNotifier;
     };
 
     template <typename ReturnValueT = void>

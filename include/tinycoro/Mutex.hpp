@@ -5,6 +5,7 @@
 
 #include "PauseHandler.hpp"
 #include "ReleaseGuard.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -28,92 +29,91 @@ namespace tinycoro {
             [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
 
         private:
-            // Checks only if the mutex is free to take.
+            // Checks only if the mutex is free to take,
+            // and locks it if it was free before.
             bool Ready() noexcept
             {
-                auto oldValue = _state.load();
-                if (oldValue == nullptr)
-                {
-                    if (_state.compare_exchange_strong(oldValue, this))
-                    {
-                        // mutex was free to take.
-                        return true;
-                    }
-                }
-                return false;
+                void* expected = nullptr;
+                return _state.compare_exchange_strong(expected, this, std::memory_order_release, std::memory_order_relaxed);
             }
 
-            void Release()
+            void Release() noexcept
             {
-                auto oldValue = _state.load();
-                assert(oldValue != nullptr);
+                void* expected = _state.load(std::memory_order_relaxed);
 
-                if (oldValue == this)
+                for (;;)
                 {
-                    if (_state.compare_exchange_strong(oldValue, nullptr))
+                    // expected can NOT be nullptr
+                    assert(expected != nullptr);
+                    
+                    void* wanted = nullptr;
+
+                    if (expected != this)
                     {
-                        // No waiters, just release the mutex.
+                        // at this point expected
+                        // can't be nullptr, because
+                        // for sure somebody is holding
+                        // the mutex.
+                        auto oldHead = static_cast<awaitable_type*>(expected);
+                        wanted       = oldHead->next ? static_cast<void*>(oldHead->next) : static_cast<void*>(this);
+                    }
+
+                    if (_state.compare_exchange_strong(expected, wanted, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        if (expected != this)
+                        {
+                            // if the expected (last set value)
+                            // was not this, so some waiter from the list,
+                            // we notify it for resumption.
+                            static_cast<awaitable_type*>(expected)->Notify();
+                        }
+
                         return;
                     }
                 }
-
-                auto oldHead = static_cast<awaitable_type*>(oldValue);
-
-                void* next = oldHead->next ? static_cast<void*>(oldHead->next) : static_cast<void*>(this);
-
-                while (_state.compare_exchange_strong(oldValue, next) == false)
-                {
-                    oldHead = static_cast<awaitable_type*>(oldValue);
-                    next    = oldHead->next ? static_cast<void*>(oldHead->next) : static_cast<void*>(this);
-                }
-
-                // wake the next awaiter
-                oldHead->Notify();
             }
 
-            auto TryAcquire(awaitable_type* awaiter)
+            auto TryAcquire(awaitable_type* awaiter) noexcept
             {
+                //void* expected = nullptr;
+                auto expected = _state.load(std::memory_order_relaxed);
+
                 for (;;)
                 {
-                    auto oldValue = _state.load();
+                    void* wanted = awaiter;
 
-                    if (oldValue == nullptr)
+                    if (expected == nullptr)
                     {
-                        if (_state.compare_exchange_strong(oldValue, this))
-                        {
-                            // mutex was free to take.
-                            return true;
-                        }
+                        // the mutex is free
+                        wanted = this;
+                    }
+                    else if (expected == this)
+                    {
+                        // the mutex is locked,
+                        // but there are no waiters
+                        // in the stack.
+                        awaiter->next = nullptr;
+                    }
+                    else
+                    {
+                        // the mutex is locked
+                        // and we have already waiters
+                        awaiter->next = static_cast<awaitable_type*>(expected);
                     }
 
-                    if (oldValue != this)
+                    if (_state.compare_exchange_strong(expected, wanted, std::memory_order_release, std::memory_order_relaxed))
                     {
-                        awaiter->next = static_cast<awaitable_type*>(oldValue);
-                    }
-
-                    while (oldValue != nullptr && _state.compare_exchange_strong(oldValue, awaiter) == false)
-                    {
-                        if (oldValue != this)
-                        {
-                            // set the next waiter to have a proper stack chain
-                            awaiter->next = static_cast<awaitable_type*>(oldValue);
-                        }
-                        else
-                        {
-                            // clear the next node
-                            awaiter->next = nullptr;
-                        }
-                    }
-
-                    if (oldValue != nullptr)
-                    {
-                        // awaiter is now in waiting queue
+                        // success operation.
+                        // we can exit from the loop.
                         break;
                     }
                 }
 
-                // awaiter is now in waiting queue
-                return false;
+                // if the last expected value is
+                // a nullptr, that means that the
+                // mutex was free to take,
+                // so the aquire was a success.
+                return expected == nullptr;
             }
 
             // nullptr => The mutex is free to take
@@ -123,7 +123,7 @@ namespace tinycoro {
         };
 
         template <typename MutexT, typename EventT>
-        class MutexAwaiter
+        class MutexAwaiter : public detail::SingleLinkable<MutexAwaiter<MutexT, EventT>>
         {
         public:
             MutexAwaiter(MutexT& mutex, EventT event)
@@ -137,7 +137,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _mutex.Ready(); }
 
-            constexpr bool await_suspend(auto parentCoro)
+            constexpr bool await_suspend(auto parentCoro) noexcept
             {
                 PutOnPause(parentCoro);
                 if (_mutex.TryAcquire(this))
@@ -162,8 +162,6 @@ namespace tinycoro {
                 _event.Set(nullptr);
                 context::UnpauseTask(parentCoro);
             }
-
-            MutexAwaiter* next{nullptr};
 
         private:
             MutexT& _mutex;

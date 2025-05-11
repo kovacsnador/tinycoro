@@ -6,6 +6,7 @@
 #include "PauseHandler.hpp"
 #include "LinkedPtrStack.hpp"
 #include "AwaiterHelper.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro {
 
@@ -152,7 +153,7 @@ namespace tinycoro {
         };
 
         template <typename ManualEventT, typename CallbackEventT>
-        class ManualEventAwaiter
+        class ManualEventAwaiter : public detail::SingleLinkable<ManualEventAwaiter<ManualEventT, CallbackEventT>>
         {
         public:
             ManualEventAwaiter(ManualEventT& manualEvent, CallbackEventT event)
@@ -195,8 +196,6 @@ namespace tinycoro {
                 _event.Set(nullptr);
                 context::UnpauseTask(parentCoro);
             }
-
-            ManualEventAwaiter* next{nullptr};
 
         private:
             ManualEventT&  _manualEvent;

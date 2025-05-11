@@ -5,6 +5,8 @@
 
 #include <tinycoro/PauseHandler.hpp>
 
+#include "CoroutineHandleMock.h"
+
 namespace tinycoro { namespace test {
 
     template <typename T>
@@ -17,6 +19,7 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(bool, IsDone, (), (const noexcept));
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
         MOCK_METHOD(void*, Address, (), (const noexcept));
+        MOCK_METHOD(CoroutineHandleMock<tinycoro::Promise<void>>, Release, (), (noexcept));
 
         tinycoro::PauseHandlerCallbackT pauseCallback;
     };
@@ -56,6 +59,11 @@ namespace tinycoro { namespace test {
         void* Address() const noexcept
         {
             return mock->Address();
+        }
+
+        auto Release() noexcept
+        {
+            return mock->Release();
         }
 
         std::shared_ptr<TaskMockImpl<T>> mock;

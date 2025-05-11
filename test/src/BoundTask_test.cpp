@@ -12,7 +12,7 @@ TEST(BoundTaskTest, BoundTaskTest_make)
 
     auto taskWrapper = tinycoro::MakeBound(task);
 
-    EXPECT_TRUE((std::same_as<tinycoro::BoundTask<std::unique_ptr<decltype(task)>, decltype(task())>, decltype(taskWrapper)>));
+    EXPECT_TRUE((std::same_as<tinycoro::BoundTask<decltype(task())>, decltype(taskWrapper)>));
 }
 
 struct TaskWrapperMockImpl
@@ -33,6 +33,7 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, SetDestroyNotifier, (std::function<void()>));
     MOCK_METHOD(void*, Address, (), (const noexcept));
+    MOCK_METHOD(void*, Release, (), (noexcept));
 };
 
 template<typename T>
@@ -76,6 +77,8 @@ struct TaskWrapperMock
     }
 
     [[nodiscard]] auto Address() const noexcept { return impl->Address(); }
+
+    [[nodiscard]] auto Release() noexcept { return impl->Release(); }
 
     std::shared_ptr<TaskWrapperMockImpl> impl = std::make_shared<TaskWrapperMockImpl>();
 };

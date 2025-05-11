@@ -75,6 +75,7 @@ namespace tinycoro { namespace detail {
         {
             return std::launder(reinterpret_cast<T*>(_buffer));
         }
+        
         template <typename T>
             requires (sizeof(T) <= SIZE)
         const T* GetAs() const
