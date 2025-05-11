@@ -145,14 +145,41 @@ TEST(IntrusivePtrTest, IntrusivePtrTest_assign_exception)
 
     EXPECT_NO_THROW(obj.emplace());
     EXPECT_CALL(*obj.get(), Destructor).Times(1);
-    
+
     type obj2;
 
     obj2.emplace("123");
 
     EXPECT_CALL(*obj2.get(), Destructor).Times(1);
-    
+
     EXPECT_THROW((obj = obj2), tinycoro::UnsafeSharedObjectException);
+}
+
+TEST(IntrusivePtrTest, IntrusivePtrTest_reassign)
+{
+    using type = tinycoro::detail::IntrusivePtr<TestStruct>;
+
+    type obj;
+    obj.emplace("123");
+
+    type obj3{"321"};
+
+    EXPECT_CALL(*obj3.get(), Destructor).Times(1);
+
+    {
+        // obj2 need to be destroyed before
+        // obj3, therefore this scope.
+        type obj2 = obj;
+        EXPECT_EQ(obj2->str, obj->str);
+
+        EXPECT_CALL(*obj2.get(), Destructor).Times(0); // never called
+
+        EXPECT_CALL(*obj.get(), Destructor).Times(1);
+
+        obj2 = obj3;
+        EXPECT_NE(obj2->str, obj->str);
+        EXPECT_EQ(obj2->str, obj3->str);
+    }
 }
 
 TEST(IntrusivePtrTest, IntrusivePtrTest_const)
@@ -163,10 +190,10 @@ TEST(IntrusivePtrTest, IntrusivePtrTest_const)
 
     EXPECT_NO_THROW(obj.emplace("123"));
     EXPECT_CALL(*obj.get(), Destructor).Times(1);
-    
+
     const type& c_obj = obj;
 
-    auto obj2{obj};
+    auto        obj2{obj};
     const type& c_obj2 = obj2;
 
     EXPECT_EQ(c_obj.get()->str, std::string{"123"});
