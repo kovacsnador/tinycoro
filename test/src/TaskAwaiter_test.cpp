@@ -147,7 +147,7 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_resume_int)
 {
     CoroTaskMock<int32_t, tinycoro::AwaiterValue> task;
 
-    EXPECT_TRUE(( std::same_as<decltype(task.await_resume()), int32_t&&>));
+    EXPECT_TRUE(( std::same_as<decltype(task.await_resume()), int32_t>));
 }
 
 TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_int)

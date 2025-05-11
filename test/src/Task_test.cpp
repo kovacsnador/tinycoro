@@ -33,7 +33,7 @@ TEST(TaskTest, TaskTest_int)
     auto task = []()->tinycoro::Task<int32_t> { co_return 42; }();
 
     EXPECT_EQ(task.await_ready(), false);
-    EXPECT_TRUE((std::same_as<int32_t&&, decltype(task.await_resume())>));
+    EXPECT_TRUE((std::same_as<int32_t, decltype(task.await_resume())>));
 
     task.Resume();
 
