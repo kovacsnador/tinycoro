@@ -49,8 +49,6 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
 
     tinycoro::Promise<MoveOnly> promise;
 
-    std::cout << sizeof(promise) << '\n';
-
     EXPECT_TRUE(requires { promise.return_value(MoveOnly{12}); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -75,12 +73,33 @@ struct FinalAwaiterMock
 
 TEST(PromiseTest, PromiseTest_FinalAwaiter)
 {
-    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t>, tinycoro::PauseHandler, std::stop_source> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
     promise.return_value(42);
 
+    EXPECT_EQ(promise.ReturnValue(), 42);
+
+    EXPECT_TRUE((std::same_as<std::coroutine_handle<decltype(promise)>, decltype(promise.get_return_object())>));
+
+    EXPECT_TRUE((std::same_as<std::suspend_always, decltype(promise.initial_suspend())>));
+    EXPECT_TRUE((std::same_as<FinalAwaiterMock, decltype(promise.final_suspend())>));
+}
+
+TEST(PromiseTest, PromiseTest_YieldValue)
+{
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source> promise;
+    EXPECT_TRUE(requires { promise.return_value(42); });
+    EXPECT_TRUE(requires { promise.yield_value(42); });
+    EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
+
+    auto yieldAwaiter = promise.yield_value(41);
+    EXPECT_TRUE((std::same_as<FinalAwaiterMock, decltype(yieldAwaiter)>));
+
+    EXPECT_EQ(promise.ReturnValue(), 41);
+
+    promise.return_value(42);
     EXPECT_EQ(promise.ReturnValue(), 42);
 
     EXPECT_TRUE((std::same_as<std::coroutine_handle<decltype(promise)>, decltype(promise.get_return_object())>));

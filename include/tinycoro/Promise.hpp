@@ -32,7 +32,7 @@ namespace tinycoro {
             void await_resume() const noexcept { }
         };
 
-        template <typename ValueT>
+        template <typename ValueT, typename YieldAwaiterT>
         struct PromiseReturnValue
         {
             using value_type = ValueT;
@@ -42,7 +42,11 @@ namespace tinycoro {
             template <typename U>
             void return_value(U&& v)
             {
-                if constexpr (requires { _value = std::forward<U>(v); })
+                if constexpr (requires { _value.emplace(std::forward<U>(v)); })
+                {
+                    _value.emplace(std::forward<U>(v));
+                }
+                else if constexpr (requires { _value = std::forward<U>(v); })
                 {
                     _value = std::forward<U>(v);
                 }
@@ -53,36 +57,27 @@ namespace tinycoro {
                 }
             }
 
-            auto&& ReturnValue() { return std::move(_value.value()); }
+            template <typename U>
+            auto yield_value(U&& v)
+            {
+                // save yield value in the same way,
+                // as for normal return value.
+                return_value(std::forward<U>(v));
+                return YieldAwaiterT{};
+            }
+
+            auto&& ReturnValue() noexcept { return std::move(_value.value()); }
 
         private:
             std::optional<value_type> _value{};
         };
 
-        template <>
-        struct PromiseReturnValue<void>
+        template <typename YieldAwaiterT>
+        struct PromiseReturnValue<void, YieldAwaiterT>
         {
             using value_type = void;
 
             void return_void() { }
-        };
-
-        template <typename ValueT, concepts::IsAwaiter AwaiterT>
-        struct PromiseYieldValue
-        {
-            using value_type = ValueT;
-
-            template <typename U>
-            auto yield_value(U&& v)
-            {
-                _value.emplace(std::forward<U>(v));
-                return AwaiterT{};
-            }
-
-            const auto& YieldValue() const { return _value.value(); }
-
-        private:
-            std::optional<value_type> _value{};
         };
 
         template <typename ReturnerT>
@@ -90,11 +85,7 @@ namespace tinycoro {
             { r.return_void() };
         } || requires (ReturnerT r) {
             { r.return_value(std::declval<typename ReturnerT::value_type>()) };
-        };
-
-        template <typename YielderT>
-        concept PromiseYielderConcept = requires (YielderT y) {
-            { y.yield_value(std::declval<typename YielderT::value_type>()) };
+            { r.yield_value(std::declval<typename ReturnerT::value_type>()) };
         };
 
         template <typename... Types>
@@ -122,25 +113,10 @@ namespace tinycoro {
             ~PromiseT() { this->Finish(); }
         };
 
-        template <concepts::IsAwaiter    FinalAwaiterT,
-                  PromiseReturnerConcept ReturnerT,
-                  PromiseYielderConcept  YielderT,
-                  typename PauseHandlerT,
-                  typename StopSourceT>
-        struct PromiseT<FinalAwaiterT, ReturnerT, YielderT, PauseHandlerT, StopSourceT>
-        : public PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT, public YielderT
-        {
-            using PromiseBase_t = PromiseBase<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>;
-
-            auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
-
-            ~PromiseT() { this->Finish(); }
-        };
-
     } // namespace detail
 
     template <typename ReturnValueT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
-    using Promise = detail::PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT>, PauseHandlerT, StopSourceT>;
+    using Promise = detail::PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT>;
 
     namespace detail {
         using CommonPromise = Promise<void>::PromiseBase_t;

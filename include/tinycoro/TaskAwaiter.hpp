@@ -33,7 +33,7 @@ namespace tinycoro {
         using AwaiterBase<CoroTaskT>::await_ready;
         using AwaiterBase<CoroTaskT>::await_suspend;
 
-        [[nodiscard]] constexpr auto&& await_resume() noexcept
+        [[nodiscard]] constexpr ReturnValueT await_resume() noexcept
         {
             auto* coroTask = static_cast<CoroTaskT*>(this);
             return coroTask->_hdl.promise().ReturnValue();

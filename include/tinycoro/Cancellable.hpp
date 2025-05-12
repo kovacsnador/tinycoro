@@ -74,7 +74,14 @@ namespace tinycoro {
             _stopCallback.reset();
 
             // delegate the call to the awaiter
-            return _awaiter.await_resume();
+            if constexpr (std::same_as<decltype(_awaiter.await_resume()), void>)
+            {
+                return _awaiter.await_resume();
+            }
+            else
+            {
+                return std::move(_awaiter.await_resume());
+            }
         }
 
     private:

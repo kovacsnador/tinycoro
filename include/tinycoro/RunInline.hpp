@@ -190,9 +190,7 @@ namespace tinycoro {
                 }
 
                 auto resultConverter = []<typename T>(T& task) {
-                    if constexpr (requires {
-                                      { task.await_resume() } -> std::same_as<void>;
-                                  })
+                    if constexpr (requires { { task.await_resume() } -> std::same_as<void>; })
                     {
                         TaskResult_t<VoidType> result{};
                         if (task.IsDone())
@@ -391,7 +389,7 @@ namespace tinycoro {
                 {
                     // if done we return the
                     // await_resume return value.
-                    results.emplace_back(it.await_resume());
+                    results.emplace_back(std::move(it.await_resume()));
                 }
                 else
                 {
