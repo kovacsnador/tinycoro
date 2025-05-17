@@ -1,9 +1,10 @@
 #ifndef TINY_CORO_CANCELLABLE_HPP
 #define TINY_CORO_CANCELLABLE_HPP
 
+#include <optional>
+
 #include "PauseHandler.hpp"
 #include "Finally.hpp"
-#include "StaticStorage.hpp"
 #include "Common.hpp"
 
 namespace tinycoro {
@@ -18,7 +19,7 @@ namespace tinycoro {
     class Cancellable
     {
         using stopCallback_t = std::stop_callback<std::function<void()>>;
-        using StorageT       = detail::StaticStorage<stopCallback_t, sizeof(stopCallback_t), stopCallback_t>;
+        using StorageT       = std::optional<stopCallback_t>;
 
     public:
         // accepts only r-value refs
@@ -44,10 +45,10 @@ namespace tinycoro {
             {
                 auto& stopSource = parentCoro.promise().StopSource();
                 assert(stopSource.stop_possible());
-
+                
                 // now we have a valid stop_source
                 // we also setup a stop_callback
-                _stopCallback.Construct<stopCallback_t>(stopSource.get_token(), [this, parentCoro] {
+                _stopCallback.emplace(stopSource.get_token(), [this, parentCoro] {
                     if (_awaiter.Cancel())
                     {
                         // if we could cancel the awaiter
