@@ -170,7 +170,7 @@ namespace tinycoro { namespace detail {
                 }
                 else
                 {
-                    future->set_value(promise->ReturnValue());
+                    future->set_value(promise->value());
                 }
             }
             else
@@ -200,16 +200,6 @@ namespace tinycoro { namespace detail {
         // save the future state inside
         // the corouitne promise
         promise.SavePromise(std::move(futureState), detail::OnTaskFinish<PromiseT, FutureStateT>);
-
-        if constexpr (requires { coro.MoveAnyFunction(); })
-        {
-            // move the underlying function object
-            // in the promise itself.
-            //
-            // This solves some of the lifetime issues,
-            // e.g. with lambda function objects.
-            promise.SaveAnyFunction(coro.MoveAnyFunction());
-        }
 
         // create the common task
         return detail::SchedulableTask{std::addressof(promise)};

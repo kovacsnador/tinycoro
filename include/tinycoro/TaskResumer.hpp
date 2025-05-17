@@ -5,16 +5,24 @@
 
 namespace tinycoro {
 
+    // TODO: put in detail namespace!!!!!!!!!!!!!!!
+
     struct TaskResumer
     {
-        template<typename PromiseT>
+        template <typename PromiseT>
         static inline void Resume(PromiseT& promise)
         {
-            auto& pauseHandler = promise.pauseHandler;
-            const auto& stopSource = promise.stopSource;
+            auto&       pauseHandler = promise.pauseHandler;
+            const auto& stopSource   = promise.stopSource;
 
-            // reset the pause state by every resume.
-            promise.pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+            if constexpr (requires { promise.pauseState; })
+            {
+                // pauseState is not supported by
+                // InlinePromise
+                //  
+                // reset the pause state by every resume.
+                promise.pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+            }
 
             if (pauseHandler)
             {
@@ -28,7 +36,7 @@ namespace tinycoro {
             }
 
             // check for child type
-            using promise_base_t = std::remove_pointer_t<decltype(promise.child)>; 
+            using promise_base_t = std::remove_pointer_t<decltype(promise.child)>;
 
             // find the last child
             promise_base_t* promisePtr = std::addressof(promise);
@@ -48,15 +56,19 @@ namespace tinycoro {
             {
                 auto& promise = handle.promise();
 
-                if(promise.exception)
-                {   
-                    // if there was an unhandled
-                    // exception the task is done
-                    return ETaskResumeState::DONE; 
+                if constexpr (requires { promise.exception; })
+                {
+                    // exception is not supported by InlinePromise
+                    if (promise.exception)
+                    {
+                        // if there was an unhandled
+                        // exception the task is done
+                        return ETaskResumeState::DONE;
+                    }
                 }
 
                 const auto& pauseHandler = promise.pauseHandler;
-                const auto& stopSource = promise.stopSource;
+                const auto& stopSource   = promise.stopSource;
 
                 if (pauseHandler)
                 {

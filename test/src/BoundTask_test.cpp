@@ -12,7 +12,7 @@ TEST(BoundTaskTest, BoundTaskTest_make)
 
     auto taskWrapper = tinycoro::MakeBound(task);
 
-    EXPECT_TRUE((std::same_as<tinycoro::BoundTask<decltype(task())>, decltype(taskWrapper)>));
+    EXPECT_TRUE((std::same_as<tinycoro::Task<std::string>, decltype(taskWrapper)>));
 }
 
 struct TaskWrapperMockImpl
@@ -82,71 +82,6 @@ struct TaskWrapperMock
 
     std::shared_ptr<TaskWrapperMockImpl> impl = std::make_shared<TaskWrapperMockImpl>();
 };
-
-TEST(BoundTaskTest, BoundTaskTest_Resume)
-{
-    TaskWrapperMock<int32_t> mock;
-
-    EXPECT_CALL(*mock.impl, Resume).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    taskWrapper.Resume();
-}
-
-TEST(BoundTaskTest, BoundTaskTest_ResumeState)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, ResumeState).Times(1).WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED));
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    auto                state = taskWrapper.ResumeState();
-
-    EXPECT_EQ(state, tinycoro::ETaskResumeState::SUSPENDED);
-}
-
-TEST(BoundTaskTest, BoundTaskTest_GetPauseHandler)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, GetPauseHandler).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    auto                pauseHandler = taskWrapper.GetPauseHandler();
-    EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
-}
-
-TEST(BoundTaskTest, BoundTaskTest_SetPauseHandler)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, SetPauseHandler).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-
-    auto pauseHandler = taskWrapper.SetPauseHandler(std::function<void()>{});
-    EXPECT_TRUE((std::same_as<decltype(pauseHandler), TaskWrapperMockImpl::PauseHandlerMock>));
-}
-
-TEST(BoundTaskTest, BoundTaskTest_SetStopSource)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, SetStopSource).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    taskWrapper.SetStopSource(std::stop_source{});
-}
-
-TEST(BoundTaskTest, BoundTaskTest_SetDestroyNotifier)
-{
-    TaskWrapperMock<void> mock;
-
-    EXPECT_CALL(*mock.impl, SetDestroyNotifier).Times(1);
-
-    tinycoro::BoundTask taskWrapper{[] {}, mock};
-    taskWrapper.SetDestroyNotifier([] {});
-}
 
 TEST(BoundTaskTest, BoundTaskFunctionalTest_SingleBoundTask)
 {

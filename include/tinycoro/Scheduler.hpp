@@ -128,7 +128,6 @@ namespace tinycoro {
                 {
                     // not allow to enqueue tasks with uninitialized std::coroutine_handler
                     // or if the a stop is requested
-                    //TaskT task = MakeSchedulableTask(std::move(coro), std::move(futureState), allocator);
                     auto task = MakeSchedulableTask(std::move(coro), std::move(futureState));
 
                     // push the task into the queue

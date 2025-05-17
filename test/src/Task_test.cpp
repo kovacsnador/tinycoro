@@ -113,7 +113,7 @@ public:
 
 TEST(CoroTaskTest, CoroTaskTest)
 {
-    auto task = []()->tinycoro::CoroTask<void, PromiseMock, PopAwaiterMock, CoroResumerMock> { co_return; }();
+    auto task = []()->tinycoro::detail::CoroTask<void, PromiseMock, PopAwaiterMock, CoroResumerMock> { co_return; }();
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 
@@ -127,5 +127,4 @@ TEST(CoroTaskTest, CoroTaskTest)
 
     auto pauseResumeCallback = []{};
     task.SetPauseHandler(pauseResumeCallback);
-    
 }

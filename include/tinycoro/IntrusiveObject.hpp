@@ -14,7 +14,7 @@ namespace tinycoro { namespace detail {
         friend IntrusivePtrT;
 
     protected:
-        void AddRef()
+        void AddRef() noexcept
         {
             _refCount.fetch_add(1, std::memory_order_relaxed);
             _refCount.notify_all();
@@ -26,7 +26,7 @@ namespace tinycoro { namespace detail {
             return _refCount.load(std::memory_order_relaxed);
         }
 
-        void ReleaseRef()
+        void ReleaseRef() noexcept
         {
             _refCount.fetch_sub(1, std::memory_order_relaxed);
             _refCount.notify_all();

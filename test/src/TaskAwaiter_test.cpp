@@ -93,9 +93,9 @@ struct PromiseMock
         return stopSource;
     }
 
-    ValueT&& ReturnValue() { return std::move(value); }
+    ValueT&& value() { return std::move(_value); }
 
-    ValueT value;
+    ValueT _value;
 };
 
 template<>
@@ -154,13 +154,13 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_int)
 {
     CoroTaskMock<int32_t, tinycoro::AwaiterValue> task;
 
-    task._hdl.promise().value = 42;
+    task._hdl.promise()._value = 42;
 
     CoroTaskMock<int32_t, tinycoro::AwaiterValue> parent;
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(parent._hdl.promise().child->value, 42);
+    EXPECT_EQ(parent._hdl.promise().child->value(), 42);
 
     EXPECT_EQ(task._hdl.promise().parent->pauseHandler.val, parent._hdl.promise().pauseHandler.val);
     EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);

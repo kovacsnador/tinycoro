@@ -16,7 +16,7 @@
     suspend.await_suspend(hdl);
 
     EXPECT_TRUE(hdl.promise().pauseHandler->IsCancellable());
-    EXPECT_EQ(hdl.promise().ReturnValue(), 42);
+    EXPECT_EQ(hdl.promise().value(), 42);
 }*/
 
 TEST(CancellableSuspentTest, CancellableSuspentTest)
