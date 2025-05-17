@@ -4,8 +4,6 @@
 #include <memory>
 #include <type_traits>
 
-#include "AnyObject.hpp"
-
 namespace tinycoro {
 
     // Helper function to create
@@ -20,8 +18,6 @@ namespace tinycoro {
         // moving the function pointer into the coroutine task
         task.SaveCoroutineFunction(std::move(functionPtr));
         return std::move(task);
-
-        //return BoundTask<decltype(task)>{std::move(functionPtr), std::move(task)};
     }
 
 } // namespace tinycoro
