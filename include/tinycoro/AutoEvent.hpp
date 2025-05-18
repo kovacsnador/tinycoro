@@ -30,23 +30,10 @@ namespace tinycoro {
 
             void Set() noexcept
             {
-                void* expected = _state.load();
+                auto* expected = _state.load(std::memory_order_acquire);
+                void* desired  = nullptr;
 
-                if (expected == this)
-                {
-                    // the event is already set,
-                    // nothing to do
-                    return;
-                }
-
-                void* desired = this;
-                if (expected && expected != this)
-                {
-                    // we have waiter in the stack
-                    desired = static_cast<awaiter_type*>(expected)->next;
-                }
-
-                while (!_state.compare_exchange_strong(expected, desired))
+                for(;;)
                 {
                     if (expected == this)
                     {
@@ -67,13 +54,21 @@ namespace tinycoro {
                         // the last value from it
                         desired = static_cast<awaiter_type*>(expected)->next;
                     }
-                }
 
-                if (expected)
-                {
-                    // finally we were able to pop an awaiter
-                    // so we can notify it
-                    static_cast<awaiter_type*>(expected)->Notify();
+                    if (_state.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        // at this point expected can only be
+                        // nullptr, or a valid awaiter but not this.
+                        if (expected)
+                        {
+                            // finally we were able to pop an awaiter
+                            // so we can notify it
+                            static_cast<awaiter_type*>(expected)->Notify();
+                        }
+
+                        // operataion succeded.
+                        return;
+                    }
                 }
             }
 
@@ -81,7 +76,7 @@ namespace tinycoro {
             {
                 // checks if the current states points to this.
                 // that means the event is set
-                return _state.load() == this;
+                return _state.load(std::memory_order_acquire) == this;
             }
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
@@ -94,25 +89,15 @@ namespace tinycoro {
                 // try to reset the event, if succeeds that means
                 // we can take the event.
                 void* expected = this;
-                return _state.compare_exchange_strong(expected, nullptr);
+                return _state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
 
             bool Add(awaiter_type* awaiter)
             {
-                void* expected = _state.load();
+                auto* expected = _state.load(std::memory_order_acquire);
                 void* desired  = nullptr;
 
-                if (expected != this)
-                {
-                    // we have some awaiters in the stack already
-                    // or the stack is empty but,
-                    // so we want to set the new awaiter on the
-                    // front of the stack
-                    desired       = awaiter;
-                    awaiter->next = static_cast<awaiter_type*>(expected);
-                }
-
-                while (!_state.compare_exchange_strong(expected, desired))
+                for(;;)
                 {
                     if (expected == this)
                     {
@@ -131,9 +116,15 @@ namespace tinycoro {
                         desired       = awaiter;
                         awaiter->next = static_cast<awaiter_type*>(expected);
                     }
+
+                    if (_state.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        // success operation
+                        break;
+                    }
                 }
 
-                // check the last state before a succesfull push
+                // check the last state before a succesfull push,
                 // if the last state was 'this' that means
                 // we could just reset the event (to nullptr)
                 // so the awaiter can be resumed without suspend
@@ -155,7 +146,8 @@ namespace tinycoro {
 
                     // try to get the awaiter list
                     // out from the state
-                    while (isAwaiter(expected, this) && !_state.compare_exchange_strong(expected, nullptr))
+                    while (isAwaiter(expected, this)
+                           && !_state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed))
                     {
                     }
 

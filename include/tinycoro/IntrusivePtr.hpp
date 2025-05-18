@@ -6,15 +6,7 @@
 #include "Exception.hpp"
 
 namespace tinycoro { namespace detail {
-
-    template<typename T>
-    concept IsIntrusiveObject = requires(T t) { 
-        { t.AddRef() };
-        { t.ReleaseRef() };
-        { t.RefCount() };
-        { t.Wait(0) }; };
     
-
     // This class is a simple intrusive ptr with
     // a shared ownership over the contained object.
     // The first instance stores the object
@@ -114,7 +106,20 @@ namespace tinycoro { namespace detail {
     private:
         void _Release() noexcept
         {
-            if constexpr (IsIntrusiveObject<value_type>)
+            // We can't use a simple concept here because of MSVC limitations.
+            //
+            // The problem is that `IntrusiveObject` has the required functions
+            // (`ReleaseRef()`, `RefCount()`, `Wait(), AddRef()`) declared as `protected`, and
+            // MSVC fails to recognize them in the `requires` expression.
+            //
+            // As a result, even though the code is valid and works with other compilers
+            // like GCC or Clang, a straightforward solution using concepts doesn't compile
+            // on MSVC.
+            if constexpr (requires {
+                              this->get()->ReleaseRef();
+                              this->get()->RefCount();
+                              this->get()->Wait(0);
+                          })
             {
                 if (auto obj = this->get())
                 {
@@ -138,7 +143,16 @@ namespace tinycoro { namespace detail {
 
         void _AddRef()
         {
-            if constexpr (IsIntrusiveObject<value_type>)
+            // We can't use a simple concept here because of MSVC limitations.
+            //
+            // The problem is that `IntrusiveObject` has the required functions
+            // (`ReleaseRef()`, `RefCount()`, `Wait(), AddRef()`) declared as `protected`, and
+            // MSVC fails to recognize them in the `requires` expression.
+            //
+            // As a result, even though the code is valid and works with other compilers
+            // like GCC or Clang, a straightforward solution using concepts doesn't compile
+            // on MSVC.
+            if constexpr (requires { this->get()->AddRef(); })
             {
                 if (auto obj = this->get())
                 {
