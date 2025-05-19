@@ -44,10 +44,10 @@ namespace tinycoro {
 
             [[nodiscard]] bool IsSet() const noexcept { return _state.load() == this; }
 
-            void Reset() noexcept
+            bool Reset() noexcept
             {
                 typename decltype(_state)::value_type expected = this;
-                _state.compare_exchange_strong(expected, nullptr);
+                return _state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
@@ -61,7 +61,7 @@ namespace tinycoro {
                 if (oldValue != this)
                 {
                     awaiter->next = static_cast<awaiter_type*>(oldValue);
-                    while (_state.compare_exchange_strong(oldValue, awaiter) == false)
+                    while (_state.compare_exchange_strong(oldValue, awaiter, std::memory_order_release, std::memory_order_relaxed) == false)
                     {
                         if (oldValue == this)
                         {
@@ -86,51 +86,50 @@ namespace tinycoro {
                 bool erased{false};
 
                 {
+                    auto expected = _state.load(std::memory_order_relaxed);
+
                     std::scoped_lock lock{_mtx};
 
-                    auto expected = _state.load(std::memory_order::acquire);
-
-                    // try to get the awaiter list
-                    // out from the state
-                    while (isAwaiter(expected, this) && !_state.compare_exchange_strong(expected, nullptr))
+                    while (isAwaiter(expected, this))
                     {
-                    }
-
-                    if (isAwaiter(expected, this))
-                    {
-                        // we have the awaiter list
-                        // get the top element, and check
-                        // if we still have our awaiter
-                        // in the list
-                        auto current = static_cast<awaiter_type*>(expected);
-
-                        while (current != nullptr)
+                        if (_state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed))
                         {
-                            // iterate ovet the elemens
-                            // and find our awaiter
-                            auto next = current->next;
+                            // we have the awaiter list
+                            // get the top element
+                            auto current = static_cast<awaiter_type*>(expected);
 
-                            if (current != awaiter)
+                            // iterate over the elements and
+                            // search for the awaiter which we want to cancel
+                            while (current != nullptr)
                             {
-                                // if this is not our awaiter
-                                // push back into the queue
-                                if (Add(current) == false)
+                                auto next = current->next;
+
+                                if (current != awaiter)
                                 {
-                                    // we were not able to
-                                    // register it again
-                                    // so there is no suspension..
-                                    // Notify the awaiter
-                                    elementsToNotify.push(current);
+                                    // if this is not our awaiter
+                                    // push back into the queue
+                                    if (Add(current) == false)
+                                    {
+                                        // we were not able to
+                                        // register it again
+                                        // so there is no suspension..
+                                        // Notify the awaiter
+                                        elementsToNotify.push(current);
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                // we found our awaiter
-                                erased = true;
+                                else
+                                {
+                                    // We found our awaiter,
+                                    // we simply just skipping it.
+                                    erased = true;
+                                }
+
+                                // jump to the next element
+                                current = next;
                             }
 
-                            // go to the next element
-                            current = next;
+                            // exit from the loop
+                            break;
                         }
                     }
                 }
@@ -148,7 +147,9 @@ namespace tinycoro {
             // other => NOT_SET with waiters
             std::atomic<void*> _state{nullptr};
 
-            // mutex only used for cancellation
+            // It's used to protect
+            // the awaiter list if we want to remove
+            // from them. ( see Cancel() )
             std::mutex _mtx;
         };
 
