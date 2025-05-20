@@ -47,10 +47,10 @@ namespace tinycoro
         // "PromiseT" must not be an L value reference.  
         template <typename PromiseT, typename OnFinishCallbackT>
             requires (!std::is_lvalue_reference_v<PromiseT>)
-        bool SavePromise(PromiseT&& promise, OnFinishCallbackT finishCb)
+        void SavePromise(PromiseT&& promise, OnFinishCallbackT finishCb)
         {
             _onFinish = finishCb;
-            return _futureStateBuffer.template Construct<PromiseT>(std::forward<PromiseT>(promise));
+            _futureStateBuffer.template Emplace<PromiseT>(std::forward<PromiseT>(promise));
         }
 
         void Finish() noexcept

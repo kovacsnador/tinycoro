@@ -25,7 +25,7 @@ TEST(SimpleStorageTest, SimpleStorageTest_not_empty)
 {
     tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
 
-    EXPECT_TRUE(storage.Construct<StorageObject>("test"));
+    storage.Emplace<StorageObject>("test");
 
     auto* obj = storage.GetAs<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
@@ -40,14 +40,39 @@ TEST(SimpleStorageTest, SimpleStorageTest_2times_initialize)
 {
     tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
 
-    EXPECT_TRUE(storage.Construct<StorageObject>("test"));
-    EXPECT_FALSE(storage.Construct<StorageObject>("test2"));
+    storage.Emplace<StorageObject>("test");
 
     auto* obj = storage.GetAs<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
 
+    storage.Emplace<StorageObject>("test2");
+
+    // get the new value
+    obj = storage.GetAs<StorageObject>();
+
     // still holds the first value
-    EXPECT_EQ(obj->data, std::string{"test"});
+    EXPECT_EQ(obj->data, std::string{"test2"});
+}
+
+TEST(SimpleStorageTest, SimpleStorageTest_reassign_explicit_destroy)
+{
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+
+    auto test = [&](std::string str) {
+        storage.Emplace<StorageObject>(str);
+
+        auto* obj = storage.GetAs<StorageObject>();
+        EXPECT_CALL(*obj, Destructor).Times(1);
+
+        EXPECT_EQ(obj->data, str);
+
+        // explicit destroy here
+        storage.Destroy();
+    };
+
+    test("test1");
+    test("test2");
+    test("test3");
 }
 
 TEST(SimpleStorageTest, SimpleStorageTest_reassign)
@@ -55,15 +80,12 @@ TEST(SimpleStorageTest, SimpleStorageTest_reassign)
     tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
 
     auto test = [&](std::string str) {
-        EXPECT_TRUE(storage.Construct<StorageObject>(str));
+        storage.Emplace<StorageObject>(str);
 
         auto* obj = storage.GetAs<StorageObject>();
         EXPECT_CALL(*obj, Destructor).Times(1);
 
-        // still holds the first value
         EXPECT_EQ(obj->data, str);
-
-        storage.Destroy();
     };
 
     test("test1");
@@ -75,7 +97,7 @@ TEST(SimpleStorageTest, SimpleStorageTest_raw_data_compare)
 {
     tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
 
-    EXPECT_TRUE(storage.Construct<StorageObject>("str"));
+    storage.Emplace<StorageObject>("str");
 
     auto* obj = storage.GetAs<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);

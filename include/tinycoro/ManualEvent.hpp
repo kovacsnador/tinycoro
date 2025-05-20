@@ -81,14 +81,19 @@ namespace tinycoro {
             {
                 auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
 
+                // In this stack, we collect all the
+                // awaiters that need to be notified.
+                //
+                // The reason is to hold the mutex
+                // for as short a time as possible.
                 detail::LinkedPtrStack<awaiter_type> elementsToNotify;
-                
-                bool erased{false};
+
+                bool cancelled{false};
 
                 {
-                    auto expected = _state.load(std::memory_order_relaxed);
-
                     std::scoped_lock lock{_mtx};
+
+                    auto expected = _state.load(std::memory_order_relaxed);
 
                     while (isAwaiter(expected, this))
                     {
@@ -113,7 +118,8 @@ namespace tinycoro {
                                         // we were not able to
                                         // register it again
                                         // so there is no suspension..
-                                        // Notify the awaiter
+                                        //
+                                        // collect the awaiter
                                         elementsToNotify.push(current);
                                     }
                                 }
@@ -121,7 +127,7 @@ namespace tinycoro {
                                 {
                                     // We found our awaiter,
                                     // we simply just skipping it.
-                                    erased = true;
+                                    cancelled = true;
                                 }
 
                                 // jump to the next element
@@ -139,7 +145,7 @@ namespace tinycoro {
                 auto top = elementsToNotify.top();
                 detail::IterInvoke(top, &awaiter_type::Notify);
 
-                return erased;
+                return cancelled;
             }
 
             // nullptr => NOT_SET and NO waiters

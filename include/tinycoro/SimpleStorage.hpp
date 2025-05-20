@@ -25,13 +25,11 @@ namespace tinycoro { namespace detail {
 
         template <typename T, typename... Args>
             requires (sizeof(T) <= SIZE) && (alignof(AlignmentT) >= alignof(T))
-        bool Construct(Args&&... args)
+        void Emplace(Args&&... args)
         {
-            if (_destructor)
-            {
-                // the object is already initialized
-                return false;
-            }
+            // destroy the previous object
+            // if there was any
+            Destroy();
 
             // The storage is not initialized yet
             // We initialize it
@@ -43,8 +41,6 @@ namespace tinycoro { namespace detail {
                 auto ptr = storage->template GetAs<T>();
                 std::destroy_at(ptr);
             };
-
-            return true;
         }
 
         // Helper function to get

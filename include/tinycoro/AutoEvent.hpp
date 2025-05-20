@@ -41,7 +41,7 @@ namespace tinycoro {
                 auto* expected = _state.load(std::memory_order_relaxed);
                 void* desired  = nullptr;
 
-                for(;;)
+                for (;;)
                 {
                     if (expected == this)
                     {
@@ -63,7 +63,7 @@ namespace tinycoro {
                         //
                         // This line is the reason
                         // why we are using the mutex in this function.
-                        // 
+                        //
                         // If we call Set() or Cancel() asynchronously,
                         // the "expected" variable can became a dangling pointer.
                         desired = static_cast<awaiter_type*>(expected)->next;
@@ -117,7 +117,7 @@ namespace tinycoro {
                 auto* expected = _state.load(std::memory_order_relaxed);
                 void* desired  = nullptr;
 
-                for(;;)
+                for (;;)
                 {
                     if (expected == this)
                     {
@@ -155,20 +155,27 @@ namespace tinycoro {
             {
                 auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
 
+                // In this stack, we collect all the
+                // awaiters that need to be notified.
+                //
+                // The reason is to hold the mutex
+                // for as short a time as possible.
                 detail::LinkedPtrStack<awaiter_type> elementsToNotify;
 
-                bool erased{false};
+                bool cancelled{false};
 
                 {
-                    auto expected = _state.load(std::memory_order_relaxed);
-
                     std::scoped_lock lock{_mtx};
+
+                    auto expected = _state.load(std::memory_order_relaxed);
 
                     while (isAwaiter(expected, this))
                     {
                         if (_state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed))
                         {
-                            // we have the awaiter list
+                            // we got exclusive access to
+                            // the awaiter list
+                            //
                             // get the top element
                             auto current = static_cast<awaiter_type*>(expected);
 
@@ -187,7 +194,9 @@ namespace tinycoro {
                                         // we were not able to
                                         // register it again
                                         // so there is no suspension..
-                                        // Notify the awaiter
+                                        //
+                                        // We geather all the awaiter
+                                        // for a later point of a resumption.
                                         elementsToNotify.push(current);
                                     }
                                 }
@@ -195,7 +204,7 @@ namespace tinycoro {
                                 {
                                     // We found our awaiter,
                                     // we simply just skipping it.
-                                    erased = true;
+                                    cancelled = true;
                                 }
 
                                 // jump to the next element
@@ -213,7 +222,7 @@ namespace tinycoro {
                 auto top = elementsToNotify.top();
                 detail::IterInvoke(top, &awaiter_type::Notify);
 
-                return erased;
+                return cancelled;
             }
 
             // nullptr => NOT set
