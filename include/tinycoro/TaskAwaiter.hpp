@@ -36,7 +36,7 @@ namespace tinycoro {
         [[nodiscard]] constexpr ReturnValueT await_resume() noexcept
         {
             auto* coroTask = static_cast<CoroTaskT*>(this);
-            return coroTask->_hdl.promise().ReturnValue();
+            return coroTask->_hdl.promise().value();
         }
     };
 

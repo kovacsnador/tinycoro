@@ -30,23 +30,18 @@ namespace tinycoro {
 
             void Set() noexcept
             {
-                void* expected = _state.load();
+                // It turned out that this Set() function
+                // needs to use the mutex to prevent a race condition.
+                //
+                // The issue occurs if the expected awaiter has already
+                // been notified and destroyed, but we still dereference it
+                // to get the next element from it.
+                std::unique_lock lock{_mtx};
 
-                if (expected == this)
-                {
-                    // the event is already set,
-                    // nothing to do
-                    return;
-                }
+                auto* expected = _state.load(std::memory_order_relaxed);
+                void* desired  = nullptr;
 
-                void* desired = this;
-                if (expected && expected != this)
-                {
-                    // we have waiter in the stack
-                    desired = static_cast<awaiter_type*>(expected)->next;
-                }
-
-                while (!_state.compare_exchange_strong(expected, desired))
+                for (;;)
                 {
                     if (expected == this)
                     {
@@ -65,15 +60,35 @@ namespace tinycoro {
                     {
                         // the stack has changed so we can continue to pop
                         // the last value from it
+                        //
+                        // This line is the reason
+                        // why we are using the mutex in this function.
+                        //
+                        // If we call Set() or Cancel() asynchronously,
+                        // the "expected" variable can became a dangling pointer.
                         desired = static_cast<awaiter_type*>(expected)->next;
                     }
-                }
 
-                if (expected)
-                {
-                    // finally we were able to pop an awaiter
-                    // so we can notify it
-                    static_cast<awaiter_type*>(expected)->Notify();
+                    if (_state.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        // unlock is here necessary,
+                        // because after calling notify,
+                        // it is not safe to release the mutex.
+                        // error on MSVC: "unlock of unowned mutex"
+                        lock.unlock();
+
+                        // at this point expected can only be
+                        // nullptr, or a valid awaiter but not this.
+                        if (expected)
+                        {
+                            // finally we were able to pop an awaiter
+                            // so we can notify it
+                            static_cast<awaiter_type*>(expected)->Notify();
+                        }
+
+                        // operataion succeded.
+                        return;
+                    }
                 }
             }
 
@@ -81,7 +96,7 @@ namespace tinycoro {
             {
                 // checks if the current states points to this.
                 // that means the event is set
-                return _state.load() == this;
+                return _state.load(std::memory_order_acquire) == this;
             }
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
@@ -94,25 +109,15 @@ namespace tinycoro {
                 // try to reset the event, if succeeds that means
                 // we can take the event.
                 void* expected = this;
-                return _state.compare_exchange_strong(expected, nullptr);
+                return _state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed);
             }
 
             bool Add(awaiter_type* awaiter)
             {
-                void* expected = _state.load();
+                auto* expected = _state.load(std::memory_order_relaxed);
                 void* desired  = nullptr;
 
-                if (expected != this)
-                {
-                    // we have some awaiters in the stack already
-                    // or the stack is empty but,
-                    // so we want to set the new awaiter on the
-                    // front of the stack
-                    desired       = awaiter;
-                    awaiter->next = static_cast<awaiter_type*>(expected);
-                }
-
-                while (!_state.compare_exchange_strong(expected, desired))
+                for (;;)
                 {
                     if (expected == this)
                     {
@@ -131,9 +136,15 @@ namespace tinycoro {
                         desired       = awaiter;
                         awaiter->next = static_cast<awaiter_type*>(expected);
                     }
+
+                    if (_state.compare_exchange_strong(expected, desired, std::memory_order_release, std::memory_order_relaxed))
+                    {
+                        // success operation
+                        break;
+                    }
                 }
 
-                // check the last state before a succesfull push
+                // check the last state before a succesfull push,
                 // if the last state was 'this' that means
                 // we could just reset the event (to nullptr)
                 // so the awaiter can be resumed without suspend
@@ -144,52 +155,64 @@ namespace tinycoro {
             {
                 auto isAwaiter = [](auto* state, auto* self) { return (state && state != self); };
 
+                // In this stack, we collect all the
+                // awaiters that need to be notified.
+                //
+                // The reason is to hold the mutex
+                // for as short a time as possible.
                 detail::LinkedPtrStack<awaiter_type> elementsToNotify;
 
-                bool erased{false};
+                bool cancelled{false};
 
                 {
                     std::scoped_lock lock{_mtx};
 
-                    auto expected = _state.load(std::memory_order::acquire);
+                    auto expected = _state.load(std::memory_order_relaxed);
 
-                    // try to get the awaiter list
-                    // out from the state
-                    while (isAwaiter(expected, this) && !_state.compare_exchange_strong(expected, nullptr))
+                    while (isAwaiter(expected, this))
                     {
-                    }
-
-                    if (isAwaiter(expected, this))
-                    {
-                        // we have the awaiter list
-                        // get the top element
-                        auto current = static_cast<awaiter_type*>(expected);
-
-                        while (current != nullptr)
+                        if (_state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed))
                         {
-                            auto next = current->next;
+                            // we got exclusive access to
+                            // the awaiter list
+                            //
+                            // get the top element
+                            auto current = static_cast<awaiter_type*>(expected);
 
-                            if (current != awaiter)
+                            // iterate over the elements and
+                            // search for the awaiter which we want to cancel
+                            while (current != nullptr)
                             {
-                                // if this is not our awaiter
-                                // push back into the queue
-                                if (Add(current) == false)
+                                auto next = current->next;
+
+                                if (current != awaiter)
                                 {
-                                    // we were not able to
-                                    // register it again
-                                    // so there is no suspension..
-                                    // Notify the awaiter
-                                    elementsToNotify.push(current);
+                                    // if this is not our awaiter
+                                    // push back into the queue
+                                    if (Add(current) == false)
+                                    {
+                                        // we were not able to
+                                        // register it again
+                                        // so there is no suspension..
+                                        //
+                                        // We geather all the awaiter
+                                        // for a later point of a resumption.
+                                        elementsToNotify.push(current);
+                                    }
                                 }
-                            }
-                            else
-                            {
-                                // we found our awaiter,
-                                erased = true;
+                                else
+                                {
+                                    // We found our awaiter,
+                                    // we simply just skipping it.
+                                    cancelled = true;
+                                }
+
+                                // jump to the next element
+                                current = next;
                             }
 
-                            // jump to the next element
-                            current = next; 
+                            // exit from the loop
+                            break;
                         }
                     }
                 }
@@ -199,7 +222,7 @@ namespace tinycoro {
                 auto top = elementsToNotify.top();
                 detail::IterInvoke(top, &awaiter_type::Notify);
 
-                return erased;
+                return cancelled;
             }
 
             // nullptr => NOT set
@@ -207,7 +230,9 @@ namespace tinycoro {
             // other => Not set with waiters
             std::atomic<void*> _state{nullptr};
 
-            // only used for awaiter cancellation
+            // It's used to protect
+            // the awaiter list if we want to remove
+            // from them. ( Set() or Cancel() )
             std::mutex _mtx;
         };
 

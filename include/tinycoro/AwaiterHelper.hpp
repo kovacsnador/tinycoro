@@ -18,6 +18,7 @@ namespace tinycoro
                 top = next;
             }
         }
+
     } // namespace detail
     
 } // namespace tinycoro

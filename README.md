@@ -217,7 +217,7 @@ catch(const std::exception& e)
 * [Examples](#examples)
     - [Scheduler](#scheduler)
     - [Task](#task)
-    - [BoundTask](#boundtask)
+    - [MakeBound](#makebound)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
@@ -296,8 +296,25 @@ void Example_voidTask()
 ```
 For simplicity, if you want to return void, you can also write `tinycoro::Task<>`. The default template parameter here is `void``. 
 
-### `BoundTask`
-If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::BoundTask<>`, which is a specialized task that encapsulates both the `tinycoro::Task<>` and the coroutine function. This ensures that the task cannot outlive its coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
+### `MakeBound`
+If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::Task<>`, which encapsulates the coroutine function. This ensures that the task cannot outlive it's coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+void Example_MakeBound()
+{
+    int value;
+
+    // Creating the task with MakeBound()
+    auto task = tinycoro::MakeBound([&]() -> tinycoro::Task<void> {
+        value++;
+        co_return;
+    });
+
+    tinycoro::GetAll(scheduler, std::move(task))
+}
+```
 
 #### ⚠️General recomendation
 Use statefull lambda functions (lambdas with capture block) with caution in a coroutine environment. They can cause lifetime issues. A better approach is to pass the necessary dependencies explicitly through function parameters, like so. `[](auto& dep1, auto& dep2... ) -> tinycoro::Task<void> {...}; `  
