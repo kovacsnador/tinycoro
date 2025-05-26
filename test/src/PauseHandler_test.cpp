@@ -169,15 +169,6 @@ TEST(ContextTest, ContextTest_MakeCancellable)
     tinycoro::context::MakeCancellable(hdl);
 }
 
-/*TEST(ContextTest, ContextTest_MakeCancellable_return_value)
-{
-    Context_CoroutineHandlerMock hdl;
-
-    EXPECT_CALL(*hdl.p, return_value(42)).Times(1);
-    EXPECT_CALL(*hdl.p->pauseHandler, SetCancellable(true)).Times(1);   
-    tinycoro::context::MakeCancellable(hdl, 42);
-}*/
-
 TEST(ContextTest, ContextTest_GetHandler)
 {
     Context_CoroutineHandlerMock hdl;

@@ -14,18 +14,10 @@ namespace tinycoro { namespace detail {
         {
             assert(newNode);
 
-            if (_first)
-            {
-                newNode->next = _first;
-                _first->prev  = newNode;
-                _first        = newNode;
-            }
-            else
-            {
-                _first = newNode;
-                _first->next = nullptr;
-            }
+            if(_first)
+                _first->prev = newNode;
 
+            newNode->next = std::exchange(_first, newNode);
             _first->prev = nullptr;
 
             ++_size;
@@ -34,28 +26,15 @@ namespace tinycoro { namespace detail {
         void erase(value_type* node) noexcept
         {
             assert(node);
+            assert(_size);
 
-            if (node == _first)
-            {
-                _first = node->next;
+            if(node->next)
+                node->next->prev = node->prev;
 
-                if (_first)
-                {
-                    _first->prev = nullptr;
-                }
-            }
+            if(node->prev)
+                node->prev->next = node->next;
             else
-            {
-                if (node->next)
-                {
-                    node->next->prev = node->prev;
-                }
-
-                if (node->prev)
-                {
-                    node->prev->next = node->next;
-                }
-            }
+                _first = node->next;
 
             node->prev = nullptr;
             node->next = nullptr;

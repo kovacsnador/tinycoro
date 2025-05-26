@@ -1,14 +1,33 @@
 #ifndef TINY_CORO_TASK_RESUMER_HPP
 #define TINY_CORO_TASK_RESUMER_HPP
 
+#include <cassert>
+
 #include "Common.hpp"
 
-namespace tinycoro {
-
-    // TODO: put in detail namespace!!!!!!!!!!!!!!!
+namespace tinycoro { namespace detail {
 
     struct TaskResumer
     {
+        // Find the last continuation
+        // and set up the loop at the end
+        // if necessary.
+        template<typename PromiseBaseT>
+        [[nodiscard]] static inline auto FindContinuation(PromiseBaseT* promisePtr) noexcept
+        {
+            assert(promisePtr);
+
+            // Iterate until we found the last corouinte
+            // in the chain, which we need to resume.
+            while (promisePtr->child != nullptr)
+            {
+                //moving forward...
+                promisePtr = promisePtr->child;
+            }
+
+            return promisePtr;
+        }
+
         template <typename PromiseT>
         static inline void Resume(PromiseT& promise)
         {
@@ -19,7 +38,7 @@ namespace tinycoro {
             {
                 // pauseState is not supported by
                 // InlinePromise
-                //  
+                //
                 // reset the pause state by every resume.
                 promise.pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
             }
@@ -35,18 +54,14 @@ namespace tinycoro {
                 pauseHandler->Resume();
             }
 
-            // check for child type
+            // check for continuation type
             using promise_base_t = std::remove_pointer_t<decltype(promise.child)>;
 
-            // find the last child
-            promise_base_t* promisePtr = std::addressof(promise);
-            while (promisePtr && promisePtr->child)
-            {
-                promisePtr = promisePtr->child;
-            }
+            // find the continuation
+            auto promiseToResume = FindContinuation<promise_base_t>(std::addressof(promise));
 
             // resume the coroutine
-            auto handle = std::coroutine_handle<promise_base_t>::from_promise(*promisePtr);
+            auto handle = std::coroutine_handle<promise_base_t>::from_promise(*promiseToResume);
             handle.resume();
         }
 
@@ -86,6 +101,7 @@ namespace tinycoro {
             return ETaskResumeState::DONE;
         }
     };
-} // namespace tinycoro
+
+}} // namespace tinycoro::detail
 
 #endif // TINY_CORO_TASK_RESUMER_HPP

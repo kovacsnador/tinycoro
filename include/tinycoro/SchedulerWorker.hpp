@@ -304,7 +304,7 @@ namespace tinycoro { namespace detail {
             {
                 // resume the task and
                 // get the resume state from the
-                // coroutine or his child
+                // coroutine (or from his continuation)
                 auto resumeState = task->Resume();
 
                 switch (resumeState)

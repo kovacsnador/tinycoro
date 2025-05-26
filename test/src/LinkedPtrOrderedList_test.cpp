@@ -52,6 +52,149 @@ TEST(LinkedPtrOrderedListTest, empty)
     EXPECT_EQ(range->next, nullptr);
 }
 
+TEST(LinkedPtrOrderedListTest, empty_lower_bound)
+{
+    using node_t = ListNodeMock<int32_t>;
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    EXPECT_EQ(list.size(), 0);
+    EXPECT_TRUE(list.empty());
+
+    auto range = list.lower_bound(42);
+    EXPECT_EQ(range, nullptr);
+}
+
+TEST(LinkedPtrOrderedListTest, lower_bound_out_of_range)
+{
+    using node_t = ListNodeMock<int32_t>;
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    node_t n1{1};
+    node_t n2{2};
+    node_t n3{3};
+    node_t n4{4};
+    node_t n5{5};
+    node_t n6{6};
+
+    EXPECT_EQ(list.size(), 0);
+
+    list.insert(&n1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&n2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&n3);
+    EXPECT_EQ(list.size(), 3);
+
+    list.insert(&n4);
+    EXPECT_EQ(list.size(), 4);
+
+    list.insert(&n5);
+    EXPECT_EQ(list.size(), 5);
+
+    list.insert(&n6);
+    EXPECT_EQ(list.size(), 6);
+
+    auto range = list.lower_bound(0);
+
+    EXPECT_EQ(range, nullptr);
+    EXPECT_EQ(list.size(), 6);
+}
+
+TEST(LinkedPtrOrderedListTest, lower_bound_last_elemet)
+{
+    using node_t = ListNodeMock<int32_t>;
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    node_t n1{1};
+    node_t n2{2};
+    node_t n3{3};
+    node_t n4{4};
+    node_t n5{5};
+    node_t n6{6};
+
+    EXPECT_EQ(list.size(), 0);
+
+    list.insert(&n1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&n2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&n3);
+    EXPECT_EQ(list.size(), 3);
+
+    list.insert(&n4);
+    EXPECT_EQ(list.size(), 4);
+
+    list.insert(&n5);
+    EXPECT_EQ(list.size(), 5);
+
+    list.insert(&n6);
+    EXPECT_EQ(list.size(), 6);
+
+    auto range = list.lower_bound(5);
+    EXPECT_FALSE(list.empty());
+    EXPECT_EQ(list.size(), 1);
+
+    EXPECT_EQ(list.begin()->value(), 6);
+    EXPECT_EQ(list.begin()->next, nullptr);
+
+    for(int32_t i = 1; i < 6; ++i)
+    {
+        EXPECT_EQ(range->value(), i);
+        range = range->next;
+    }
+    
+    EXPECT_EQ(range, nullptr);
+}
+
+TEST(LinkedPtrOrderedListTest, lower_bound_all)
+{
+    using node_t = ListNodeMock<int32_t>;
+    tinycoro::detail::LinkedPtrOrderedList<node_t> list;
+
+    node_t n1{1};
+    node_t n2{2};
+    node_t n3{3};
+    node_t n4{4};
+    node_t n5{5};
+    node_t n6{6};
+
+    EXPECT_EQ(list.size(), 0);
+
+    list.insert(&n1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&n2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&n3);
+    EXPECT_EQ(list.size(), 3);
+
+    list.insert(&n4);
+    EXPECT_EQ(list.size(), 4);
+
+    list.insert(&n5);
+    EXPECT_EQ(list.size(), 5);
+
+    list.insert(&n6);
+    EXPECT_EQ(list.size(), 6);
+
+    auto range = list.lower_bound(42);
+    EXPECT_TRUE(list.empty());
+    EXPECT_EQ(list.size(), 0);
+
+    for(int32_t i = 1; i < 7; ++i)
+    {
+        EXPECT_EQ(range->value(), i);
+        range = range->next;
+    }
+
+    EXPECT_EQ(range, nullptr);
+}
+
 TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_ordered_insert)
 {
     using node_t = ListNodeMock<int32_t>;
@@ -157,6 +300,7 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_lower_bound)
     node_t n4{4};
     node_t n5{5};
     node_t n6{6};
+    node_t n7{2};
 
     EXPECT_EQ(list.size(), 0);
 
@@ -178,16 +322,17 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_lower_bound)
     list.insert(&n1);
     EXPECT_EQ(list.size(), 6);
 
+    list.insert(&n7);
+    EXPECT_EQ(list.size(), 7);
+
     auto range = list.lower_bound(2);
 
     EXPECT_EQ(list.size(), 4);
     EXPECT_FALSE(list.empty());
 
-    for(int32_t i = 1; range; ++i)
-    {
-        EXPECT_EQ(range->value(), i);
-        range = range->next;
-    }
+    EXPECT_EQ(range->value(), 1);
+    EXPECT_EQ(range->next->value(), 2);
+    EXPECT_EQ(range->next->next->value(), 2);
 
     range = list.lower_bound(6);
 

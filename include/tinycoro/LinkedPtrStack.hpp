@@ -24,18 +24,18 @@ namespace tinycoro { namespace detail {
                 newNode->prev = nullptr;
             }
 
-            newNode->next = _top;
-            _top          = newNode;
+            newNode->next = std::exchange(_top, newNode);
         }
 
         // Pops and return the poped node.
         [[nodiscard]] value_type* pop() noexcept
         {
-            auto top = _top;
-            if (top)
+            value_type* elem{nullptr};
+
+            if (_top)
             {
-                --_size;
-                _top = _top->next;
+                elem = std::exchange(_top, _top->next);
+                elem->next = nullptr;
 
                 if constexpr (concepts::DoubleLinkable<NodeT>)
                 {
@@ -43,13 +43,13 @@ namespace tinycoro { namespace detail {
                         _top->prev = nullptr;
 
                     // clean up the element
-                    top->prev = nullptr;
+                    elem->prev = nullptr;
                 }
 
-                // clean up the element
-                top->next = nullptr;
+                --_size;
             }
-            return top;
+
+            return elem;
         }
 
         [[nodiscard]] auto size() const noexcept { return _size; }
@@ -70,25 +70,16 @@ namespace tinycoro { namespace detail {
 
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
-                if (elem == _top)
-                {
-                    _top = elem->next;
+                if(_top == nullptr)
+                    return false;
 
-                    if (_top)
-                        _top->prev = nullptr;
-                }
+                if (elem->next)
+                    elem->next->prev = elem->prev;
+
+                if (elem->prev)
+                    elem->prev->next = elem->next;
                 else
-                {
-                    if (elem->next)
-                    {
-                        elem->next->prev = elem->prev;
-                    }
-
-                    if (elem->prev)
-                    {
-                        elem->prev->next = elem->next;
-                    }
-                }
+                    _top = elem->next;
 
                 elem->next = nullptr;
                 elem->prev = nullptr;
@@ -98,34 +89,21 @@ namespace tinycoro { namespace detail {
             }
             else
             {
-                if (_top == elem)
+                value_type** indirect = std::addressof(_top);
+                while (*indirect)
                 {
-                    _top = elem->next;
-
-                    elem->next = nullptr;
-
-                    --_size;
-                    return true;
-                }
-                else
-                {
-                    auto current = _top;
-                    while (current && current->next)
+                    if (*indirect == elem)
                     {
-                        if (current->next == elem)
-                        {
-                            // find the element
-                            // in the list
-                            current->next = elem->next;
+                        // found our element
+                        //
+                        // take out from the list
+                        *indirect  = elem->next;
+                        elem->next = nullptr;
 
-                            elem->next = nullptr;
-
-                            --_size;
-                            return true;
-                        }
-
-                        current = current->next;
+                        --_size;
+                        return true;
                     }
+                    indirect = std::addressof((*indirect)->next);
                 }
             }
 
