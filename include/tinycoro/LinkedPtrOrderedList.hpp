@@ -20,77 +20,41 @@ namespace tinycoro { namespace detail {
         // stays in order
         void insert(value_type* node) noexcept
         {
-            if (node == nullptr)
-            {
-                return;
-            }
+            assert(node);
 
             _size++;
 
-            if (_root == nullptr)
+            value_type** indirect = std::addressof(_root);
+
+            while(*indirect && (*indirect)->value() < node->value())
             {
-                // there is no root
-                // initialize the root
-                _root       = node;
-                _root->next = nullptr;
-                return;
+                // move forward
+                indirect = std::addressof((*indirect)->next);
             }
 
-            // _node <= _root
-            if ((_root->value() < node->value()) == false)
-            {
-                // we can put it to the beginning
-                node->next = _root;
-                _root      = node;
-                return;
-            }
-
-            // we need to put it somewhere in the list
-            // but not the first place
-            auto current = _root;
-            while (current->next && current->next->value() < node->value())
-            {
-                // we have still element to compare
-                current = current->next;
-            }
-
-            // this should never fail
-            assert(current);
-
-            node->next    = current->next;
-            current->next = node;
+            node->next = std::exchange(*indirect, node);
         }
 
-        // gives the lower_bound back
-        // and erase the range from the list
-        value_type* lower_bound(auto valToCompare) noexcept
+        // Removes and returns the leading segment (range) of the list
+        // whose elements are less than or equal to `valToCompare`.
+        [[nodiscard]] value_type* lower_bound(auto valToCompare) noexcept
         {
-            if (_root)
+            auto less_greater = [](auto a, auto b) { return !(a < b); };
+
+            value_type** indirect = std::addressof(_root);
+            
+            while(*indirect && less_greater(valToCompare, (*indirect)->value()))
             {
-                // compare with root to see if
-                // valToCompare not less that root
-                // if(_cmpFunc(valToCompare, _root->value()) == false)
-                if ((valToCompare < _root->value()) == false)
-                {
-                    _size--;
-
-                    // we have at least 2 values in the list
-                    auto current = _root;
-                    while (current->next && (valToCompare < current->next->value()) == false) // current->next <= valToCompare
-                    {
-                        _size--;
-                        current = current->next;
-                    }
-
-                    // this should never fail
-                    assert(current);
-
-                    auto oldRoot  = _root;
-                    _root         = current->next;
-                    current->next = nullptr;
-                    return oldRoot;
-                }
+                // move forward
+                indirect = std::addressof((*indirect)->next);
+                _size--;
             }
+
+            if(*indirect != _root)
+            {
+                return std::exchange(_root, std::exchange(*indirect, nullptr));
+            }
+
             return nullptr;
         }
 
@@ -98,39 +62,23 @@ namespace tinycoro { namespace detail {
         {
             assert(elem);
 
-            if (elem)
+            value_type** indirect = std::addressof(_root);
+
+            while(*indirect)
             {
-                if (_root == elem)
+                if(*indirect == elem)
                 {
-                    _root = elem->next;
+                    *indirect = elem->next;
 
                     elem->next = nullptr;
-
                     --_size;
+
                     return true;
                 }
-                else
-                {
-                    auto current = _root;
-                    while (current && current->next)
-                    {
-                        if (current->next == elem)
-                        {
-                            // find the element
-                            // in the list
-                            current->next = elem->next;
 
-                            elem->next = nullptr;
-
-                            --_size;
-                            return true;
-                        }
-
-                        current = current->next;
-                    }
-                }
+                indirect = std::addressof((*indirect)->next);
             }
-            
+
             return false;
         }
 

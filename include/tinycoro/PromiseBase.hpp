@@ -8,7 +8,6 @@
 
 #include "Common.hpp"
 #include "IntrusivePtr.hpp"
-#include "AnyObject.hpp"
 #include "UnsafeFunction.hpp"
 #include "LinkedUtils.hpp"
 
@@ -42,12 +41,12 @@ namespace tinycoro { namespace detail {
         {
             if (parent == nullptr)
             {
-                // The parent is nullptr,
+                // The parent coroutine is nullptr,
                 // that means this is a root
                 // coroutine promise.
                 //
                 // Only trigger stop, if this
-                // is a parent coroutine
+                // is a root coroutine
                 stopSource.request_stop();
             }
 
@@ -62,8 +61,11 @@ namespace tinycoro { namespace detail {
         // Disallow copy and move
         PromiseBase(PromiseBase&&) = delete;
 
-        PromiseBase* child{nullptr};
-        PromiseBase* parent{nullptr};
+        // These are navigation pointers used to
+        // resume and chain together coroutines,
+        // enabling continuous execution.
+        PromiseBase_t* parent{nullptr};
+        PromiseBase_t* child{nullptr};
 
         // At the beginning we not initialize
         // the stop source here, the initialization
@@ -117,27 +119,17 @@ namespace tinycoro { namespace detail {
             _destroyNotifier = std::forward<T>(cb);
         }
 
-        void SaveAnyFunction(detail::AnyObject&& anyFunc)
-        {
-            assert(_anyFunction == false);
-            _anyFunction = std::move(anyFunc);
-        }
-
         [[nodiscard]] std::suspend_always initial_suspend() const noexcept { return {}; }
 
         [[nodiscard]] FinalAwaiterT final_suspend() const noexcept { return {}; }
 
-        constexpr void unhandled_exception() { std::rethrow_exception(std::current_exception()); }
+        constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 
     private:
         // callback to notify others if
         // the coroutine is destroyed.
         // std::function<void()> destroyNotifier;
         detail::UnsafeFunction<void(void*)> _destroyNotifier;
-
-        // Holds the underlying corouinte function
-        // in case we use the BoundTask() idiom
-        detail::AnyObject _anyFunction{};
     };
 
 }} // namespace tinycoro::detail

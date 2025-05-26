@@ -160,12 +160,21 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(stack.size(), 3);
     
     EXPECT_TRUE(stack.erase(&node3));
+    EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
 
-    auto top = stack.steal();
-    EXPECT_EQ(top, &node1);
-    EXPECT_EQ(top->next, &node2);
+    EXPECT_EQ(stack.pop(), &node1);
+
+    auto top = stack.begin();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, nullptr);
+
+    stack.push(&node1);
+
+    top = stack.steal();
+    EXPECT_EQ(top, &node2);
+    EXPECT_EQ(top->next, &node1);
     EXPECT_EQ(top->next->next, nullptr);
 }
 

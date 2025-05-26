@@ -41,31 +41,21 @@ namespace tinycoro { namespace detail {
 
             ++_size;
 
-            if (_first)
-            {
-                newNode->next = _first;
+            newNode->next = std::exchange(_first, newNode);
 
-                if constexpr (concepts::DoubleLinkable<NodeT>)
-                {
-                    _first->prev = newNode;
-                }
-
-                _first = newNode;
-            }
-            else
-            {
-                _first = newNode;
-                _last = newNode;
-            }
+            if (_last == nullptr)
+                _last = _first;
 
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
-                newNode->prev = nullptr;
+                _first->prev = nullptr;
+
+                if (_first->next)
+                    _first->next->prev = _first;
             }
         }
 
-
-        void concat(LinkedPtrQueue& other)
+        void concat(LinkedPtrQueue& other) noexcept
         {
             if (_first == nullptr)
             {
@@ -96,11 +86,13 @@ namespace tinycoro { namespace detail {
         // Pops and return the popped node.
         [[nodiscard]] value_type* pop() noexcept
         {
-            auto top = _first;
-            if (top)
+            if (_first)
             {
                 --_size;
-                _first = _first->next;
+
+                auto top = std::exchange(_first, _first->next);
+
+                top->next = nullptr;
 
                 if (_first == nullptr)
                 {
@@ -114,9 +106,10 @@ namespace tinycoro { namespace detail {
                     }
                 }
 
-                top->next = nullptr;
+                return top;
             }
-            return top;
+
+            return nullptr;
         }
 
         [[nodiscard]] auto size() const noexcept { return _size; }
@@ -134,86 +127,57 @@ namespace tinycoro { namespace detail {
 
         bool erase(value_type* elem)
         {
+            assert(elem);
+
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
-                if (elem)
-                {
-                    // debug check if the elem is in list
-                    assert(detail::helper::Contains(_first, elem));
+                if(_first == nullptr)
+                    return false;
 
-                    if (elem == _first)
-                    {
-                        _first = _first->next;
+                // debug check if the elem is in list
+                assert(detail::helper::Contains(_first, elem));
 
-                        if (_first)
-                        {
-                            _first->prev = nullptr;
-                        }
-                        else
-                        {
-                            _last = nullptr;
-                        }
-                    }
-                    else
-                    {
-                        if (elem->prev)
-                            elem->prev->next = elem->next;
+                if (elem->next)
+                    elem->next->prev = elem->prev;
+                else
+                    _last = elem->prev;
 
-                        if (elem->next)
-                            elem->next->prev = elem->prev;
-                    }
+                if (elem->prev)
+                    elem->prev->next = elem->next;
+                else
+                    _first = elem->next;
 
-                    elem->prev = nullptr;
-                    elem->next = nullptr;
+                elem->prev = nullptr;
+                elem->next = nullptr;
 
-                    --_size;
+                --_size;
 
-                    return true;
-                }
+                return true;
             }
             else
             {
-                if (elem)
-                {
-                    if (_first == elem)
-                    {
-                        _first = elem->next;
+                value_type** indirect = std::addressof(_first);
+                value_type*  prev{nullptr};
 
-                        if (_last == elem)
-                        {
-                            // so we had only one element
-                            _last = _first;
-                        }
+                while (*indirect)
+                {
+                    if (*indirect == elem)
+                    {
+                        // take out from the list
+                        *indirect = elem->next;
 
                         elem->next = nullptr;
 
+                        if (elem == _last)
+                            _last = prev;
+
                         --_size;
+
                         return true;
                     }
 
-                    auto current = _first;
-                    while (current && current->next)
-                    {
-                        if (current->next == elem)
-                        {
-                            // find the element
-                            // in the list
-                            current->next = elem->next;
-
-                            if (_last == elem)
-                            {
-                                // we have a new last element
-                                _last = current;
-                            }
-
-                            elem->next = nullptr;
-
-                            --_size;
-                            return true;
-                        }
-
-                        current = current->next;
-                    }
+                    prev     = *indirect;
+                    indirect = std::addressof((*indirect)->next);
                 }
             }
 

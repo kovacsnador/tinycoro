@@ -21,15 +21,19 @@ namespace tinycoro {
                 if (promise.parent)
                 {
                     using promise_t = std::remove_pointer_t<decltype(promise.parent)>;
-
+                    // reset the parent child,
+                    // because we are done.
                     promise.parent->child = nullptr;
+
+                    // We can strait jump and resume
+                    // the parent coroutine.
                     return std::coroutine_handle<promise_t>::from_promise(*promise.parent);
                 }
 
                 return std::noop_coroutine();
             }
 
-            void await_resume() const noexcept { }
+            void await_resume() const noexcept {}
         };
 
         template <typename... Args>

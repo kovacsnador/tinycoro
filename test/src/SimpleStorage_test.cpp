@@ -49,6 +49,7 @@ TEST(SimpleStorageTest, SimpleStorageTest_2times_initialize)
 
     // get the new value
     obj = storage.GetAs<StorageObject>();
+    EXPECT_CALL(*obj, Destructor).Times(1);
 
     // still holds the first value
     EXPECT_EQ(obj->data, std::string{"test2"});

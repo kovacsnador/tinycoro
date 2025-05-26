@@ -5,6 +5,7 @@
 
 #include "PromiseBase.hpp"
 #include "Common.hpp"
+#include "AnyObject.hpp"
 
 namespace tinycoro
 {
@@ -53,6 +54,14 @@ namespace tinycoro
             _futureStateBuffer.template Emplace<PromiseT>(std::forward<PromiseT>(promise));
         }
 
+        // Saves the underlying coroutine function
+        // in the promise object itself.
+        void SaveAnyFunction(detail::AnyObject&& anyFunc)
+        {
+            assert(_anyFunction == false);
+            _anyFunction = std::move(anyFunc);
+        }
+
         void Finish() noexcept
         {
             // This logic was previously in the destructor of SchedulablePromise,
@@ -89,6 +98,10 @@ namespace tinycoro
         // promise like std::promise<>
         // or tinycoro::detail::UnsafePromise<>
         detail::SimpleStorage<BUFFER_SIZE> _futureStateBuffer;
+
+        // Holds the underlying corouinte function
+        // in case we use the BoundTask() idiom
+        detail::AnyObject _anyFunction{};
     };
         
     } // namespace detail

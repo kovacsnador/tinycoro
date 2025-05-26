@@ -9,7 +9,7 @@ namespace tinycoro {
 
         [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
         {
-            auto* coroTask = reinterpret_cast<CoroTaskT*>(this);
+            auto* coroTask = static_cast<CoroTaskT*>(this);
 
             auto& parentPromise = parentCoro.promise();
             auto  hdl           = coroTask->_hdl;
@@ -19,20 +19,18 @@ namespace tinycoro {
             promise.parent       = std::addressof(parentPromise);
             promise.stopSource   = parentPromise.StopSource();
             promise.pauseHandler = parentPromise.pauseHandler;
+            
             return hdl;
         }
     };
 
     template <typename ReturnValueT, typename CoroTaskT>
-    class AwaiterValue : private AwaiterBase<CoroTaskT>
+    class AwaiterValue : public AwaiterBase<CoroTaskT>
     {
     protected:
         AwaiterValue() = default;
 
     public:
-        using AwaiterBase<CoroTaskT>::await_ready;
-        using AwaiterBase<CoroTaskT>::await_suspend;
-
         [[nodiscard]] constexpr ReturnValueT await_resume() noexcept
         {
             auto* coroTask = static_cast<CoroTaskT*>(this);
@@ -41,15 +39,12 @@ namespace tinycoro {
     };
 
     template <typename CoroTaskT>
-    class AwaiterValue<void, CoroTaskT> : private AwaiterBase<CoroTaskT>
+    class AwaiterValue<void, CoroTaskT> : public AwaiterBase<CoroTaskT>
     {
     protected:
         AwaiterValue() = default;
 
     public:
-        using AwaiterBase<CoroTaskT>::await_ready;
-        using AwaiterBase<CoroTaskT>::await_suspend;
-
         constexpr void await_resume() noexcept { }
     };
 
