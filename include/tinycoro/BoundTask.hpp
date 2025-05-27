@@ -22,7 +22,7 @@ namespace tinycoro {
 
         // moving the function pointer into the coroutine task
         task.SaveCoroutineFunction(std::move(functionPtr));
-        return std::move(task);
+        return task;
     }
 
 } // namespace tinycoro
