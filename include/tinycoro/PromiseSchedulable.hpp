@@ -1,3 +1,8 @@
+// -----------------------------------------------------------------------------
+//  Copyright (c) 2024 Tamas Kovacs
+//  Licensed under the MIT License – see LICENSE.txt for details.
+// -----------------------------------------------------------------------------
+
 #ifndef TINY_CORO_PROMISE_SCHEDULABLE_HPP
 #define TINY_CORO_PROMISE_SCHEDULABLE_HPP
 

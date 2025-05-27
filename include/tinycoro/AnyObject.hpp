@@ -1,3 +1,8 @@
+// -----------------------------------------------------------------------------
+//  Copyright (c) 2024 Tamas Kovacs
+//  Licensed under the MIT License – see LICENSE.txt for details.
+// -----------------------------------------------------------------------------
+
 #ifndef TINY_CORO_ANY_OBJECT_HPP
 #define TINY_CORO_ANY_OBJECT_HPP
 
@@ -14,7 +19,7 @@ namespace tinycoro { namespace detail {
     };
 
     // The actual bridge which holds the object.
-    // This class is only one, who knows the object type.
+    // This class is the only one, who knows the real object type.
     template <typename ObjectT>
     struct ObjectBridgeImpl : IObjectBridge
     {

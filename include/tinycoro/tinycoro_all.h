@@ -1,3 +1,8 @@
+// -----------------------------------------------------------------------------
+//  Copyright (c) 2024 Tamas Kovacs
+//  Licensed under the MIT License – see LICENSE.txt for details.
+// -----------------------------------------------------------------------------
+
 #ifndef TINY_CORO_TINY_CORO_ALL_H
 #define TINY_CORO_TINY_CORO_ALL_H
 
@@ -8,7 +13,6 @@
 #include "Exception.hpp"
 #include "Finally.hpp"
 #include "Generator.hpp"
-//#include "PackagedTask.hpp"
 #include "Scheduler.hpp"
 #include "StopSourceAwaiter.hpp"
 #include "SleepAwaiter.hpp"
