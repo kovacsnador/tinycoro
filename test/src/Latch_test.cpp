@@ -60,13 +60,11 @@ TEST(LatchTest, LatchTest_constructor)
     EXPECT_THROW(tinycoro::Latch{0}, tinycoro::LatchException);
 }
 
-template <typename, typename>
-class PopAwaiterMock
+template <typename T, typename U>
+class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U>>
 {
 public:
     PopAwaiterMock(auto&, auto) { }
-
-    PopAwaiterMock* next{nullptr};
 };
 
 TEST(LatchTest, LatchTest_coawaitReturn)

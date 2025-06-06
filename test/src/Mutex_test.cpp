@@ -11,13 +11,11 @@ struct MutexTest : testing::TestWithParam<size_t>
 
 INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000, 100'000));
 
-template <typename, typename>
-class PopAwaiterMock
+template <typename T, typename U>
+class PopAwaiterMock : tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U>>
 {
 public:
     PopAwaiterMock(auto&, auto) { }
-
-    PopAwaiterMock* next{nullptr};
 };
 
 TEST(MutexTest, MutexTest_coawaitReturn)

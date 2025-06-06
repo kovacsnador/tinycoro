@@ -6,24 +6,53 @@
 #ifndef TINY_CORO_LINEKD_UTILS_HPP
 #define TINY_CORO_LINEKD_UTILS_HPP
 
+#include "Diagnostics.hpp"
+#include "Common.hpp"
+
 namespace tinycoro { namespace detail {
-    
-    // helper class to indicate
-    // single linkable property
+
+    // Helper class to indicate a singly linkable property.
     template <typename ClassT>
     struct SingleLinkable
     {
         ClassT* next{nullptr};
+
+#ifdef TINYCORO_DIAGNOSTICS
+        // Pointer to the owning list.
+        //
+        // This has several advantages:
+        // - Improves safety and debuggability.
+        // - Provides performance benefits, as we can
+        //   quickly check whether the element is
+        //   currently part of a list.
+        // - Prevents elemenst to be mixed between 2 or more lists.
+        void* owner{nullptr};
+#endif
     };
 
-    // helper class to indicate
-    // double linkable property
+    // Helper class to indicate a doubly linkable property.
     template <typename ClassT>
-    struct DoubleLinkable
+    struct DoubleLinkable : SingleLinkable<ClassT>
     {
-        ClassT* next{nullptr};
         ClassT* prev{nullptr};
     };
+
+#ifdef TINYCORO_DIAGNOSTICS
+
+    template<concepts::Linkable NodeT>
+    void ClearOwners(NodeT node, void* ownerToCompare)
+    {
+        while(node)
+        {
+            TINYCORO_ASSERT(node->owner == ownerToCompare);
+
+            auto next = node->next;
+            node->owner = nullptr;
+            node = next;
+        }
+    }
+
+#endif
 
 }} // namespace tinycoro::detail
 

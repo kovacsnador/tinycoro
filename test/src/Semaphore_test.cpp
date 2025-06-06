@@ -69,7 +69,7 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
 }
 
 template <typename SemaphoreT, typename EventT>
-class PopAwaiterMock
+class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<SemaphoreT, EventT>>
 {
 public:
     PopAwaiterMock(SemaphoreT& s, EventT e)
@@ -85,7 +85,6 @@ public:
 
     auto TestRelease() { return semaphore.Release(); }
 
-    PopAwaiterMock* next{nullptr};
     SemaphoreT&  semaphore;
     EventT event;
 };

@@ -6,9 +6,10 @@
 #ifndef TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP
 #define TINY_CORO_LINKED_PTR_ORDERED_LIST_HPP
 
-#include <functional>
-
 #include "Common.hpp"
+#include "LinkedUtils.hpp"
+#include "Diagnostics.hpp"
+
 
 namespace tinycoro { namespace detail {
 
@@ -27,6 +28,10 @@ namespace tinycoro { namespace detail {
         {
             assert(node);
 
+#ifdef TINYCORO_DIAGNOSTICS
+            TINYCORO_ASSERT(node && node->owner == nullptr);
+            node->owner = this;
+#endif
             _size++;
 
             value_type** indirect = std::addressof(_root);
@@ -38,6 +43,9 @@ namespace tinycoro { namespace detail {
             }
 
             node->next = std::exchange(*indirect, node);
+
+            if(node->next == nullptr)
+                _last = node;
         }
 
         // Removes and returns the leading segment (range) of the list
@@ -50,10 +58,17 @@ namespace tinycoro { namespace detail {
             
             while(*indirect && less_greater(valToCompare, (*indirect)->value()))
             {
+#ifdef TINYCORO_DIAGNOSTICS
+                // detach from owner list
+                (*indirect)->owner = nullptr;
+#endif
                 // move forward
                 indirect = std::addressof((*indirect)->next);
                 _size--;
             }
+
+            if(_size == 0)
+                _last = nullptr;
 
             if(*indirect != _root)
             {
@@ -67,7 +82,11 @@ namespace tinycoro { namespace detail {
         {
             assert(elem);
 
+            if(elem->next == nullptr && elem != _last)
+                return false;
+
             value_type** indirect = std::addressof(_root);
+            value_type* prev{nullptr};
 
             while(*indirect)
             {
@@ -76,11 +95,18 @@ namespace tinycoro { namespace detail {
                     *indirect = elem->next;
 
                     elem->next = nullptr;
+#ifdef TINYCORO_DIAGNOSTICS
+                    elem->owner = nullptr;
+#endif
+                    if(elem == _last)
+                        _last = prev;
+
                     --_size;
 
                     return true;
                 }
 
+                prev = *indirect;
                 indirect = std::addressof((*indirect)->next);
             }
 
@@ -89,7 +115,11 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] value_type* steal() noexcept
         {
+#ifdef TINYCORO_DIAGNOSTICS
+            ClearOwners(_root, this);
+#endif
             _size = 0;
+            _last = nullptr;
             return std::exchange(_root, nullptr);
         }
 
@@ -98,9 +128,12 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto empty() const noexcept { return _size == 0; }
 
         [[nodiscard]] constexpr value_type* begin() noexcept { return _root; }
+        [[nodiscard]] constexpr value_type* last() noexcept { return _last; }
 
     private:
         value_type* _root{};
+        value_type* _last{};
+        
         size_t      _size{};
     };
 

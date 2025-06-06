@@ -174,19 +174,17 @@ TEST(BufferedChannelTest, BufferedChannelTest_moveOnlyValue)
     EXPECT_EQ(44, val.value);
 }
 
-template <typename, typename, typename>
-class PopAwaiterMock
+template <typename T, typename U, typename V>
+class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U, V>>
 {
 public:
     PopAwaiterMock(auto&, auto, auto) { }
 
     void Notify() const noexcept { };
-
-    PopAwaiterMock* next{nullptr};
 };
 
 template <typename C, typename E>
-class ListenerAwaiterMock
+class ListenerAwaiterMock : public tinycoro::detail::SingleLinkable<ListenerAwaiterMock<C, E>>
 {
 public:
     ListenerAwaiterMock(C&, E, size_t v)
@@ -196,22 +194,18 @@ public:
 
     void Notify() const noexcept { };
 
-    ListenerAwaiterMock* next{nullptr};
-
     auto value() { return val; }
 
     size_t val;
 };
 
-template <typename, typename, typename>
-class PushAwaiterMock
+template <typename T, typename U, typename V>
+class PushAwaiterMock : public tinycoro::detail::SingleLinkable<PushAwaiterMock<T, U, V>>
 {
 public:
     PushAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept { };
-
-    PushAwaiterMock* next{nullptr};
+    void Notify() const noexcept { }
 };
 
 TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)

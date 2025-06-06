@@ -7,6 +7,7 @@
 #define TINY_CORO_LINKED_PTR_QUEUE_HPP
 
 #include "Common.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -20,6 +21,11 @@ namespace tinycoro { namespace detail {
             assert(newNode);
             assert(newNode->next == nullptr);
 
+#ifdef TINYCORO_DIAGNOSTICS
+            TINYCORO_ASSERT(newNode && newNode->owner == nullptr);
+            newNode->owner = this;
+#endif
+            
             ++_size;
 
             if (_last)
@@ -44,6 +50,10 @@ namespace tinycoro { namespace detail {
             assert(newNode);
             assert(newNode->next == nullptr);
 
+#ifdef TINYCORO_DIAGNOSTICS
+            TINYCORO_ASSERT(newNode && newNode->owner == nullptr);
+            newNode->owner = this;
+#endif
             ++_size;
 
             newNode->next = std::exchange(_first, newNode);
@@ -60,34 +70,6 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        void concat(LinkedPtrQueue& other) noexcept
-        {
-            if (_first == nullptr)
-            {
-                _first = other._first;
-                _last  = other._last;
-            }
-            else
-            {
-                if constexpr (concepts::DoubleLinkable<NodeT>)
-                {
-                    if (other._first)
-                        other._first->prev = _last;
-                }
-
-                if (_last)
-                    _last->next = other._first;
-
-                if (other._last)
-                    _last = other._last;
-            }
-
-            _size += other._size;
-
-            // reset the other queue
-            std::ignore = other.steal();
-        }
-
         // Pops and return the popped node.
         [[nodiscard]] value_type* pop() noexcept
         {
@@ -98,7 +80,9 @@ namespace tinycoro { namespace detail {
                 auto top = std::exchange(_first, _first->next);
 
                 top->next = nullptr;
-
+#ifdef TINYCORO_DIAGNOSTICS
+                top->owner = nullptr;
+#endif
                 if (_first == nullptr)
                 {
                     _last = nullptr;
@@ -120,11 +104,15 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto size() const noexcept { return _size; }
 
         [[nodiscard]] constexpr value_type* begin() noexcept { return _first; }
+        [[nodiscard]] constexpr value_type* last() noexcept { return _last; }
 
         [[nodiscard]] constexpr bool empty() const noexcept { return !_first; }
 
         [[nodiscard]] value_type* steal() noexcept
         {
+#ifdef TINYCORO_DIAGNOSTICS
+            ClearOwners(_first, this);
+#endif
             _size = 0;
             _last = nullptr;
             return std::exchange(_first, nullptr);
@@ -134,8 +122,14 @@ namespace tinycoro { namespace detail {
         {
             assert(elem);
 
+            if(elem->next == nullptr && elem != _last)
+                return false;
+
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
+#ifdef TINYCORO_DIAGNOSTICS
+                TINYCORO_ASSERT(elem && elem->owner == this);
+#endif      
                 if(_first == nullptr)
                     return false;
 
@@ -154,7 +148,9 @@ namespace tinycoro { namespace detail {
 
                 elem->prev = nullptr;
                 elem->next = nullptr;
-
+#ifdef TINYCORO_DIAGNOSTICS
+                elem->owner = nullptr;
+#endif
                 --_size;
 
                 return true;
@@ -178,6 +174,9 @@ namespace tinycoro { namespace detail {
 
                         --_size;
 
+#ifdef TINYCORO_DIAGNOSTICS
+                        elem->owner = nullptr;
+#endif 
                         return true;
                     }
 
@@ -192,6 +191,7 @@ namespace tinycoro { namespace detail {
     private:
         value_type* _first{nullptr};
         value_type* _last{nullptr};
+
         size_t      _size{};
     };
 

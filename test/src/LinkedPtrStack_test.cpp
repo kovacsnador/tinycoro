@@ -1,14 +1,13 @@
 #include <gtest/gtest.h>
 
 #include <tinycoro/LinkedPtrStack.hpp>
+#include <tinycoro/LinkedUtils.hpp>
 
 #include "ListCommonUtils.hpp"
 
 
 // Mock Node class
-struct MockNode {
-    MockNode* next = nullptr;
-};
+struct MockNode : tinycoro::detail::SingleLinkable<MockNode> { };
 
 class LinkedPtrStackTest : public ::testing::Test {
 protected:
@@ -108,6 +107,33 @@ TEST_F(LinkedPtrStackTest, Size) {
     EXPECT_EQ(stack.size(), 0);
 }
 
+TEST_F(LinkedPtrStackTest, Last) {
+    EXPECT_EQ(stack.size(), 0);
+    EXPECT_EQ(stack.last(), nullptr);
+
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+    EXPECT_EQ(stack.last(), &node1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    EXPECT_EQ(stack.last(), &node1);
+    
+    EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
+
+    std::ignore = stack.steal();
+    EXPECT_EQ(stack.last(), nullptr);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.last(), &node3);
+}
+
 TEST_F(LinkedPtrStackTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 0);
     
@@ -119,15 +145,19 @@ TEST_F(LinkedPtrStackTest, EraseFirst) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node1);
     
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(node1.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node2);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node3);
     EXPECT_EQ(top->next, &node2);
     EXPECT_EQ(top->next->next, nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(LinkedPtrStackTest, EraseMiddle) {
@@ -145,11 +175,13 @@ TEST_F(LinkedPtrStackTest, EraseMiddle) {
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node3);
     EXPECT_EQ(top->next, &node1);
     EXPECT_EQ(top->next->next, nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(LinkedPtrStackTest, EraseLast) {
@@ -164,9 +196,12 @@ TEST_F(LinkedPtrStackTest, EraseLast) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
+    EXPECT_EQ(stack.last(), &node1);
+
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node2);
@@ -186,8 +221,11 @@ TEST_F(LinkedPtrStackTest, EraseAll) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
+    EXPECT_EQ(stack.last(), &node1);
+
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.top();
     EXPECT_EQ(top, &node2);
@@ -196,6 +234,7 @@ TEST_F(LinkedPtrStackTest, EraseAll) {
 
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 1);
+    EXPECT_EQ(stack.last(), &node2);
 
     top = stack.top();
     EXPECT_EQ(top, &node2);
@@ -203,6 +242,7 @@ TEST_F(LinkedPtrStackTest, EraseAll) {
 
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(stack.size(), 0);
+    EXPECT_EQ(stack.last(), nullptr);
 
     EXPECT_TRUE(stack.empty());
 

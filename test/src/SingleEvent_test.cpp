@@ -16,8 +16,8 @@ TEST(SingleEventTest, SingleEventTest_Set)
     EXPECT_TRUE(singleEvent.IsSet());
 }
 
-template <typename, typename>
-class PopAwaiterMock
+template <typename T, typename U>
+class PopAwaiterMock : tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U>>
 {
 public:
     PopAwaiterMock(auto&, auto) { }

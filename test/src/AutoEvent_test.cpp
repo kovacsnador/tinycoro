@@ -24,13 +24,11 @@ TEST(AutoEventTest, AutoEventTest_constructor)
     EXPECT_TRUE(event.IsSet());
 }
 
-template <typename, typename>
-class PopAwaiterMock
+template <typename T, typename U>
+class PopAwaiterMock : tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U>>
 {
 public:
     PopAwaiterMock(auto&, auto) { }
-
-    PopAwaiterMock* next{nullptr};
 };
 
 TEST(AutoEventTest, AutoEventTest_coawaitReturn)

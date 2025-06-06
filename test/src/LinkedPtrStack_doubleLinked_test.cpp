@@ -1,14 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <tinycoro/LinkedPtrStack.hpp>
+#include <tinycoro/LinkedUtils.hpp>
 
 #include "ListCommonUtils.hpp"
 
 // Mock Node class
-struct MockNodeDS {
-    MockNodeDS* next = nullptr;
-    MockNodeDS* prev = nullptr;
-};
+struct MockNodeDS : tinycoro::detail::DoubleLinkable<MockNodeDS> { };
 
 class DoubleLinkedPtrStackTest : public ::testing::Test {
 protected:
@@ -61,9 +59,13 @@ TEST_F(DoubleLinkedPtrStackTest, PopFromEmptyStackReturnsNull) {
 
 // Test: Popping all nodes should make the stack empty again
 TEST_F(DoubleLinkedPtrStackTest, PopAllNodesMakesStackEmpty) {
+    EXPECT_EQ(stack.last(), nullptr);
+    
     stack.push(&node1);
     stack.push(&node2);
     stack.push(&node3);
+
+    EXPECT_EQ(stack.last(), &node1);
 
     EXPECT_FALSE(stack.empty());
     
@@ -110,8 +112,36 @@ TEST_F(DoubleLinkedPtrStackTest, Size) {
     EXPECT_EQ(stack.size(), 0);
 }
 
+TEST_F(DoubleLinkedPtrStackTest, Last) {
+    EXPECT_EQ(stack.size(), 0);
+    EXPECT_EQ(stack.last(), nullptr);
+
+    stack.push(&node1);
+    EXPECT_EQ(stack.size(), 1);
+    EXPECT_EQ(stack.last(), &node1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.size(), 3);
+    EXPECT_EQ(stack.last(), &node1);
+    
+    EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
+
+    std::ignore = stack.steal();
+    EXPECT_EQ(stack.last(), nullptr);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.last(), &node3);
+}
+
 TEST_F(DoubleLinkedPtrStackTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 0);
+    EXPECT_EQ(stack.last(), nullptr);
     
     stack.push(&node1);
     EXPECT_EQ(stack.size(), 1);
@@ -121,9 +151,12 @@ TEST_F(DoubleLinkedPtrStackTest, EraseFirst) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node1);
     
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node2);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node3);
@@ -133,6 +166,7 @@ TEST_F(DoubleLinkedPtrStackTest, EraseFirst) {
     EXPECT_EQ(top->next->prev, &node3);
 
     EXPECT_EQ(top->next->next, nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(DoubleLinkedPtrStackTest, EraseMiddle) {
@@ -146,9 +180,12 @@ TEST_F(DoubleLinkedPtrStackTest, EraseMiddle) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node1);
     
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node3);
@@ -158,6 +195,7 @@ TEST_F(DoubleLinkedPtrStackTest, EraseMiddle) {
     EXPECT_EQ(top->next->prev, &node3);
 
     EXPECT_EQ(top->next->next, nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(DoubleLinkedPtrStackTest, EraseLast) {
@@ -171,9 +209,12 @@ TEST_F(DoubleLinkedPtrStackTest, EraseLast) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node1);
     
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node2);
@@ -197,8 +238,11 @@ TEST_F(DoubleLinkedPtrStackTest, EraseAll) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
+    EXPECT_EQ(stack.last(), &node1);
+
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node1);
 
     auto top = stack.top();
     EXPECT_EQ(top, &node2);
@@ -211,6 +255,7 @@ TEST_F(DoubleLinkedPtrStackTest, EraseAll) {
 
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 1);
+    EXPECT_EQ(stack.last(), &node2);
 
     top = stack.top();
     EXPECT_EQ(top, &node2);
@@ -219,6 +264,7 @@ TEST_F(DoubleLinkedPtrStackTest, EraseAll) {
 
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(stack.size(), 0);
+    EXPECT_EQ(stack.last(), nullptr);
 
     EXPECT_TRUE(stack.empty());
 
