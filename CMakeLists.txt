@@ -11,7 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Option to enable ASAN
 option(WithASAN "Build with AddressSanitizer" OFF)
 option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
-option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
+option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" ON)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
