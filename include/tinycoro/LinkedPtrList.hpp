@@ -39,13 +39,13 @@ namespace tinycoro { namespace detail {
         bool erase(value_type* node) noexcept
         {
             assert(node);
-            assert(_size);
+
+            if((node->next == nullptr && node != _last) || _first == nullptr)
+                return false;   // not in the list
 
 #ifdef TINYCORO_DIAGNOSTICS
             TINYCORO_ASSERT(node && node->owner == this);
 #endif
-            if(node->next == nullptr && node != _last)
-                return false;   // not in the list
 
             if(node->next)
                 node->next->prev = node->prev;
