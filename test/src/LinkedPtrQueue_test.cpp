@@ -252,6 +252,20 @@ TEST_F(LinkedPtrQueueTest, push_front_first_elem) {
     EXPECT_EQ(stack.pop(), &node1);
 }
 
+TEST_F(LinkedPtrQueueTest, erase_from_empty_queue) {
+    EXPECT_EQ(stack.size(), 0);
+    
+    stack.push(&node1);
+    stack.push(&node2);
+    stack.push(&node3);
+
+    std::ignore = stack.steal();
+    
+    EXPECT_FALSE(stack.erase(&node1));
+    EXPECT_FALSE(stack.erase(&node2));
+    EXPECT_FALSE(stack.erase(&node3));
+}
+
 TEST_F(LinkedPtrQueueTest, EraseAll) {
     EXPECT_EQ(stack.size(), 0);
     

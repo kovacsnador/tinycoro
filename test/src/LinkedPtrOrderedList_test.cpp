@@ -542,6 +542,30 @@ TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_Erase_invalid) {
     EXPECT_EQ(list.size(), 3);
 }
 
+TEST(LinkedPtrOrderedListTest, LinkedPtrOrderedListTest_Erase_from_empty) {
+
+    tinycoro::detail::LinkedPtrOrderedList<ListNodeMock<int32_t>> list;
+
+    ListNodeMock<int32_t> node1{1};
+    ListNodeMock<int32_t> node2{2};
+    ListNodeMock<int32_t> node3{3};
+
+    EXPECT_EQ(list.size(), 0);
+    
+    list.insert(&node1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.insert(&node2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.insert(&node3);
+    EXPECT_EQ(list.size(), 3);
+
+    std::ignore = list.steal();
+
+    EXPECT_FALSE(list.erase(&node2));
+}
+
 struct LinkedPtrOrderedListTest : testing::TestWithParam<int32_t>
 {
 };
