@@ -3,9 +3,8 @@
 #include <tinycoro/AtomicPtrStack.hpp>
 #include <tinycoro/tinycoro_all.h>
 
-struct AtomicStackNode
+struct AtomicStackNode : tinycoro::detail::SingleLinkable<AtomicStackNode>
 {
-    AtomicStackNode* next{nullptr};
 };
 
 class AtomicPtrStackTest : public ::testing::Test {

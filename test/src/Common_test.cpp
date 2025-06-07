@@ -10,6 +10,7 @@
 
 #include <tinycoro/Common.hpp>
 #include <tinycoro/LinkedPtrStack.hpp>
+#include <tinycoro/LinkedUtils.hpp>
 
 template<typename T>
 struct Concepts_IterableTest : public testing::Test
@@ -135,9 +136,8 @@ TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_customConstructor)
 
 TEST(Helper_ContainsTest, Helper_ContainsTest)
 {
-    struct Node
+    struct Node : tinycoro::detail::SingleLinkable<Node>
     {
-        Node* next{nullptr};
     };
 
     Node n1{};

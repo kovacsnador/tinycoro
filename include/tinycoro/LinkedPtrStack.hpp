@@ -7,6 +7,7 @@
 #define TINY_CORO_LINEKD_PTR_STACK_HPP
 
 #include "Common.hpp"
+#include "LinkedUtils.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -19,6 +20,10 @@ namespace tinycoro { namespace detail {
         {
             assert(newNode);
 
+#ifdef TINYCORO_DIAGNOSTICS
+            TINYCORO_ASSERT(newNode && newNode->owner == nullptr);
+            newNode->owner = this;
+#endif
             ++_size;
 
             if constexpr (concepts::DoubleLinkable<NodeT>)
@@ -28,6 +33,9 @@ namespace tinycoro { namespace detail {
 
                 newNode->prev = nullptr;
             }
+
+            if(_top == nullptr)
+                _end = newNode;
 
             newNode->next = std::exchange(_top, newNode);
         }
@@ -52,6 +60,13 @@ namespace tinycoro { namespace detail {
                 }
 
                 --_size;
+
+#ifdef TINYCORO_DIAGNOSTICS
+                elem->owner = nullptr;
+#endif
+
+                if(_top == nullptr)
+                    _end = nullptr;
             }
 
             return elem;
@@ -60,12 +75,17 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto size() const noexcept { return _size; }
 
         [[nodiscard]] constexpr value_type* top() noexcept { return _top; }
+        [[nodiscard]] constexpr value_type* last() noexcept { return _end; }
 
         [[nodiscard]] constexpr bool empty() const noexcept { return !_top; }
 
         [[nodiscard]] value_type* steal() noexcept
         {
+#ifdef TINYCORO_DIAGNOSTICS
+            ClearOwners(_top, this);
+#endif
             _size = 0;
+            _end = nullptr;
             return std::exchange(_top, nullptr);
         }
 
@@ -73,13 +93,24 @@ namespace tinycoro { namespace detail {
         {
             assert(elem);
 
+            if(elem->next == nullptr && elem != _end)
+                return false;
+
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
                 if(_top == nullptr)
                     return false;
 
+#ifdef TINYCORO_DIAGNOSTICS
+                TINYCORO_ASSERT(elem != nullptr && elem->owner == this);
+
+                elem->owner = nullptr;
+#endif
+
                 if (elem->next)
                     elem->next->prev = elem->prev;
+                else
+                    _end = elem->prev;
 
                 if (elem->prev)
                     elem->prev->next = elem->next;
@@ -95,6 +126,7 @@ namespace tinycoro { namespace detail {
             else
             {
                 value_type** indirect = std::addressof(_top);
+                value_type* prev{nullptr};
                 while (*indirect)
                 {
                     if (*indirect == elem)
@@ -104,10 +136,20 @@ namespace tinycoro { namespace detail {
                         // take out from the list
                         *indirect  = elem->next;
                         elem->next = nullptr;
+                        
+                        if(elem == _end)
+                            _end = prev;
 
                         --_size;
+
+#ifdef TINYCORO_DIAGNOSTICS
+                        elem->owner = nullptr;
+#endif
                         return true;
                     }
+
+                    prev = *indirect;
+
                     indirect = std::addressof((*indirect)->next);
                 }
             }
@@ -117,6 +159,8 @@ namespace tinycoro { namespace detail {
 
     private:
         value_type* _top{nullptr};
+        value_type* _end{nullptr};
+
         size_t      _size{};
     };
 }} // namespace tinycoro::detail

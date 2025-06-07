@@ -103,7 +103,7 @@ struct CoroResumerMock
 };
 
 template<typename ReturnValueT, typename BaseT>
-class PopAwaiterMock
+class PopAwaiterMock : tinycoro::detail::SingleLinkable<PopAwaiterMock<ReturnValueT, BaseT>>
 {
 public:
     constexpr bool await_ready() const noexcept { return true; }

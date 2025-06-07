@@ -1,13 +1,12 @@
 #include <gtest/gtest.h>
 
 #include <tinycoro/LinkedPtrQueue.hpp>
+#include <tinycoro/LinkedUtils.hpp>
 
 #include "ListCommonUtils.hpp"
 
 // Mock Node class
-struct MockNodeQ {
-    MockNodeQ* next = nullptr;
-};
+struct MockNodeQ : tinycoro::detail::SingleLinkable<MockNodeQ> { };
 
 class LinkedPtrQueueTest : public ::testing::Test {
 protected:
@@ -103,6 +102,32 @@ TEST_F(LinkedPtrQueueTest, Size) {
     EXPECT_EQ(stack.size(), 0);
 }
 
+TEST_F(LinkedPtrQueueTest, Last) {
+    EXPECT_EQ(stack.last(), nullptr);
+    
+    stack.push(&node1);
+    EXPECT_EQ(stack.last(), &node1);
+
+    stack.push(&node2);
+    EXPECT_EQ(stack.last(), &node2);
+
+    stack.push(&node3);
+    EXPECT_EQ(stack.last(), &node3);
+    
+    EXPECT_EQ(&node1, stack.pop());
+    EXPECT_EQ(stack.last(), &node3);
+
+    EXPECT_EQ(&node2, stack.pop());
+    EXPECT_EQ(stack.last(), &node3);
+
+    EXPECT_EQ(&node3, stack.pop());
+    EXPECT_EQ(stack.last(), nullptr);
+
+    // call pop on empty stack
+    EXPECT_EQ(nullptr, stack.pop());
+    EXPECT_EQ(stack.size(), 0);
+}
+
 TEST_F(LinkedPtrQueueTest, EraseFirst) {
     EXPECT_EQ(stack.size(), 0);
     
@@ -114,10 +139,13 @@ TEST_F(LinkedPtrQueueTest, EraseFirst) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node3);
     
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(node1.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node3);
 
     auto top = stack.begin();
     EXPECT_EQ(top, &node2);
@@ -137,14 +165,18 @@ TEST_F(LinkedPtrQueueTest, EraseMiddle) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
+    EXPECT_EQ(stack.last(), &node3);
+
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node3);
 
     auto top = stack.steal();
     EXPECT_EQ(top, &node1);
     EXPECT_EQ(top->next, &node3);
     EXPECT_EQ(top->next->next, nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(LinkedPtrQueueTest, EraseLast) {
@@ -159,10 +191,13 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
     
+    EXPECT_EQ(stack.last(), &node3);
+
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(node2.next, nullptr);
     EXPECT_EQ(node3.next, nullptr);
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node2);
 
     EXPECT_EQ(stack.pop(), &node1);
 
@@ -176,35 +211,7 @@ TEST_F(LinkedPtrQueueTest, EraseLast) {
     EXPECT_EQ(top, &node2);
     EXPECT_EQ(top->next, &node1);
     EXPECT_EQ(top->next->next, nullptr);
-}
-
-TEST_F(LinkedPtrQueueTest, Concat) {
-    EXPECT_EQ(stack.size(), 0);
-    
-    stack.push(&node1);
-    stack.push(&node2);
-    stack.push(&node3);
-    
-    MockNodeQ node4, node5, node6;
-    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack2;
-
-    stack2.push(&node4);
-    stack2.push(&node5);
-    stack2.push(&node6);
-
-    stack.concat(stack2);
-    EXPECT_EQ(stack.size(), 6);
-
-    EXPECT_EQ(node3.next, &node4);
-
-    size_t count{};
-    auto it = stack.steal();
-    while (it != nullptr)
-    {
-        count++;
-        it = it->next;
-    }
-    EXPECT_EQ(count, 6);    
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 TEST_F(LinkedPtrQueueTest, push_front) {
@@ -216,6 +223,7 @@ TEST_F(LinkedPtrQueueTest, push_front) {
     
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(node2.next, nullptr);
+    EXPECT_EQ(stack.last(), &node3);
 
     stack.push_front(&node2);
     EXPECT_EQ(node2.next, &node1);
@@ -244,45 +252,18 @@ TEST_F(LinkedPtrQueueTest, push_front_first_elem) {
     EXPECT_EQ(stack.pop(), &node1);
 }
 
-TEST_F(LinkedPtrQueueTest, Concat_empty) {
+TEST_F(LinkedPtrQueueTest, erase_from_empty_queue) {
     EXPECT_EQ(stack.size(), 0);
     
     stack.push(&node1);
     stack.push(&node2);
     stack.push(&node3);
+
+    std::ignore = stack.steal();
     
-    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack2;
-
-    stack.concat(stack2);
-    EXPECT_EQ(stack.size(), 3);
-
-    size_t count{};
-    auto it = stack.steal();
-    while (it != nullptr)
-    {
-        count++;
-        it = it->next;
-    }
-    EXPECT_EQ(count, 3); 
-}
-
-TEST_F(LinkedPtrQueueTest, Concat_empty_2) {
-    EXPECT_EQ(stack.size(), 0);
-    
-    tinycoro::detail::LinkedPtrQueue<MockNodeQ> stack2;
-
-    stack2.push(&node1);
-    stack2.push(&node2);
-    stack2.push(&node3);
-
-    stack.concat(stack2);
-    EXPECT_EQ(stack.size(), 3);
-
-    auto it = stack.steal();
-    EXPECT_EQ(it, &node1);
-    EXPECT_EQ(it->next, &node2);
-    EXPECT_EQ(it->next->next, &node3);
-    EXPECT_EQ(it->next->next->next, nullptr);
+    EXPECT_FALSE(stack.erase(&node1));
+    EXPECT_FALSE(stack.erase(&node2));
+    EXPECT_FALSE(stack.erase(&node3));
 }
 
 TEST_F(LinkedPtrQueueTest, EraseAll) {
@@ -296,9 +277,12 @@ TEST_F(LinkedPtrQueueTest, EraseAll) {
 
     stack.push(&node3);
     EXPECT_EQ(stack.size(), 3);
+
+    EXPECT_EQ(stack.last(), &node3);
     
     EXPECT_TRUE(stack.erase(&node3));
     EXPECT_EQ(stack.size(), 2);
+    EXPECT_EQ(stack.last(), &node2);
 
     auto top = stack.begin();
     EXPECT_EQ(top, &node1);
@@ -307,10 +291,14 @@ TEST_F(LinkedPtrQueueTest, EraseAll) {
 
     EXPECT_TRUE(stack.erase(&node1));
     EXPECT_EQ(stack.size(), 1);
+    EXPECT_EQ(stack.last(), &node2);
+
+    EXPECT_EQ(stack.begin(), stack.last());
 
     top = stack.begin();
     EXPECT_EQ(top, &node2);
     EXPECT_EQ(top->next, nullptr);
+    EXPECT_EQ(stack.last(), &node2);
 
     EXPECT_TRUE(stack.erase(&node2));
     EXPECT_EQ(stack.size(), 0);
@@ -318,6 +306,7 @@ TEST_F(LinkedPtrQueueTest, EraseAll) {
     EXPECT_TRUE(stack.empty());
 
     EXPECT_EQ(stack.begin(), nullptr);
+    EXPECT_EQ(stack.last(), nullptr);
 }
 
 struct LinkedPtrQueueFunctionalTest : testing::TestWithParam<size_t>

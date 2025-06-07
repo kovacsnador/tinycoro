@@ -60,7 +60,7 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Configure with coverage flags using Clang
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON -D BUILD_WITH_DIAGNOSTICS=ON
       working-directory: ${{ github.workspace }}
 
     - name: Build

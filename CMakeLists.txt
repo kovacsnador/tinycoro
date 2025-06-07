@@ -11,6 +11,7 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 # Option to enable ASAN
 option(WithASAN "Build with AddressSanitizer" OFF)
 option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
+option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
@@ -42,6 +43,11 @@ if (CMAKE_BUILD_TYPE STREQUAL "Debug")
   message("CMAKE_CXX_FLAGS_DEBUG -> ${CMAKE_CXX_FLAGS_DEBUG}")
 elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
   message("CMAKE_CXX_FLAGS_RELEASE -> ${CMAKE_CXX_FLAGS_RELEASE}")
+endif()
+
+if(BUILD_WITH_DIAGNOSTICS)
+  # add global flag for diagnostics
+  add_compile_definitions(TINYCORO_DIAGNOSTICS)
 endif()
 
 if(BUILD_WITH_EXAMPLES)

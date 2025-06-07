@@ -3,15 +3,12 @@
 #include <tinycoro/tinycoro_all.h>
 
 template<typename T>
-struct Node
+struct Node : tinycoro::detail::DoubleLinkable<Node<T>>
 {
     Node(T v)
     : val{v}
     {
     }
-
-    Node* next{nullptr};
-    Node* prev{nullptr};
 
     T val;
 };
@@ -27,9 +24,13 @@ struct LinkedPtrListTest : testing::Test
 
 TEST_F(LinkedPtrListTest, LinkedPtrListTest_push)
 {
+    EXPECT_EQ(list.last(), nullptr);
+
     list.push_front(&n1);
     list.push_front(&n2);
     list.push_front(&n3);
+
+    EXPECT_EQ(list.last(), &n1);
 
     EXPECT_EQ(n3.next, &n2);
     EXPECT_EQ(n3.prev, nullptr);
@@ -43,11 +44,16 @@ TEST_F(LinkedPtrListTest, LinkedPtrListTest_push)
 
 TEST_F(LinkedPtrListTest, LinkedPtrListTest_erase)
 {
+    EXPECT_EQ(list.last(), nullptr);
+
     list.push_front(&n1);
     list.push_front(&n2);
     list.push_front(&n3);
 
+    EXPECT_EQ(list.last(), &n1);
+
     list.erase(&n2);
+    EXPECT_EQ(list.last(), &n1);
 
     EXPECT_EQ(n3.next, &n1);
     EXPECT_EQ(n3.prev, nullptr);
@@ -59,6 +65,7 @@ TEST_F(LinkedPtrListTest, LinkedPtrListTest_erase)
     EXPECT_EQ(n1.prev, &n3);
 
     list.erase(&n3);
+    EXPECT_EQ(list.last(), &n1);
     
     EXPECT_EQ(n3.next, nullptr);
     EXPECT_EQ(n3.prev, nullptr);
@@ -71,7 +78,10 @@ TEST_F(LinkedPtrListTest, LinkedPtrListTest_erase)
 
     EXPECT_EQ(&n1, list.begin());
 
+    EXPECT_EQ(list.begin(), list.last());
+
     list.erase(&n1);
+    EXPECT_EQ(list.last(), nullptr);
 
     EXPECT_EQ(n3.next, nullptr);
     EXPECT_EQ(n3.prev, nullptr);
@@ -118,12 +128,45 @@ TEST_F(LinkedPtrListTest, LinkedPtrListTest_size)
     list.push_front(&n3);
     EXPECT_EQ(list.size(), 3);
 
+    EXPECT_EQ(list.last(), &n1);
+
     list.erase(&n3);
     EXPECT_EQ(list.size(), 2);
+    EXPECT_EQ(list.last(), &n1);
 
     list.erase(&n2);
     EXPECT_EQ(list.size(), 1);
+    EXPECT_EQ(list.last(), &n1);
     
     list.erase(&n1);
     EXPECT_EQ(list.size(), 0);
+    EXPECT_EQ(list.last(), nullptr);
+}
+
+TEST_F(LinkedPtrListTest, LinkedPtrListTest_last)
+{
+    EXPECT_EQ(list.size(), 0);
+
+    list.push_front(&n1);
+    EXPECT_EQ(list.size(), 1);
+
+    list.push_front(&n2);
+    EXPECT_EQ(list.size(), 2);
+
+    list.push_front(&n3);
+    EXPECT_EQ(list.size(), 3);
+
+    EXPECT_EQ(list.last(), &n1);
+
+    list.erase(&n1);
+    EXPECT_EQ(list.size(), 2);
+    EXPECT_EQ(list.last(), &n2);
+
+    list.erase(&n2);
+    EXPECT_EQ(list.size(), 1);
+    EXPECT_EQ(list.last(), &n3);
+    
+    list.erase(&n3);
+    EXPECT_EQ(list.size(), 0);
+    EXPECT_EQ(list.last(), nullptr);
 }

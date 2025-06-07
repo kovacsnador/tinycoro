@@ -13,37 +13,31 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_open)
     EXPECT_FALSE(channel.IsOpen());
 }
 
-template <typename, typename, typename>
-class PopAwaiterMock
+template <typename T, typename U, typename V>
+class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T, U, V>>
 {
 public:
     PopAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept { };
-
-    PopAwaiterMock* next{nullptr};
 };
 
-template <typename, typename, typename>
-class PushAwaiterMock
+template <typename T, typename U, typename V>
+class PushAwaiterMock : public tinycoro::detail::SingleLinkable<PushAwaiterMock<T, U, V>>
 {
 public:
     PushAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept { };
-
-    PushAwaiterMock* next{nullptr};
 };
 
-template <typename, typename>
-class ListenerAwaiterMock
+template <typename T, typename U>
+class ListenerAwaiterMock : public tinycoro::detail::SingleLinkable<ListenerAwaiterMock<T, U>>
 {
 public:
     ListenerAwaiterMock(auto&, auto...) { }
 
     void Notify() const noexcept { };
-
-    ListenerAwaiterMock* next{nullptr};
 
     size_t value() { return 42; }
 };
