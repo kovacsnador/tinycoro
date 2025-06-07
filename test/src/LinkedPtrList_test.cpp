@@ -170,3 +170,12 @@ TEST_F(LinkedPtrListTest, LinkedPtrListTest_last)
     EXPECT_EQ(list.size(), 0);
     EXPECT_EQ(list.last(), nullptr);
 }
+
+TEST_F(LinkedPtrListTest, LinkedPtrListTest_erase_not_in_list)
+{
+    n1.next = &n2;
+    n2.prev = &n1;
+
+    // not in the list
+    EXPECT_FALSE(list.erase(&n1));
+}
