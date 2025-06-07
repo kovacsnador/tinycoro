@@ -127,12 +127,12 @@ namespace tinycoro { namespace detail {
 
             if constexpr (concepts::DoubleLinkable<NodeT>)
             {
-#ifdef TINYCORO_DIAGNOSTICS
-                TINYCORO_ASSERT(elem && elem->owner == this);
-#endif      
                 if(_first == nullptr)
                     return false;
 
+#ifdef TINYCORO_DIAGNOSTICS
+                TINYCORO_ASSERT(elem && elem->owner == this);
+#endif      
                 // debug check if the elem is in list
                 assert(detail::helper::Contains(_first, elem));
 
