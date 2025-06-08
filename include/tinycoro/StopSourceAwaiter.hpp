@@ -55,6 +55,21 @@ namespace tinycoro {
         StopSourceT* _stopSource;
     };
 
+    namespace this_coro
+    {   
+        template<typename StopSourceT = std::stop_source>
+        [[nodiscard]] auto stop_source() noexcept -> StopSourceAwaiter<StopSourceT>
+        {
+            return {};
+        }
+
+        template<typename StopSourceT = std::stop_source>
+        [[nodiscard]] auto stop_token() noexcept -> StopTokenAwaiter<StopSourceT>
+        {
+            return {};
+        }
+    }
+
 } // namespace tinycoro
 
 #endif // TINY_CORO_STOP_SOURCE_AWAITER_HPP

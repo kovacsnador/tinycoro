@@ -90,3 +90,9 @@ TEST(StopSourceAwaiterTest, StopTokenAwaiterTest_nostate)
 
     EXPECT_TRUE(stopToken.stop_possible());
 }
+
+TEST(StopSourceAwaiterTest, test_this_coro_functions)
+{
+    EXPECT_TRUE((std::same_as<decltype(tinycoro::this_coro::stop_source()), tinycoro::StopSourceAwaiter<>>));
+    EXPECT_TRUE((std::same_as<decltype(tinycoro::this_coro::stop_token()), tinycoro::StopTokenAwaiter<>>));
+}

@@ -194,7 +194,7 @@ tinycoro::Task<void> EPoll(auto& newConnectionChannel, auto& receiveChannel, fil
     std::vector<epoll_event> events(max_events);
 
     // getting the shared stop token
-    auto stopToken = co_await tinycoro::StopTokenAwaiter{};
+    auto stopToken = co_await tinycoro::this_coro::stop_token();
 
     DebugPrint() << "[INFO] Start polling on fd: " << epoll_fd << "\n";
 

@@ -148,7 +148,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_sleep_cancellable)
     auto sleepInterruptTask = [&](auto duration) -> tinycoro::Task<void> {
 
         // save the stop source in the global variable
-        stopSource = co_await tinycoro::StopSourceAwaiter{};
+        stopSource = co_await tinycoro::this_coro::stop_source();
 
         event.Set();
 

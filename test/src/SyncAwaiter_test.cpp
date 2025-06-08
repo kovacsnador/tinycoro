@@ -301,7 +301,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
         co_return count;
     };
 
-    auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+    auto stopSource = co_await tinycoro::this_coro::stop_source();
 
     auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
