@@ -291,7 +291,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)
     int                 counter = 0;
 
     auto waiterTask = [&]() -> tinycoro::Task<void> {
-        auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+        auto stopSource = co_await tinycoro::this_coro::stop_source();
 
         co_await event;
 

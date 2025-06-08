@@ -10,7 +10,6 @@
 #include <chrono>
 
 #include "Task.hpp"
-#include "StopSourceAwaiter.hpp"
 #include "CancellableSuspend.hpp"
 #include "AutoEvent.hpp"
 

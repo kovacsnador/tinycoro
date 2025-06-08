@@ -650,8 +650,8 @@ TEST_F(ExampleTest, Example_AnyOfDynamicVoid)
     tinycoro::SoftClock clock;
 
     auto task1 = [&clock](auto duration) -> tinycoro::Task<void> {
-        [[maybe_unused]] auto stopToken  = co_await tinycoro::StopTokenAwaiter{};
-        [[maybe_unused]] auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+        [[maybe_unused]] auto stopToken  = co_await tinycoro::this_coro::stop_token();
+        [[maybe_unused]] auto stopSource = co_await tinycoro::this_coro::stop_source();
 
         co_await tinycoro::SleepFor(clock, duration);
     };
@@ -804,7 +804,7 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
             co_return count;
         };
 
-        auto stopSource = co_await tinycoro::StopSourceAwaiter{};
+        auto stopSource = co_await tinycoro::this_coro::stop_source();
 
         auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
