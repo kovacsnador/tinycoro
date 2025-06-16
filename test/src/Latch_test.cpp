@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include "mock/CoroutineHandleMock.h"
+#include "Allocator.hpp"
 
 #include <tinycoro/tinycoro_all.h>
 
@@ -120,10 +121,7 @@ struct LatchEventMock
     {
     }
 
-    void Set(auto func)
-    {
-        mock->Set(func);
-    }
+    void Set(auto func) { mock->Set(func); }
 
     std::shared_ptr<LatchEventMockImpl> mock;
 };
@@ -135,7 +133,7 @@ struct LatchMock
 
 TEST(LatchTest, LatchAwaiter)
 {
-    LatchMock mock;
+    LatchMock      mock;
     LatchEventMock eventMock;
 
     EXPECT_CALL(mock, Add).WillRepeatedly(testing::Return(false));
@@ -152,6 +150,17 @@ TEST(LatchTest, LatchAwaiter)
 
 struct LatchTest : testing::TestWithParam<size_t>
 {
+    void SetUp()
+    {
+        // resets the memory resource
+        s_allocator.release();
+    }
+
+    static inline tinycoro::test::Allocator<LatchTest, 500000u> s_allocator;
+
+    template<typename PromiseT>
+    using Allocator = tinycoro::test::AllocatorAdapter<PromiseT, decltype(s_allocator)>;
+
 };
 
 INSTANTIATE_TEST_SUITE_P(LatchTest, LatchTest, testing::Values(1, 2, 10, 100, 1000, 10000));
@@ -165,12 +174,12 @@ TEST_P(LatchTest, LatchFunctionalTest_ArriveAndWait)
     tinycoro::Latch     latch{count};
     std::atomic<size_t> latchCount{};
 
-    auto task = [&]() -> tinycoro::Task<void> {
+    auto task = [&]() -> tinycoro::Task<void, LatchTest::Allocator> {
         co_await latch.ArriveAndWait();
         ++latchCount;
     };
 
-    std::vector<tinycoro::Task<void>> tasks;
+    std::vector<tinycoro::Task<void, LatchTest::Allocator>> tasks;
     for (size_t i = 0; i < count; ++i)
     {
         tasks.emplace_back(task());
@@ -188,17 +197,17 @@ TEST_P(LatchTest, LatchFunctionalTest_Wait_cancel)
     tinycoro::SoftClock clock;
     tinycoro::Latch     latch{count};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::Task<int32_t, LatchTest::Allocator> {
         co_await tinycoro::Cancellable(latch.Wait());
         co_return 42;
     };
 
-    auto sleep = [&]()->tinycoro::Task<int32_t> {
-        co_await tinycoro::SleepFor(clock, 100ms);
+    auto sleep = [&]() -> tinycoro::Task<int32_t, LatchTest::Allocator> {
+        co_await tinycoro::SleepFor<LatchTest::Allocator>(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::Task<int32_t, LatchTest::Allocator>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for (size_t i = 0; i < count; ++i)
@@ -210,7 +219,7 @@ TEST_P(LatchTest, LatchFunctionalTest_Wait_cancel)
 
     EXPECT_EQ(results[0], 44);
 
-    for(size_t i = 1; i < results.size(); ++i)
+    for (size_t i = 1; i < results.size(); ++i)
     {
         EXPECT_FALSE(results[i].has_value());
     }
@@ -225,18 +234,17 @@ TEST_P(LatchTest, LatchFunctionalTest_Wait)
     tinycoro::Latch     latch{count};
     std::atomic<size_t> latchCount{};
 
-    auto task = [&]() -> tinycoro::Task<void> {
+    auto task = [&]() -> tinycoro::Task<void, LatchTest::Allocator> {
         co_await latch.Wait();
         ++latchCount;
     };
 
-    auto countDown = [&]()->tinycoro::Task<void>
-    {
+    auto countDown = [&]() -> tinycoro::Task<void, LatchTest::Allocator> {
         latch.CountDown();
         co_return;
     };
 
-    std::vector<tinycoro::Task<void>> tasks;
+    std::vector<tinycoro::Task<void, LatchTest::Allocator>> tasks;
     for (size_t i = 0; i < count; ++i)
     {
         tasks.emplace_back(task());
@@ -258,7 +266,7 @@ TEST_P(LatchTest, LatchFunctionalTest_coawait)
     std::atomic<size_t> latchCount_1{};
     std::atomic<size_t> latchCount_2{};
 
-    auto task = [&]() -> tinycoro::Task<void> {
+    auto task = [&]() -> tinycoro::Task<void, LatchTest::Allocator> {
         ++latchCount_1;
         co_await latch_1;
 
@@ -266,8 +274,7 @@ TEST_P(LatchTest, LatchFunctionalTest_coawait)
         co_await latch_2;
     };
 
-    auto countDown = [&]()->tinycoro::Task<void>
-    {
+    auto countDown = [&]() -> tinycoro::Task<void, LatchTest::Allocator> {
         latch_1.CountDown();
         latch_1.CountDown();
 
@@ -276,7 +283,7 @@ TEST_P(LatchTest, LatchFunctionalTest_coawait)
         co_return;
     };
 
-    std::vector<tinycoro::Task<void>> tasks;
+    std::vector<tinycoro::Task<void, LatchTest::Allocator>> tasks;
     for (size_t i = 0; i < count; ++i)
     {
         tasks.emplace_back(task());
@@ -299,12 +306,21 @@ TEST_P(LatchTest, LatchTest_cancel_multi)
 
     std::atomic<size_t> taskCount;
 
-    auto task1 = [&]() -> tinycoro::Task<size_t> { co_await tinycoro::Cancellable(latch.Wait()); co_return ++taskCount; };
-    auto task2 = [&]() -> tinycoro::Task<size_t> { co_await tinycoro::Cancellable(latch.ArriveAndWait()); co_return ++taskCount; };
+    auto task1 = [&]() -> tinycoro::Task<size_t, LatchTest::Allocator> {
+        co_await tinycoro::Cancellable(latch.Wait());
+        co_return ++taskCount;
+    };
+    auto task2 = [&]() -> tinycoro::Task<size_t, LatchTest::Allocator> {
+        co_await tinycoro::Cancellable(latch.ArriveAndWait());
+        co_return ++taskCount;
+    };
 
-    auto sleep = [&]()->tinycoro::Task<size_t> { co_await tinycoro::SleepFor(clock, 50ms); co_return 44u; };
+    auto sleep = [&]() -> tinycoro::Task<size_t, LatchTest::Allocator> {
+        co_await tinycoro::SleepFor<LatchTest::Allocator>(clock, 50ms);
+        co_return 44u;
+    };
 
-    std::vector<tinycoro::Task<size_t>> tasks;
+    std::vector<tinycoro::Task<size_t, LatchTest::Allocator>> tasks;
     tasks.reserve((count * 3) + 1);
     tasks.emplace_back(sleep());
     for (size_t i = 0; i < count; ++i)

@@ -36,12 +36,12 @@ namespace tinycoro { namespace detail {
         {
             if (promise)
             {
-                _handle = std::coroutine_handle<PromiseT>::from_promise(*promise);
+                _hdl = std::coroutine_handle<PromiseT>::from_promise(*promise);
             }
         }
 
         SchedulableTaskT(SchedulableTaskT&& other) noexcept
-        : _handle{std::exchange(other._handle, nullptr)}
+        : _hdl{std::exchange(other._hdl, nullptr)}
         {
         }
 
@@ -50,7 +50,7 @@ namespace tinycoro { namespace detail {
             if (std::addressof(other) != this)
             {
                 Destroy();
-                _handle = std::exchange(other._handle, nullptr);
+                _hdl = std::exchange(other._hdl, nullptr);
             }
             return *this;
         }
@@ -62,23 +62,23 @@ namespace tinycoro { namespace detail {
             try
             {
                 // resume the corouitne
-                _coroResumer.Resume(_handle.promise());
+                _coroResumer.Resume(_hdl.promise());
             }
             catch (...)
             {
                 // if there was an exception
                 // save it in the promise.
-                _handle.promise().exception = std::current_exception();
+                _hdl.promise().exception = std::current_exception();
             }
 
             // return the corouitne state.
-            return _coroResumer.ResumeState(_handle);
+            return _coroResumer.ResumeState(_hdl);
         }
 
         auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
         {
 
-            auto& pauseHandler = _handle.promise().pauseHandler;
+            auto& pauseHandler = _hdl.promise().pauseHandler;
             if (pauseHandler)
             {
                 // pause handler is already initialized
@@ -87,7 +87,7 @@ namespace tinycoro { namespace detail {
             else
             {
                 // first the pause handler need to be initialized
-                _handle.promise().MakePauseHandler(std::move(pauseResume));
+                _hdl.promise().MakePauseHandler(std::move(pauseResume));
             }
 
             return pauseHandler.get();
@@ -95,10 +95,10 @@ namespace tinycoro { namespace detail {
 
         auto release() noexcept -> PromiseT*
         {
-            assert(_handle);
+            assert(_hdl);
 
-            auto& promise = _handle.promise();
-            _handle       = nullptr;
+            auto& promise = _hdl.promise();
+            _hdl       = nullptr;
             return std::addressof(promise);
         }
 
@@ -108,30 +108,30 @@ namespace tinycoro { namespace detail {
 
             if (newPromise)
             {
-                _handle = std::coroutine_handle<PromiseT>::from_promise(*newPromise);
+                _hdl = std::coroutine_handle<PromiseT>::from_promise(*newPromise);
             }
         }
 
-        constexpr bool operator==(std::nullptr_t) const noexcept { return _handle == nullptr; }
+        constexpr bool operator==(std::nullptr_t) const noexcept { return _hdl == nullptr; }
 
         // To mimic the smart pointer api
         constexpr auto* operator->() noexcept { return this; }
 
         auto get() noexcept
         {
-            assert(_handle);
-            return std::addressof(_handle.promise());
+            assert(_hdl);
+            return std::addressof(_hdl.promise());
         }
 
-        auto& PauseState() noexcept { return _handle.promise().pauseState; }
+        auto& PauseState() noexcept { return _hdl.promise().pauseState; }
 
     private:
         void Destroy() noexcept
         {
-            if (_handle)
+            if (_hdl)
             {
-                _handle.destroy();
-                _handle = nullptr;
+                _hdl.destroy();
+                _hdl = nullptr;
             }
         }
 
@@ -139,13 +139,13 @@ namespace tinycoro { namespace detail {
         // coroutine resumption and state
         [[no_unique_address]] CoroResumerT _coroResumer{};
 
-        std::coroutine_handle<PromiseT> _handle{nullptr};
+        std::coroutine_handle<PromiseT> _hdl{nullptr};
     };
 
     // this is the common task type
     // which hides the actual std::corouitne_handle<>
     // promise type.
-    using SchedulableTask = SchedulableTaskT<tinycoro::detail::CommonPromise>;
+    using SchedulableTask = SchedulableTaskT<tinycoro::detail::CommonSchedulablePromiseT>;
 
     // This is the OnFinish callback
     // which is triggered in the promise base

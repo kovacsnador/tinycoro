@@ -132,7 +132,7 @@ namespace tinycoro {
 
             void destroy() noexcept
             {
-                if (_hdl)
+                if(_hdl)
                 {
                     _hdl.destroy();
                     _hdl = nullptr;
@@ -149,11 +149,11 @@ namespace tinycoro {
 
     } // namespace detail
 
-    template <typename ReturnValueT = void>
-    using Task = detail::CoroTask<ReturnValueT, Promise<ReturnValueT>, AwaiterValue>;
+    template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
+    using Task = detail::CoroTask<ReturnValueT, Promise<ReturnValueT, AllocatorT>, AwaiterValue>;
 
-    template <typename ReturnValueT = void>
-    using InlineTask = detail::CoroTask<ReturnValueT, InlinePromise<ReturnValueT>, AwaiterValue>;
+    template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
+    using InlineTask = detail::CoroTask<ReturnValueT, InlinePromise<ReturnValueT, AllocatorT>, AwaiterValue>;
 
 } // namespace tinycoro
 

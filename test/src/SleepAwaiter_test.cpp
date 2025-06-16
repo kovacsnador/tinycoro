@@ -3,6 +3,8 @@
 #include <chrono>
 #include <future>
 
+#include "Allocator.hpp"
+
 #include <tinycoro/tinycoro_all.h>
 
 using namespace std::chrono_literals;
@@ -202,6 +204,16 @@ TEST(IsDurationTest, IsDurationTest)
 
 struct SleepAwaiterStressTest : testing::TestWithParam<size_t>
 {
+    void SetUp() override
+    {
+        // resets the memory resource
+        s_allocator.release();
+    }
+
+    static inline tinycoro::test::Allocator<SleepAwaiterStressTest, 100000u> s_allocator;
+
+    template<typename PromiseT>
+    using Allocator = tinycoro::test::AllocatorAdapter<PromiseT, decltype(s_allocator)>;
 };
 
 INSTANTIATE_TEST_SUITE_P(SleepAwaiterStressTest, SleepAwaiterStressTest, testing::Values(1, 10, 100));
@@ -217,8 +229,8 @@ TEST_P(SleepAwaiterStressTest, SleepAwaiterStressTest_sleepFor)
     {
         std::stop_source source;
 
-        auto task = [&clock](auto duration) -> tinycoro::Task<void> {
-            co_await tinycoro::SleepFor(clock, duration);
+        auto task = [&clock](auto duration) -> tinycoro::Task<void, SleepAwaiterStressTest::Allocator> {
+            co_await tinycoro::SleepFor<SleepAwaiterStressTest::Allocator>(clock, duration);
         };
 
         EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, task(1ms), task(2s), task(3s)));

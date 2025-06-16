@@ -5,8 +5,19 @@
 
 #include <tinycoro/tinycoro_all.h>
 
+#include "Allocator.hpp"
+
 struct MutexTest : testing::TestWithParam<size_t>
 {
+    void SetUp() override
+    {
+        s_allocator.release();
+    }
+
+    static inline tinycoro::test::Allocator<MutexTest,  20000000u> s_allocator;
+
+    template<typename T>
+    using AllocatorT = tinycoro::test::AllocatorAdapter<T, decltype(s_allocator)>;
 };
 
 INSTANTIATE_TEST_SUITE_P(MutexTest, MutexTest, testing::Values(1, 10, 100, 1000, 10'000, 100'000));
@@ -38,12 +49,12 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
 
     size_t count{0};
 
-    auto task = [&]() -> tinycoro::Task<size_t> {
+    auto task = [&]() -> tinycoro::Task<size_t, MutexTest::AllocatorT> {
         auto lock = co_await mutex;
         co_return ++count;
     };
 
-    std::vector<tinycoro::Task<size_t>> tasks;
+    std::vector<tinycoro::Task<size_t, MutexTest::AllocatorT>> tasks;
 
     auto size = GetParam();
 

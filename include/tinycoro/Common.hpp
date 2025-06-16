@@ -158,12 +158,6 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept IsAllocator = requires (T alloc, int val) {
-            { alloc.template new_object<int>(42) } -> std::same_as<int*>;
-            { alloc.deallocate_bytes(&val, sizeof(val), alignof(decltype(val))) };
-        };
-
-        template <typename T>
         concept IsAwaiter = requires (T t) {
             { t.await_ready() };
             { t.await_suspend(std::coroutine_handle<>{}) };
@@ -179,6 +173,28 @@ namespace tinycoro {
 		concept FutureState = ( requires(T f) { { f.set_value() }; } 
                                 || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) 
                             && requires(T f) { f.set_exception(std::exception_ptr{}); };
+
+        template<typename T>
+        concept IsAllocatorAdapterNoException = (noexcept(std::declval<T>().operator new(42u)) && requires (T a) {
+                { a.operator new(42u) } -> std::same_as<void*>;
+                { a.operator delete(nullptr, 42u) } -> std::same_as<void>;
+                { a.get_return_object_on_allocation_failure() };
+        });
+
+        template<typename T>
+        concept IsAllocatorAdapterException = (!noexcept(std::declval<T>().operator new(42u)) && requires (T a) {
+                { a.operator new(42u) } -> std::same_as<void*>;
+                { a.operator delete(nullptr, 42u) } -> std::same_as<void>;
+        });
+
+        template<typename T>
+        concept IsAllocatorAdapterT = IsAllocatorAdapterNoException<T> || IsAllocatorAdapterException<T> || std::is_empty_v<T>;
+
+        template<template<typename> class T>
+        concept IsAllocatorAdapter = IsAllocatorAdapterT<T<int>>;
+
+        /*template<typename T>
+        concept IsAllocatorAdapter = requires { sizeof(int) > 1; };*/
 
     } // namespace concepts
 
