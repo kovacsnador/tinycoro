@@ -242,6 +242,9 @@ catch(const std::exception& e)
     - [Barrier](#barrier)
     - [BufferedChannel](#bufferedchannel)
     - [UnbufferedChannel](#unbufferedchannel)
+* [Allocators](#allocators)
+    - [AllocatorAdapter](#allocatoradapter)
+    - [Allocator](#allocator)
 * [Warning](#warning)
 * [Contributing](#contributing)
 * [Support](#support)
@@ -1264,6 +1267,86 @@ The operations on `BufferedChannel` and `UnbufferedChannel` returns an `EChannel
 - `SUCCESS`: The operation completed successfully.
 - `LAST`: Indicates the last value was received, and the channel is now closed.
 - `CLOSED`: The operation failed because the channel was already closed.
+
+## Allocators
+
+Tinycoro supports custom allocators, which are used to control memory allocation for coroutine frames. This feature is enabled by specifying an allocator adapter as a template parameter in the Task or InlineTask type. For example:
+```cpp
+tinycoro::Task<void, CustomAllocatorAdapter>
+tinycoro::InlineTask<int32_t, CustomAllocatorAdapter>
+```
+
+Here’s a simple coroutine that uses a custom allocator adapter:
+```cpp
+tinycoro::Task<int32_t, AllocAdapter> Coroutine() {
+    co_return 42;
+}
+```
+
+### `AllocatorAdapter`
+An allocator adapter is a template that defines how memory is allocated and deallocated for coroutine promises. It is passed as a template argument to Task or InlineTask.
+At a minimum, the adapter must provide two static member functions:
+- **operator new(size_t)** – allocates memory
+- **operator delete(void*, size_t)** – deallocates memory
+
+If operator new is marked `noexcept`, you must also define a static function named `get_return_object_on_allocation_failure()` to handle allocation failures.
+A simple example using std::malloc and std::free would look like this:
+```cpp
+template<typename PromiseT>
+        struct ExampleAllocatorAdapter
+        {
+            // ensure the use of non-throwing operator-new
+            [[noreturn]] static std::coroutine_handle<PromiseT> get_return_object_on_allocation_failure()
+            {
+                throw std::bad_alloc{};
+            }
+
+            // operator new noexcept
+            [[nodiscard]] static void* operator new(size_t nbytes) noexcept
+            {
+                return std::malloc(nbytes);
+            }
+
+            // operator delete
+            static void operator delete(void* ptr, [[maybe_unused]] size_t nbytes) noexcept
+            {
+                std::free(ptr);
+            }
+        };
+
+```
+
+### `Allocator`
+If you need more control over memory management (e.g., using a fixed-size buffer or pooling), you can define your own allocator class and a corresponding adapter.
+```cpp
+template <typename PromiseT, typename AllocatorT>
+    struct AllocatorAdapter
+    {
+        [[nodiscard]] static void* operator new(size_t nbytes) { return AllocatorT::s_allocator.allocate_bytes(nbytes); }
+
+        static void operator delete(void* ptr, size_t nbytes) noexcept { AllocatorT::s_allocator.deallocate_bytes(ptr, nbytes); }
+    };
+
+    template <typename OwnerT, std::unsigned_integral auto SIZE>
+    struct Allocator
+    {
+        template<typename T>
+        using adapter_t = AllocatorAdapter<T, Allocator>;
+
+        template<typename, typename>
+        friend struct AllocatorAdapter;
+
+        void release() noexcept { s_spr.release(); }
+
+    private:
+        static inline std::unique_ptr<std::byte[]>               s_buffer = std::make_unique<std::byte[]>(SIZE);
+        static inline std::pmr::monotonic_buffer_resource        s_mbr{s_buffer.get(), SIZE};
+        static inline std::pmr::synchronized_pool_resource       s_spr{&s_mbr};
+        static inline std::pmr::polymorphic_allocator<std::byte> s_allocator{&s_spr};
+    };
+
+```
+This setup allows you to fine-tune memory usage for performance or deterministic behavior—especially useful in embedded, real-time, or resource-constrained environments.
 
 ## Warning
 
