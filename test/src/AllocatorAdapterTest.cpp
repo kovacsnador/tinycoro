@@ -87,15 +87,26 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_Async)
     EXPECT_EQ(t3, 3);
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc) 
+void bad_alloc(auto& mock, auto task)
 {
     EXPECT_CALL(mock, allocate_bytes_noexcept).Times(1).WillRepeatedly([]([[maybe_unused]] size_t nbytes) { return nullptr; });
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
     auto func = [&]{ std::ignore = tinycoro::RunInline(task(0)); }; 
 
     EXPECT_THROW(func(), std::bad_alloc);
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc) 
+{
+    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
+    bad_alloc(mock, std::move(task));
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_inlineTask) 
+{
+    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
+    bad_alloc(mock, std::move(task));
 }
 
 TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_multi) 
@@ -109,7 +120,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_multi)
     EXPECT_THROW(func(), std::bad_alloc);
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi) 
+void second_bad_alloc_multi(auto& mock, auto task)
 {
     EXPECT_CALL(mock, allocate_bytes_noexcept)
         .Times(2)
@@ -120,10 +131,22 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi)
 
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
+    //auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
     auto func = [&]{ std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); }; 
 
     EXPECT_THROW(func(), std::bad_alloc);
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi) 
+{
+    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
+    second_bad_alloc_multi(mock, std::move(task));
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_inline) 
+{
+    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapterNoExcept> { i++; co_return i; };
+    second_bad_alloc_multi(mock, std::move(task));
 }
 
 TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_async) 
@@ -145,7 +168,8 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_async)
     EXPECT_THROW(func(), std::bad_alloc);
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new) 
+//template<template<typename, template<typename> class> class TaskT>
+void throw_in_operator_new(auto& mock, auto task)
 {
     EXPECT_CALL(mock, allocate_bytes)
         .Times(2)
@@ -154,10 +178,22 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new)
 
     EXPECT_CALL(mock, deallocate_bytes).Times(1).WillOnce([](void* p, [[maybe_unused]] size_t nbytes) { return std::free(p); });
 
-    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapter> { i++; co_return i; };
+    //auto task = [](int32_t i) -> TaskT<int32_t, AllocatorAdapter> { i++; co_return i; };
     auto func = [&]{ std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); }; 
 
     EXPECT_THROW(func(), std::bad_alloc);
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new) 
+{
+    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapter> { i++; co_return i; };
+    throw_in_operator_new(mock, std::move(task));
+}
+
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_InlineTask) 
+{
+    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapter> { i++; co_return i; };
+    throw_in_operator_new(mock, std::move(task));
 }
 
 TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_async) 
