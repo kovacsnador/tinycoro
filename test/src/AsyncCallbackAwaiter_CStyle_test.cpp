@@ -22,7 +22,7 @@ struct AsyncCallbackAwaiter_CStyleTest : public testing::Test
 
     bool pauseHandlerCalled{false};
 
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
+    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
 };
 
 using AsyncCallbackAwaiter_CStyleTest_Int32 = AsyncCallbackAwaiter_CStyleTest<int32_t>;

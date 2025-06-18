@@ -150,10 +150,10 @@ namespace tinycoro {
     } // namespace detail
 
     template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
-    using Task = detail::CoroTask<ReturnValueT, Promise<ReturnValueT, AllocatorT>, AwaiterValue>;
+    using Task = detail::CoroTask<ReturnValueT, detail::Promise<ReturnValueT, AllocatorT>, AwaiterValue>;
 
     template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
-    using InlineTask = detail::CoroTask<ReturnValueT, InlinePromise<ReturnValueT, AllocatorT>, AwaiterValue>;
+    using InlineTask = detail::CoroTask<ReturnValueT, detail::InlinePromise<ReturnValueT, AllocatorT>, AwaiterValue>;
 
 } // namespace tinycoro
 

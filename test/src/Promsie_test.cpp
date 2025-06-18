@@ -6,7 +6,7 @@
 
 TEST(PromiseTest, PromiseTest_void)
 {
-    tinycoro::Promise<void> promise;
+    tinycoro::detail::Promise<void> promise;
 
     EXPECT_TRUE(requires { promise.return_void(); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
@@ -18,7 +18,7 @@ TEST(PromiseTest, PromiseTest_void)
 
 TEST(PromiseTest, PromiseTest_int)
 {
-    tinycoro::Promise<int32_t> promise;
+    tinycoro::detail::Promise<int32_t> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -47,7 +47,7 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
         int32_t i{};
     };
 
-    tinycoro::Promise<MoveOnly> promise;
+    tinycoro::detail::Promise<MoveOnly> promise;
 
     EXPECT_TRUE(requires { promise.return_value(MoveOnly{12}); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });

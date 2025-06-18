@@ -154,7 +154,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new)
 
     EXPECT_CALL(mock, deallocate_bytes).Times(1).WillOnce([](void* p, [[maybe_unused]] size_t nbytes) { return std::free(p); });
 
-    auto task = [](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapter> { i++; co_return i; };
+    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapter> { i++; co_return i; };
     auto func = [&]{ std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); }; 
 
     EXPECT_THROW(func(), std::bad_alloc);

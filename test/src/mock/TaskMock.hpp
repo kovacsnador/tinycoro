@@ -19,7 +19,7 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(bool, IsDone, (), (const noexcept));
         MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
         MOCK_METHOD(void*, Address, (), (const noexcept));
-        MOCK_METHOD(CoroutineHandleMock<tinycoro::Promise<void>>, Release, (), (noexcept));
+        MOCK_METHOD(CoroutineHandleMock<tinycoro::detail::Promise<void>>, Release, (), (noexcept));
 
         tinycoro::PauseHandlerCallbackT pauseCallback;
     };

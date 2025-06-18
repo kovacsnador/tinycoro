@@ -1290,6 +1290,9 @@ At a minimum, the adapter must provide two static member functions:
 - **operator delete(void*, size_t)** – deallocates memory
 
 If operator new is marked `noexcept`, you must also define a static function named `get_return_object_on_allocation_failure()` to handle allocation failures.
+
+Note: *Even if you do not define `operator new` as `noexcept`, you still need to provide at least one template parameter to the adapter. This parameter will be instantiated with the actual promise type by the coroutine frame and can be use if needed.*
+
 A simple example using std::malloc and std::free would look like this:
 ```cpp
 template<typename PromiseT>

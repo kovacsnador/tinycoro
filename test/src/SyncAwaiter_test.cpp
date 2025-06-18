@@ -99,7 +99,7 @@ struct SyncAwaiterTest : testing::Test
 
 protected:
     bool                                                         resumerCalled{false};
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<void>> hdl;
+    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<void>> hdl;
 
     SchedulerMock schedulerMock;
 };

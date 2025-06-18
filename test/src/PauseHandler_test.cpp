@@ -73,7 +73,7 @@ TYPED_TEST(Concepts_PauseHandlerTest, Concepts_PauseHandlerTest_test)
 
 TEST(PauseHandlerTest, CancellableSuspentTest_value)
 {
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>> hdl;
+    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>> hdl;
 
     bool called = false;
 
