@@ -17,7 +17,7 @@ template <typename T>
 struct SemaphoreMock
 {
     MOCK_METHOD(void, Release, ());
-    MOCK_METHOD(bool, TryAcquire, (void*, tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>>));
+    MOCK_METHOD(bool, TryAcquire, (void*, tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>>));
 };
 
 struct SemaphoreAwaiterTest : public testing::Test
@@ -35,7 +35,7 @@ struct SemaphoreAwaiterTest : public testing::Test
     }
 
     SemaphoreMock<value_type>                                          mock;
-    tinycoro::test::CoroutineHandleMock<tinycoro::Promise<value_type>> hdl;
+    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<value_type>> hdl;
 
     tinycoro::detail::SemaphoreAwaiter<decltype(mock), tinycoro::detail::PauseCallbackEvent> awaiter;
 };
@@ -79,7 +79,7 @@ public:
     }
 
     MOCK_METHOD(void, Notify, (), (const));
-    MOCK_METHOD(void, PutOnPause, (tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>));
+    MOCK_METHOD(void, PutOnPause, (tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>>));
 
     auto TestTryAcquire(auto parentCoro) { return semaphore.TryAcquire(this, parentCoro); }
 
@@ -96,7 +96,7 @@ struct EventMock
 struct SemaphoreTest : public testing::TestWithParam<size_t>
 {
     using semaphore_type  = tinycoro::detail::Semaphore<PopAwaiterMock, tinycoro::detail::LinkedPtrQueue>;
-    using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::Promise<int32_t>>;
+    using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>>;
 
     void SetUp() override
     {

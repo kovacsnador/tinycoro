@@ -5,6 +5,7 @@
 
 #include <tinycoro/tinycoro_all.h>
 
+#include "Allocator.hpp"
 #include "mock/CoroutineHandleMock.h"
 
 struct BarrierTest : testing::TestWithParam<size_t>
@@ -606,6 +607,15 @@ TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
 
 struct BarrierFunctionalTest : testing::TestWithParam<size_t>
 {
+    void SetUp() override
+    {
+        s_allocator.release();
+    }
+
+    static inline tinycoro::test::Allocator<BarrierFunctionalTest, 300000u> s_allocator;
+
+    template<typename T>
+    using AllocatorT = tinycoro::test::AllocatorAdapter<T, decltype(s_allocator)>;
 };
 
 INSTANTIATE_TEST_SUITE_P(BarrierFunctionalTest, BarrierFunctionalTest, testing::Values(2, 5, 10, 100, 200, 300));
@@ -627,14 +637,14 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
 
     tinycoro::Barrier barrier{count, onComplition};
 
-    auto arrivel = [&]() -> tinycoro::Task<void> {
+    auto arrivel = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
         for (size_t i = 0; i < count; ++i)
         {
             co_await barrier.ArriveAndWait();
         }
     };
 
-    auto worker = [&]() -> tinycoro::Task<void> {
+    auto worker = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
         for (size_t i = 0; i < count; ++i)
         {
             controlCount++;
@@ -642,7 +652,7 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
         }
     };
 
-    std::vector<tinycoro::Task<void>> tasks;
+    std::vector<tinycoro::Task<void, BarrierFunctionalTest::AllocatorT>> tasks;
     for (size_t i = 0; i < count - 1; ++i)
     {
         tasks.push_back(arrivel());

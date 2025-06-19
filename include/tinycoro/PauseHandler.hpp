@@ -63,27 +63,27 @@ namespace tinycoro {
         {
         }
 
-        void Resume()
+        void Resume() noexcept
         {
             _state.store(0u, std::memory_order::relaxed);
         }
 
         void ResetCallback(concepts::PauseHandlerCb auto pr) { _resumerCallback = std::move(pr); }
 
-        [[nodiscard]] auto Pause()
+        [[nodiscard]] auto Pause() noexcept
         {
             assert(IsPaused() == false);
             _state.fetch_or(c_pauseMask, std::memory_order_release);
             return _resumerCallback;
         }
 
-        void Unpause()
+        void Unpause() noexcept
         {
             assert(IsPaused());
             _state.fetch_and(~c_pauseMask, std::memory_order_release);
         }
 
-        void SetCancellable(bool flag)
+        void SetCancellable(bool flag) noexcept
         {
             assert(IsCancellable() != flag);
 
@@ -106,7 +106,7 @@ namespace tinycoro {
     };
 
     namespace context {
-        [[nodiscard]] auto PauseTask(auto coroHdl)
+        [[nodiscard]] auto PauseTask(auto coroHdl) noexcept
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);
@@ -114,7 +114,7 @@ namespace tinycoro {
             return pauseHandlerPtr->Pause();
         }
 
-        void MakeCancellable(auto coroHdl)
+        void MakeCancellable(auto coroHdl) noexcept
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);
@@ -122,7 +122,7 @@ namespace tinycoro {
             pauseHandlerPtr->SetCancellable(true);
         }
 
-        void UnpauseTask(auto coroHdl)
+        void UnpauseTask(auto coroHdl) noexcept
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);
@@ -130,7 +130,7 @@ namespace tinycoro {
             pauseHandlerPtr->Unpause();
         }
 
-        [[nodiscard]] auto* GetHandler(auto coroHdl)
+        [[nodiscard]] auto* GetHandler(auto coroHdl) noexcept
         {
             auto pauseHandlerPtr = coroHdl.promise().pauseHandler.get();
             assert(pauseHandlerPtr);

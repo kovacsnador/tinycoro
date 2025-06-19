@@ -9,6 +9,7 @@
 #include <coroutine>
 #include <future>
 
+#include "AllocatorAdapter.hpp"
 #include "PromiseSchedulable.hpp"
 #include "PauseHandler.hpp"
 
@@ -38,14 +39,14 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            void await_resume() const noexcept {}
+            void await_resume() const noexcept { }
         };
 
         template <typename... Args>
         struct PromiseReturnValue;
 
         // This is the default return value handler
-        // It handles return values, which are 
+        // It handles return values, which are
         // !is_trivially_constructible_v and !is_trivially_assignable_v
         // and are not references.
         template <typename ValueT, typename YieldAwaiterT>
@@ -96,20 +97,26 @@ namespace tinycoro {
 
             PromiseReturnValue() = default;
 
-            template<typename T>
+            template <typename T>
             void return_value(T&& v)
             {
                 if constexpr (requires { _value = std::forward<T>(v); })
                 {
                     _value = std::forward<T>(v);
                 }
-                else
+                else if constexpr (requires { _value = value_type{std::forward<T>(v)}; })
                 {
                     _value = value_type{std::forward<T>(v)};
                 }
+                else
+                {
+                    // special case for direct optional assignment
+                    assert(v.has_value());
+                    _value = v.value();
+                }
             }
 
-            template<typename T>
+            template <typename T>
             auto yield_value(T&& v)
             {
                 // save yield value in the same way,
@@ -118,10 +125,7 @@ namespace tinycoro {
                 return YieldAwaiterT{};
             }
 
-            value_type& value() noexcept
-            {
-                return _value;
-            }
+            value_type& value() noexcept { return _value; }
 
         private:
             ValueT _value{};
@@ -135,8 +139,8 @@ namespace tinycoro {
         struct PromiseReturnValue<ValueT&, YieldAwaiterT>
         {
             using reference_t = ValueT&;
-            using value_type = ValueT;
-            using pointer_t = std::add_pointer_t<value_type>;
+            using value_type  = ValueT;
+            using pointer_t   = std::add_pointer_t<value_type>;
 
             PromiseReturnValue() = default;
 
@@ -191,10 +195,17 @@ namespace tinycoro {
         // So with this SchedulablePromise, we can convert any derived promise
         // to std::coroutine_handle<SchedulablePromise>.
         // It is used inside the scheduler logic.
-        template <concepts::IsAwaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
-        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT
+        template <concepts::IsAwaiter    FinalAwaiterT,
+                  PromiseReturnerConcept ReturnerT,
+                  typename PauseHandlerT,
+                  typename StopSourceT,
+                  template <typename> class AllocatorT>
+            requires concepts::IsAllocatorAdapter<AllocatorT>
+        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>,
+                          public ReturnerT,
+                          public AllocatorT<PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
         {
-            auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
+            [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<PromiseT>::from_promise(*this); }
 
             // Here we trigger the base class Finish function.
             //
@@ -211,24 +222,42 @@ namespace tinycoro {
 
         // Inline Promise class.
         // Only inherits from the promise base object.
-        template <concepts::IsAwaiter FinalAwaiterT, PromiseReturnerConcept ReturnerT, typename PauseHandlerT, typename StopSourceT>
-        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, public ReturnerT
+        template <concepts::IsAwaiter    FinalAwaiterT,
+                  PromiseReturnerConcept ReturnerT,
+                  typename PauseHandlerT,
+                  typename StopSourceT,
+                  template <typename> class AllocatorT>
+            requires concepts::IsAllocatorAdapter<AllocatorT>
+        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>,
+                                public ReturnerT,
+                                public AllocatorT<InlinePromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
         {
-            auto get_return_object() { return std::coroutine_handle<std::decay_t<decltype(*this)>>::from_promise(*this); }
+            [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<InlinePromiseT>::from_promise(*this); }
         };
 
+        template <typename ReturnValueT,
+                  template <typename> class AllocatorT = detail::NonAllocatorAdapter,
+                  typename PauseHandlerT               = PauseHandler,
+                  typename StopSourceT                 = std::stop_source>
+        using Promise = detail::
+            PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT, AllocatorT>;
+
+        template <typename ReturnValueT,
+                  template <typename> class AllocatorT = detail::NonAllocatorAdapter,
+                  typename PauseHandlerT               = PauseHandler,
+                  typename StopSourceT                 = std::stop_source>
+        using InlinePromise = detail::InlinePromiseT<detail::FinalAwaiter,
+                                                     detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>,
+                                                     PauseHandlerT,
+                                                     StopSourceT,
+                                                     AllocatorT>;
     } // namespace detail
 
-    template <typename ReturnValueT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
-    using Promise
-        = detail::PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT>;
-
-    template <typename ReturnValueT, typename PauseHandlerT = PauseHandler, typename StopSourceT = std::stop_source>
-    using InlinePromise
-        = detail::InlinePromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT>;
-
     namespace detail {
-        using CommonPromise = Promise<void>::PromiseBase_t;
+        // This represents a common schedulable promise type
+        // that can be used for all Promise<T> specializations, (as base class)
+        // regardless of their return type.
+        using CommonSchedulablePromiseT = Promise<void>::PromiseBase_t;
     } // namespace detail
 
 } // namespace tinycoro

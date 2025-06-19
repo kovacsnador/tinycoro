@@ -6,7 +6,7 @@
 
 TEST(PromiseTest, PromiseTest_void)
 {
-    tinycoro::Promise<void> promise;
+    tinycoro::detail::Promise<void> promise;
 
     EXPECT_TRUE(requires { promise.return_void(); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
@@ -18,7 +18,7 @@ TEST(PromiseTest, PromiseTest_void)
 
 TEST(PromiseTest, PromiseTest_int)
 {
-    tinycoro::Promise<int32_t> promise;
+    tinycoro::detail::Promise<int32_t> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -47,7 +47,7 @@ TEST(PromiseTest, PromiseTest_MoveOnly)
         int32_t i{};
     };
 
-    tinycoro::Promise<MoveOnly> promise;
+    tinycoro::detail::Promise<MoveOnly> promise;
 
     EXPECT_TRUE(requires { promise.return_value(MoveOnly{12}); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
@@ -73,7 +73,7 @@ struct FinalAwaiterMock
 
 TEST(PromiseTest, PromiseTest_FinalAwaiter)
 {
-    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source, tinycoro::detail::NonAllocatorAdapter> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -89,7 +89,7 @@ TEST(PromiseTest, PromiseTest_FinalAwaiter)
 
 TEST(PromiseTest, PromiseTest_YieldValue)
 {
-    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source, tinycoro::detail::NonAllocatorAdapter> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { promise.yield_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
@@ -184,4 +184,14 @@ TEST(PromiseTest, PromiseTest_not_trivial)
 
     auto&& s_copy2 = promise.value();
     EXPECT_EQ(s_copy2.i, s2.i);
+}
+
+TEST(PromiseTest, PromiseTest_assignment_from_optional_trivial)
+{
+    tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock> promise;
+    std::optional<int32_t> val{42};
+
+    promise.return_value(val);
+
+    EXPECT_EQ(promise.value(), *val);
 }

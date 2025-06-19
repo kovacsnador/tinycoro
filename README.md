@@ -217,6 +217,7 @@ catch(const std::exception& e)
 * [Examples](#examples)
     - [Scheduler](#scheduler)
     - [Task](#task)
+    - [InlineTask](#inlinetask)
     - [MakeBound](#makebound)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
@@ -242,6 +243,9 @@ catch(const std::exception& e)
     - [Barrier](#barrier)
     - [BufferedChannel](#bufferedchannel)
     - [UnbufferedChannel](#unbufferedchannel)
+* [Allocators](#allocators)
+    - [AllocatorAdapter](#allocatoradapter)
+    - [Allocator](#allocator)
 * [Warning](#warning)
 * [Contributing](#contributing)
 * [Support](#support)
@@ -272,29 +276,86 @@ tinycoro::Scheduler scheduler{4}; // 4 worker threads
 tinycoro::Scheduler scheduler; 
 ```
 
-### `Task`
-This example demonstrates how to create a basic coroutine task that returns void and schedule it using the tinycoro::Scheduler. The scheduler takes complete ownership of the coroutine, managing its lifecycle.
+## Task
 
-The `Enqueue` function in the `tinycoro::Scheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
+This example demonstrates how to create a basic coroutine task that returns `void` and schedule it using the `tinycoro::Scheduler`.  
+The scheduler takes **complete ownership** of the coroutine and manages its lifecycle.
 
-If your coroutine has return value, `GetAll(...)` function will return `std::optional<>` object(s), to support possible task cancellation. If the task got cancelled, the returning `optional` will be empty.
+While you can manually enqueue tasks in `tinycoro::Scheduler`, it is **recommended to use helper functions** like `tinycoro::GetAll(...)` or `tinycoro::AnyOf(...)`.
+These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified, fast and safe way.
+
+The `GetAll(...)` function supports both **individual tasks** and **containers of tasks**. It returns `std::optional<>`, `std::tuple<std::optional<T>...>` or `std::vector<std::optional<T>>` depending on the return type and cancellation state.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
 void Example_voidTask()
 {
-    // create a scheduler
+    // Create a scheduler
     tinycoro::Scheduler scheduler;
 
     auto task = []() -> tinycoro::Task<void> {
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, task())
+    // Recommended way to run the task
+    tinycoro::GetAll(scheduler, task());
 }
 ```
-For simplicity, if you want to return void, you can also write `tinycoro::Task<>`. The default template parameter here is `void``. 
+
+> 💡 For simplicity, if you want to return `void`, you can also just write `tinycoro::Task<>`.  
+> The default template parameter is `void`.
+
+---
+
+## InlineTask
+
+`tinycoro::InlineTask<T>` is a **lightweight coroutine type** with the same cancellation support as `Task<T>`, but it differs in several important ways:
+
+- It does **not** interact with the `tinycoro::Scheduler`.
+- It always runs **on the current thread**, no asynchronous execution.
+- It uses **significantly less memory** than `Task`, since it doesn't need to store any scheduling state.
+
+This makes `InlineTask` ideal for **local, synchronous coroutine flows** where you don't need scheduling or cross-thread execution.
+
+You can `co_await` an `InlineTask` directly from within another coroutine, or run it synchronously using the `tinycoro::RunInline(...)` helper function.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+tinycoro::InlineTask<int> InlineTask(int val)
+{
+    co_return val;
+}
+
+tinycoro::Task<int> Task(int val)
+{
+    // Option 1: co_await inside another coroutine 
+    auto value = co_await InlineTask(val);
+
+    co_return value;
+}
+
+void RunExample()
+{
+    // Option 2: run synchronously
+    //
+    // You don't need to be inside a coroutine context
+    // to use RunInline — it works in any regular function too.
+    auto [val_41, val_42] = tinycoro::RunInline(InlineTask(41), InlineTask(42));
+}
+```
+
+### When to use `InlineTask`
+
+Use `InlineTask` when:
+- You **don't need scheduler-based execution**.
+- You want to keep coroutine execution **strictly on the current thread**.
+- You want to build small, composable coroutine helpers.
+- You **still want cancellation support**, but without the cost of task queuing or thread management.
+
+Use `Task` when:
+- You need **asynchronous coroutine execution**.
 
 ### `MakeBound`
 If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::Task<>`, which encapsulates the coroutine function. This ensures that the task cannot outlive it's coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
@@ -1214,7 +1275,7 @@ UnbufferedChannel(std::function<void(ValueT&)> cleanupFunc = {});
   Returns whether the channel is open.
 
 
-### Exmaple:
+### Example:
 
 ```cpp
 #include <tinycoro/UnbufferedChannel.hpp>
@@ -1264,6 +1325,143 @@ The operations on `BufferedChannel` and `UnbufferedChannel` returns an `EChannel
 - `SUCCESS`: The operation completed successfully.
 - `LAST`: Indicates the last value was received, and the channel is now closed.
 - `CLOSED`: The operation failed because the channel was already closed.
+
+## `Allocators`
+
+Tinycoro supports **custom allocators** for controlling memory allocation of coroutine frames. This is achieved by specifying an **allocator adapter** as a template argument in the `Task` or `InlineTask` types. For example:
+
+```cpp
+tinycoro::Task<void, CustomAllocatorAdapter>
+tinycoro::InlineTask<int32_t, CustomAllocatorAdapter>
+```
+
+Here’s a simple coroutine using a custom allocator adapter:
+
+```cpp
+tinycoro::Task<int32_t, AllocAdapter> Coroutine() {
+    co_return 42;
+}
+```
+
+---
+
+### `AllocatorAdapter`
+
+An **allocator adapter** is a class template that defines how memory is allocated and deallocated for the coroutine’s promise type included coroutine frame. It is passed as a **single template argument** to `Task` or `InlineTask`, and must accept exactly **one template parameter**, which is the promise type.
+
+The adapter must define (at minimum) these two static functions:
+
+- `operator new(size_t)` – allocates memory  
+- `operator delete(void*, size_t)` – deallocates memory
+
+If `operator new` is marked `noexcept`, the adapter must also define:
+
+- `get_return_object_on_allocation_failure()` – to handle allocation failure gracefully.
+
+> ⚠️ **Important:** The allocator adapter must be a class template with exactly **one** template parameter.  
+> If your adapter depends on additional types (e.g., a custom allocator), you must wrap it using an alias template.  
+> For example:
+> ```cpp
+> template<typename T>
+> using Adapter = MyAdapter<T, CustomAllocatorType>;
+> ```
+
+> 💡 **Note:** This design implicitly encourages the use of **global** or **static** allocator instances.  
+> This avoids dangling references or lifetime issues that can occur when coroutine frames outlive their local allocator context.  
+> While this may seem restrictive, it provides a **safer** and more **predictable** memory model for asynchronous code.
+
+A minimal example using `std::malloc` and `std::free`:
+
+```cpp
+template<typename PromiseT>
+struct MallocFreeAdapter
+{
+    [[noreturn]] static std::coroutine_handle<PromiseT> get_return_object_on_allocation_failure()
+    {
+        throw std::bad_alloc{};
+    }
+
+    [[nodiscard]] static void* operator new(size_t nbytes) noexcept
+    {
+        return std::malloc(nbytes);
+    }
+
+    static void operator delete(void* ptr, [[maybe_unused]] size_t nbytes) noexcept
+    {
+        std::free(ptr);
+    }
+};
+```
+
+**Usage:**
+
+```cpp
+tinycoro::Task<int32_t, MallocFreeAdapter> Coroutine(int32_t val)
+{
+    co_return val;
+}
+```
+
+---
+
+### `Allocator`
+
+For more advanced use cases (e.g., memory pooling or pre-allocated buffers), you can implement your own allocator class and plug it into a reusable adapter.
+
+```cpp
+// Adapter taking both Promise and custom allocator.
+template <typename PromiseT, typename AllocatorT>
+struct AllocatorAdapter
+{
+    [[nodiscard]] static void* operator new(size_t nbytes)
+    {
+        return AllocatorT::s_allocator.allocate_bytes(nbytes);
+    }
+
+    static void operator delete(void* ptr, size_t nbytes) noexcept
+    {
+        AllocatorT::s_allocator.deallocate_bytes(ptr, nbytes);
+    }
+};
+```
+
+Define a custom allocator and expose a usable adapter:
+
+```cpp
+template <std::unsigned_integral auto SIZE>
+struct Allocator
+{
+    // This alias produces a single-parameter adapter.
+    template<typename T>
+    using adapter_t = AllocatorAdapter<T, Allocator>;
+
+    // Adapter is a friend class,
+    // so it has access to private stuffs...
+    template<typename, typename>
+    friend struct AllocatorAdapter;
+
+private:
+    static inline std::unique_ptr<std::byte[]>               s_buffer = std::make_unique<std::byte[]>(SIZE);
+    static inline std::pmr::monotonic_buffer_resource        s_mbr{s_buffer.get(), SIZE};
+    static inline std::pmr::synchronized_pool_resource       s_spr{&s_mbr};
+    static inline std::pmr::polymorphic_allocator<std::byte> s_allocator{&s_spr};
+};
+```
+
+**Usage:**
+
+```cpp
+// Create allocator with 10000 bytes
+using AllocatorT = Allocator<10000>;
+
+// Pass the adapter alias to the task
+tinycoro::Task<void, AllocatorT::adapter_t> Coroutine()
+{
+    co_return;
+}
+```
+
+This setup allows you to fine-tune memory usage for performance or deterministic behavior—especially useful in embedded, real-time, or resource-constrained environments.
 
 ## Warning
 

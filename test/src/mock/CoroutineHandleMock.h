@@ -36,7 +36,7 @@ namespace tinycoro { namespace test {
     template<typename T = void>
     auto MakeCoroutineHdl(std::regular_invocable auto pauseResumerCallback)
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
         hdl.promise().pauseHandler.emplace(pauseResumerCallback);
         return hdl;
     }
@@ -44,7 +44,7 @@ namespace tinycoro { namespace test {
     template<typename T = void>
     auto MakeCoroutineHdl()
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::Promise<T>> hdl;
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
         hdl.promise().pauseHandler.emplace([]{});
         return hdl;
     }
