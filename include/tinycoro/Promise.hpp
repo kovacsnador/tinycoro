@@ -104,9 +104,15 @@ namespace tinycoro {
                 {
                     _value = std::forward<T>(v);
                 }
-                else
+                else if constexpr (requires { _value = value_type{std::forward<T>(v)}; })
                 {
                     _value = value_type{std::forward<T>(v)};
+                }
+                else
+                {
+                    // special case for direct optional assignment
+                    assert(v.has_value());
+                    _value = v.value();
                 }
             }
 

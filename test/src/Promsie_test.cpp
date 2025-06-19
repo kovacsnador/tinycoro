@@ -185,3 +185,13 @@ TEST(PromiseTest, PromiseTest_not_trivial)
     auto&& s_copy2 = promise.value();
     EXPECT_EQ(s_copy2.i, s2.i);
 }
+
+TEST(PromiseTest, PromiseTest_assignment_from_optional_trivial)
+{
+    tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock> promise;
+    std::optional<int32_t> val{42};
+
+    promise.return_value(val);
+
+    EXPECT_EQ(promise.value(), *val);
+}
