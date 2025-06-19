@@ -7,6 +7,7 @@
 #define TINY_CORO_SIMPLE_STORAGE_HPP
 
 #include <concepts>
+#include <cstddef>
 
 namespace tinycoro { namespace detail {
 
@@ -14,7 +15,7 @@ namespace tinycoro { namespace detail {
     //
     // It stores a simple object on his internal storage (stack).
     // It does not support copy or move operation.
-    template <std::unsigned_integral auto SIZE, typename AlignmentT = void*>
+    template <std::unsigned_integral auto SIZE, typename AlignmentT = std::max_align_t>
     class SimpleStorage
     {
         using Storage_t    = std::byte[SIZE];
