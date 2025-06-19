@@ -217,6 +217,7 @@ catch(const std::exception& e)
 * [Examples](#examples)
     - [Scheduler](#scheduler)
     - [Task](#task)
+    - [InlineTask](#inlinetask)
     - [MakeBound](#makebound)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
@@ -275,29 +276,86 @@ tinycoro::Scheduler scheduler{4}; // 4 worker threads
 tinycoro::Scheduler scheduler; 
 ```
 
-### `Task`
-This example demonstrates how to create a basic coroutine task that returns void and schedule it using the tinycoro::Scheduler. The scheduler takes complete ownership of the coroutine, managing its lifecycle.
+## Task
 
-The `Enqueue` function in the `tinycoro::Scheduler` is designed to schedule one or more coroutine tasks for execution. It supports both individual and containerized task inputs. The function returns std::future object(s).
+This example demonstrates how to create a basic coroutine task that returns `void` and schedule it using the `tinycoro::Scheduler`.  
+The scheduler takes **complete ownership** of the coroutine and manages its lifecycle.
 
-If your coroutine has return value, `GetAll(...)` function will return `std::optional<>` object(s), to support possible task cancellation. If the task got cancelled, the returning `optional` will be empty.
+While you can manually enqueue tasks in `tinycoro::Scheduler`, it is **recommended to use helper functions** like `tinycoro::GetAll(...)` or `tinycoro::AnyOf(...)`.
+These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified, fast and safe way.
+
+The `GetAll(...)` function supports both **individual tasks** and **containers of tasks**. It returns `std::optional<>`, `std::tuple<std::optional<T>...>` or `std::vector<std::optional<T>>` depending on the return type and cancellation state.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
 void Example_voidTask()
 {
-    // create a scheduler
+    // Create a scheduler
     tinycoro::Scheduler scheduler;
 
     auto task = []() -> tinycoro::Task<void> {
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, task())
+    // Recommended way to run the task
+    tinycoro::GetAll(scheduler, task());
 }
 ```
-For simplicity, if you want to return void, you can also write `tinycoro::Task<>`. The default template parameter here is `void``. 
+
+> 💡 For simplicity, if you want to return `void`, you can also just write `tinycoro::Task<>`.  
+> The default template parameter is `void`.
+
+---
+
+## InlineTask
+
+`tinycoro::InlineTask<T>` is a **lightweight coroutine type** with the same cancellation support as `Task<T>`, but it differs in several important ways:
+
+- It does **not** interact with the `tinycoro::Scheduler`.
+- It always runs **on the current thread**, no asynchronous execution.
+- It uses **significantly less memory** than `Task`, since it doesn't need to store any scheduling state.
+
+This makes `InlineTask` ideal for **local, synchronous coroutine flows** where you don't need scheduling or cross-thread execution.
+
+You can `co_await` an `InlineTask` directly from within another coroutine, or run it synchronously using the `tinycoro::RunInline(...)` helper function.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+tinycoro::InlineTask<int> InlineTask(int val)
+{
+    co_return val;
+}
+
+tinycoro::Task<int> Task(int val)
+{
+    // Option 1: co_await inside another coroutine 
+    auto value = co_await InlineTask(val);
+
+    co_return value;
+}
+
+void RunExample()
+{
+    // Option 2: run synchronously
+    //
+    // You don't need to be inside a coroutine context
+    // to use RunInline — it works in any regular function too.
+    auto [val_41, val_42] = tinycoro::RunInline(InlineTask(41), InlineTask(42));
+}
+```
+
+### When to use `InlineTask`
+
+Use `InlineTask` when:
+- You **don't need scheduler-based execution**.
+- You want to keep coroutine execution **strictly on the current thread**.
+- You want to build small, composable coroutine helpers.
+- You **still want cancellation support**, but without the cost of task queuing or thread management.
+
+Use `Task` when:
+- You need **asynchronous coroutine execution**.
 
 ### `MakeBound`
 If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::Task<>`, which encapsulates the coroutine function. This ensures that the task cannot outlive it's coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.
