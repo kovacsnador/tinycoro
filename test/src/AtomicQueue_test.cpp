@@ -194,7 +194,7 @@ struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest, testing::Values(1, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest, testing::Values(1, 10, 100, 1000, 2000));
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_single_threaded)
 {
@@ -254,7 +254,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
 
     tinycoro::Scheduler scheduler;
 
-    tinycoro::detail::AtomicQueue<size_t, (1 << 17)> queue; // make sure you have enough cache size
+    tinycoro::detail::AtomicQueue<size_t, (1 << 15)> queue; // make sure you have enough cache size
 
     auto producer = [&]() -> tinycoro::Task<void> {
         for (auto i : std::views::iota(0u, count))
@@ -294,7 +294,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
 
     tinycoro::Scheduler scheduler;
 
-    tinycoro::detail::AtomicQueue<size_t, (1 << 17)> queue; // make sure you have enough cache size
+    tinycoro::detail::AtomicQueue<size_t, (1 << 15)> queue; // make sure you have enough cache size
 
     auto producer = [&]() -> tinycoro::Task<void> {
         for (auto i : std::views::iota(0u, count))

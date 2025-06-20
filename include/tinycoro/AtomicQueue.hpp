@@ -7,6 +7,7 @@
 #define TINY_CORO_ATOMIC_QUEUE_HPP
 
 #include <concepts>
+#include <array>
 
 #include "CachelineAlign.hpp"
 #include "Common.hpp"
@@ -25,12 +26,10 @@ namespace tinycoro { namespace detail {
         using sequence_t = uint64_t;
 
         AtomicQueue()
-        : _buffer{std::make_unique<Element[]>(SIZE)}
         {
-            for (uint64_t i = 0; i < SIZE; ++i)
+            for(sequence_t i = 0; i < _buffer.size(); ++i)
             {
-                auto elem = _buffer.get() + i;
-                elem->_sequence.store(i, std::memory_order_relaxed);
+                _buffer[i]._sequence.store(i, std::memory_order_relaxed);
             }
         }
 
@@ -45,8 +44,8 @@ namespace tinycoro { namespace detail {
             {
                 // get the current enqueue position
                 auto pos  = _head.load(std::memory_order_relaxed);
-                auto elem = _buffer.get() + (pos & BUFFER_MASK);
-                auto seq  = elem->_sequence.load(std::memory_order_acquire);
+                auto& elem = _buffer[pos & BUFFER_MASK];
+                auto seq  = elem._sequence.load(std::memory_order_acquire);
 
                 if (seq == pos)
                 {
@@ -54,10 +53,10 @@ namespace tinycoro { namespace detail {
                     {
                         // found the right place
                         // pushing the value into the queue
-                        elem->_value = std::forward<U>(value);
+                        elem._value = std::forward<U>(value);
 
                         // store the new position as the next sequence
-                        elem->_sequence.store(pos + 1, std::memory_order_release);
+                        elem._sequence.store(pos + 1, std::memory_order_release);
 
                         // notify waiter that
                         // we have a new value
@@ -87,8 +86,8 @@ namespace tinycoro { namespace detail {
             {
                 // get the current dequeue position
                 auto pos  = _tail.load(std::memory_order_relaxed);
-                auto elem = _buffer.get() + (pos & BUFFER_MASK);
-                auto seq  = elem->_sequence.load(std::memory_order_acquire);
+                auto& elem = _buffer[pos & BUFFER_MASK];
+                auto seq  = elem._sequence.load(std::memory_order_acquire);
 
                 if (seq == pos + 1)
                 {
@@ -97,9 +96,9 @@ namespace tinycoro { namespace detail {
                     if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
                     {
                         // we got exclusive access to the element
-                        data = std::move(elem->_value);
+                        data = std::move(elem._value);
 
-                        elem->_sequence.store(pos + SIZE, std::memory_order_release);
+                        elem._sequence.store(pos + SIZE, std::memory_order_release);
 
                         // notify the waiters
                         // that a value is popped
@@ -135,6 +134,8 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        // wait for new element to push
+        // in case the queue is full
         void wait_for_push() const noexcept
         {
             auto head = _head.load(std::memory_order_relaxed);
@@ -163,8 +164,8 @@ namespace tinycoro { namespace detail {
         // the buffer mask. Should be for example 0xFFFFF
         static constexpr sequence_t BUFFER_MASK{SIZE - 1};
 
-        // the pointer of the ringbuffer
-        std::unique_ptr<Element[]> _buffer;
+        // the array of the ringbuffer
+        std::array<Element, SIZE> _buffer;
 
         // the last push position of an element
         alignas(CACHELINE_SIZE) std::atomic<sequence_t> _head{};
