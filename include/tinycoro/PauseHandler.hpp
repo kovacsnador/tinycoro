@@ -58,9 +58,15 @@ namespace tinycoro {
         static constexpr uint8_t c_cancelMask{0x02};
 
     public:
-        PauseHandler(concepts::PauseHandlerCb auto pr)
+        PauseHandler(auto pr, bool cancellable = tinycoro::default_initial_cancellable_policy::value)
         : _resumerCallback{pr}
         {
+            // Set the initial cancellable flag: true or false.
+            //
+            // If set to true, the coroutine is cancellable before it starts.
+            // The flag is reset after the coroutine starts.
+            if(cancellable)
+                SetCancellable(cancellable);
         }
 
         void Resume() noexcept
@@ -73,14 +79,14 @@ namespace tinycoro {
         [[nodiscard]] auto Pause() noexcept
         {
             assert(IsPaused() == false);
-            _state.fetch_or(c_pauseMask, std::memory_order_release);
+            _state.fetch_or(c_pauseMask, std::memory_order_relaxed);
             return _resumerCallback;
         }
 
         void Unpause() noexcept
         {
             assert(IsPaused());
-            _state.fetch_and(~c_pauseMask, std::memory_order_release);
+            _state.fetch_and(~c_pauseMask, std::memory_order_relaxed);
         }
 
         void SetCancellable(bool flag) noexcept
@@ -88,21 +94,21 @@ namespace tinycoro {
             assert(IsCancellable() != flag);
 
             if (flag)
-                _state.fetch_or(c_cancelMask, std::memory_order_release);
+                _state.fetch_or(c_cancelMask, std::memory_order_relaxed);
             else
-                _state.fetch_and(~c_cancelMask, std::memory_order_release);
+                _state.fetch_and(~c_cancelMask, std::memory_order_relaxed);
         }
 
-        [[nodiscard]] bool IsPaused() const noexcept { return _state & c_pauseMask; }
+        [[nodiscard]] bool IsPaused() const noexcept { return _state.load(std::memory_order_relaxed) & c_pauseMask; }
 
-        [[nodiscard]] bool IsCancellable() const noexcept { return _state & c_cancelMask; }
+        [[nodiscard]] bool IsCancellable() const noexcept { return _state.load(std::memory_order_relaxed) & c_cancelMask; }
 
     private:
         // Placing _state before _resumerCallback saves 8 bytes of padding
         // on all three major compilers: MSVC, GCC, and Clang.
         std::atomic<uint8_t> _state{};
 
-        PauseHandlerCallbackT _resumerCallback;
+        PauseHandlerCallbackT _resumerCallback{};
     };
 
     namespace context {

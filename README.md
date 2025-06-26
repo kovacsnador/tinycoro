@@ -218,6 +218,7 @@ catch(const std::exception& e)
     - [Scheduler](#scheduler)
     - [Task](#task)
     - [InlineTask](#inlinetask)
+    - [Cancellation](#cancellation)
     - [MakeBound](#makebound)
     - [RunInline](#runinline)
     - [Task with return value](#returnvaluetask)
@@ -356,6 +357,38 @@ Use `InlineTask` when:
 
 Use `Task` when:
 - You need **asynchronous coroutine execution**.
+
+### `Cancellation`
+
+By default, all `Task` and `InlineTask` instances are **cancellable at their initial suspend point**.  
+This allows cancellation to prevent a coroutine from starting execution at all — useful for avoiding unnecessary work.
+
+If you want to **disable cancellation at the initial suspend**, you can use the `tinycoro::noninitial_cancellable` policy as the 3. template parameter:
+
+```cpp
+tinycoro::Task<void, tinycoro::DefaultAllocator, tinycoro::noninitial_cancellable>
+tinycoro::InlineTask<void, tinycoro::DefaultAllocator, tinycoro::noninitial_cancellable>
+```
+
+But much more conveniently, you can just use the provided type aliases, which are recommended and super easy to use:
+```cpp
+tinycoro::TaskNIC<void>
+tinycoro::InlineTaskNIC<void>
+
+// NIC stands for 'non initial cancellable'.
+```
+These aliases make your code cleaner and easier to read—use them whenever possible.
+
+All other suspension points are **not** cancellable by default, but you can explicitly make them cancellable by wrapping the awaitable in `tinycoro::Cancellable`, like this:
+```cpp
+co_await tinycoro::Cancellable{autoEvent.Wait()};
+```
+This works with almost all awaitables in tinycoro, including `Task` and `InlineTask` themselves (since they are awaitables too).
+It gives you fine-grained control over cancellation at any suspension point.
+
+> ℹ️ You can also **read cancellation behavior directly from the code**:  
+> Every cancellable suspension point is explicitly wrapped with `tinycoro::Cancellable{...}` — making it easy to see where cancellation may occur.
+
 
 ### `MakeBound`
 If you want to manage the lifetime of a coroutine function and its associated task together, you can use the `tinycoro::MakeBound` factory function. This function creates a `tinycoro::Task<>`, which encapsulates the coroutine function. This ensures that the task cannot outlive it's coroutine function, avoiding common pitfalls associated with coroutines and lambda expressions.

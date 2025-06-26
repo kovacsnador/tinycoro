@@ -25,16 +25,17 @@ namespace tinycoro {
     namespace detail {
 
         template <typename ReturnValueT,
+                  concepts::IsInitialCancellablePolicy InitialCancellablePolicyT,
                   typename PromiseT,
                   template <typename, typename> class AwaiterT,
                   typename CoroResumerT = TaskResumer,
                   typename StopSourceT  = std::stop_source>
-        struct [[nodiscard]] CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
+        struct [[nodiscard]] CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, InitialCancellablePolicyT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
         {
             template <typename CoroutineFunctionT, typename... Args>
             friend auto tinycoro::MakeBound(CoroutineFunctionT&& func, Args&&... args);
 
-            using SelfType = CoroTask<ReturnValueT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
+            using SelfType = CoroTask<ReturnValueT, InitialCancellablePolicyT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>;
 
             friend struct AwaiterBase<SelfType>;
             friend class AwaiterT<ReturnValueT, SelfType>;
@@ -49,6 +50,8 @@ namespace tinycoro {
             using coro_hdl_type = std::coroutine_handle<promise_type>;
 
             using value_type = typename promise_type::value_type;
+
+            using initial_cancellable_policy = InitialCancellablePolicyT;
 
             template <typename... Args>
                 requires std::constructible_from<coro_hdl_type, Args...>
@@ -83,7 +86,7 @@ namespace tinycoro {
 
             [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-            auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
+            void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
             {
                 auto& pauseHandler = _hdl.promise().pauseHandler;
                 if (pauseHandler)
@@ -94,10 +97,8 @@ namespace tinycoro {
                 else
                 {
                     // pause handler need to be initialized
-                    _hdl.promise().MakePauseHandler(std::move(pauseResume));
+                    _hdl.promise().MakePauseHandler(std::move(pauseResume), InitialCancellablePolicyT::value);
                 }
-
-                return pauseHandler.get();
             }
 
             [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
@@ -149,11 +150,27 @@ namespace tinycoro {
 
     } // namespace detail
 
-    template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
-    using Task = detail::CoroTask<ReturnValueT, detail::Promise<ReturnValueT, AllocatorT>, AwaiterValue>;
+    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator, concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
+    using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, AllocatorT>, AwaiterValue>;
 
-    template <typename ReturnValueT = void, template<typename> class AllocatorT = detail::NonAllocatorAdapter>
-    using InlineTask = detail::CoroTask<ReturnValueT, detail::InlinePromise<ReturnValueT, AllocatorT>, AwaiterValue>;
+    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator, concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
+    using InlineTask = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, AllocatorT>, AwaiterValue>;
+
+    // Convenience aliases for tasks with a non-initial cancellable policy.
+    // (TaskNIC/InlineTaskNIC)
+    //
+    // These are helper types meant to simplify usage when cancellation should not be 
+    // automatically propagated into the coroutine on creation (i.e., not initially cancellable).
+    // This is typically useful for root coroutines or tasks that should explicitly manage
+    // cancellation behavior.
+    //
+    // Note: These aliases are just syntactic sugar over Task and InlineTask with 
+    // `noninitial_cancellable_t` passed as the cancellation policy.
+    template<typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator>
+    using TaskNIC = Task<ReturnT, AllocatorT, noninitial_cancellable_t>;
+
+    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator>
+    using InlineTaskNIC = InlineTask<ReturnT, AllocatorT, noninitial_cancellable_t>;
 
 } // namespace tinycoro
 

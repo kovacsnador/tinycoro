@@ -13,6 +13,7 @@
 #include "CancellableSuspend.hpp"
 #include "AutoEvent.hpp"
 #include "AllocatorAdapter.hpp"
+#include "Common.hpp"
 
 using namespace std::chrono_literals;
 
@@ -33,8 +34,8 @@ namespace tinycoro {
 
     } // namespace concepts
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
     {
         tinycoro::AutoEvent finished;
 
@@ -50,28 +51,28 @@ namespace tinycoro {
         co_await finished;
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
     {
         co_await SleepUntil<AllocatorAdapterT>(softClock, softClock.Now() + duration, stopToken);
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepFor(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
     {
         auto stopToken = co_await this_coro::stop_token();
         co_await SleepFor<AllocatorAdapterT>(softClock, duration, stopToken);
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepUntil(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
     {
         auto stopToken = co_await this_coro::stop_token();
         co_await SleepUntil<AllocatorAdapterT>(softClock, timePoint, stopToken);
     }
     
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint, concepts::IsStopToken auto stopToken)
     {
         co_await SleepUntil<AllocatorAdapterT>(softClock, timePoint, stopToken);
 
@@ -81,21 +82,21 @@ namespace tinycoro {
         }
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration, concepts::IsStopToken auto stopToken)
     {
         co_await SleepUntilCancellable<AllocatorAdapterT>(softClock, softClock.Now() + duration, stopToken);
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepForCancellable(concepts::IsSoftClock auto& softClock, concepts::IsDuration auto duration)
     {
         auto stopToken = co_await this_coro::stop_token();
         co_await SleepForCancellable<AllocatorAdapterT>(softClock, duration, stopToken);
     }
 
-    template<template<typename> class AllocatorAdapterT = detail::NonAllocatorAdapter>
-    Task<void, AllocatorAdapterT> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
+    template<template<typename> class AllocatorAdapterT = DefaultAllocator>
+    tinycoro::Task<void, AllocatorAdapterT> SleepUntilCancellable(concepts::IsSoftClock auto& softClock, concepts::IsTimePoint auto timePoint)
     {
         auto stopToken = co_await this_coro::stop_token();
         co_await SleepUntilCancellable<AllocatorAdapterT>(softClock, timePoint, stopToken);

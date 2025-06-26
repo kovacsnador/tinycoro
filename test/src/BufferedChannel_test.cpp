@@ -280,13 +280,13 @@ TEST(BufferedChannelTest, BufferedChannelTest_cancel)
     tinycoro::SoftClock                clock;
     tinycoro::BufferedChannel<int32_t> channel;
 
-    auto listener = [&]() -> tinycoro::Task<int32_t> {
+    auto listener = [&]() -> tinycoro::TaskNIC<int32_t> {
         int32_t val;
         co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
-    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
+    auto listenerWaiter = [&]() -> tinycoro::TaskNIC<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
 
     auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOf(scheduler,
                                                                 listener(),
@@ -315,13 +315,13 @@ TEST(BufferedChannelTest, BufferedChannelTest_cancel_inline)
     tinycoro::SoftClock                clock;
     tinycoro::BufferedChannel<int32_t> channel;
 
-    auto listener = [&]() -> tinycoro::Task<int32_t> {
+    auto listener = [&]() -> tinycoro::TaskNIC<int32_t> {
         int32_t val;
         co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
-    auto listenerWaiter = [&]() -> tinycoro::Task<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
+    auto listenerWaiter = [&]() -> tinycoro::TaskNIC<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
 
     auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOfInline(listener(),
                                                                       listener(),
@@ -1436,17 +1436,17 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushWait_cancel)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{10};
 
-    auto task = [&](auto i) -> tinycoro::Task<int32_t> {
+    auto task = [&](auto i) -> tinycoro::TaskNIC<int32_t> {
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
         co_return i;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
@@ -1481,23 +1481,29 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{5};
 
-    auto producer = [&](auto i) -> tinycoro::Task<size_t> {
+    // check if all tasks are running
+    // non_initial_cancellable tasks.
+    std::atomic<size_t> cc{};
+
+    auto producer = [&](auto i) -> tinycoro::TaskNIC<size_t> {
+        cc++;
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
         co_return i;
     };
 
-    auto consumer = [&]() -> tinycoro::Task<size_t> {
+    auto consumer = [&]() -> tinycoro::TaskNIC<size_t> {
         size_t val;
+        cc++;
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return val;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<size_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<size_t> {
         co_await tinycoro::SleepFor(clock, 50ms);
         co_return 44u;
     };
 
-    std::vector<tinycoro::Task<size_t>> tasks;
+    std::vector<tinycoro::TaskNIC<size_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
@@ -1509,6 +1515,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel)
     auto result = tinycoro::AnyOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(result[0].value(), 44);
+    EXPECT_EQ(cc, count * 2);
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel_inline)
@@ -1518,23 +1525,29 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel_inline)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{5};
 
-    auto producer = [&](auto i) -> tinycoro::Task<size_t> {
+    // check if all tasks are running
+    // non_initial_cancellable tasks.
+    std::atomic<size_t> cc{};
+
+    auto producer = [&](auto i) -> tinycoro::TaskNIC<size_t> {
+        cc++;
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PushWait(42u));
         co_return i;
     };
 
-    auto consumer = [&]() -> tinycoro::Task<size_t> {
+    auto consumer = [&]() -> tinycoro::TaskNIC<size_t> {
         size_t val;
+        cc++;
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return val;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<size_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<size_t> {
         co_await tinycoro::SleepFor(clock, 50ms);
         co_return 44u;
     };
 
-    std::vector<tinycoro::Task<size_t>> tasks;
+    std::vector<tinycoro::TaskNIC<size_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
@@ -1546,6 +1559,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_Push_and_Pop_Wait_cancel_inline)
     auto result = tinycoro::AnyOfInline(std::move(tasks));
 
     EXPECT_EQ(result[0].value(), 44);
+    EXPECT_EQ(cc, count * 2);
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelTest_PopWait_cancel)
@@ -1556,18 +1570,18 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PopWait_cancel)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{10};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::TaskNIC<int32_t> {
         size_t                val{};
         [[maybe_unused]] auto state = co_await tinycoro::Cancellable(channel.PopWait(val));
         co_return 42;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for ([[maybe_unused]] auto _ : std::views::iota(0u, count))
@@ -1593,17 +1607,17 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_ListenerWait_cancel)
     const auto                        count = GetParam();
     tinycoro::BufferedChannel<size_t> channel{10};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(channel.WaitForListeners(count + 1));
         co_return 42;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for ([[maybe_unused]] auto _ : std::views::iota(0u, count))

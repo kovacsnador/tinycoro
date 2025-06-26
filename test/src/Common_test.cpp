@@ -184,7 +184,7 @@ struct Concepts_AllocatorAdapter : testing::Test
 };
 
 using AllocatorAdapterTyped = testing::Types<std::tuple<EmptyClass<int>, std::true_type>,
-                                             std::tuple<tinycoro::detail::NonAllocatorAdapter<int>, std::true_type>,
+                                             std::tuple<tinycoro::DefaultAllocator<int>, std::true_type>,
                                              std::tuple<AllocatorAdapterNoexcept<int>, std::true_type>,
                                              std::tuple<AllocatorAdapterExcept<int>, std::true_type>,
                                              std::tuple<std::string, std::false_type>,

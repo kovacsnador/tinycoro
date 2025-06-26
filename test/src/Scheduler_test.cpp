@@ -53,7 +53,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
     auto task = [&](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
         }
         cc++;
     };

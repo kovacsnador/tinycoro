@@ -31,5 +31,6 @@
 #include "UnbufferedChannel.hpp"
 #include "SoftClock.hpp"
 #include "Cancellable.hpp"
+#include "InlineAwait.hpp"
 
 #endif // TINY_CORO_TINY_CORO_ALL_H

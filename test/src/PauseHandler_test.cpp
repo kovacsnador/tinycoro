@@ -100,7 +100,9 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
     EXPECT_TRUE((std::same_as<decltype(func), decltype(res)>));
 
     EXPECT_TRUE(pauseHandler.IsPaused());
-    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    // initial cancellable as default
+    EXPECT_TRUE(pauseHandler.IsCancellable());
 
     pauseHandler.Unpause();
     EXPECT_FALSE(pauseHandler.IsPaused());
@@ -111,7 +113,22 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 {
     tinycoro::PauseHandler pauseHandler{[]{}};
+    
+    // initial cancellable as default
+    EXPECT_TRUE(pauseHandler.IsCancellable());
 
+    pauseHandler.SetCancellable(false);
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+
+    pauseHandler.SetCancellable(true);
+    EXPECT_TRUE(pauseHandler.IsCancellable());
+}
+
+TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
+{
+    tinycoro::PauseHandler pauseHandler{[]{}, tinycoro::noninitial_cancellable_t::value};
+    
+    // initial cancellable as default
     EXPECT_FALSE(pauseHandler.IsCancellable());
 
     pauseHandler.SetCancellable(true);

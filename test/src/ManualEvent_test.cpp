@@ -209,17 +209,17 @@ TEST_P(ManualEventTest, ManualEventTest_cancel)
 
     tinycoro::ManualEvent event;
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for (size_t i = 0; i < count; ++i)
@@ -248,7 +248,7 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_custom_cache_size)
 
     std::atomic<size_t> taskCount{};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         event.Reset();
 
@@ -260,12 +260,12 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_custom_cache_size)
         co_return 42;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for (size_t i = 0; i < count; ++i)
@@ -293,7 +293,7 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_inline)
 
     std::atomic<size_t> taskCount{};
 
-    auto task = [&]() -> tinycoro::Task<int32_t> {
+    auto task = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         event.Reset();
 
@@ -305,12 +305,12 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_inline)
         co_return 42;
     };
 
-    auto sleep = [&]() -> tinycoro::Task<int32_t> {
+    auto sleep = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     tasks.reserve(count + 1);
     tasks.emplace_back(sleep());
     for (size_t i = 0; i < count; ++i)

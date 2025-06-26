@@ -584,7 +584,7 @@ TEST_F(ExampleTest, Example_AnyOfVoid)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
         }
     };
 
@@ -599,7 +599,7 @@ TEST_F(ExampleTest, Example_AnyOf)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
             count++;
         }
         co_return count;
@@ -627,7 +627,7 @@ TEST_F(ExampleTest, Example_AnyOfDynamic)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
             count++;
         }
         co_return count;
@@ -671,7 +671,7 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
     auto task1 = [](auto duration) -> tinycoro::Task<void> {
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
         }
     };
 
@@ -679,7 +679,7 @@ TEST_F(ExampleTest, Example_AnyOfVoidException)
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
             throw std::runtime_error("Exception throwed!");
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
         }
         co_return 42;
     };
@@ -798,7 +798,7 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
             for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
             {
-                co_await tinycoro::CancellableSuspend{};
+                co_await tinycoro::this_coro::yield_cancellable();
                 count++;
             }
             co_return count;

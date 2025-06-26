@@ -193,10 +193,10 @@ TEST(SingleEventTest, SingleEventTest_cancel)
 
     tinycoro::SingleEvent<int32_t> event;
 
-    auto receiver = [&]() -> tinycoro::Task<int32_t> {
+    auto receiver = [&]() -> tinycoro::TaskNIC<int32_t> {
         auto result = co_await tinycoro::Cancellable(event.Wait());
         co_return result;
-    };
+    }; 
 
     auto [r1, r2] = tinycoro::AnyOf(scheduler, receiver(), tinycoro::SleepFor(clock, 100ms));
 
@@ -210,7 +210,7 @@ TEST(SingleEventTest, SingleEventTest_cancel_inline)
 
     tinycoro::SingleEvent<int32_t> event;
 
-    auto receiver = [&]() -> tinycoro::Task<int32_t> {
+    auto receiver = [&]() -> tinycoro::TaskNIC<int32_t> {
         auto result = co_await tinycoro::Cancellable(event.Wait());
         co_return result;
     };
