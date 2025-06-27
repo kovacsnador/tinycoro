@@ -23,6 +23,24 @@ namespace tinycoro {
 
         constexpr void await_resume() const noexcept {}
     };
+
+    namespace this_coro
+    {   
+        // This yield is not cancellable
+        //
+        // If you need a yield which is cancellable
+        // use yield_cancellable().
+        constexpr auto yield() noexcept -> std::suspend_always
+        {
+            return {};
+        }
+
+        // A cancellable yield.
+        constexpr auto yield_cancellable() noexcept -> tinycoro::CancellableSuspend
+        {
+            return {};
+        }
+    }
     
 } // namespace tinycoro
 

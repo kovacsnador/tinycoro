@@ -43,6 +43,9 @@ namespace tinycoro
         };
 
     } // namespace detail
+
+    template<typename T>
+    using DefaultAllocator = detail::NonAllocatorAdapter<T>;
     
 } // namespace tinycoro
 

@@ -33,19 +33,19 @@ namespace tinycoro { namespace test {
         std::shared_ptr<PromiseT> _promise;
     };
 
-    template<typename T = void>
+    template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl(std::regular_invocable auto pauseResumerCallback)
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace(pauseResumerCallback);
+        hdl.promise().pauseHandler.emplace(pauseResumerCallback, InitialCancellablePolicyT::value);
         return hdl;
     }
 
-    template<typename T = void>
+    template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace([]{});
+        hdl.promise().pauseHandler.emplace([]{}, InitialCancellablePolicyT::value);
         return hdl;
     }
 

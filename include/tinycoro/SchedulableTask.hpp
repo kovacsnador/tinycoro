@@ -75,25 +75,19 @@ namespace tinycoro { namespace detail {
             return _coroResumer.ResumeState(_hdl);
         }
 
-        auto SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
+        void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
         {
-
+            // At this point the pauseHandler should have been initialized
+            // through the MakeSchedulableTask() function.
             auto& pauseHandler = _hdl.promise().pauseHandler;
-            if (pauseHandler)
-            {
-                // pause handler is already initialized
-                pauseHandler->ResetCallback(std::move(pauseResume));
-            }
-            else
-            {
-                // first the pause handler need to be initialized
-                _hdl.promise().MakePauseHandler(std::move(pauseResume));
-            }
 
-            return pauseHandler.get();
+            assert(pauseHandler);
+            
+            // pause handler should be already initialized
+            pauseHandler->ResetCallback(std::move(pauseResume));
         }
 
-        auto release() noexcept -> PromiseT*
+        [[nodiscard]] auto release() noexcept -> PromiseT*
         {
             assert(_hdl);
 
@@ -112,18 +106,18 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        constexpr bool operator==(std::nullptr_t) const noexcept { return _hdl == nullptr; }
+        [[nodiscard]] constexpr bool operator==(std::nullptr_t) const noexcept { return _hdl == nullptr; }
 
         // To mimic the smart pointer api
-        constexpr auto* operator->() noexcept { return this; }
+        [[nodiscard]] constexpr auto* operator->() noexcept { return this; }
 
-        auto get() noexcept
+        [[nodiscard]] auto get() noexcept
         {
             assert(_hdl);
             return std::addressof(_hdl.promise());
         }
 
-        auto& PauseState() noexcept { return _hdl.promise().pauseState; }
+        [[nodiscard]] auto& PauseState() noexcept { return _hdl.promise().pauseState; }
 
     private:
         void Destroy() noexcept
@@ -205,6 +199,12 @@ namespace tinycoro { namespace detail {
         // save the future state inside
         // the corouitne promise
         promise.SavePromise(std::move(futureState), detail::OnTaskFinish<PromiseT, FutureStateT>);
+
+        // Initialize the pause handler with the appropriate initial cancellation policy.
+        //
+        // This is the right place to set it because this coroutine will act as a root
+        // in the coroutine chain.
+        promise.MakePauseHandler(nullptr, CoroT::initial_cancellable_policy::value);
 
         // create the common task
         return detail::SchedulableTask{std::addressof(promise)};

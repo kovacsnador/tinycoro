@@ -47,7 +47,7 @@ TEST(TaskTest, TaskTest_int)
 
 struct PauseHandlerMock
 {
-    PauseHandlerMock(auto cb)
+    PauseHandlerMock(auto cb, bool)
     : pauseResume{cb}
     {
     }
@@ -113,7 +113,7 @@ public:
 
 TEST(CoroTaskTest, CoroTaskTest)
 {
-    auto task = []()->tinycoro::detail::CoroTask<void, PromiseMock, PopAwaiterMock, CoroResumerMock> { co_return; }();
+    auto task = []()->tinycoro::detail::CoroTask<void, tinycoro::default_initial_cancellable_policy, PromiseMock, PopAwaiterMock, CoroResumerMock> { co_return; }();
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 

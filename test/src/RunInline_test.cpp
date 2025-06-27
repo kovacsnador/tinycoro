@@ -635,7 +635,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
     auto consumer3 = [&]()->tinycoro::Task<>
     {
         // this task should be stopped through stopsource
-        co_await tinycoro::CancellableSuspend{};
+        co_await tinycoro::this_coro::yield_cancellable();
 
         // This code should never reached...
         i++; 
@@ -766,7 +766,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled)
 
     tinycoro::AutoEvent event;
 
-    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+    auto waitTask = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
@@ -795,7 +795,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_latch)
 
     tinycoro::Latch latch{1};
 
-    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+    auto waitTask = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(latch.Wait());
         co_return 42;
     };
@@ -821,17 +821,17 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_dynamic)
     tinycoro::SoftClock clock;
     tinycoro::AutoEvent event;
 
-    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+    auto waitTask = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };
 
-    auto sleepTask = [&]() -> tinycoro::Task<int32_t> {
+    auto sleepTask = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::SleepFor(clock, 100ms);
         co_return 44;
     };
 
-    std::vector<tinycoro::Task<int32_t>> tasks;
+    std::vector<tinycoro::TaskNIC<int32_t>> tasks;
     for(size_t i = 0; i < 5; ++i)
     {
         tasks.emplace_back(waitTask());
@@ -859,7 +859,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_manual)
 
     tinycoro::ManualEvent event;
 
-    auto waitTask = [&]() -> tinycoro::Task<int32_t> {
+    auto waitTask = [&]() -> tinycoro::TaskNIC<int32_t> {
         co_await tinycoro::Cancellable(event.Wait());
         co_return 42;
     };

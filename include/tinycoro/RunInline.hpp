@@ -293,7 +293,7 @@ namespace tinycoro {
         requires (sizeof...(TaskT) > 0)
     [[nodiscard]] auto AnyOfInline(TaskT&&... tasks)
     {
-        StopSourceT stopSource;
+        StopSourceT stopSource{};
         return AnyOfWithStopSourceInline(stopSource, std::forward<TaskT>(tasks)...);
     }
 

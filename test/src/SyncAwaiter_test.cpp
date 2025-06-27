@@ -263,7 +263,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest1(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
             count++;
         }
         co_return count;
@@ -295,7 +295,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
 
         for (auto start = std::chrono::system_clock::now(); std::chrono::system_clock::now() - start < duration;)
         {
-            co_await tinycoro::CancellableSuspend{};
+            co_await tinycoro::this_coro::yield_cancellable();
             count++;
         }
         co_return count;
@@ -405,6 +405,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
 
     auto coro = [&]() -> tinycoro::Task<void> {
         std::vector<tinycoro::Task<size_t>> tasks;
+        tasks.reserve(size);
 
         for (size_t i = 0; i < size; ++i)
         {
@@ -415,11 +416,14 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
 
         // check for unique values
         std::set<size_t> set;
-        for (auto it : results)
+        for (auto& it : results)
         {
-            // no lock needed here only one consumer
-            auto [_, inserted] = set.insert(*it);
-            EXPECT_TRUE(inserted);
+            if(it.has_value())
+            {
+                // no lock needed here only one consumer
+                auto [_, inserted] = set.insert(*it);
+                EXPECT_TRUE(inserted);
+            }
         }
     };
 
@@ -436,7 +440,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
     std::atomic<size_t> count{};
 
     auto task = [](auto& c) -> tinycoro::Task<size_t> { 
-        co_await tinycoro::CancellableSuspend{};
+        co_await tinycoro::this_coro::yield_cancellable();
         co_return ++c;
     };
 

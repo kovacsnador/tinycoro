@@ -236,14 +236,14 @@ namespace tinycoro {
         };
 
         template <typename ReturnValueT,
-                  template <typename> class AllocatorT = detail::NonAllocatorAdapter,
+                  template <typename> class AllocatorT = DefaultAllocator,
                   typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
         using Promise = detail::
             PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT, AllocatorT>;
 
         template <typename ReturnValueT,
-                  template <typename> class AllocatorT = detail::NonAllocatorAdapter,
+                  template <typename> class AllocatorT = DefaultAllocator,
                   typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
         using InlinePromise = detail::InlinePromiseT<detail::FinalAwaiter,
