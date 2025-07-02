@@ -58,7 +58,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_RunInline)
         co_return i;
     };
 
-    auto ret = tinycoro::RunInline(task());
+    auto ret = tinycoro::AllOfInline(task());
     EXPECT_EQ(ret, 1);
 }
 
@@ -74,7 +74,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_Async)
         co_return i;
     };
 
-    auto [t1, t2, t3] = tinycoro::GetAll(scheduler, task(0), task(1), task(2));
+    auto [t1, t2, t3] = tinycoro::AllOf(scheduler, task(0), task(1), task(2));
 
     EXPECT_EQ(t1, 1);
     EXPECT_EQ(t2, 2);
@@ -86,7 +86,7 @@ void bad_alloc(auto& mock, auto task)
     EXPECT_CALL(mock, allocate_bytes_noexcept).Times(1).WillRepeatedly([]([[maybe_unused]] size_t nbytes) { return nullptr; });
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { std::ignore = tinycoro::RunInline(task(0)); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -118,7 +118,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_multi)
         i++;
         co_return i;
     };
-    auto func = [&] { std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -134,7 +134,7 @@ void second_bad_alloc_multi(auto& mock, auto task)
 
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -172,7 +172,7 @@ void third_bad_alloc_multi_syncwait(auto& mock, auto task)
 
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { tinycoro::RunInline(task()); };
+    auto func = [&] { tinycoro::AllOfInline(task()); };
     EXPECT_THROW(func(), std::bad_alloc);
 }
 
@@ -183,7 +183,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_sync_aw
     auto task = []() -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { co_return 42; };
 
     auto wrapperTask = [&]() -> tinycoro::Task<void, AllocatorAdapterNoExcept> {
-        std::ignore = co_await tinycoro::SyncAwait(scheduler, task(), task(), task());
+        std::ignore = co_await tinycoro::AllOfAwait(scheduler, task(), task(), task());
     };
 
     third_bad_alloc_multi_syncwait(mock, wrapperTask);
@@ -196,7 +196,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_sync_aw
     auto task = []() -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { co_return 42; };
 
     auto wrapperTask = [&]() -> tinycoro::InlineTask<void, AllocatorAdapterNoExcept> {
-        std::ignore = co_await tinycoro::SyncAwait(scheduler, task(), task(), task());
+        std::ignore = co_await tinycoro::AllOfAwait(scheduler, task(), task(), task());
     };
 
     third_bad_alloc_multi_syncwait(mock, wrapperTask);
@@ -219,7 +219,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_async)
         i++;
         co_return i;
     };
-    auto func = [&] { std::ignore = tinycoro::GetAll(scheduler, task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(scheduler, task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -236,7 +236,7 @@ void throw_in_operator_new(auto& mock, auto task)
 
     EXPECT_CALL(mock, deallocate_bytes).Times(1).WillOnce([](void* p, [[maybe_unused]] size_t nbytes) { return std::free(p); });
 
-    auto func = [&] { std::ignore = tinycoro::RunInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -277,7 +277,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_async)
         i++;
         co_return i;
     };
-    auto func = [&] { std::ignore = tinycoro::GetAll(scheduler, task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(scheduler, task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -300,10 +300,10 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_sync_await_throw)
 
     auto task = [&](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapter> {
         // this need to throw std::bad_alloc
-        std::ignore = co_await tinycoro::SyncAwait(scheduler, nestedTask(0), nestedTask(1));
+        std::ignore = co_await tinycoro::AllOfAwait(scheduler, nestedTask(0), nestedTask(1));
         co_return ++i;
     };
-    auto func = [&] { std::ignore = tinycoro::GetAll(scheduler, task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(scheduler, task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -326,10 +326,10 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_sync_await_throw_noexcept)
 
     auto task = [&](int32_t i) -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> {
         // this need to throw std::bad_alloc
-        std::ignore = co_await tinycoro::SyncAwait(scheduler, nestedTask(0), nestedTask(1));
+        std::ignore = co_await tinycoro::AllOfAwait(scheduler, nestedTask(0), nestedTask(1));
         co_return ++i;
     };
-    auto func = [&] { std::ignore = tinycoro::GetAll(scheduler, task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(scheduler, task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }

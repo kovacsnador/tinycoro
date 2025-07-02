@@ -147,7 +147,7 @@ TEST(SingleEventTest, SingleEventFunctionalTest_1)
         EXPECT_EQ(val, 42);
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
 }
 
 TEST(SingleEventTest, SingleEventFunctionalTest_2)
@@ -183,7 +183,7 @@ TEST(SingleEventTest, SingleEventFunctionalTest_2)
         }
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
 }
 
 TEST(SingleEventTest, SingleEventTest_cancel)

@@ -14,7 +14,7 @@ void Example_Semaphore(tinycoro::Scheduler& scheduler)
         co_return ++count;
     };
 
-    auto [c1, c2, c3] = tinycoro::GetAll(scheduler, task(), task(), task());
+    auto [c1, c2, c3] = tinycoro::AllOf(scheduler, task(), task(), task());
 
     // Every varaible should have unique value (on intel processor for sure :) ).
     // So (c1 != c2 && c2 != c3 && c3 != c1)

@@ -117,7 +117,7 @@ namespace tinycoro { namespace detail {
 
         // Sets the destroyer notifier callback
         //
-        // It is used in the "SyncAwait" like context.
+        // It is used in the "AllOfAwait" like context.
         template <std::regular_invocable T>
         void SetDestroyNotifier(T&& cb) noexcept
         {

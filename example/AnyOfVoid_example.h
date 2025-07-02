@@ -18,7 +18,7 @@ void Example_AnyOfVoid(auto& scheduler)
 
     std::stop_source source;
 
-    tinycoro::AnyOfWithStopSource(scheduler, source, task1(1s), task1(2s), task1(3s));
+    tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
 
     SyncOut() << "co_return => void" << '\n';
 }

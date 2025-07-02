@@ -279,7 +279,7 @@ template <typename ReturnT>
 struct SchedulerTestMock
 {
     template<template<typename> class PromiseT>
-    auto Enqueue()
+    auto Enqueue(auto...)
     {
         return EnqueueMethod();
     }
@@ -287,18 +287,20 @@ struct SchedulerTestMock
     MOCK_METHOD(ReturnT, EnqueueMethod, ());
 };
 
+static constexpr auto dummyTask = []()->tinycoro::Task<> { co_return; };
+
 template <typename T>
-struct AnyOfWithStopSourceTest : testing::Test
+struct AnyOfTest : testing::Test
 {
     using value_type = T;
 };
 
-using AnyOfWithStopSourceTypes
+using AnyOfTypes
     = testing::Types<std::promise<std::optional<int32_t>>, std::promise<std::optional<tinycoro::VoidType>>, tinycoro::unsafe::Promise<std::optional<int32_t>>, tinycoro::unsafe::Promise<std::optional<tinycoro::VoidType>>>;
 
-TYPED_TEST_SUITE(AnyOfWithStopSourceTest, GetAllTestWithTupleMixedTypes);
+TYPED_TEST_SUITE(AnyOfTest, GetAllTestWithTupleMixedTypes);
 
-TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
+TYPED_TEST(AnyOfTest, AnyOfTest)
 {
     using PromiseT = TestFixture::value_type;
     using ValueT   = std::decay_t<decltype(std::declval<PromiseT>().get_future().get())>;
@@ -331,20 +333,20 @@ TYPED_TEST(AnyOfWithStopSourceTest, AnyOfWithStopSourceTest)
     EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
 
-    if constexpr (requires { std::ignore = tinycoro::AnyOfWithStopSource(scheduler, stopSource); })
+    if constexpr (requires { std::ignore = tinycoro::AnyOf(scheduler, stopSource, dummyTask()); })
     {
-        auto results = tinycoro::AnyOfWithStopSource(scheduler, stopSource);
+        auto results = tinycoro::AnyOf(scheduler, stopSource, dummyTask());
         EXPECT_EQ(std::get<0>(results), ValueT{});
         EXPECT_EQ(std::get<1>(results), ValueT{});
         EXPECT_EQ(std::get<2>(results), ValueT{});
     }
     else
     {
-        EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, stopSource));
+        EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, stopSource, dummyTask()));
     }
 }
 
-TEST(AnyOfTest, AnyOfWithStopSourceTest_exception)
+TEST(AnyOfTest, AnyOfTest_exception)
 {
     auto cb = [] {
         std::promise<std::optional<tinycoro::VoidType>> promise;
@@ -355,10 +357,10 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_exception)
     SchedulerTestMock<std::invoke_result_t<decltype(cb)>> scheduler;
 
     EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
-    EXPECT_THROW(tinycoro::AnyOf(scheduler), std::runtime_error);
+    EXPECT_THROW(tinycoro::AnyOf(scheduler, dummyTask()), std::runtime_error);
 }
 
-TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t)
+TEST(AnyOfTest, AnyOfTest_single_int32_t)
 {
     auto cb = [] {
         std::promise<std::optional<int32_t>> promise;
@@ -370,13 +372,13 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t)
 
     EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
-    auto result = tinycoro::AnyOf(scheduler);
+    auto result = tinycoro::AnyOf(scheduler, dummyTask());
 
     EXPECT_TRUE((std::same_as<std::optional<int32_t>, decltype(result)>));
     EXPECT_EQ(result, 42);
 }
 
-TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t_exception)
+TEST(AnyOfTest, AnyOfTest_single_int32_t_exception)
 {
     auto cb = [] {
         std::promise<std::optional<int32_t>> promise;
@@ -388,10 +390,10 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_single_int32_t_exception)
 
     EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
-    EXPECT_THROW([&scheduler]{std::ignore = tinycoro::AnyOf(scheduler);}(), std::runtime_error);
+    EXPECT_THROW([&scheduler]{std::ignore = tinycoro::AnyOf(scheduler, dummyTask());}(), std::runtime_error);
 }
 
-TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
+TEST(AnyOfTest, AnyOfTest_multi_int32_t)
 {
     auto cb = [] {
         std::promise<std::optional<int32_t>> p1;
@@ -410,7 +412,7 @@ TEST(AnyOfTest, AnyOfWithStopSourceTest_multi_int32_t)
 
     EXPECT_CALL(scheduler, EnqueueMethod).WillOnce(testing::Invoke(cb));
 
-    auto results = tinycoro::AnyOf(scheduler);
+    auto results = tinycoro::AnyOf(scheduler, dummyTask());
 
     EXPECT_TRUE((std::same_as<std::optional<int32_t>, std::tuple_element_t<0, decltype(results)>>));
     EXPECT_TRUE((std::same_as<std::optional<int32_t>, std::tuple_element_t<1, decltype(results)>>));

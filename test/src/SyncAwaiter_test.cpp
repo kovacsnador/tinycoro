@@ -107,7 +107,7 @@ protected:
 TEST_F(SyncAwaiterTest, SyncAwaiterTest_voidTask)
 {
     auto task    = []() -> tinycoro::Task<void> { co_return; };
-    auto awaiter = tinycoro::SyncAwait(schedulerMock, task(), task());
+    auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_FALSE(resumerCalled);
@@ -124,7 +124,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_vector_voidTask)
     tasks.push_back(task());
     tasks.push_back(task());
 
-    auto awaiter = tinycoro::SyncAwait(schedulerMock, tasks);
+    auto awaiter = tinycoro::AllOfAwait(schedulerMock, tasks);
 
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_FALSE(resumerCalled);
@@ -136,7 +136,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_vector_voidTask)
 TEST_F(SyncAwaiterTest, SyncAwaiterTest_intTask)
 {
     auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
-    auto awaiter = tinycoro::SyncAwait(schedulerMock, task(), task(), task());
+    auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_FALSE(resumerCalled);
@@ -159,7 +159,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_array_intTask)
     tasks[1] = task();
     tasks[2] = task();
 
-    auto awaiter = tinycoro::SyncAwait(schedulerMock, tasks);
+    auto awaiter = tinycoro::AllOfAwait(schedulerMock, tasks);
 
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_FALSE(resumerCalled);
@@ -195,7 +195,7 @@ TEST_F(SyncAwaiterTest, AnyOfAwaitStopSource_intTask)
     std::stop_source ss;
 
     auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
-    auto awaiter = tinycoro::AnyOfStopSourceAwait(schedulerMock, ss, task(), task(), task());
+    auto awaiter = tinycoro::AnyOfAwait(schedulerMock, ss, task(), task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_FALSE(resumerCalled);
@@ -217,7 +217,7 @@ tinycoro::Task<std::string> AsyncAwaiterTest1(auto& scheduler)
     auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
     auto task3 = []() -> tinycoro::Task<std::string> { co_return "789"; };
 
-    auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+    auto tupleResult = co_await tinycoro::AllOfAwait(scheduler, task1(), task2(), task3());
 
     // tuple accumulate
     co_return std::apply(
@@ -243,7 +243,7 @@ tinycoro::Task<void> AsyncAwaiterTest2(auto& scheduler)
     auto task2 = []() -> tinycoro::Task<void> { co_return; };
     auto task3 = []() -> tinycoro::Task<void> { co_return; };
 
-    co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+    co_await tinycoro::AllOfAwait(scheduler, task1(), task2(), task3());
 }
 
 TEST(AsyncAwaiterTest2, AsyncAwaiterTest2)
@@ -303,7 +303,7 @@ tinycoro::Task<void> AnyOfCoAwaitTest2(auto& scheduler)
 
     auto stopSource = co_await tinycoro::this_coro::stop_source();
 
-    auto results = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
+    auto results = co_await tinycoro::AnyOfAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
     EXPECT_TRUE(std::get<0>(results).value() > 0);
     EXPECT_FALSE(std::get<1>(results).has_value());
@@ -342,13 +342,13 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
             co_return "tee";
         };
 
-        // The `SyncAwait` ensures both `Toast()` and `Coffee()` are executed concurrently.
-        auto [toast, coffee, tee] = co_await tinycoro::SyncAwait(scheduler, Toast(), Coffee(), Tee());
+        // The `AllOfAwait` ensures both `Toast()` and `Coffee()` are executed concurrently.
+        auto [toast, coffee, tee] = co_await tinycoro::AllOfAwait(scheduler, Toast(), Coffee(), Tee());
         co_return *toast + " + " + *coffee + " + " + *tee;
     };
 
     // Start the asynchronous execution of the Breakfast task.
-    auto breakfast = tinycoro::GetAll(scheduler, task(scheduler));
+    auto breakfast = tinycoro::AllOf(scheduler, task(scheduler));
     EXPECT_TRUE(breakfast == "toast + coffee + tee");
 }
 
@@ -376,7 +376,7 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
             tasks.push_back(task());
         }
 
-        auto results = co_await tinycoro::SyncAwait(scheduler, std::move(tasks));
+        auto results = co_await tinycoro::AllOfAwait(scheduler, std::move(tasks));
 
         EXPECT_EQ(results.size(), count);
 
@@ -390,7 +390,7 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
         }
     };
 
-    tinycoro::RunInline(coro());
+    tinycoro::AllOfInline(coro());
 }
 
 TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
@@ -427,7 +427,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
         }
     };
 
-    tinycoro::RunInline(coro());
+    tinycoro::AllOfInline(coro());
 }
 
 TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
@@ -464,7 +464,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
         }
     };
 
-    tinycoro::RunInline(coro());
+    tinycoro::AllOfInline(coro());
 }
 
 TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
@@ -500,7 +500,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
         EXPECT_EQ(count, 1);
     };
 
-    tinycoro::RunInline(coro());
+    tinycoro::AllOfInline(coro());
 }
 
 TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
@@ -534,5 +534,5 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         EXPECT_EQ(count, 0);
     };
 
-    tinycoro::RunInline(coro());
+    tinycoro::AllOfInline(coro());
 }

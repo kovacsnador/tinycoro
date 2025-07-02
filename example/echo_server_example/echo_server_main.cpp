@@ -170,7 +170,7 @@ tinycoro::Task<void> EPoll(auto& newConnectionChannel, auto& receiveChannel, fil
 
         // run cleanup coroutine on the current thread
         // if we leave the coroutine task
-        tinycoro::RunInline(cleanUp()); 
+        tinycoro::AllOfInline(cleanUp()); 
     });
 
     // Create epoll instance

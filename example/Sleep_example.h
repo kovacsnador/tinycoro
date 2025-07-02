@@ -17,7 +17,7 @@ void Example_sleep(auto& scheduler)
         co_return 42;
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
 
     SyncOut() << "co_return => " << *val << '\n';
 }

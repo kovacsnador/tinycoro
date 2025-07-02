@@ -260,7 +260,7 @@ TEST_F(ExampleTest, Example_multiTaskDifferentValues)
 
     auto task3 = []() -> tinycoro::Task<S> { co_return 43; };
 
-    auto results = tinycoro::GetAll(scheduler, task1(), task2(), task3());
+    auto results = tinycoro::AllOf(scheduler, task1(), task2(), task3());
 
     auto voidType = std::get<0>(results);
 
@@ -389,7 +389,7 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_exception)
         co_return 42;
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
     EXPECT_EQ(val, 42);
 }
 
@@ -408,7 +408,7 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_void_exception)
             cb), std::runtime_error);
     };
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, task()));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, task()));
 }
 
 TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle)
@@ -462,7 +462,7 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyle_exception)
         co_return userData;
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
     EXPECT_EQ(val, 21);
 }
 
@@ -506,7 +506,7 @@ TEST_F(ExampleTest, Example_asyncCallbackAwaiter_CStyleVoid_exception)
         co_await task2();
     };
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, task1()));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, task1()));
 }
 
 TEST_F(ExampleTest, Example_asyncCallbackAwaiterWithReturnValue)
@@ -589,7 +589,7 @@ TEST_F(ExampleTest, Example_AnyOfVoid)
     };
 
     std::stop_source source;
-    EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, task1(1s), task1(2s), task1(3s)));
+    EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s)));
 }
 
 TEST_F(ExampleTest, Example_AnyOf)
@@ -663,7 +663,7 @@ TEST_F(ExampleTest, Example_AnyOfDynamicVoid)
     tasks.push_back(task1(20ms));
     tasks.push_back(task1(30ms));
 
-    EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, std::move(tasks)));
+    EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, source, std::move(tasks)));
 }
 
 TEST_F(ExampleTest, Example_AnyOfVoidException)
@@ -743,7 +743,7 @@ TEST_F(ExampleTest, ExampleSyncAwait)
         auto task3 = []() -> tinycoro::Task<std::string> { co_return "123"; };
 
         // waiting to finish all other tasks. (non blocking)
-        auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+        auto tupleResult = co_await tinycoro::AllOfAwait(scheduler, task1(), task2(), task3());
 
         // tuple accumulate
         co_return std::apply(
@@ -770,7 +770,7 @@ TEST_F(ExampleTest, ExampleSyncAwaitException)
         auto task3 = []() -> tinycoro::Task<std::string> { co_return "123"; };
 
         // waiting to finish all other tasks. (non blocking)
-        auto tupleResult = co_await tinycoro::SyncAwait(scheduler, task1(), task2(), task3());
+        auto tupleResult = co_await tinycoro::AllOfAwait(scheduler, task1(), task2(), task3());
 
         // tuple accumulate
         co_return std::apply(
@@ -806,7 +806,7 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
 
         auto stopSource = co_await tinycoro::this_coro::stop_source();
 
-        auto [t1, t2, t3] = co_await tinycoro::AnyOfStopSourceAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
+        auto [t1, t2, t3] = co_await tinycoro::AnyOfAwait(scheduler, stopSource, task1(100ms), task1(2s), task1(3s));
 
         EXPECT_TRUE(*t1 > 0);
         EXPECT_FALSE(t2.has_value());
@@ -815,5 +815,5 @@ TEST_F(ExampleTest, ExampleAnyOfCoAwait)
         EXPECT_TRUE(std::chrono::system_clock::now() - now < 500ms);
     };
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, anyOfCoAwaitTest(scheduler)));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, anyOfCoAwaitTest(scheduler)));
 }

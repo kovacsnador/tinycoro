@@ -14,7 +14,7 @@ void Example_voidTask(auto& scheduler)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, task());
+    tinycoro::AllOf(scheduler, task());
 
     SyncOut() << "co_return => void" << '\n';
 }

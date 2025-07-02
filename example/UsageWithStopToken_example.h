@@ -38,7 +38,7 @@ void Example_usageWithStopToken(auto& scheduler)
 
     std::stop_source source;
 
-    auto results = tinycoro::GetAll(scheduler, task1(1s, source), task2(source.get_token()));
+    auto results = tinycoro::AllOf(scheduler, task1(1s, source), task2(source.get_token()));
 
     auto task2Val = std::get<1>(results);
 

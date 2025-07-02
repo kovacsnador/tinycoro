@@ -31,9 +31,9 @@ void Example_multiMovedTasksDynamic(auto& scheduler)
     tasks.push_back(task2());
     tasks.push_back(task3());
 
-    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
+    auto results = tinycoro::AllOf(scheduler, std::move(tasks));
 
-    SyncOut() << "GetAll co_return => " << *results[0] << ", " << *results[1] << ", " << *results[2] << '\n';
+    SyncOut() << "AllOf co_return => " << *results[0] << ", " << *results[1] << ", " << *results[2] << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_MULTI_MOVED_TASKS_DYNAMIC_H__

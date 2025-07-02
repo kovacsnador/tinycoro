@@ -127,7 +127,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_sleep)
 
     auto start  = std::chrono::system_clock::now();
 
-    tinycoro::GetAll(scheduler, stopRequester(), sleepInterruptTask(timeout1), sleepInterruptTask(timeout2));
+    tinycoro::AllOf(scheduler, stopRequester(), sleepInterruptTask(timeout1), sleepInterruptTask(timeout2));
 
     auto end = std::chrono::system_clock::now();
 
@@ -170,7 +170,7 @@ TEST_F(SleepAwaiterTest, SimpleSleepAwaiterTest_interrupt_sleep_cancellable)
 
     auto start = std::chrono::system_clock::now();
 
-    tinycoro::GetAll(scheduler, stopRequester(), sleepInterruptTask(timeout1));
+    tinycoro::AllOf(scheduler, stopRequester(), sleepInterruptTask(timeout1));
 
     auto end = std::chrono::system_clock::now();
 
@@ -233,6 +233,6 @@ TEST_P(SleepAwaiterStressTest, SleepAwaiterStressTest_sleepFor)
             co_await tinycoro::SleepFor<SleepAwaiterStressTest::Allocator>(clock, duration);
         };
 
-        EXPECT_NO_THROW(tinycoro::AnyOfWithStopSource(scheduler, source, task(1ms), task(2s), task(3s)));
+        EXPECT_NO_THROW(tinycoro::AnyOf(scheduler, source, task(1ms), task(2s), task(3s)));
     }
 }

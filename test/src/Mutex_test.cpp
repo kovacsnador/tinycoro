@@ -63,7 +63,7 @@ TEST_P(MutexTest, MutexFunctionalTest_1)
         tasks.push_back(task());
     }
 
-    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
+    auto results = tinycoro::AllOf(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;
@@ -101,7 +101,7 @@ TEST_P(MutexStressTest, MutexFunctionalStressTest_1)
     };
 
     // starting 8 async tasks at the same time
-    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+    tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
     EXPECT_EQ(count, size * 8);
 }

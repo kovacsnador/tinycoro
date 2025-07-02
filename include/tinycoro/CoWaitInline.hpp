@@ -3,15 +3,15 @@
 //  Licensed under the MIT License – see LICENSE.txt for details.
 // -----------------------------------------------------------------------------
 
-#ifndef TINY_CORO_INLINE_AWAIT_HPP
-#define TINY_CORO_INLINE_AWAIT_HPP
+#ifndef TINY_CORO_CO_WAIT_INLINE_HPP
+#define TINY_CORO_CO_WAIT_INLINE_HPP
 
 #include <tuple>
 #include <atomic>
 #include <stop_token>
 
 #include "Common.hpp"
-#include "RunInline.hpp"
+#include "WaitInline.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -32,18 +32,18 @@ namespace tinycoro {
         };
 
         template <typename...>
-        struct InlineAwaitT;
+        struct AllOfAwaitT;
 
         // Container specialization
         template <concepts::Iterable ContainerT>
-        struct InlineAwaitT<ContainerT> : InlineAwaitBase
+        struct AllOfAwaitT<ContainerT> : InlineAwaitBase
         {
-            InlineAwaitT(ContainerT& container)
+            AllOfAwaitT(ContainerT& container)
             : _container{container}
             {
             }
 
-            [[nodiscard]] auto await_resume() { return tinycoro::RunInline(_container); }
+            [[nodiscard]] auto await_resume() { return tinycoro::AllOfInline(_container); }
 
         private:
             ContainerT& _container;
@@ -52,16 +52,16 @@ namespace tinycoro {
         // Task specialization
         template <concepts::IsCorouitneTask... Tasks>
             requires (sizeof...(Tasks) > 0)
-        struct InlineAwaitT<Tasks...> : InlineAwaitBase
+        struct AllOfAwaitT<Tasks...> : InlineAwaitBase
         {
-            InlineAwaitT(Tasks&&... tasks)
+            AllOfAwaitT(Tasks&&... tasks)
             : _tasks{std::forward_as_tuple(std::forward<Tasks>(tasks)...)}
             {
             }
 
             [[nodiscard]] auto await_resume()
             {
-                return std::apply([&]<typename... Args>(Args&&... tasks) { return tinycoro::RunInline(std::forward<Args>(tasks)...); }, _tasks);
+                return std::apply([&]<typename... Args>(Args&&... tasks) { return tinycoro::AllOfInline(std::forward<Args>(tasks)...); }, _tasks);
             }
 
         private:
@@ -69,13 +69,13 @@ namespace tinycoro {
         };
 
         template <typename...>
-        struct AnyOfInlineAwaitT;
+        struct AnyOfAwaitT;
 
         template <concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... Tasks>
             requires (sizeof...(Tasks) > 0)
-        struct AnyOfInlineAwaitT<StopSourceT, Tasks...> : InlineAwaitBase
+        struct AnyOfAwaitT<StopSourceT, Tasks...> : InlineAwaitBase
         {
-            AnyOfInlineAwaitT(StopSourceT stopSource, Tasks&&... tasks)
+            AnyOfAwaitT(StopSourceT stopSource, Tasks&&... tasks)
             : _tasks{std::forward_as_tuple(std::forward<Tasks>(tasks)...)}
             , _stopSource{std::move(stopSource)}
             {
@@ -83,7 +83,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto await_resume()
             {
-                return std::apply([&]<typename... Args>(Args&&... tasks) { return tinycoro::AnyOfWithStopSourceInline(std::move(_stopSource), std::forward<Args>(tasks)...); }, _tasks);
+                return std::apply([&]<typename... Args>(Args&&... tasks) { return tinycoro::AnyOfInline(std::move(_stopSource), std::forward<Args>(tasks)...); }, _tasks);
             }
 
         private:
@@ -92,15 +92,15 @@ namespace tinycoro {
         };
 
         template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
-        struct AnyOfInlineAwaitT<StopSourceT, ContainerT> : InlineAwaitBase
+        struct AnyOfAwaitT<StopSourceT, ContainerT> : InlineAwaitBase
         {
-            AnyOfInlineAwaitT(StopSourceT stopSource, ContainerT& container)
+            AnyOfAwaitT(StopSourceT stopSource, ContainerT& container)
             : _container{container}
             , _stopSource{std::move(stopSource)}
             {
             }
 
-            [[nodiscard]] auto await_resume() { return tinycoro::AnyOfWithStopSourceInline(std::move(_stopSource), _container); }
+            [[nodiscard]] auto await_resume() { return tinycoro::AnyOfInline(std::move(_stopSource), _container); }
 
         private:
             ContainerT& _container;
@@ -113,38 +113,59 @@ namespace tinycoro {
         // the constructors of the primary template only,
         // not of the specializations.
         template<typename T>
-        InlineAwaitT(T) -> InlineAwaitT<T>;
+        AllOfAwaitT(T) -> AllOfAwaitT<T>;
 
         template<typename... T>
-        InlineAwaitT(T...) -> InlineAwaitT<T...>;
+        AllOfAwaitT(T...) -> AllOfAwaitT<T...>;
 
 
         template<typename S, typename T>
-        AnyOfInlineAwaitT(S, T) -> AnyOfInlineAwaitT<S, T>;
+        AnyOfAwaitT(S, T) -> AnyOfAwaitT<S, T>;
 
         template<typename S, typename... T>
-        AnyOfInlineAwaitT(S, T...) -> AnyOfInlineAwaitT<S, T...>;
+        AnyOfAwaitT(S, T...) -> AnyOfAwaitT<S, T...>;
 
     } // namespace detail
 
-    template <typename... Args>
-    [[nodiscard]] auto InlineAwait(Args&&... args)
+    template <concepts::IsCorouitneTask... Args>
+        requires (sizeof...(Args) > 0)
+    [[nodiscard]] auto AllOfInlineAwait(Args&&... args)
     {
-        return detail::InlineAwaitT{std::forward<Args>(args)...};
+        return detail::AllOfAwaitT{std::forward<Args>(args)...};
     }
 
-    template <concepts::IsStopSource StopSourceT, typename... Args>
+    template <concepts::Iterable ContainerT>
+    [[nodiscard]] auto AllOfInlineAwait(ContainerT&& container)
+    {
+        return detail::AllOfAwaitT{std::forward<ContainerT>(container)};
+    }
+
+    template <concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... Args>
+        requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AnyOfInlineAwait(StopSourceT& stopSource, Args&&... args)
     {
-        return detail::AnyOfInlineAwaitT{stopSource, std::forward<Args>(args)...};
+        return detail::AnyOfAwaitT{stopSource, std::forward<Args>(args)...};
+    }
+
+    template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
+    [[nodiscard]] auto AnyOfInlineAwait(StopSourceT& stopSource, ContainerT&& container)
+    {
+        return detail::AnyOfAwaitT{stopSource, std::forward<ContainerT>(container)};
     }
 
     template <concepts::IsCorouitneTask... Args>
+        requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AnyOfInlineAwait(Args&&... args)
     {
-        return detail::AnyOfInlineAwaitT{std::stop_source{}, std::forward<Args>(args)...};
+        return detail::AnyOfAwaitT{std::stop_source{}, std::forward<Args>(args)...};
+    }
+
+    template <concepts::Iterable ContainerT>
+    [[nodiscard]] auto AnyOfInlineAwait(ContainerT&& container)
+    {
+        return detail::AnyOfAwaitT{std::stop_source{}, std::forward<ContainerT>(container)};
     }
 
 } // namespace tinycoro
 
-#endif // TINY_CORO_INLINE_AWAIT_HPP
+#endif // TINY_CORO_CO_WAIT_INLINE_HPP

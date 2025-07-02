@@ -319,7 +319,7 @@ TEST_P(BarrierTest, BarrierFunctionalTest_1)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(number, 0);
 }
@@ -364,7 +364,7 @@ TEST(BarrierTest, BarrierFunctionalTest_2)
         co_return name;
     };
 
-    auto [anil, busara, carl] = tinycoro::GetAll(scheduler, work(workers[0]), work(workers[1]), work(workers[2]));
+    auto [anil, busara, carl] = tinycoro::AllOf(scheduler, work(workers[0]), work(workers[1]), work(workers[2]));
 
     EXPECT_EQ(anil, workers[0]);
     EXPECT_EQ(busara, workers[1]);
@@ -423,7 +423,7 @@ TEST(BarrierTest, BarrierFewerTasksThanCount)
     };
 
     // Run all tasks
-    tinycoro::GetAll(scheduler, task(), task(), controlTask());
+    tinycoro::AllOf(scheduler, task(), task(), controlTask());
 
     EXPECT_EQ(number, 202);
     EXPECT_EQ(completion_count, 1);
@@ -467,7 +467,7 @@ TEST(BarrierTest, BarrierFewerTasksThanCount_withControlComplitionCallback)
     };
 
     // Run all tasks
-    tinycoro::GetAll(scheduler, task(), task());
+    tinycoro::AllOf(scheduler, task(), task());
 
     EXPECT_EQ(number, 202);
     EXPECT_EQ(completion_count, 1);
@@ -505,7 +505,7 @@ TEST_P(BarrierTest, BarrierTest_functionalTest_3)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST(BarrierTest, BarrierTest_functionalTest_cancel_scheduler)
@@ -574,7 +574,7 @@ TEST(BarrierTest, BarrierTest_preset_stopSource_cancel)
     auto task2 = [&]() -> tinycoro::Task<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
     stopSource.request_stop();
-    tinycoro::AnyOfWithStopSource(scheduler, stopSource, task2(), task1());
+    tinycoro::AnyOf(scheduler, stopSource, task2(), task1());
 
     // all the coroutines are cancelled before the execution.
     EXPECT_EQ(count, 0);
@@ -582,7 +582,7 @@ TEST(BarrierTest, BarrierTest_preset_stopSource_cancel)
     auto taskNic1 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.Wait()); };
     auto taskNic2 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
-    tinycoro::AnyOfWithStopSource(scheduler, stopSource, taskNic1(), taskNic2());
+    tinycoro::AnyOf(scheduler, stopSource, taskNic1(), taskNic2());
 
     // The tasks are not initiali cancellable
     // so they will run and increase the count variable.
@@ -602,14 +602,14 @@ TEST(BarrierTest, BarrierTest_preset_stopSource_inline)
     auto task2 = [&]() -> tinycoro::Task<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
     stopSource.request_stop();
-    tinycoro::AnyOfWithStopSourceInline(stopSource, task2(), task1());
+    tinycoro::AnyOfInline(stopSource, task2(), task1());
 
     EXPECT_EQ(count, 0);
 
     auto taskNic1 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.Wait()); };
     auto taskNic2 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
-    tinycoro::AnyOfWithStopSourceInline(stopSource, taskNic2(), taskNic1());
+    tinycoro::AnyOfInline(stopSource, taskNic2(), taskNic1());
 
     EXPECT_EQ(count, 2);
 }
@@ -689,7 +689,7 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
     }
     tasks.push_back(worker());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST(BarrierTest, BarrierTest_completionException)
@@ -707,6 +707,6 @@ TEST(BarrierTest, BarrierTest_completionException)
         fullyCompleted++;
     };
 
-    EXPECT_THROW(tinycoro::GetAll(scheduler, task(), task()), std::runtime_error);
+    EXPECT_THROW(tinycoro::AllOf(scheduler, task(), task()), std::runtime_error);
     EXPECT_EQ(fullyCompleted, 1);
 }

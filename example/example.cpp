@@ -98,7 +98,7 @@ int main()
 
         Example_CustomAwaiter(scheduler);
 
-        auto val = tinycoro::GetAll(scheduler, Example_SyncAwait(scheduler));
+        auto val = tinycoro::AllOf(scheduler, Example_SyncAwait(scheduler));
         SyncOut() << *val << '\n';
 
         scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();

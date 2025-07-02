@@ -22,7 +22,7 @@ void Example_nestedTask(auto& scheduler)
         co_return val;
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
 
     SyncOut() << "co_return => " << *val << '\n';
 }

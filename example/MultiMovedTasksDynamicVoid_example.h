@@ -31,8 +31,7 @@ void Example_multiMovedTasksDynamicVoid(auto& scheduler)
     tasks.push_back(task2());
     tasks.push_back(task3());
 
-    auto futures = scheduler.Enqueue(std::move(tasks));
-    tinycoro::GetAll(futures);
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 #endif //!__TINY_CORO_EXAMPLE_MULTI_MOVED_TASKS_DYNAMIC_VOID_H__

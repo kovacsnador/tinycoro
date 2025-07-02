@@ -36,7 +36,7 @@ void Example_asyncCallbackAwaiterWithReturnValue(auto& scheduler)
         co_return s.i;
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
     SyncOut() << "co_return => " << *val << '\n';
 }
 

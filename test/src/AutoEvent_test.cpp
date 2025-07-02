@@ -146,7 +146,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest)
     }
     tasks.push_back(autoEventProducer());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
@@ -171,7 +171,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_preset)
         tasks.push_back(autoEventConsumer());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(count, autoCount);
 }
@@ -345,7 +345,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
         tasks.push_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     // Since event is auto-resetting, each Set should trigger only one waiter
     EXPECT_EQ(counter, GetParam());
@@ -363,7 +363,7 @@ TEST(AutoEventTest, AutoEventFunctionalTest_setBeforeAwait)
         waited = true;
     };
 
-    tinycoro::GetAll(scheduler, task());
+    tinycoro::AllOf(scheduler, task());
 
     // Since the event was set before co_await, waited should be true
     EXPECT_TRUE(waited);
@@ -395,7 +395,7 @@ TEST_P(AutoEventStressTest, AutoEventStressTest_1)
     };
 
     // starting 8 async tasks at the same time
-    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+    tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
     EXPECT_EQ(count, size * 8);
 }

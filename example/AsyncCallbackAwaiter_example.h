@@ -35,7 +35,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
 
     try
     {
-        auto val = tinycoro::GetAll(scheduler, task());
+        auto val = tinycoro::AllOf(scheduler, task());
         SyncOut() << "co_return => " << *val << '\n';
     }
     catch (const std::exception& e)
@@ -43,7 +43,7 @@ void Example_asyncCallbackAwaiter(auto& scheduler)
         std::cerr << e.what() << '\n';
     }
 
-    // auto val = tinycoro::GetAll(scheduler, task());
+    // auto val = tinycoro::AllOf(scheduler, task());
     // SyncOut() << "co_return => " << *val << '\n';
 }
 
