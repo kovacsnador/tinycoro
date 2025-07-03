@@ -115,7 +115,7 @@ Finally, we create a `tinycoro::Scheduler` to manage the execution of the Breakf
     std::cout << "Breakfast is " << *breakfast << ", Total time " << sec << '\n'; 
 ```
 -------
-### Complition callback example
+### Completion callback example
 Imagine you have two asynchronous API calls, and one needs to wait for the other to finish. A common example of this scenario might look like the following in traditional C++:
 
 ```cpp
@@ -227,33 +227,31 @@ This approach removes all callback semantics, improves readability and maintaina
 
 ### `How to invoke the coroutine functions`
 
-All you need is a `tinycoro::Scheduler`. In most cases, you'll only need a single instance of the scheduler, but you can use multiple instances if necessary. The Scheduler's `Enqueue(..)` function returns a traditional `std::future`, allowing you to call the `get()` method as you normally would. In this example, the type of the returned future is `std::future<std::optional<std::string>>`.
-We use `std::optinal` as the return value, because we need to handle potential task cancellations.
-```cpp
-try
-{
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+You can run coroutine tasks in **tinycoro** either **inline (on the current thread)** or via a **`Scheduler` (multi-threaded)**. Using the helper functions like `AllOf`, `AnyOf` or `AllOfInline` is **recommended** for their **improved safety, composability, and cancellation support**.
 
-    std::future<std::optional<std::string>> future = scheduler.Enqueue(MyCoroutine());
-    std::cout << future.get().value() << '\n';
-}
-catch(const std::exception& e)
-{
-    std::cerr << e.what() << '\n';  // Exception: "Invalid data input."
+---
+
+#### ✅ Without a scheduler — cooperative, inline execution
+
+For single-threaded, inline usage, `AllOfInline` is the preferred helper. It runs multiple `tinycoro::Task` or `tinycoro::InlineTask` instances and returns a tuple of `std::optional<T>` results.
+
+```cpp
+auto [res1, res2] = tinycoro::AllOfInline(Task1(), InlineTask2());
+if (res1 && res2) {
+    std::cout << *res1 << " and " << *res2 << '\n';
 }
 ```
 
-Alternatively, you can use helper functions to aggregate the value or values of multiple futures. For instance, the `tinycoro::AllOf` function simplifies this process:
+#### ✅ With a scheduler — concurrent execution using threads
+The Scheduler allows you to run coroutines concurrently across multiple threads. Using `AllOf` safely aggregates the results of multiple `tinycoro::Tasks`.
 ```cpp
-try
-{
-    auto result = tinycoro::AllOf(scheduler, MyCoroutine());
-    std::cout << *result << '\n';
+tinycoro::Scheduler scheduler;
+
+auto [res1, res2] = tinycoro::AllOf(scheduler, Task1(), Task2());
+if (res1 && res2) {
+    std::cout << *res1 << " and " << *res2 << '\n';
 }
-catch(const std::exception& e)
-{
-    std::cerr << e.what() << '\n';  // Exception: "Invalid data input."
-}
+
 ```
 
 ## Usage
@@ -321,9 +319,9 @@ The yielded values are retrieved one by one using `co_await`, and the final valu
 auto generator = [](int32_t max) -> tinycoro::Task<int32_t> {
     for (auto it : std::views::iota(0, max))
     {
-        co_yield it;
+        co_yield it;    // yield a value
     }
-    co_return max;
+    co_return max;  // return the max value
 };
 
 auto consumer = [gen = generator](int32_t max) -> tinycoro::Task<void> {
@@ -422,7 +420,7 @@ You can use it in two modes:
 
 ---
 
-### With Scheduler (Synchronous)
+### With Scheduler (Parallel)
 
 Runs all given `tinycoro::Task`s using the provided scheduler. Blocks until **all** tasks finish.
 
@@ -450,7 +448,7 @@ tinycoro::AllOfInline(task1, task2, ...); // task1, task2 can be Task or InlineT
 
 ---
 
-### With Scheduler (Coroutine)
+### With Scheduler (Parallel)
 
 Asynchronously waits for all `tinycoro::Task`s to complete via the scheduler.
 
@@ -464,7 +462,7 @@ co_await AllOfAwait(scheduler, task1, task2, ...); // each task is a tinycoro::T
 
 ---
 
-### Inline Execution (Coroutine)
+### Inline Execution (Synchronous)
 
 Asynchronously waits for all tasks to complete on the current coroutine thread.
 
@@ -496,7 +494,7 @@ Same pattern applies here:
 
 ---
 
-### With Scheduler (Synchronous)
+### With Scheduler (Parallel)
 
 Runs all `tinycoro::Task`s via the scheduler. Blocks until **any one** finishes.
 
@@ -538,7 +536,7 @@ tinycoro::AnyOf(scheduler, stopSource, task1, task2, ...);
 
 ---
 
-### With Scheduler (Coroutine)
+### With Scheduler (Parallel)
 
 Asynchronously races `tinycoro::Task`s via the scheduler.
 
@@ -553,7 +551,7 @@ co_await AnyOfAwait(scheduler, stopSource, task1, task2, ...);
 
 ---
 
-### Inline Execution (Coroutine)
+### Inline Execution (Synchronous)
 
 Asynchronously races all tasks in the current coroutine context.
 
@@ -576,15 +574,15 @@ co_await AnyOfInlineAwait(stopSource, task1, task2, ...);
 
 ## `InlineTask`
 
-`tinycoro::InlineTask<T>` is a **lightweight coroutine type** with the same cancellation support as `Task<T>`, but it differs in several important ways:
+`tinycoro::InlineTask<T>` is a **lightweight coroutine type** with the same cancellation support as `tinycoro::Task<T>`, but it differs in several important ways:
 
 - It does **not** interact with the `tinycoro::Scheduler`.
 - It always runs **on the current thread**, no asynchronous execution.
-- It uses **significantly less memory** than `Task`, since it doesn't need to store any scheduling state.
+- It uses **significantly less memory** than `tinycoro::Task`, since it doesn't need to store any scheduling state.
 
 This makes `InlineTask` ideal for **local, synchronous coroutine flows** where you don't need scheduling or cross-thread execution.
 
-You can `co_await` an `InlineTask` directly from within another coroutine, or run it synchronously using the `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)` helper function.
+You can `co_await` an `InlineTask` directly from within another coroutine, or run it synchronously using the `tinycoro::AllOfInline(...)` or `tinycoro::AnyOfInline(...)` helper function.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -608,8 +606,7 @@ void RunExample()
     //
     // You don't need to be inside a coroutine context
     // to use AllOf — it works in any regular function too.
-tinycoro::AllOf(scheduler, InlineTask(1), InlineTask(2)); // Error
-    auto [val_41, val_42] = tinycoro::AllOf(InlineTask(41), InlineTask(42));
+    auto [val_41, val_42] = tinycoro::AllOfInline(InlineTask(41), InlineTask(42)); // Ok
 }
 ```
 
@@ -621,7 +618,7 @@ tinycoro::AllOf(scheduler, InlineTask(1), InlineTask(2)); // Error
 tinycoro::AllOf(scheduler, InlineTask(1), InlineTask(2)); // Error
 
 // ✅ Use this instead if you want synchronous execution:
-tinycoro::AllOf(InlineTask(1), InlineTask(2)); // OK
+tinycoro::AllOfInline(InlineTask(1), InlineTask(2)); // OK
 ```
 
 ### When to use `InlineTask`
@@ -711,7 +708,7 @@ struct MyClass
 ```
 
 ### `ReturnValueTask`
-When you schedule a task using the `tinycoro::Scheduler`, you can use the `std::future` returned by the scheduler to retrieve the result of the coroutine, just like with any other asynchronous task.
+When you schedule a task using the `tinycoro::AllOf`, you can use the `std::optional` returned by the function to retrieve the result of the coroutine.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -727,7 +724,7 @@ void Example_returnValueTask(tinycoro::Scheduler& scheduler)
 ```
 
 ### `ExceptionTask`
-When scheduling tasks using tinycoro::Scheduler, exceptions thrown within a coroutine are propagated through the `std::future`. You can handle these exceptions using the traditional way with the `try-catch` approach when calling `future.get()`.
+When scheduling tasks using `tinycoro::AllOf`, exceptions thrown within a coroutine are propagated through. You can handle these exceptions using the traditional way with the `try-catch` approach.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -1050,7 +1047,7 @@ void Example_AnyOfVoid(tinycoro::Scheduler& scheduler)
 
     std::stop_source source;
 
-    // start multiple tasks and wait for the first to complete and cancel all other.
+    // start multiple tasks and wait for the first to complete and cancel all others.
     tinycoro::AnyOf(scheduler, source, task1(1s), task1(2s), task1(3s));
 }
 ```
@@ -1152,7 +1149,7 @@ tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
         co_return count;
     };
 
-    // Nonblocking wait for other tasks
+    // Nonblocking wait for the first task to complete.
     auto [t1, t2, t3] = co_await tinycoro::AnyOfAwaitAsync(scheduler, task1(1s), task1(2s), task1(3s));
 }
 ```
