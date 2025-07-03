@@ -14,9 +14,9 @@ void Example_multiTasks(auto& scheduler)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, task(), task(), task());
+    tinycoro::AllOf(scheduler, task(), task(), task());
 
-    SyncOut() << "GetAll co_return => void" << '\n';
+    SyncOut() << "co_return => void" << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_MULTI_TASKS_H__

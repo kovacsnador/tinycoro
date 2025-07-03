@@ -139,7 +139,7 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
         EXPECT_EQ(val, 3u);
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
 }
 
 TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
@@ -187,7 +187,7 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
         EXPECT_EQ(val, 4u);
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
 }
 
 struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
@@ -241,7 +241,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_pop)
     };
 
     auto [v1, v2, v3, v4, v5, v6, v7, v8]
-        = tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+        = tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
 
     auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
@@ -266,7 +266,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, producer(), producer(), producer(), producer(), producer(), producer(), producer(), producer());
+    tinycoro::AllOf(scheduler, producer(), producer(), producer(), producer(), producer(), producer(), producer(), producer());
 
     EXPECT_FALSE(queue.empty());
 
@@ -281,7 +281,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
     };
 
     auto [v1, v2, v3, v4, v5, v6, v7, v8]
-        = tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+        = tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
 
     auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
@@ -328,7 +328,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
         co_return c;
     };
 
-    auto [v9, v10, v11, v12, v13, v14, v15, v16, v1, v2, v3, v4, v5, v6, v7, v8] = tinycoro::GetAll(scheduler,
+    auto [v9, v10, v11, v12, v13, v14, v15, v16, v1, v2, v3, v4, v5, v6, v7, v8] = tinycoro::AllOf(scheduler,
                                                                                                     producer(),
                                                                                                     producer(),
                                                                                                     producer(),
@@ -393,7 +393,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler,
+    tinycoro::AllOf(scheduler,
                      producer(),
                      producer(),
                      producer(),

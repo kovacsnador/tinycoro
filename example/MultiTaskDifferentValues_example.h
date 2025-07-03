@@ -36,12 +36,12 @@ void Example_multiTaskDifferentValues(auto& scheduler)
 
     try
     {
-        auto [voidType, val, s] = tinycoro::GetAll(scheduler, task1(), task2(), task3());
+        auto [voidType, val, s] = tinycoro::AllOf(scheduler, task1(), task2(), task3());
 
-        SyncOut() << std::boolalpha << "GetAll task1 co_return => void " << std::is_same_v<std::optional<tinycoro::VoidType>, std::decay_t<decltype(voidType)>>
+        SyncOut() << std::boolalpha << "AllOf task1 co_return => void " << std::is_same_v<std::optional<tinycoro::VoidType>, std::decay_t<decltype(voidType)>>
                   << '\n';
-        SyncOut() << "GetAll task2 co_return => " << *val << '\n';
-        SyncOut() << "GetAll task3 co_return => " << (*s).i << '\n';
+        SyncOut() << "AllOf task2 co_return => " << *val << '\n';
+        SyncOut() << "AllOf task3 co_return => " << (*s).i << '\n';
     }
     catch (const std::exception& e)
     {

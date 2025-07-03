@@ -53,7 +53,7 @@ void Example_CustomAwaiter(auto& scheduler)
         co_return val;
     };
 
-    auto val = tinycoro::GetAll(scheduler, asyncTask());
+    auto val = tinycoro::AllOf(scheduler, asyncTask());
 
     SyncOut() << "co_return => " << *val << '\n'; 
 }

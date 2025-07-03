@@ -36,7 +36,7 @@ TEST_P(YieldValueTest, YieldValueTest_generator)
         EXPECT_EQ(co_await task, max);
     };
 
-    tinycoro::GetAll(scheduler, consumer(count));
+    tinycoro::AllOf(scheduler, consumer(count));
 }
 
 // Disable code becasue of GCC-11 bug.
@@ -69,7 +69,7 @@ TEST(YieldValueTest, YieldValueTest_variant_yield)
         EXPECT_EQ(std::get<bool>(val), true);
     };
 
-    tinycoro::GetAll(scheduler, runner());
+    tinycoro::AllOf(scheduler, runner());
 }
 
 TEST(YieldValueTest, YieldValueTest_variant_yield_runinline)
@@ -86,7 +86,7 @@ TEST(YieldValueTest, YieldValueTest_variant_yield_runinline)
         EXPECT_EQ(std::get<bool>(val), true);
     };
 
-    tinycoro::RunInline(runner());
+    tinycoro::AllOfInline(runner());
 }
 
 #endif /* !TINY_CORO_GCC_11 */
@@ -99,7 +99,7 @@ TEST(YieldValueTest, YieldValueTest_direct_invoke_runinline)
     };
 
     // in this case co_yield is just ignored
-    auto val = tinycoro::RunInline(func());
+    auto val = tinycoro::AllOfInline(func());
     EXPECT_EQ(*(val.value()), 42);
 }
 
@@ -113,6 +113,6 @@ TEST(YieldValueTest, YieldValueTest_direct_invoke_scheduler)
     };
 
     // in this case co_yield is just ignored
-    auto val = tinycoro::GetAll(scheduler, func());
+    auto val = tinycoro::AllOf(scheduler, func());
     EXPECT_EQ(*(val.value()), 42);
 }

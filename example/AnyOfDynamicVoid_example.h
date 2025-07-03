@@ -33,7 +33,7 @@ void Example_AnyOfDynamicVoid(auto& scheduler)
     tasks.push_back(task1(20ms));
     tasks.push_back(task1(30ms));
 
-    tinycoro::AnyOfWithStopSource(scheduler, source, std::move(tasks));
+    tinycoro::AnyOf(scheduler, source, std::move(tasks));
 
     SyncOut() << "co_return => void\n";
 }

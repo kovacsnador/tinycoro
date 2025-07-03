@@ -91,7 +91,7 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_SingleBoundTask)
 
     auto coro = [&i]() -> tinycoro::Task<int32_t> { co_return i++; };
 
-    auto result = tinycoro::GetAll(scheduler, tinycoro::MakeBound(coro));
+    auto result = tinycoro::AllOf(scheduler, tinycoro::MakeBound(coro));
 
     EXPECT_EQ(result, 0);
     EXPECT_EQ(i, 1);
@@ -112,7 +112,7 @@ TEST(BoundTaskTest, BoundTaskFunctionalTest_coawait_task)
         co_return ++val;
     };
 
-    auto result = tinycoro::GetAll(scheduler, tinycoro::MakeBound(coro));
+    auto result = tinycoro::AllOf(scheduler, tinycoro::MakeBound(coro));
 
     EXPECT_EQ(result, 2);
     EXPECT_EQ(i, 1);
@@ -193,7 +193,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_MultiTasks)
         tasks.push_back(tinycoro::MakeBound(coro));
     }
 
-    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
+    auto results = tinycoro::AllOf(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;
@@ -232,7 +232,7 @@ TEST_P(BoundTaskTest, BoundTaskFunctionalTest_coawait_task_multi)
         tasks.push_back(tinycoro::MakeBound(coro));
     }
 
-    auto results = tinycoro::GetAll(scheduler, std::move(tasks));
+    auto results = tinycoro::AllOf(scheduler, std::move(tasks));
 
     // check for unique values
     std::set<size_t> set;

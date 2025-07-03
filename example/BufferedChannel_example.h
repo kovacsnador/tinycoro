@@ -33,7 +33,7 @@ void Example_bufferedChannel(auto& scheduler)
     channel.Push(std::vector<int32_t>{7});
     channel.PushAndClose(std::vector<int32_t>{8, 9});   // push and close the channel
 
-    tinycoro::GetAll(scheduler, consumer());
+    tinycoro::AllOf(scheduler, consumer());
 }
 
 #endif //!__TINY_CORO_EXAMPLE_BUFFERED_CHANNEL_H__

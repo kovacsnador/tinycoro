@@ -584,7 +584,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_pushWai
         EXPECT_EQ(val, expected);
     };
 
-    tinycoro::RunInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41));
+    tinycoro::AllOfInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41));
 
     channel.Close();
 
@@ -617,7 +617,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_cleanup_callback_stuck_p
         co_return;
     };
 
-    tinycoro::RunInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
+    tinycoro::AllOfInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
 
     EXPECT_EQ(coll.size(), 3);
 
@@ -748,7 +748,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_waitForce)
 
     auto duration = 200ms;
 
-    tinycoro::GetAll(scheduler, producer(duration), consumer(duration));
+    tinycoro::AllOf(scheduler, producer(duration), consumer(duration));
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_push_await_order)
@@ -950,7 +950,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest)
     // single threaded scheduler
     tinycoro::Scheduler scheduler{1};
 
-    tinycoro::GetAll(scheduler, consumer(), producer());
+    tinycoro::AllOf(scheduler, consumer(), producer());
 }
 
 TEST(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_singleThreadedScheduler)
@@ -985,7 +985,7 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_singleThreadedS
     // single threaded scheduler
     tinycoro::Scheduler scheduler{1};
 
-    tinycoro::GetAll(scheduler, consumer(), producer());
+    tinycoro::AllOf(scheduler, consumer(), producer());
 }
 
 struct BufferedChannelTest : testing::TestWithParam<size_t>
@@ -1036,7 +1036,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param)
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
     EXPECT_EQ(allValues.size(), count);
 }
 
@@ -1076,7 +1076,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_pushWait)
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
     EXPECT_EQ(allValues.size(), count);
 }
 
@@ -1120,7 +1120,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti)
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+    tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
 }
@@ -1165,7 +1165,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_pushWait)
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+    tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
 }
@@ -1195,7 +1195,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners)
         tasks.push_back(consumer());
     }
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, std::move(tasks)));
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners_multi_waiters)
@@ -1223,7 +1223,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListeners_multi
         tasks.push_back(producer());
     }
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, std::move(tasks)));
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListenersClose)
@@ -1248,7 +1248,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_waitForListenersClose)
     }
     tasks.push_back(producer());
 
-    EXPECT_NO_THROW(tinycoro::GetAll(scheduler, std::move(tasks)));
+    EXPECT_NO_THROW(tinycoro::AllOf(scheduler, std::move(tasks)));
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorClose)
@@ -1303,7 +1303,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_paramMulti_destructorC
     }
     tasks.push_back(producer());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(allValues.size(), count);
 }
@@ -1348,7 +1348,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_param_autoEvent)
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+    tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
 }
@@ -1386,7 +1386,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose)
         }
     }
 
-    tinycoro::GetAll(scheduler, consumer());
+    tinycoro::AllOf(scheduler, consumer());
 }
 
 TEST(BufferedChannelTest, BufferedChannelTest_PushCloseMulti)
@@ -1418,7 +1418,7 @@ TEST(BufferedChannelTest, BufferedChannelTest_PushCloseMulti)
         EXPECT_THROW(channel.Push(33u), tinycoro::BufferedChannelException);
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer());
+    tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer());
 
     EXPECT_EQ(allValues.size(), 4);
 
@@ -1694,7 +1694,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushClose_multi)
     }
     tasks.push_back(producer());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(lastValue, count - 1);
     EXPECT_EQ(allValues.size(), count);
@@ -1755,7 +1755,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_PushCloseWait_multi)
     }
     tasks.push_back(producer());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(lastValue, count - 1);
     EXPECT_EQ(allValues.size(), count);
@@ -1801,7 +1801,7 @@ TEST_P(BufferedChannelTest, BufferedChannelTest_WaitPush_singleThread_minQueueSi
         channel.Close();
     };
 
-    tinycoro::GetAll(scheduler, consumer(), producer());
+    tinycoro::AllOf(scheduler, consumer(), producer());
 
     EXPECT_EQ(currentValue, count);
     EXPECT_EQ(allValues.size(), count);
@@ -1844,7 +1844,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_fixedQueueSiz
         EXPECT_EQ(tinycoro::EChannelOpStatus::LAST, co_await channel.PushAndCloseWait(count - 1));
     };
 
-    tinycoro::GetAll(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
+    tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), producer(), consumer());
 
     EXPECT_EQ(allValues.size(), count);
 }
@@ -1879,7 +1879,7 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_close_fixedQu
     }
     tasks.push_back(producer());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_tryPush)
@@ -1919,5 +1919,5 @@ TEST_P(BufferedChannelTest, BufferedChannelFunctionalTest_tryPush)
         co_return;
     };
 
-    tinycoro::GetAll(scheduler, producer(), consumer());
+    tinycoro::AllOf(scheduler, producer(), consumer());
 }

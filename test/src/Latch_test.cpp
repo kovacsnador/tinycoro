@@ -185,7 +185,7 @@ TEST_P(LatchTest, LatchFunctionalTest_ArriveAndWait)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_EQ(count, latchCount);
 }
 
@@ -251,7 +251,7 @@ TEST_P(LatchTest, LatchFunctionalTest_Wait)
         tasks.emplace_back(countDown());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_EQ(count, latchCount);
 }
 
@@ -290,7 +290,7 @@ TEST_P(LatchTest, LatchFunctionalTest_coawait)
         tasks.emplace_back(countDown());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_EQ(count, latchCount_1);
     EXPECT_EQ(count, latchCount_2);
 }

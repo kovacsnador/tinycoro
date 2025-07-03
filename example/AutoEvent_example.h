@@ -26,7 +26,7 @@ void Example_AutoEvent(auto& scheduler)
     };
 
 
-    auto [result1, result2] = tinycoro::GetAll(scheduler, consumer(), producer());
+    auto [result1, result2] = tinycoro::AllOf(scheduler, consumer(), producer());
 
     assert(*result1 == 42);
 

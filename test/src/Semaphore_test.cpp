@@ -190,7 +190,7 @@ TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
         co_return ++count;
     };
 
-    auto [c1, c2, c3] = tinycoro::GetAll(scheduler, task(), task(), task());
+    auto [c1, c2, c3] = tinycoro::AllOf(scheduler, task(), task(), task());
 
     EXPECT_TRUE(c1 != c2 && c2 != c3 && c3 != c1);
     EXPECT_EQ(count, 3);
@@ -215,7 +215,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_EQ(count, param);
 }
 
@@ -244,7 +244,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_double)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_EQ(count, param * 2);
 }
 
@@ -280,7 +280,7 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
         tasks.emplace_back(task());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
     EXPECT_TRUE(max <= 4);
 }
 
@@ -309,7 +309,7 @@ TEST_P(SemaphoreStressTest, SemaphoreStressTest_1)
     };
 
     // starting 8 async tasks at the same time
-    tinycoro::GetAll(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+    tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
     EXPECT_EQ(count, size * 8);
 }

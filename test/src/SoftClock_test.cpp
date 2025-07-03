@@ -316,7 +316,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::RunInline(waiter());
+    tinycoro::AllOfInline(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_requestStop_test)
@@ -369,7 +369,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::RunInline(waiter());
+    tinycoro::AllOfInline(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
@@ -398,7 +398,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::RunInline(waiter());
+    tinycoro::AllOfInline(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)
@@ -429,7 +429,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)
         tasks.push_back(setTimer());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(count, c);
 }
@@ -457,7 +457,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1)
         tasks.push_back(measure());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_timedOut)
@@ -492,7 +492,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_timedOut)
         
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
@@ -522,7 +522,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
         tasks.push_back(measure());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2)
@@ -548,7 +548,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2)
         tasks.push_back(measure());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2_random)
@@ -578,7 +578,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2_random)
         tasks.push_back(measure());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token)
@@ -609,7 +609,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token)
         tasks.push_back(setTimer());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(count, c);
 }
@@ -638,7 +638,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
         tasks.push_back(setTimer());
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     // should be 0
     EXPECT_EQ(0, c);
@@ -679,7 +679,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel_st
 
     tasks.push_back(canceller());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     // should be 0
     EXPECT_EQ(0, c);
@@ -720,7 +720,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
         }
     }
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     // should be 0
     EXPECT_EQ(0, c);

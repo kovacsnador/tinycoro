@@ -9,7 +9,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_int_return)
 {
     auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
 
-    auto awaitable = tinycoro::InlineAwait(task(40), task(41), task(42));
+    auto awaitable = tinycoro::AllOfInlineAwait(task(40), task(41), task(42));
 
     EXPECT_TRUE(awaitable.await_ready());
     EXPECT_FALSE(awaitable.await_suspend(int32_t{}));
@@ -24,7 +24,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_int_return_single_task)
 {
     auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
 
-    auto awaitable = tinycoro::InlineAwait(task(42));
+    auto awaitable = tinycoro::AllOfInlineAwait(task(42));
 
     EXPECT_TRUE(awaitable.await_ready());
     EXPECT_FALSE(awaitable.await_suspend(int32_t{}));
@@ -42,7 +42,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_void_return)
         co_return;
     };
 
-    auto awaitable = tinycoro::InlineAwait(task(), task(), task());
+    auto awaitable = tinycoro::AllOfInlineAwait(task(), task(), task());
 
     EXPECT_TRUE(awaitable.await_ready());
     EXPECT_FALSE(awaitable.await_suspend(int32_t{}));
@@ -60,7 +60,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_container_int_return)
     container.push_back(task(41));
     container.push_back(task(42));
 
-    auto awaitable = tinycoro::InlineAwait(container);
+    auto awaitable = tinycoro::AllOfInlineAwait(container);
 
     EXPECT_TRUE(awaitable.await_ready());
     EXPECT_FALSE(awaitable.await_suspend(int32_t{}));
@@ -85,7 +85,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_container_void_return)
     container.push_back(task());
     container.push_back(task());
 
-    auto awaitable = tinycoro::InlineAwait(container);
+    auto awaitable = tinycoro::AllOfInlineAwait(container);
 
     EXPECT_TRUE(awaitable.await_ready());
     EXPECT_FALSE(awaitable.await_suspend(int32_t{}));
@@ -99,11 +99,11 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait)
     auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
 
     auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
-        auto [r1, r2, r3] = co_await tinycoro::InlineAwait(task(40), task(41), task(42));
+        auto [r1, r2, r3] = co_await tinycoro::AllOfInlineAwait(task(40), task(41), task(42));
         co_return *r1 + *r2 + *r3;
     };
 
-    auto result = tinycoro::RunInline(wrapper());
+    auto result = tinycoro::AllOfInline(wrapper());
 
     EXPECT_EQ(123, result);
 }
@@ -116,11 +116,11 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_exception)
     };
 
     auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
-        auto [r1, r2, r3] = co_await tinycoro::InlineAwait(task(40), task(41), task(42));
+        auto [r1, r2, r3] = co_await tinycoro::AllOfInlineAwait(task(40), task(41), task(42));
         co_return *r1 + *r2 + *r3;
     };
 
-    auto func = [&] { std::ignore = tinycoro::RunInline(wrapper()); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(wrapper()); };
     EXPECT_THROW(func(), std::runtime_error);
 }
 
@@ -134,11 +134,11 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container)
         vec.push_back(task(41));
         vec.push_back(task(42));
 
-        auto res = co_await tinycoro::InlineAwait(vec);
+        auto res = co_await tinycoro::AllOfInlineAwait(vec);
         co_return res[0].value() + res[1].value() + res[2].value();
     };
 
-    auto result = tinycoro::RunInline(wrapper());
+    auto result = tinycoro::AllOfInline(wrapper());
 
     EXPECT_EQ(123, result);
 }
@@ -158,11 +158,11 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_void)
         vec.push_back(task(count));
         vec.push_back(task(count));
 
-        co_await tinycoro::InlineAwait(vec);
+        co_await tinycoro::AllOfInlineAwait(vec);
         co_return;
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 
     EXPECT_EQ(3, count);
 }
@@ -180,11 +180,11 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_exception)
         vec.push_back(task(41));
         vec.push_back(task(42));
 
-        auto res = co_await tinycoro::InlineAwait(vec);
+        auto res = co_await tinycoro::AllOfInlineAwait(vec);
         co_return res[0].value() + res[1].value() + res[2].value();
     };
 
-    auto func = [&] { std::ignore = tinycoro::RunInline(wrapper()); };
+    auto func = [&] { std::ignore = tinycoro::AllOfInline(wrapper()); };
     EXPECT_THROW(func(), std::runtime_error);
 }
 
@@ -249,7 +249,7 @@ TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test)
         co_return;
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 }
 
 TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_stopSource)
@@ -275,7 +275,7 @@ TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_stopSource)
         co_return;
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 }
 
 TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_stopSource_vector)
@@ -304,7 +304,7 @@ TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_stopSource_vecto
         EXPECT_FALSE(res[2].has_value());
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 }
 
 TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_InlineNIC)
@@ -328,7 +328,7 @@ TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_InlineNIC)
         EXPECT_EQ(r3, 42);
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 }
 
 TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_InlineNIC_vector)
@@ -357,5 +357,5 @@ TEST(AnyOfInlineAwaitTest, AnyOfInlineAwaitTest_functional_test_InlineNIC_vector
         EXPECT_EQ(res[2], 42);
     };
 
-    tinycoro::RunInline(wrapper());
+    tinycoro::AllOfInline(wrapper());
 }

@@ -21,7 +21,7 @@ void Example_aggregateValue(auto& scheduler)
         co_return Aggregate{42, 43};
     };
 
-    auto val = tinycoro::GetAll(scheduler, task());
+    auto val = tinycoro::AllOf(scheduler, task());
 
     SyncOut() << "co_return => " << val->i << " " << val->j << '\n';
 }

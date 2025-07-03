@@ -167,7 +167,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest)
     }
     tasks.push_back(trigger());
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(globalCount, count);
 }
@@ -196,7 +196,7 @@ TEST_P(ManualEventTest, ManualEventFunctionalTest_preSet)
     // preset the event
     event.Set();
 
-    tinycoro::GetAll(scheduler, std::move(tasks));
+    tinycoro::AllOf(scheduler, std::move(tasks));
 
     EXPECT_EQ(globalCount, count);
 }

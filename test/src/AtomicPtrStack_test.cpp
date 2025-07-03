@@ -89,7 +89,7 @@ TEST_P(AtomicPtrStackFunctionalTest, AtomicPtrStackFunctionalTest_multi_threaded
         co_return;
     };
     
-    tinycoro::GetAll(scheduler, producer(vec1), producer(vec2), producer(vec3), producer(vec4));
+    tinycoro::AllOf(scheduler, producer(vec1), producer(vec2), producer(vec3), producer(vec4));
 
     auto elem = stack.close();
 

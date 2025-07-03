@@ -3,8 +3,8 @@
 //  Licensed under the MIT License – see LICENSE.txt for details.
 // -----------------------------------------------------------------------------
 
-#ifndef TINY_CORO_SYNC_AWAIT_HPP
-#define TINY_CORO_SYNC_AWAIT_HPP
+#ifndef TINY_CORO_CO_WAIT_HPP
+#define TINY_CORO_CO_WAIT_HPP
 
 #include <cassert>
 #include <functional>
@@ -191,41 +191,47 @@ namespace tinycoro {
     } // namespace detail
 
     template <typename SchedulerT, concepts::Iterable ContainerT>
-    [[nodiscard]] auto SyncAwait(SchedulerT& scheduler, ContainerT&& container)
+    [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, ContainerT&& container)
     {
         using FuturesType = decltype(std::declval<SchedulerT>().Enqueue(std::move(container)));
         return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FuturesType, ContainerT>{scheduler, {}, std::forward<ContainerT>(container)};
     }
 
     template <typename SchedulerT, concepts::IsCorouitneTask... Args>
-    [[nodiscard]] auto SyncAwait(SchedulerT& scheduler, Args&&... args)
+        requires (sizeof...(Args) > 0)
+    [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
         return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
-    template <typename SchedulerT, typename StopSourceT, concepts::Iterable ContainerT>
-    [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, ContainerT&& container)
+    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
+    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, ContainerT&& container)
     {
         using FuturesType = decltype(std::declval<SchedulerT>().Enqueue(std::move(container)));
         return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FuturesType, ContainerT>{
             scheduler, std::move(stopSource), {}, std::forward<ContainerT>(container)};
     }
 
-    template <typename SchedulerT, typename StopSourceT, concepts::IsCorouitneTask... Args>
-    [[nodiscard]] auto AnyOfStopSourceAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
+    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... Args>
+        requires (sizeof...(Args) > 0)
+    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
         return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FutureTupleType, Args...>{
             scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 
-    template <typename SchedulerT, typename StopSourceT = std::stop_source, typename... Args>
+    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, typename... Args>
+        requires (sizeof...(Args) > 0) && /*requires (SchedulerT s, Args... a) {
+            { s.Enqueue(std::forward<Args>(a)...) };
+        }*/
+        (!concepts::IsStopSource<SchedulerT>)
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, Args&&... args)
     {
-        return AnyOfStopSourceAwait(scheduler, StopSourceT{}, std::forward<Args>(args)...);
+        return AnyOfAwait(scheduler, StopSourceT{}, std::forward<Args>(args)...);
     }
 
 } // namespace tinycoro
 
-#endif // TINY_CORO_SYNC_AWAIT_HPP
+#endif // TINY_CORO_CO_WAIT_HPP

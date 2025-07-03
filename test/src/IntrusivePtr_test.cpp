@@ -258,5 +258,5 @@ TEST(IntrusivePtrTest, IntrusivePtrTest_async)
         // all refs are released...
     };
 
-    tinycoro::GetAll(scheduler, task(), task2(), task2(), task2(), task2());
+    tinycoro::AllOf(scheduler, task(), task2(), task2(), task2(), task2());
 }
