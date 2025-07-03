@@ -25,6 +25,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 * [Examples](#examples)
     - [Scheduler](#scheduler)
     - [Task](#task)
+    - [SyncFunctions](#syncfunctions)
     - [AllOf](#allof)
     - [AllOfInline](#allofinline)
     - [AnyOf](#anyof)
@@ -355,6 +356,55 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 }
 ```
 ---
+### `SyncFunctions`
+#### Overview:
+
+- **`tinycoro::AllOf(scheduler, tasks...)`**  
+  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **all** complete.
+
+- **`tinycoro::AllOfInline(tasks...)`**  
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until all finish.
+
+---
+
+- **`tinycoro::AnyOf(scheduler, tasks...)`**  
+  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes.
+
+- **`tinycoro::AnyOfInline(tasks...)`**  
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until the first finishes.
+
+---
+
+- **`tinycoro::AnyOf(scheduler, stopSource, tasks...)`**  
+  Like `AnyOf` but supports cooperative cancellation of remaining tasks when one finishes.
+
+- **`tinycoro::AnyOfInline(stopSource, tasks...)`**  
+  Like `AnyOfInline` but supports cooperative cancellation of remaining tasks when one finishes.
+
+---
+
+- **`co_await tinycoro::AllOfAwait(scheduler, tasks...)`**  
+  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **all** complete.
+
+- **`co_await tinycoro::AllOfInlineAwait(tasks...)`**  
+  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when all finish.
+
+---
+
+- **`co_await tinycoro::AnyOfAwait(scheduler, tasks...)`**  
+  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes.
+
+- **`co_await tinycoro::AnyOfInlineAwait(tasks...)`**  
+  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when the first finishes.
+
+---
+
+- **`co_await tinycoro::AnyOfAwait(scheduler, stopSource, tasks...)`**  
+  Like `AnyOfAwait` but supports cooperative cancellation of remaining tasks when one finishes.
+
+- **`co_await tinycoro::AnyOfInlineAwait(stopSource, tasks...)`**  
+  Like `AnyOfInlineAwait` but supports cooperative cancellation of remaining tasks when one finishes.
+---
 
 ### `AllOf`
 
@@ -523,137 +573,6 @@ co_await AnyOfInlineAwait(stopSource, task1, task2, ...);
 - Use `tinycoro::Task` with `AllOf/AnyOf` (scheduler-based).
 - Use `tinycoro::Task` or `tinycoro::InlineTask` with `AllOfInline/AnyOfInline`.
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-### `AllOf`
-
-`tinycoro::AllOf` is one of the **core utilities** in tinycoro. It allows you to run multiple tasks and wait for **all** of them to complete.
-
-You can use it either with a scheduler for **concurrent execution**, or without a scheduler for **inline execution** on the current thread. You can also `co_await` the coroutine-friendly variant `AllOfAwait(...)` to wait asynchronously.
-
----
-
-### With Scheduler (Synchronous)
-
-Runs all given tasks using the provided scheduler. Blocks until **all** tasks finish.
-
-```cpp
-tinycoro::AllOf(scheduler, task1, task2, ...);
-```
----
-- Executes tasks concurrently via the scheduler.
-- Returns when all tasks are complete.
-- Ideal for multi-threaded environments or task scheduling.
-
-### Without Scheduler (Synchronous)
-Runs all given tasks on the current thread. Blocks until all tasks finish.
-```cpp
-tinycoro::AllOf(task1, task2, ...);
-```
-- Executes tasks concurrently in the current coroutine thread context.
-- Useful in single-threaded environments or when no scheduler is needed.
-
-###  With Scheduler (Coroutine)
-Use co_await to wait for all tasks asynchronously, executed via the scheduler.
-
-```cpp
-co_await AllOfAwait(scheduler, task1, task2, ...);
-```
-- Non-blocking — returns control to the caller coroutine.
-- Schedules tasks concurrently and resumes when all are complete.
-- Suitable for composing async flows in a coroutine-friendly way.
-
-###  Without Scheduler (Coroutine)
-Use co_await to wait for all tasks inline, in the current coroutine execution context.
-
-```cpp
-co_await AllOfAwait(task1, task2, ...);
-```
-- Non-blocking — stays on the current thread/coroutine.
-- Runs tasks cooperatively, resuming once all finish.
-----
-
-🔹 Both tinycoro::AllOf(...) and co_await AllOfAwait(...) return `std::optional` or `std::tuple<std::optional>` or `std::vector<std::optional>` of results from the tasks, preserving the order.
-
-💡 Use the version that best fits your concurrency model: synchronous or coroutine-based, with or without a scheduler.
-
-###  `AnyOf`
-
-`tinycoro::AnyOf` is another core utility in tinycoro. It allows you to wait until **any** of the given tasks finishes — useful when you want the **first available result** or need to implement early cancellation.
-
-You can use it with or without a scheduler, and you can `co_await` the coroutine-friendly version `AnyOfAwait(...)`.
-
----
-
-### With Scheduler
-
-Runs all given tasks using the provided scheduler. Blocks until **any one** of them finishes.
-
-```cpp
-tinycoro::AnyOf(scheduler, task1, task2, ...);
-```
-- Executes tasks concurrently using the scheduler.
-- Returns as soon as the first task finishes.
-- Useful for racing multiple operations.
-
-### Without Scheduler (Synchronous)
-Runs all tasks on the current thread and blocks until the first finishes.
-
-```cpp
-tinycoro::AnyOf(task1, task2, ...);
-```
-- Executes tasks sconcurrently on the current thread.
-- Returns after the first completed result.
-- Lightweight and scheduler-free.
-
-### With Stop Source (Synchronous)
-Supports cancellation for the losing tasks once the first task completes.
-
-```cpp
-tinycoro::AnyOf(stopSource, task1, task2, ...);
-tinycoro::AnyOf(scheduler, stopSource, task1, task2, ...);
-```
-- When one task finishes, the others receive a stop request.
-- Prevents wasteful work.
-### With Scheduler (Coroutine)
-Use co_await to wait asynchronously until one task finishes, scheduled via the scheduler.
-
-```cpp
-co_await AnyOfAwait(scheduler, task1, task2, ...);
-co_await AnyOfAwait(scheduler, stopSource, task1, task2, ...);
-```
-- Non-blocking.
-- Runs all tasks concurrently using the scheduler.
-- Resumes as soon as one task finishes.
-- Cancels other tasks if stopSource is provided.
-### Without Scheduler (Coroutine)
-Use co_await to wait inline until the first task completes.
-
-```cpp
-co_await AnyOfAwait(task1, task2, ...);
-co_await AnyOfAwait(stopSource, task1, task2, ...);
-```
-- Non-blocking.
-- Runs tasks cooperatively in the current coroutine context.
-- Resumes after the first result is ready.
----
-🔹 `AnyOf` and `AnyOfAwait` return a `std::tuple<std::optional>` or `std::vector<std::optional>` that identifies which task finished, depending on your configuration.
-
-💡 Use stopSource if you want early cancellation of the other tasks to save resources.
 
 ## `InlineTask`
 
