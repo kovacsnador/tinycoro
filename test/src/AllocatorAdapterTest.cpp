@@ -47,7 +47,7 @@ struct AllocatorAdapterTest : testing::Test
     MockAllocatorTracer mock;
 };
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_RunInline)
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_WaitInline)
 {
     EXPECT_CALL(mock, allocate_bytes_noexcept).Times(1).WillOnce([](size_t nbytes) { return std::malloc(nbytes); });
     EXPECT_CALL(mock, deallocate_bytes).Times(1).WillOnce([](void* p, [[maybe_unused]] size_t nbytes) { return std::free(p); });

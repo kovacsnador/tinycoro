@@ -33,7 +33,7 @@ void Example_multiTasksDynamic(auto& scheduler)
 
     auto results = tinycoro::AllOf(scheduler, std::move(tasks));
 
-    SyncOut() << "GetAll co_return => " << *results[0] << ", " << *results[1] << ", " << *results[2] << '\n';
+    SyncOut() << "co_return => " << *results[0] << ", " << *results[1] << ", " << *results[2] << '\n';
 }
 
 #endif //!__TINY_CORO_EXAMPLE_MULTI_TASKS_DYNAMIC_H__

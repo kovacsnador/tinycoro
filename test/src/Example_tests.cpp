@@ -735,7 +735,7 @@ TEST_F(ExampleTest, ExampleOwnAwaiter)
     EXPECT_EQ(*val, 42);
 }
 
-TEST_F(ExampleTest, ExampleSyncAwait)
+TEST_F(ExampleTest, ExampleAllOfAwait)
 {
     auto syncAwait = [](auto& scheduler) -> tinycoro::Task<std::string> {
         auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
@@ -759,7 +759,7 @@ TEST_F(ExampleTest, ExampleSyncAwait)
     EXPECT_EQ(std::string{"123123123"}, future.get().value());
 }
 
-TEST_F(ExampleTest, ExampleSyncAwaitException)
+TEST_F(ExampleTest, ExampleAllOfAwaitException)
 {
     auto syncAwait = [](auto& scheduler) -> tinycoro::Task<std::string> {
         auto task1 = []() -> tinycoro::Task<std::string> {

@@ -34,7 +34,7 @@
 #include "CustomAwaiter.h"
 
 #include "AnyOfCoAwait_example.h"
-#include "SyncAwait_example.h"
+#include "AllOfAwait_example.h"
 
 #include "Semaphore_example.h"
 
@@ -98,7 +98,7 @@ int main()
 
         Example_CustomAwaiter(scheduler);
 
-        auto val = tinycoro::AllOf(scheduler, Example_SyncAwait(scheduler));
+        auto val = tinycoro::AllOf(scheduler, Example_AllOfAwait(scheduler));
         SyncOut() << *val << '\n';
 
         scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();

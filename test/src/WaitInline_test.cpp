@@ -5,10 +5,10 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-struct RunInline_PauseHandlerMock
+struct WaitInline_PauseHandlerMock
 {
-    RunInline_PauseHandlerMock() = default;
-    RunInline_PauseHandlerMock(tinycoro::PauseHandlerCallbackT c)
+    WaitInline_PauseHandlerMock() = default;
+    WaitInline_PauseHandlerMock(tinycoro::PauseHandlerCallbackT c)
     : cb{c}
     {
     }
@@ -26,7 +26,7 @@ struct PromiseMock
 };
 
 template<typename ReturnT, typename PauseHandlerT>
-struct RunInline_TaskMock
+struct WaitInline_TaskMock
 {
     using value_type = ReturnT;
 
@@ -44,13 +44,13 @@ struct RunInline_TaskMock
 };
 
 template<typename ReturnT, typename PauseHandlerT>
-struct RunInline_TaskMockWrapper
+struct WaitInline_TaskMockWrapper
 {
     using value_type = ReturnT;
     using promise_type = PromiseMock<ReturnT>;
 
-    RunInline_TaskMockWrapper()
-    : mock{std::make_shared<RunInline_TaskMock<ReturnT, PauseHandlerT>>()}
+    WaitInline_TaskMockWrapper()
+    : mock{std::make_shared<WaitInline_TaskMock<ReturnT, PauseHandlerT>>()}
     {
         ON_CALL(*mock, IsDone).WillByDefault(::testing::Return(true));
     }
@@ -101,17 +101,17 @@ struct RunInline_TaskMockWrapper
         return mock->IsDone();
     }
 
-    std::shared_ptr<RunInline_TaskMock<ReturnT, PauseHandlerT>> mock;
+    std::shared_ptr<WaitInline_TaskMock<ReturnT, PauseHandlerT>> mock;
 };
 
 
-TEST(RunInlineTest, RunInlineTest_void)
+TEST(WaitInlineTest, WaitInlineTest_void)
 {
-    RunInline_TaskMockWrapper<void, RunInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<void, WaitInline_PauseHandlerMock> mock;
 
     EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>(callback);
+            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
             return mock.mock->pauseHandlerMock;
         }
     ));
@@ -125,13 +125,13 @@ TEST(RunInlineTest, RunInlineTest_void)
     tinycoro::AllOfInline(mock);
 }
 
-TEST(RunInlineTest, RunInlineTest_int32)
+TEST(WaitInlineTest, WaitInlineTest_int32)
 {
-    RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock> mock;
 
     EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>(callback);
+            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
             return mock.mock->pauseHandlerMock;
         }
     ));
@@ -154,13 +154,13 @@ TEST(RunInlineTest, RunInlineTest_int32)
     EXPECT_EQ(42, val);
 }
 
-TEST(RunInlineTest, RunInlineTest_pause)
+TEST(WaitInlineTest, WaitInlineTest_pause)
 {
-    RunInline_TaskMock<int32_t, RunInline_PauseHandlerMock> mock;
+    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock;
 
     EXPECT_CALL(mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>(callback);
+            mock.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
 
             EXPECT_CALL(*mock.pauseHandlerMock, Resume()).Times(1);
 
@@ -197,13 +197,13 @@ TEST(RunInlineTest, RunInlineTest_pause)
     EXPECT_EQ(42, val);
 }
 
-TEST(RunInlineTest, RunInlineTest_cancelled)
+TEST(WaitInlineTest, WaitInlineTest_cancelled)
 {
-    RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock> mock;
 
     EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>(callback);
+            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
             return mock.mock->pauseHandlerMock;
         }
     ));
@@ -225,11 +225,11 @@ TEST(RunInlineTest, RunInlineTest_cancelled)
     EXPECT_FALSE(val.has_value());
 }
 
-TEST(RunInlineTest, RunInlineTest_multiTasks)
+TEST(WaitInlineTest, WaitInlineTest_multiTasks)
 {
-    RunInline_TaskMock<int32_t, RunInline_PauseHandlerMock> mock1;
+    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock1;
 
-    mock1.pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+    mock1.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
 
     EXPECT_CALL(mock1, IsDone)
         .WillOnce(testing::Return(false))
@@ -251,9 +251,9 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
 
     EXPECT_CALL(mock1, await_resume()).Times(1).WillOnce(testing::Return(42));
 
-    RunInline_TaskMock<int32_t, RunInline_PauseHandlerMock> mock2;
+    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock2;
 
-    mock2.pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+    mock2.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
 
     EXPECT_CALL(mock2, IsDone)
         .WillOnce(testing::Return(false))
@@ -281,15 +281,15 @@ TEST(RunInlineTest, RunInlineTest_multiTasks)
     EXPECT_EQ(43, result2);
 }
 
-TEST(RunInlineTest, RunInlineTest_dynamicTasks)
+TEST(WaitInlineTest, WaitInlineTest_dynamicTasks)
 {
-    std::vector<RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock>> tasks;
+    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock>> tasks;
 
     for(size_t i=0; i < 10; ++i)
     {
         tasks.emplace_back();
 
-        tasks[i].mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+        tasks[i].mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
 
         EXPECT_CALL(*tasks[i].mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&tasks, index = i] (auto) {
@@ -316,15 +316,15 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks)
     });
 }
 
-TEST(RunInlineTest, RunInlineTest_dynamicTasks_cancelled)
+TEST(WaitInlineTest, WaitInlineTest_dynamicTasks_cancelled)
 {
-    std::vector<RunInline_TaskMockWrapper<int32_t, RunInline_PauseHandlerMock>> tasks;
+    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock>> tasks;
 
     for(size_t i=0; i < 10; ++i)
     {
         tasks.emplace_back();
 
-        tasks[i].mock->pauseHandlerMock = std::make_shared<RunInline_PauseHandlerMock>();
+        tasks[i].mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
 
         EXPECT_CALL(*tasks[i].mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
         [&tasks, index = i] (auto) {
@@ -352,7 +352,7 @@ TEST(RunInlineTest, RunInlineTest_dynamicTasks_cancelled)
     });
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_voidTasks)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_voidTasks)
 {
     size_t i = 0;
 
@@ -378,7 +378,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_voidTasks)
     EXPECT_EQ(i, 3);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_1)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_1)
 {
     tinycoro::SingleEvent<int32_t> event;
 
@@ -394,7 +394,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_1)
     EXPECT_EQ(value, 42);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_2)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_2)
 {
     tinycoro::SoftClock clock;
     tinycoro::SingleEvent<int32_t> event;
@@ -418,7 +418,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_2)
     EXPECT_EQ(value, 42);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_3)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_3)
 {
     int32_t count{};
 
@@ -456,7 +456,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_3)
     EXPECT_EQ(v5, count);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_4)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_4)
 {
     int32_t count{};
 
@@ -481,7 +481,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_4)
     EXPECT_EQ(results[4], count);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_5)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_5)
 {
     int32_t count{};
 
@@ -515,7 +515,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_5)
     EXPECT_EQ(count, 3);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_exception)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_exception)
 {
     int32_t count{};
 
@@ -548,7 +548,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_exception)
     EXPECT_EQ(count, 3);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_exception2)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_exception2)
 {
     int32_t count{};
 
@@ -575,7 +575,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_exception2)
     EXPECT_EQ(3, count);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_pauseTask)
 {
     tinycoro::Latch latch{2};
 
@@ -606,7 +606,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask)
     EXPECT_EQ(i, 6);
 }
 
-TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
+TEST(WaitInlineTest, WaitInline_FunctionalTest_pauseTask_stoped)
 {
     std::stop_source ssource;
 
@@ -648,7 +648,7 @@ TEST(RunInlineTest, RunInline_FunctionalTest_pauseTask_stoped)
     EXPECT_EQ(i, 4);
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_with_scheduler)
 {   
     tinycoro::SoftClock clock;
     tinycoro::Scheduler scheduler;
@@ -679,7 +679,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_with_scheduler)
     EXPECT_EQ(fut2.get(), 43);
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleep)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleep)
 {
     tinycoro::SoftClock clock;
     auto deferedTask = [&clock](int32_t r) -> tinycoro::Task<int32_t> {
@@ -695,7 +695,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleep)
     
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti)
 {
     tinycoro::SoftClock clock;
     auto deferedTask = [&clock](int32_t r) -> tinycoro::Task<int32_t> {
@@ -713,7 +713,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti)
     EXPECT_EQ(r3, 43);
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti_dynamic)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti_dynamic)
 {
     tinycoro::SoftClock clock;
 
@@ -734,7 +734,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_sleepMulti_dynamic)
     EXPECT_EQ(results[2], 43);
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_pushawait)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_pushawait)
 {
     tinycoro::BufferedChannel<int32_t> channel;
 
@@ -760,7 +760,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_pushawait)
     EXPECT_EQ(fortyTwo, 42);
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled)
 {
     tinycoro::SoftClock clock;
 
@@ -789,7 +789,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled)
     event.Set();
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_latch)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_latch)
 {
     tinycoro::SoftClock clock;
 
@@ -816,7 +816,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_latch)
     EXPECT_TRUE(r6.has_value());
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_dynamic)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_dynamic)
 {
     tinycoro::SoftClock clock;
     tinycoro::AutoEvent event;
@@ -853,7 +853,7 @@ TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_dynamic)
     event.Set();
 }
 
-TEST(RunInlineTest, RunInlineTest_FunctionalTest_cancelled_manual)
+TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_manual)
 {
     tinycoro::SoftClock clock;
 

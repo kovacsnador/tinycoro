@@ -303,7 +303,7 @@ namespace tinycoro {
         using TaskReturnT = typename std::decay_t<ContainerT>::value_type::value_type;
 
         template <concepts::Iterable ContainerT, typename StopSourceT>
-        void RunInlineImplContainer(ContainerT&& container, StopSourceT stopSource)
+        void WaitInlineImplContainer(ContainerT&& container, StopSourceT stopSource)
         {
             std::exception_ptr     exception{};
             helper::AutoResetEvent event{};
@@ -414,7 +414,7 @@ namespace tinycoro {
     [[nodiscard]] auto AllOfInline(ContainerT&& container)
     {
         // Runs all the tasks sequentialy
-        detail::RunInlineImplContainer(container, std::stop_source{std::nostopstate});
+        detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
         return detail::CollectResults(container);
     }
 
@@ -423,7 +423,7 @@ namespace tinycoro {
     void AllOfInline(ContainerT&& container)
     {
         // Runs all the tasks sequentialy
-        detail::RunInlineImplContainer(container, std::stop_source{std::nostopstate});
+        detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
     }
 
     template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
@@ -431,7 +431,7 @@ namespace tinycoro {
     [[nodiscard]] auto AnyOfInline(StopSourceT stopSource, ContainerT&& container)
     {
         // Runs all the tasks sequentialy
-        detail::RunInlineImplContainer(container, stopSource);
+        detail::WaitInlineImplContainer(container, stopSource);
         return detail::CollectResults(container);
     }
 
@@ -440,7 +440,7 @@ namespace tinycoro {
     void AnyOfInline(StopSourceT stopSource, ContainerT&& container)
     {
         // Runs all the tasks sequentialy
-        detail::RunInlineImplContainer(container, stopSource);
+        detail::WaitInlineImplContainer(container, stopSource);
     }
 
     template < concepts::IsStopSource StopSourceT = std::stop_source, concepts::Iterable ContainerT>

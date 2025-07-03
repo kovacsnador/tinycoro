@@ -90,7 +90,7 @@ struct SchedulerMock
     }
 };
 
-struct SyncAwaiterTest : testing::Test
+struct AllOfAwaiterTest : testing::Test
 {
     void SetUp() override
     {
@@ -104,7 +104,7 @@ protected:
     SchedulerMock schedulerMock;
 };
 
-TEST_F(SyncAwaiterTest, SyncAwaiterTest_voidTask)
+TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_voidTask)
 {
     auto task    = []() -> tinycoro::Task<void> { co_return; };
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task());
@@ -116,7 +116,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_voidTask)
     EXPECT_NO_THROW(awaiter.await_resume());
 }
 
-TEST_F(SyncAwaiterTest, SyncAwaiterTest_vector_voidTask)
+TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_vector_voidTask)
 {
     auto task = []() -> tinycoro::Task<void> { co_return; };
 
@@ -133,7 +133,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_vector_voidTask)
     EXPECT_NO_THROW(awaiter.await_resume());
 }
 
-TEST_F(SyncAwaiterTest, SyncAwaiterTest_intTask)
+TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_intTask)
 {
     auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task(), task());
@@ -150,7 +150,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_intTask)
     EXPECT_EQ(r3, 0);
 }
 
-TEST_F(SyncAwaiterTest, SyncAwaiterTest_array_intTask)
+TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_array_intTask)
 {
     auto task = []() -> tinycoro::Task<int32_t> { co_return 0; };
 
@@ -173,7 +173,7 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_array_intTask)
     EXPECT_EQ(results[2], 0);
 }
 
-TEST_F(SyncAwaiterTest, AnyOfAwait_intTask)
+TEST_F(AllOfAwaiterTest, AnyOfAwait_intTask)
 {
     auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
     auto awaiter = tinycoro::AnyOfAwait(schedulerMock, task(), task(), task());
@@ -190,7 +190,7 @@ TEST_F(SyncAwaiterTest, AnyOfAwait_intTask)
     EXPECT_EQ(std::get<2>(results), 0);
 }
 
-TEST_F(SyncAwaiterTest, AnyOfAwaitStopSource_intTask)
+TEST_F(AllOfAwaiterTest, AnyOfAwaitStopSource_intTask)
 {
     std::stop_source ss;
 
@@ -320,7 +320,7 @@ TEST(AnyOfCoAwaitTest2, AnyOfCoAwaitTest2)
     EXPECT_NO_THROW(tinycoro::GetAll(future));
 }
 
-TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
+TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_callOrder)
 {
     tinycoro::Scheduler scheduler{1};
 
@@ -352,13 +352,13 @@ TEST_F(SyncAwaiterTest, SyncAwaiterTest_callOrder)
     EXPECT_TRUE(breakfast == "toast + coffee + tee");
 }
 
-struct SyncAwaiterDynamicTest : testing::TestWithParam<size_t>
+struct AllOfAwaiterDynamicTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicTest, testing::Values(1, 10, 100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(AllOfAwaiterDynamicTest, AllOfAwaiterDynamicTest, testing::Values(1, 10, 100, 1000, 10000));
 
-TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
+TEST_P(AllOfAwaiterDynamicTest, AllOfAwaiterDynamicFuntionalTest_1)
 {
     tinycoro::Scheduler scheduler{16};
 
@@ -393,7 +393,7 @@ TEST_P(SyncAwaiterDynamicTest, SyncAwaiterDynamicFuntionalTest_1)
     tinycoro::AllOfInline(coro());
 }
 
-TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
+TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
 {
     tinycoro::Scheduler scheduler{16};
 
@@ -430,7 +430,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
     tinycoro::AllOfInline(coro());
 }
 
-TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
+TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 {
     // only 1 thread
     tinycoro::Scheduler scheduler{1};
@@ -467,7 +467,7 @@ TEST_P(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
     tinycoro::AllOfInline(coro());
 }
 
-TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
+TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
 {
     tinycoro::SoftClock clock;
     // scheduler with only 1 thread
@@ -503,7 +503,7 @@ TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
     tinycoro::AllOfInline(coro());
 }
 
-TEST(SyncAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
+TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
 {
     tinycoro::SoftClock clock;
     // scheduler with only 1 thread

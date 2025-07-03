@@ -5,7 +5,7 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-tinycoro::Task<std::string> Example_SyncAwait(auto& scheduler)
+tinycoro::Task<std::string> Example_AllOfAwait(auto& scheduler)
 {
     auto task1 = []() -> tinycoro::Task<std::string> { co_return "123"; };
     auto task2 = []() -> tinycoro::Task<std::string> { co_return "456"; };
