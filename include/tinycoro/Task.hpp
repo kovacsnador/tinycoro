@@ -30,7 +30,8 @@ namespace tinycoro {
                   template <typename, typename> class AwaiterT,
                   typename CoroResumerT = TaskResumer,
                   typename StopSourceT  = std::stop_source>
-        struct [[nodiscard]] CoroTask : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, InitialCancellablePolicyT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
+        struct [[nodiscard]] CoroTask
+        : private AwaiterT<ReturnValueT, CoroTask<ReturnValueT, InitialCancellablePolicyT, PromiseT, AwaiterT, CoroResumerT, StopSourceT>>
         {
             template <typename CoroutineFunctionT, typename... Args>
             friend auto tinycoro::MakeBound(CoroutineFunctionT&& func, Args&&... args);
@@ -110,10 +111,10 @@ namespace tinycoro {
                 _hdl.promise().SetStopSource(std::forward<T>(arg));
             }
 
-            template <std::regular_invocable T>
-            void SetDestroyNotifier(T&& cb) noexcept
+            //template <std::regular_invocable T>
+            void SetCurrentAwaitable(void* awaitable) noexcept
             {
-                _hdl.promise().SetDestroyNotifier(std::forward<T>(cb));
+                _hdl.promise().SetCurrentAwaitable(awaitable);
             }
 
             [[nodiscard]] address_t Address() const noexcept { return _hdl.address(); }
@@ -123,7 +124,7 @@ namespace tinycoro {
 
         private:
             // Only used by MakeBound() to save
-            // the coroutine function inside the 
+            // the coroutine function inside the
             // coroutine promise
             template <typename T>
             void SaveCoroutineFunction(T&& function) noexcept
@@ -133,7 +134,7 @@ namespace tinycoro {
 
             void destroy() noexcept
             {
-                if(_hdl)
+                if (_hdl)
                 {
                     _hdl.destroy();
                     _hdl = nullptr;
@@ -150,26 +151,30 @@ namespace tinycoro {
 
     } // namespace detail
 
-    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator, concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
+    template <typename ReturnT                                               = void,
+              template <typename> class AllocatorT                           = DefaultAllocator,
+              concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
     using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, AllocatorT>, AwaiterValue>;
 
-    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator, concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
+    template <typename ReturnT                                               = void,
+              template <typename> class AllocatorT                           = DefaultAllocator,
+              concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
     using InlineTask = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, AllocatorT>, AwaiterValue>;
 
     // Convenience aliases for tasks with a non-initial cancellable policy.
     // (TaskNIC/InlineTaskNIC)
     //
-    // These are helper types meant to simplify usage when cancellation should not be 
+    // These are helper types meant to simplify usage when cancellation should not be
     // automatically propagated into the coroutine on creation (i.e., not initially cancellable).
     // This is typically useful for root coroutines or tasks that should explicitly manage
     // cancellation behavior.
     //
-    // Note: These aliases are just syntactic sugar over Task and InlineTask with 
+    // Note: These aliases are just syntactic sugar over Task and InlineTask with
     // `noninitial_cancellable_t` passed as the cancellation policy.
-    template<typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator>
+    template <typename ReturnT = void, template <typename> class AllocatorT = DefaultAllocator>
     using TaskNIC = Task<ReturnT, AllocatorT, noninitial_cancellable_t>;
 
-    template <typename ReturnT = void, template<typename> class AllocatorT = DefaultAllocator>
+    template <typename ReturnT = void, template <typename> class AllocatorT = DefaultAllocator>
     using InlineTaskNIC = InlineTask<ReturnT, AllocatorT, noninitial_cancellable_t>;
 
 } // namespace tinycoro

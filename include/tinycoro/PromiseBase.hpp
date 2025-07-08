@@ -37,7 +37,6 @@ namespace tinycoro { namespace detail {
     template <concepts::IsAwaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT>
     struct PromiseBase
     {
-        using OnFinishCallback_t = void (*)(void*, void*);
         using PromiseBase_t = PromiseBase;
 
         PromiseBase() = default;
@@ -53,13 +52,6 @@ namespace tinycoro { namespace detail {
                 // Only trigger stop, if this
                 // is a root coroutine
                 stopSource.request_stop();
-            }
-
-            if (_destroyNotifier)
-            {
-                // notify others that the task
-                // is destroyed.
-                _destroyNotifier();
             }
         }
 
@@ -115,13 +107,24 @@ namespace tinycoro { namespace detail {
             return stopSource;
         }
 
-        // Sets the destroyer notifier callback
+        // Set the current awaitable.
         //
-        // It is used in the "AllOfAwait" like context.
-        template <std::regular_invocable T>
-        void SetDestroyNotifier(T&& cb) noexcept
+        // It is used in the "AllOfAwait" and "AnyOfAwait" context (with scheduler),
+        // to store the awaitable pointer for later resumption.
+        void SetCurrentAwaitable(void* awaitable) noexcept
+        {   
+            assert(parent == nullptr);  // need to be a root corouitne
+            assert(_currentAwaitable == nullptr); //  must not be set
+
+            _currentAwaitable = awaitable;
+        }
+
+        // Get the stored custom data
+        [[nodiscard]] constexpr auto CurrentAwaitable() const noexcept
         {
-            _destroyNotifier = std::forward<T>(cb);
+            assert(parent == nullptr);  // need to be a root corouitne
+
+            return _currentAwaitable;
         }
 
         [[nodiscard]] std::suspend_always initial_suspend() const noexcept { return {}; }
@@ -131,10 +134,11 @@ namespace tinycoro { namespace detail {
         constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 
     private:
-        // callback to notify others if
-        // the coroutine is destroyed.
-        // std::function<void()> destroyNotifier;
-        detail::UnsafeFunction<void(void*)> _destroyNotifier;
+        // Saving the current awaitable.
+        //
+        // It is used in the "AllOfAwait" and "AnyOfAwait" context (with scheduler),
+        // to be able to resume the awaitable.
+        void* _currentAwaitable{nullptr};
     };
 
 }} // namespace tinycoro::detail
