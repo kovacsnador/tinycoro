@@ -260,33 +260,26 @@ namespace tinycoro {
             // simple auto reset event
             struct AutoResetEvent
             {
-                AutoResetEvent() = default;
-
-                // Start with a custom flag
-                explicit AutoResetEvent(bool flag)
-                : _flag{flag}
-                {
-                }
 
                 // sets the event
                 void Set() noexcept
                 {
-                    _flag.store(true, std::memory_order_release);
+                    _flag.test_and_set(std::memory_order_release);
                     _flag.notify_all();
                 }
 
                 // Waits for the event and resets the flag
                 // to prepare for the next Set()
-                bool Wait() noexcept
+                void WaitAndReset() noexcept
                 {
                     _flag.wait(false);
-                    return _flag.exchange(false, std::memory_order_release);
+                    _flag.clear(std::memory_order_release);
                 }
 
-                [[nodiscard]] bool IsSet() const noexcept { return _flag.load(std::memory_order::relaxed); }
+                [[nodiscard]] bool IsSet() const noexcept { return _flag.test(std::memory_order::relaxed); }
 
             private:
-                std::atomic<bool> _flag{};
+                std::atomic_flag _flag{};
             };
 
         } // namespace helper
