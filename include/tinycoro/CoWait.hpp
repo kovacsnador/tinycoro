@@ -19,6 +19,32 @@ namespace tinycoro {
 
     namespace detail {
 
+        // Custom onFinish task callback.
+        //
+        // Not only setting the future object, but also responisble
+        // for the awaiter resumption.
+        //
+        // In our use case with `co_await`, this is essential because
+        // we must notify the awaitable object once the coroutine
+        // has completed execution and all associated `co_await` tasks are done.
+        template <typename AwaitableT>
+        struct AsyncAwaitOnFinishWrapper
+        {
+            template <typename PromiseT, typename FutureStateT>
+            [[nodiscard]] static constexpr auto Get() noexcept
+            {
+                return [](void* promise, void* futureState) {
+                    // Call the default task finish handler to set the future.
+                    detail::OnTaskFinish<PromiseT, FutureStateT>(promise, futureState);
+
+                    // Notify the current awaitable if all the coroutines are completed.
+                    auto  p = static_cast<PromiseT*>(promise);
+                    auto* a = static_cast<AwaitableT>(p->CurrentAwaitable());
+                    a->DestroyNotify();
+                };
+            }
+        };
+
         template <typename SchedulerT, typename EventT, typename FuturesT>
         struct AsyncAwaiterBase
         {
@@ -39,17 +65,12 @@ namespace tinycoro {
             [[nodiscard]] auto await_resume() { return GetAll(this->_futures); }
 
         protected:
-            auto MakeDestroyNotifier()
+            constexpr void DestroyNotify() noexcept
             {
-                auto func = [](void* self) {
-                    auto* awaiter = static_cast<decltype(this)>(self);
-                    if (awaiter->_counter.fetch_sub(1, std::memory_order_relaxed) == 1)
-                    {
-                        awaiter->_event.Notify();
-                    }
-                };
-
-                return detail::UnsafeFunction<void(void*)>{func, this};
+                if (_counter.fetch_sub(1, std::memory_order_relaxed) == 1)
+                {
+                    _event.Notify();
+                }
             }
 
             SchedulerT&         _scheduler;
@@ -65,6 +86,8 @@ namespace tinycoro {
         template <typename SchedulerT, typename EventT, typename FuturesT, concepts::IsCorouitneTask... Args>
         struct AsyncAwaiterT<SchedulerT, EventT, FuturesT, Args...> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
         {
+            friend struct AsyncAwaitOnFinishWrapper<AsyncAwaiterT*>;
+
             AsyncAwaiterT(SchedulerT& scheduler, EventT event, Args&&... args)
             : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, sizeof...(Args)}
             , _coroutineTasks(std::forward<Args>(args)...)
@@ -76,13 +99,12 @@ namespace tinycoro {
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
-                auto destroyNotifier = this->MakeDestroyNotifier();
-
                 // start all coroutines
                 this->_futures = std::apply(
-                    [destroyNotifier, this]<typename... Ts>(Ts&&... ts) {
-                        (ts.SetDestroyNotifier(destroyNotifier), ...);
-                        return this->_scheduler.Enqueue(std::forward<Ts>(ts)...);
+                    [this]<typename... Ts>(Ts&&... ts) {
+                        (ts.SetCurrentAwaitable(this), ...);
+                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
+                            std::forward<Ts>(ts)...);
                     },
                     std::move(this->_coroutineTasks));
             }
@@ -94,6 +116,8 @@ namespace tinycoro {
         template <typename SchedulerT, typename EventT, typename FuturesT, concepts::Iterable ContainerT>
         struct AsyncAwaiterT<SchedulerT, EventT, FuturesT, ContainerT> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
         {
+            friend struct AsyncAwaitOnFinishWrapper<AsyncAwaiterT*>;
+
             AsyncAwaiterT(SchedulerT& scheduler, EventT event, ContainerT&& container)
             : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
             , _container{std::forward<ContainerT>(container)}
@@ -105,16 +129,15 @@ namespace tinycoro {
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
-                auto destroyNotifier = this->MakeDestroyNotifier();
-
                 // setting the destroy notifier callback
                 for (auto& it : _container)
                 {
-                    it.SetDestroyNotifier(destroyNotifier);
+                    it.SetCurrentAwaitable(this);
                 }
 
                 // start all coroutines
-                this->_futures = this->_scheduler.Enqueue(std::move(_container));
+                this->_futures
+                    = this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(std::move(_container));
             }
 
         private:
@@ -127,6 +150,8 @@ namespace tinycoro {
         template <typename SchedulerT, typename StopSourceT, typename EventT, typename FuturesT, concepts::IsCorouitneTask... Args>
         struct AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, EventT, FuturesT, Args...> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
         {
+            friend struct AsyncAwaitOnFinishWrapper<AsyncAnyOfAwaiterT*>;
+
             AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, Args&&... args)
             : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, sizeof...(Args)}
             , _stopSource{std::move(stopSource)}
@@ -139,13 +164,12 @@ namespace tinycoro {
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
-                auto destroyNotifier = this->MakeDestroyNotifier();
-
                 // start all coroutines
                 this->_futures = std::apply(
-                    [destroyNotifier, this]<typename... Ts>(Ts&&... ts) {
-                        ((ts.SetDestroyNotifier(destroyNotifier), ts.SetStopSource(_stopSource)), ...);
-                        return this->_scheduler.Enqueue(std::forward<Ts>(ts)...);
+                    [this]<typename... Ts>(Ts&&... ts) {
+                        ((ts.SetCurrentAwaitable(this), ts.SetStopSource(_stopSource)), ...);
+                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
+                            std::forward<Ts>(ts)...);
                     },
                     std::move(this->_coroutineTasks));
             }
@@ -158,6 +182,8 @@ namespace tinycoro {
         template <typename SchedulerT, typename StopSourceT, typename EventT, typename FuturesT, concepts::Iterable ContainerT>
         struct AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, EventT, FuturesT, ContainerT> : public AsyncAwaiterBase<SchedulerT, EventT, FuturesT>
         {
+            friend struct AsyncAwaitOnFinishWrapper<AsyncAnyOfAwaiterT*>;
+
             AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, ContainerT&& container)
             : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
             , _stopSource{std::move(stopSource)}
@@ -170,17 +196,16 @@ namespace tinycoro {
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
-                auto destroyNotifier = this->MakeDestroyNotifier();
-
                 // setting the destroy notifier callback
                 for (auto& it : _container)
                 {
-                    it.SetDestroyNotifier(destroyNotifier);
+                    it.SetCurrentAwaitable(this);
                     it.SetStopSource(_stopSource);
                 }
 
                 // start all coroutines
-                this->_futures = this->_scheduler.Enqueue(std::move(_container));
+                this->_futures
+                    = this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(std::move(_container));
             }
 
         private:
@@ -193,22 +218,23 @@ namespace tinycoro {
     template <typename SchedulerT, concepts::Iterable ContainerT>
     [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, ContainerT&& container)
     {
-        using FuturesType = decltype(std::declval<SchedulerT>().Enqueue(std::move(container)));
-        return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FuturesType, ContainerT>{scheduler, {}, std::forward<ContainerT>(container)};
+        using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
+        return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FuturesType, ContainerT>{
+            scheduler, {}, std::forward<ContainerT>(container)};
     }
 
     template <typename SchedulerT, concepts::IsCorouitneTask... Args>
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, Args&&... args)
     {
-        using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
+        using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...));
         return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
     template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, ContainerT&& container)
     {
-        using FuturesType = decltype(std::declval<SchedulerT>().Enqueue(std::move(container)));
+        using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
         return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FuturesType, ContainerT>{
             scheduler, std::move(stopSource), {}, std::forward<ContainerT>(container)};
     }
@@ -217,19 +243,22 @@ namespace tinycoro {
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
-        using FutureTupleType = decltype(std::declval<SchedulerT>().Enqueue(std::forward<Args>(args)...));
+        using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...));
         return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FutureTupleType, Args...>{
             scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 
-    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, typename... Args>
-        requires (sizeof...(Args) > 0) && /*requires (SchedulerT s, Args... a) {
-            { s.Enqueue(std::forward<Args>(a)...) };
-        }*/
-        (!concepts::IsStopSource<SchedulerT>)
-    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, Args&&... args)
+    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... Args>
+        requires (sizeof...(Args) > 0)
+    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, Args&&... tasks)
     {
-        return AnyOfAwait(scheduler, StopSourceT{}, std::forward<Args>(args)...);
+        return AnyOfAwait(scheduler, StopSourceT{}, std::forward<Args>(tasks)...);
+    }
+
+    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::Iterable ContainerT>
+    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, ContainerT&& tasks)
+    {
+        return AnyOfAwait(scheduler, StopSourceT{}, std::forward<ContainerT>(tasks));
     }
 
 } // namespace tinycoro

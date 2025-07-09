@@ -176,6 +176,7 @@ namespace tinycoro {
             Future() = default;
 
             Future(Future&& other) = default;
+            Future& operator=(Future&& other) = default;
 
             auto get() -> ValueT
             {

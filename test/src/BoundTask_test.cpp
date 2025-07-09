@@ -31,7 +31,7 @@ struct TaskWrapperMockImpl
     MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
     MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
-    MOCK_METHOD(void, SetDestroyNotifier, (std::function<void()>));
+    MOCK_METHOD(void, SetCurrentAwaitable, (void*));
     MOCK_METHOD(void*, Address, (), (const noexcept));
     MOCK_METHOD(void*, Release, (), (noexcept));
 };
@@ -71,9 +71,9 @@ struct TaskWrapperMock
     }
 
     template <typename U>
-    void SetDestroyNotifier(U&& cb)
+    void SetCurrentAwaitable(U&& cb)
     {
-        impl->SetDestroyNotifier(std::forward<U>(cb));
+        impl->SetCurrentAwaitable(std::forward<U>(cb));
     }
 
     [[nodiscard]] auto Address() const noexcept { return impl->Address(); }

@@ -14,7 +14,9 @@ concept AllSame = (std::same_as<T, Ts> && ...);
 
 struct SchedulerMock
 {
-    template <tinycoro::concepts::NonIterable CoroTaskT>
+    template <template <typename> class FutureStateT = std::promise,
+              typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
+              tinycoro::concepts::NonIterable CoroTaskT>
     auto Enqueue([[maybe_unused]] CoroTaskT&& t)
     {
         auto task    = std::move(t);
@@ -32,7 +34,9 @@ struct SchedulerMock
         return promise.get_future();
     }
 
-    template <tinycoro::concepts::Iterable ContainerT>
+    template <template <typename> class FutureStateT = std::promise,
+              typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
+              tinycoro::concepts::Iterable ContainerT>
     auto Enqueue(ContainerT&& c)
     {
         using ValueT = std::decay_t<ContainerT>::value_type::promise_type::value_type;
@@ -61,13 +65,16 @@ struct SchedulerMock
         return futures;
     }
 
-    template <tinycoro::concepts::NonIterable... Args>
+    template <template <typename> class FutureStateT = std::promise,
+              typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
+              tinycoro::concepts::NonIterable... Args>
         requires (sizeof...(Args) > 1)
     auto Enqueue([[maybe_unused]] Args&&... args)
     {
         auto tupleTask = std::make_tuple(std::forward<Args>(args)...);
 
-        auto promises = std::make_tuple(std::promise<typename tinycoro::detail::FutureReturnT<typename Args::promise_type::value_type>::value_type>{}...);
+        auto promises
+            = std::make_tuple(std::promise<typename tinycoro::detail::FutureReturnT<typename Args::promise_type::value_type>::value_type>{}...);
         std::apply(
             []<typename... Ts>(Ts&&... ts) {
                 auto setPromise = [](auto& p) {
@@ -86,20 +93,16 @@ struct SchedulerMock
                 (setPromise(ts), ...);
             },
             promises);
+
         return std::apply([]<typename... Ts>(Ts&&... ts) { return std::make_tuple(ts.get_future()...); }, promises);
     }
 };
 
 struct AllOfAwaiterTest : testing::Test
 {
-    void SetUp() override
-    {
-        hdl.promise().pauseHandler.emplace([this] { resumerCalled = true; });
-    }
 
 protected:
-    bool                                                         resumerCalled{false};
-    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<void>> hdl;
+    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<void>> hdl = tinycoro::test::MakeCoroutineHdl();
 
     SchedulerMock schedulerMock;
 };
@@ -110,10 +113,10 @@ TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_voidTask)
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_resume());
+
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), void>));
 }
 
 TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_vector_voidTask)
@@ -127,10 +130,10 @@ TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_vector_voidTask)
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, tasks);
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_resume());
+
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), void>));
 }
 
 TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_intTask)
@@ -139,15 +142,16 @@ TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_intTask)
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, task(), task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
 
     auto [r1, r2, r3] = awaiter.await_resume();
 
     EXPECT_EQ(r1, 0);
     EXPECT_EQ(r2, 0);
     EXPECT_EQ(r3, 0);
+
+    using return_t = tinycoro::detail::FutureTypeGetter<int32_t, tinycoro::unsafe::Promise>::futureReturn_t;
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), std::tuple<return_t, return_t, return_t>>));
 }
 
 TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_array_intTask)
@@ -162,15 +166,16 @@ TEST_F(AllOfAwaiterTest, AllOfAwaiterTest_array_intTask)
     auto awaiter = tinycoro::AllOfAwait(schedulerMock, tasks);
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
 
     auto results = awaiter.await_resume();
 
     EXPECT_EQ(results[0], 0);
     EXPECT_EQ(results[1], 0);
     EXPECT_EQ(results[2], 0);
+
+    using return_t = tinycoro::detail::FutureTypeGetter<int32_t, tinycoro::unsafe::Promise>::futureReturn_t;
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), std::vector<return_t>>));
 }
 
 TEST_F(AllOfAwaiterTest, AnyOfAwait_intTask)
@@ -179,15 +184,16 @@ TEST_F(AllOfAwaiterTest, AnyOfAwait_intTask)
     auto awaiter = tinycoro::AnyOfAwait(schedulerMock, task(), task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
 
     auto results = awaiter.await_resume();
 
     EXPECT_EQ(std::get<0>(results), 0);
     EXPECT_EQ(std::get<1>(results), 0);
     EXPECT_EQ(std::get<2>(results), 0);
+
+    using return_t = tinycoro::detail::FutureTypeGetter<int32_t, tinycoro::unsafe::Promise>::futureReturn_t;
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), std::tuple<return_t, return_t, return_t>>));
 }
 
 TEST_F(AllOfAwaiterTest, AnyOfAwaitStopSource_intTask)
@@ -198,10 +204,8 @@ TEST_F(AllOfAwaiterTest, AnyOfAwaitStopSource_intTask)
     auto awaiter = tinycoro::AnyOfAwait(schedulerMock, ss, task(), task(), task());
 
     EXPECT_FALSE(awaiter.await_ready());
-    EXPECT_FALSE(resumerCalled);
     EXPECT_FALSE(ss.stop_requested());
     EXPECT_NO_THROW(awaiter.await_suspend(hdl));
-    EXPECT_TRUE(resumerCalled);
     EXPECT_TRUE(ss.stop_requested());
 
     auto results = awaiter.await_resume();
@@ -209,6 +213,36 @@ TEST_F(AllOfAwaiterTest, AnyOfAwaitStopSource_intTask)
     EXPECT_EQ(std::get<0>(results), 0);
     EXPECT_EQ(std::get<1>(results), 0);
     EXPECT_EQ(std::get<2>(results), 0);
+
+    using return_t = tinycoro::detail::FutureTypeGetter<int32_t, tinycoro::unsafe::Promise>::futureReturn_t;
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), std::tuple<return_t, return_t, return_t>>));
+}
+
+TEST_F(AllOfAwaiterTest, AnyOfAwait_mixedTask)
+{
+    std::stop_source ss;
+
+    auto task    = []() -> tinycoro::Task<int32_t> { co_return 0; };
+    auto task_double    = []() -> tinycoro::Task<double> { co_return 0.0; };
+    auto task_bool    = []() -> tinycoro::Task<bool> { co_return false; };
+    auto awaiter = tinycoro::AnyOfAwait(schedulerMock, ss, task(), task_double(), task_bool());
+
+    EXPECT_FALSE(awaiter.await_ready());
+    EXPECT_FALSE(ss.stop_requested());
+    EXPECT_NO_THROW(awaiter.await_suspend(hdl));
+    EXPECT_TRUE(ss.stop_requested());
+
+    auto results = awaiter.await_resume();
+
+    EXPECT_EQ(std::get<0>(results), 0);
+    EXPECT_EQ(std::get<1>(results), 0.0);
+    EXPECT_EQ(std::get<2>(results), false);
+
+    using return_t = tinycoro::detail::FutureTypeGetter<int32_t, tinycoro::unsafe::Promise>::futureReturn_t;
+    using return_double_t = tinycoro::detail::FutureTypeGetter<double, tinycoro::unsafe::Promise>::futureReturn_t;
+    using return_bool_t = tinycoro::detail::FutureTypeGetter<bool, tinycoro::unsafe::Promise>::futureReturn_t;
+
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), std::tuple<return_t, return_double_t, return_bool_t>>));
 }
 
 tinycoro::Task<std::string> AsyncAwaiterTest1(auto& scheduler)
@@ -418,7 +452,7 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
         std::set<size_t> set;
         for (auto& it : results)
         {
-            if(it.has_value())
+            if (it.has_value())
             {
                 // no lock needed here only one consumer
                 auto [_, inserted] = set.insert(*it);
@@ -439,7 +473,7 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 
     std::atomic<size_t> count{};
 
-    auto task = [](auto& c) -> tinycoro::Task<size_t> { 
+    auto task = [](auto& c) -> tinycoro::Task<size_t> {
         co_await tinycoro::this_coro::yield_cancellable();
         co_return ++c;
     };
@@ -458,7 +492,7 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
         EXPECT_EQ(results.size(), size);
         EXPECT_EQ(results.at(0), 1);
 
-        for(size_t i = 1 ; i < results.size() ; ++i)
+        for (size_t i = 1; i < results.size(); ++i)
         {
             EXPECT_FALSE(results[i].has_value());
         }
@@ -527,7 +561,7 @@ TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         tasks.push_back(t2());
 
         tasks.push_back(task(1000ms));
-        //tasks.push_back(task(2000ms));
+        // tasks.push_back(task(2000ms));
 
         EXPECT_THROW(co_await tinycoro::AnyOfAwait(scheduler, std::move(tasks)), std::runtime_error);
 

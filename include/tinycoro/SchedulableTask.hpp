@@ -82,7 +82,7 @@ namespace tinycoro { namespace detail {
             auto& pauseHandler = _hdl.promise().pauseHandler;
 
             assert(pauseHandler);
-            
+
             // pause handler should be already initialized
             pauseHandler->ResetCallback(std::move(pauseResume));
         }
@@ -92,7 +92,7 @@ namespace tinycoro { namespace detail {
             assert(_hdl);
 
             auto& promise = _hdl.promise();
-            _hdl       = nullptr;
+            _hdl          = nullptr;
             return std::addressof(promise);
         }
 
@@ -143,7 +143,7 @@ namespace tinycoro { namespace detail {
 
     // This is the OnFinish callback
     // which is triggered in the promise base
-    // in order to set the value in the 
+    // in order to set the value in the
     // corresponding promise object.
     template <typename PromiseT, typename FutureStateT>
     void OnTaskFinish(void* self, void* futureStatePtr)
@@ -181,11 +181,40 @@ namespace tinycoro { namespace detail {
         }
     }
 
+    struct OnTaskFinishCallbackWrapper
+    {   
+        template<typename PromiseT, typename FutureStateT>
+        [[nodiscard]] constexpr static auto Get() noexcept
+        {
+            // Returns the function pointer
+            // which we need to invoke on task
+            // finish.
+            return detail::OnTaskFinish<PromiseT, FutureStateT>;
+        }
+    };
+
+    template<typename ReturnT, template <typename> class FutureStateT>
+    struct FutureTypeGetter
+    {   
+        // futureReturn_t is packed in a std::optinal
+        using futureReturn_t = typename detail::FutureReturnT<ReturnT>::value_type;
+        
+        // this is the future state type
+        //
+        // e.g. std::promise<std::optinal<int32_t>>
+        using futureState_t = FutureStateT<futureReturn_t>;
+
+        // and this is the corresponding future type
+        //
+        // e.g. std::future<std::optinal<int32_t>> 
+        using future_t = decltype(std::declval<futureState_t>().get_future()); 
+    };
+
     // The schedulable task factory function.
     //
     // Intented to save and connect the future state
     // (e.g std::promise<>) object with the corouitne itself.
-    template <concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
+    template <typename OnFinishCallbackT, concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
         requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
     auto MakeSchedulableTask(CoroT&& coro, FutureStateT&& futureState)
     {
@@ -194,11 +223,12 @@ namespace tinycoro { namespace detail {
         auto  originalHandle = coro.Release();
         auto& promise        = originalHandle.promise();
 
-        using PromiseT = CoroT::promise_type;
+        using promise_t = std::remove_cvref_t<CoroT>::promise_type;
+        using futureState_t = std::remove_cvref_t<FutureStateT>;
 
         // save the future state inside
         // the corouitne promise
-        promise.SavePromise(std::move(futureState), detail::OnTaskFinish<PromiseT, FutureStateT>);
+        promise.SavePromise(std::move(futureState), OnFinishCallbackT::template Get<promise_t, futureState_t>());
 
         // Initialize the pause handler with the appropriate initial cancellation policy.
         //

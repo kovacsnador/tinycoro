@@ -71,69 +71,62 @@ namespace tinycoro {
             auto GetStopToken() const noexcept { return _stopSource.get_token(); }
             auto GetStopSource() const noexcept { return _stopSource; }
 
-            template <template <typename> class FutureStateT = std::promise, concepts::IsCorouitneTask... CoroTasksT>
+            template <template <typename> class FutureStateT = std::promise,
+                      typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
+                      concepts::IsCorouitneTask... CoroTasksT>
                 requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
             [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
             {
                 if constexpr (sizeof...(CoroTasksT) == 1)
                 {
-                    return EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks)...);
+                    return EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks)...);
                 }
                 else
                 {
-                    return std::tuple{EnqueueImpl<FutureStateT>(std::forward<CoroTasksT>(tasks))...};
+                    return std::tuple{EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks))...};
                 }
             }
 
-            template <template <typename> class FutureStateT = std::promise, concepts::Iterable ContainerT>
+            template <template <typename> class FutureStateT = std::promise,
+                      typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
+                      concepts::Iterable ContainerT>
                 requires concepts::FutureState<FutureStateT<void>> && (!std::is_reference_v<ContainerT>)
             [[nodiscard]] auto Enqueue(ContainerT&& tasks)
             {
                 // get the result value
                 using desiredValue_t = typename std::decay_t<ContainerT>::value_type::value_type;
 
-                // check against void
-                // if not void we create a std::optional
-                // to support cancellation
-                using futureValue_t = detail::FutureReturnT<desiredValue_t>::value_type;
+                // calculate the future object which will be returned.
+                using future_t = detail::FutureTypeGetter<desiredValue_t, FutureStateT>::future_t;
 
-                using FutureStateType = FutureStateT<futureValue_t>;
-
-                std::vector<decltype(std::declval<FutureStateType>().get_future())> futures;
+                std::vector<future_t> futures;
                 futures.reserve(std::size(tasks));
 
                 for (auto&& task : tasks)
                 {
                     // register tasks and collect all the futures
-                    futures.emplace_back(EnqueueImpl<FutureStateT>(std::move(task)));
+                    futures.emplace_back(EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::move(task)));
                 }
 
                 return futures;
             }
 
         private:
-            template <template<typename> class FutureStateT, concepts::IsCorouitneTask CoroTaksT>
-            requires (!std::is_reference_v<CoroTaksT>) &&  concepts::FutureState<FutureStateT<void>>
-        [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
+            template <template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsCorouitneTask CoroTaksT>
+                requires (!std::is_reference_v<CoroTaksT>) && concepts::FutureState<FutureStateT<void>>
+            [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
             {
-                // get the result value
-                using desiredValue_t = typename CoroTaksT::value_type;
+                using futureState_t = detail::FutureTypeGetter<typename CoroTaksT::value_type, FutureStateT>::futureState_t;
 
-                // check against void
-                // if not void we create a std::optional
-                // to support cancellation
-                using futureValue_t = typename detail::FutureReturnT<desiredValue_t>::value_type;
+                futureState_t futureState;
 
-                FutureStateT<futureValue_t> futureState;
+                auto future = futureState.get_future();
 
-                auto future  = futureState.get_future();
-                auto address = coro.Address();
-
-                if (_stopSource.stop_requested() == false && address)
+                if (_stopSource.stop_requested() == false && coro.Address())
                 {
                     // not allow to enqueue tasks with uninitialized std::coroutine_handler
                     // or if the a stop is requested
-                    auto task = MakeSchedulableTask(std::move(coro), std::move(futureState));
+                    auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
                     // push the task into the queue
                     helper::PushTask(std::move(task), _sharedTasks, _stopSource);
