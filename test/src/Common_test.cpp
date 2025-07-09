@@ -14,6 +14,8 @@
 #include <tinycoro/LinkedUtils.hpp>
 #include <tinycoro/AllocatorAdapter.hpp>
 
+#include <tinycoro/tinycoro_all.h>
+
 template <typename T>
 struct Concepts_IterableTest : public testing::Test
 {
@@ -98,22 +100,34 @@ TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_defaultConstructor)
     event.Set();
 
     EXPECT_TRUE(event.IsSet());
-    EXPECT_TRUE(event.Wait());
+    event.WaitAndReset();
 
     EXPECT_FALSE(event.IsSet());
 }
 
-TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_customConstructor)
+TEST(Helper_AutoResetEvent, Helper_AutoResetEvent_waitAndReset)
 {
-    tinycoro::detail::helper::AutoResetEvent event{true};
-    EXPECT_TRUE(event.IsSet());
+    tinycoro::SoftClock clock;
+    tinycoro::Scheduler scheduler{2};
 
-    EXPECT_TRUE(event.Wait());
+    tinycoro::detail::helper::AutoResetEvent event;
     EXPECT_FALSE(event.IsSet());
 
-    event.Set();
+    auto setter = [&]()->tinycoro::Task<> {  
+        co_await tinycoro::SleepFor(clock, 200ms);
+        event.Set();
+    };
 
-    EXPECT_TRUE(event.IsSet());
+    auto waiter = [&]()->tinycoro::Task<> {
+        EXPECT_FALSE(event.IsSet());
+        event.WaitAndReset();
+        EXPECT_FALSE(event.IsSet());
+        co_return;
+    };
+
+    tinycoro::AllOf(scheduler, waiter(), setter());
+
+    EXPECT_FALSE(event.IsSet());
 }
 
 TEST(Helper_ContainsTest, Helper_ContainsTest)

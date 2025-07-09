@@ -184,7 +184,7 @@ namespace tinycoro {
                         // most tasks are finished but we have at least
                         // one paused task, so we need to wait on this thread...
                         // Waits until somebody get's notified to resume
-                        event.Wait();
+                        event.WaitAndReset();
                     }
                 }
 
@@ -366,7 +366,7 @@ namespace tinycoro {
                 {
                     // all in pause state or done, so we need to wait on this thread...
                     // Waits until somebody get's notified to resume
-                    event.Wait();
+                    event.WaitAndReset();
                 }
 
                 // clear the vector for the next batch of results
