@@ -687,10 +687,10 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleep)
         co_return r;
     };
 
-    auto start = std::chrono::system_clock::now();
+    auto start = tinycoro::SoftClock::Now();
     auto res = tinycoro::AllOfInline(deferedTask(42));
 
-    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
     EXPECT_EQ(res, 42);
     
 }
@@ -703,11 +703,11 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti)
         co_return r;
     };
 
-    auto start = std::chrono::system_clock::now();
+    auto start = tinycoro::SoftClock::Now();
     auto [r1, r2, r3] = tinycoro::AllOfInline(deferedTask(41), deferedTask(42), deferedTask(43));
 
     // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
-    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
     EXPECT_EQ(r1, 41);
     EXPECT_EQ(r2, 42);
     EXPECT_EQ(r3, 43);
@@ -724,11 +724,11 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti_dynamic)
 
     std::array<tinycoro::Task<int32_t>, 3> tasks{deferedTask(41), deferedTask(42), deferedTask(43)};
 
-    auto start = std::chrono::system_clock::now();
+    auto start = tinycoro::SoftClock::Now();
     auto results = tinycoro::AllOfInline(tasks);
 
     // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
-    EXPECT_TRUE(std::chrono::system_clock::now() >= start + 200ms);
+    EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
     EXPECT_EQ(results[0], 41);
     EXPECT_EQ(results[1], 42);
     EXPECT_EQ(results[2], 43);

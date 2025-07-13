@@ -12,54 +12,11 @@ struct CancellationTokenMock
     CancellationTokenMock(auto) { }
 };
 
-TEST(SoftClockTest, SoftClockTest_constructor_and_freqency_check)
-{
-    {
-        tinycoro::SoftClock clock;
-        EXPECT_EQ(clock.Frequency(), 100ms);
-    }
-
-    {
-        tinycoro::SoftClock clock{10ms};
-        EXPECT_EQ(clock.Frequency(), tinycoro::SoftClock::s_minFrequency);
-    }
-
-    {
-        tinycoro::SoftClock clock{200ms};
-        EXPECT_EQ(clock.Frequency(), 200ms);
-    }
-
-    {
-        tinycoro::SoftClock clock{2s};
-        EXPECT_EQ(clock.Frequency(), 2s);
-    }
-
-    {
-        std::stop_source ss;
-
-        tinycoro::SoftClock clock{ss.get_token()};
-        EXPECT_EQ(clock.Frequency(), 100ms);
-        ss.request_stop();
-
-        EXPECT_TRUE(clock.StopRequested());
-    }
-
-    {
-        std::stop_source ss;
-
-        tinycoro::SoftClock clock{ss.get_token(), 20ms};
-        EXPECT_EQ(clock.Frequency(), tinycoro::SoftClock::s_minFrequency);
-        ss.request_stop();
-
-        EXPECT_TRUE(clock.StopRequested());
-    }
-}
-
 TEST(SoftClockTest, SoftClockTest_registration_token_type)
 {
-    tinycoro::detail::SoftClock<CancellationTokenMock> clock{};
+    tinycoro::detail::SoftClock<CancellationTokenMock, std::chrono::milliseconds> clock{};
 
-    using clock_t = tinycoro::detail::SoftClock<CancellationTokenMock>;
+    using clock_t = tinycoro::detail::SoftClock<CancellationTokenMock, std::chrono::milliseconds>;
 
     using tokenType1 = decltype(std::declval<clock_t>().RegisterWithCancellation([]() noexcept { }, 50ms));
     using tokenType2 = decltype(std::declval<clock_t>().RegisterWithCancellation([]() noexcept { }, std::declval<clock_t>().Now() + 50ms));
@@ -70,7 +27,7 @@ TEST(SoftClockTest, SoftClockTest_registration_token_type)
 
 TEST(SoftClockTest, SoftClockTest_simple)
 {
-    tinycoro::SoftClock clock{50ms};
+    tinycoro::SoftClock clock{};
 
     bool called{false};
 
@@ -87,7 +44,7 @@ TEST(SoftClockTest, SoftClockTest_move_token)
     bool called{false};
     auto token = clock.RegisterWithCancellation([&called]() noexcept { called = true; }, 300s);
 
-    tinycoro::CancellationToken token2{std::move(token)};
+    tinycoro::SoftClockCancelToken token2{std::move(token)};
 
     // this should cancel nothing
     EXPECT_FALSE(token.TryCancel());
@@ -99,9 +56,9 @@ TEST(SoftClockTest, SoftClockTest_move_token)
 
 TEST(SoftClockTest, SoftClockTest_move_token_destroy_clock)
 {
-    tinycoro::CancellationToken token1;
-    tinycoro::CancellationToken token2;
-    tinycoro::CancellationToken token3;
+    tinycoro::SoftClockCancelToken token1;
+    tinycoro::SoftClockCancelToken token2;
+    tinycoro::SoftClockCancelToken token3;
 
     {
         tinycoro::SoftClock clock;
@@ -152,13 +109,13 @@ TEST(SoftClockTest, SoftClockTest_destroy_clock)
 
 TEST(SoftClockTest, SoftClockTest_move_token_timed_out)
 {
-    tinycoro::CancellationToken token1;
-    tinycoro::CancellationToken token2;
-    tinycoro::CancellationToken token3;
-    tinycoro::CancellationToken token4;
-    tinycoro::CancellationToken token5;
+    tinycoro::SoftClockCancelToken token1;
+    tinycoro::SoftClockCancelToken token2;
+    tinycoro::SoftClockCancelToken token3;
+    tinycoro::SoftClockCancelToken token4;
+    tinycoro::SoftClockCancelToken token5;
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     bool t1{false};
     bool t2{false};
@@ -191,7 +148,7 @@ TEST(SoftClockTest, SoftClockTest_move_token_timed_out)
 
 TEST(SoftClockTest, SoftClockTest_timed_out)
 {
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     bool t1{false};
     bool t2{false};
@@ -217,7 +174,7 @@ TEST(SoftClockTest, SoftClockTest_timed_out)
 
 TEST(SoftClockTest, SoftClockTest_token_mixed)
 {
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     bool t1{false};
     bool t2{false};
@@ -249,7 +206,7 @@ TEST(SoftClockTest, SoftClockTest_stop_token)
 {
     std::stop_source stopSource;
 
-    tinycoro::SoftClock clock{stopSource.get_token(), 40ms};
+    tinycoro::SoftClock clock{stopSource.get_token()};
 
     EXPECT_FALSE(clock.StopRequested());
 
@@ -266,7 +223,7 @@ TEST(SoftClockTest, SoftClockTest_stop_token)
 
 TEST(SoftClockTest, SoftClockTest_stop_and_start)
 {
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     std::this_thread::sleep_for(100ms);
 
@@ -290,7 +247,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_ignore_tokens)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -298,19 +255,24 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_ignore_tokens)
     }
 }
 
-TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token)
+TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_completion_token)
 {
     const auto count = GetParam();
 
     tinycoro::Latch latch{count};
+    std::atomic<bool> fff{false};
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
-    std::vector<tinycoro::CancellationToken> tokens;
+    std::vector<tinycoro::SoftClockCancelToken> tokens;
 
     for (size_t i = 0; i < count; ++i)
     {
-        tokens.push_back(clock.RegisterWithCancellation([&latch]() noexcept { latch.CountDown(); }, 50ms));
+        tokens.push_back(clock.RegisterWithCancellation([&]() noexcept { 
+            
+            fff = true;
+            
+            latch.CountDown(); }, 50ms));
     }
 
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
@@ -325,7 +287,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_requestStop_test)
 
     size_t c{};
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -345,7 +307,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_destructor_test)
 
     auto onExit = tinycoro::Finally([&c] { EXPECT_EQ(c, 0); });
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -359,7 +321,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition)
 
     tinycoro::Latch latch{count};
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -378,9 +340,9 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
 
     tinycoro::Latch latch{count / 2};
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
-    std::vector<tinycoro::CancellationToken> tokens;
+    std::vector<tinycoro::SoftClockCancelToken> tokens;
 
     for (size_t i = 0; i < count; ++i)
     {
@@ -406,7 +368,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)
     const auto count = GetParam();
 
     tinycoro::Barrier   barrier{count};
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -438,7 +400,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -464,7 +426,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_timedOut)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -499,7 +461,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_1_random)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -529,7 +491,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -555,7 +517,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_measure_2_random)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -586,7 +548,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token)
     const auto count = GetParam();
 
     tinycoro::Barrier   barrier{count};
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -618,7 +580,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
@@ -651,7 +613,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_with_token_cancel_st
     std::stop_source ss;
 
     tinycoro::Latch     latch{1};
-    tinycoro::SoftClock clock{ss.get_token(), 40ms};
+    tinycoro::SoftClock clock{ss.get_token()};
 
     tinycoro::Scheduler scheduler;
 
@@ -689,7 +651,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded_close)
 {
     const auto count = GetParam();
 
-    tinycoro::SoftClock clock{40ms};
+    tinycoro::SoftClock clock{};
 
     tinycoro::Scheduler scheduler;
 
