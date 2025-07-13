@@ -328,9 +328,18 @@ namespace tinycoro {
                         }
                     }
 
+                    assert(lock.owns_lock());
                     assert(_events.empty() == false);
+
+                    // Save the timeout in a local varaible.
+                    // this is necessary in order to prevent
+                    // "heap-use-after-free"
+                    // because the lock is released in wait_until()
+                    // right after it is invoked.
+                    auto timeout = _events.begin()->first;
+
                     // Wait until we can invoke the first event.
-                    if (_cv.wait_until(lock, jthreadStopToken, _events.begin()->first, [this] { return std::exchange(_recalcWaitingTime, false); }) == false)
+                    if (_cv.wait_until(lock, jthreadStopToken, timeout, [this] { return std::exchange(_recalcWaitingTime, false); }) == false)
                     {
                         // we need this check against stop_toke here,
                         // becasue on timeout
