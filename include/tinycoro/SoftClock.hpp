@@ -26,18 +26,21 @@ namespace tinycoro {
         // this is a cancellation token
         // to be able to cancel the events
         // after registration in the SoftClock
-        template <template <typename> class ParentT>
-        class CancellationToken
+        template <template <typename, typename> class ParentT, concepts::IsDuration PrecisionT>
+        class SoftClockCancelToken
         {
             // Only sharedImpl_t has access to the real constructor
-            friend ParentT<CancellationToken>::sharedImpl_t;
+            // which is private.
+            friend ParentT<SoftClockCancelToken, PrecisionT>::sharedImpl_t;
 
         public:
+            using precision_t = PrecisionT;
+
             // support default construction
-            CancellationToken() = default;
+            SoftClockCancelToken() = default;
 
             // allow move construction
-            CancellationToken(CancellationToken&& other) noexcept
+            SoftClockCancelToken(SoftClockCancelToken&& other) noexcept
             {
                 std::scoped_lock lock{_mtx, other._mtx};
                 _cancellationCallback       = std::move(other._cancellationCallback);
@@ -45,7 +48,7 @@ namespace tinycoro {
             }
 
             // allow move assignment
-            CancellationToken& operator=(CancellationToken&& other) noexcept
+            SoftClockCancelToken& operator=(SoftClockCancelToken&& other) noexcept
             {
                 if (this != std::addressof(other))
                 {
@@ -59,7 +62,7 @@ namespace tinycoro {
                 return *this;
             }
 
-            ~CancellationToken()
+            ~SoftClockCancelToken()
             {
                 // if the destructor is called
                 // we automatically try to cancel the event
@@ -98,8 +101,8 @@ namespace tinycoro {
         private:
             // private constructor
             template <typename T>
-                requires (!std::same_as<std::decay<T>, CancellationToken>)
-            CancellationToken(T&& cb)
+                requires (!std::same_as<std::decay<T>, SoftClockCancelToken>)
+            SoftClockCancelToken(T&& cb)
             : _cancellationCallback{std::forward<T>(cb)}
             {
             }
@@ -111,289 +114,321 @@ namespace tinycoro {
             std::mutex _mtx;
         };
 
-        template <typename CancellationTokenT>
-        class SoftClock
+        template <typename CancellationTokenT, concepts::IsDuration PrecisionT>
+        class SoftClockImpl : public std::enable_shared_from_this<SoftClockImpl<CancellationTokenT, PrecisionT>>
         {
+            friend CancellationTokenT;
+
         public:
-            using precision_t = std::chrono::milliseconds;
+            using precision_t = PrecisionT;
 
             // using steady clock
             // Class std::chrono::steady_clock represents a monotonic clock.
             using clock_t     = std::chrono::steady_clock;
             using timepoint_t = std::chrono::time_point<clock_t, precision_t>;
 
-            // the minimum allowed update frequency
-            static constexpr concepts::IsDuration auto s_minFrequency = 40ms;
+            using callback_t  = std::function<void()>;
 
-            class SoftClockImpl : public std::enable_shared_from_this<SoftClockImpl>
+            using map_t = std::pmr::multimap<timepoint_t, callback_t>;
+
+            // Default constructor
+            // without stop_token support.
+            SoftClockImpl()
+            : _stopCallback{std::stop_token{}, [] {}} // stop_callback, does nothing
+            , _events{&_pool}
+            , _thread{[this](std::stop_token token) { Run(token); }}
             {
-                friend CancellationTokenT;
+            }
 
-            public:
-                using callback_t = std::function<void()>;
+            // Constructor with custom stop token
+            SoftClockImpl(std::stop_token stopToken)
+            : _stopCallback{std::move(stopToken),
+                            [this] {
+                                // register a stop_callback which is intented to trigger the RequestStop.
+                                RequestStop();
+                            }}
+            , _events{&_pool}
+            , _thread{[this](std::stop_token token) { Run(token); }}
+            {
+            }
 
-                using map_t = std::pmr::multimap<timepoint_t, callback_t>;
+            // disable copy and move
+            SoftClockImpl(SoftClockImpl&&) = delete;
 
-                // Constructor with custom update frequency
-                // the minimum frequency is defined in s_minFrequency
-                template <concepts::IsDuration T = precision_t>
-                SoftClockImpl(T frequency = 100ms)
-                : _frequency{std::max(s_minFrequency, std::chrono::duration_cast<precision_t>(frequency))}
-                , _stopCallback{std::stop_token{}, [] {}}
-                , _events{&_pool}
-                , _thread{[this](std::stop_token token) { Run(token); }}
+            ~SoftClockImpl()
+            {
+                // We just simply call RequestStop
+                // it notifies the jthread to stop
+                // and detaches all the tokens
+                RequestStop();
+
+                if (_thread.joinable())
                 {
+                    // Explicitly join the jthread here to ensure proper destruction order.
+                    // Although jthread automatically joins in its destructor, we must ensure
+                    // that the jthread is the first member to be destroyed. This is because
+                    // if the jthread destructor calls join (thread still running) after other members
+                    // are destroyed, it could lead to dangling references or undefined behavior.
+                    //
+                    // By joining here, we guarantee that the jthread has stopped before
+                    // any other members are destroyed, avoiding potential race conditions
+                    // or access to invalid memory.
+                    _thread.join();
                 }
+            }
 
-                // Constructor with custom update frequency and a stop token
-                // the minimum frequency is defined in s_minFrequency
-                template <concepts::IsDuration T = precision_t>
-                SoftClockImpl(std::stop_token stopToken, T frequency = 100ms)
-                : _frequency{std::max(s_minFrequency, std::chrono::duration_cast<precision_t>(frequency))}
-                , _stopCallback{std::move(stopToken),
-                                [this] {
-                                    // register a stop_callback which is intented to trigger the RequestStop.
-                                    RequestStop();
-                                }}
-                , _events{&_pool}
-                , _thread{[this](std::stop_token token) { Run(token); }}
+            // Register a callback with a custom duration (no cancellation possible)
+            template <concepts::IsNothrowInvokeable CbT>
+            void Register(CbT&& cb, concepts::IsDuration auto duration)
+            {
+                Register(std::forward<CbT>(cb), clock_t::now() + duration);
+            }
+
+            // Register a callback with a custom duration (no cancellation possible)
+            template <concepts::IsNothrowInvokeable CbT>
+            void Register(CbT&& cb, concepts::IsTimePoint auto timePoint)
+            {
+                auto tp = TimePointCast(timePoint);
+                RegisterImpl(std::forward<CbT>(cb), tp);
+            }
+
+            // Register a callback and get cancellation token.
+            template <concepts::IsNothrowInvokeable CbT>
+            [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
+            {
+                return RegisterWithCancellation(std::forward<CbT>(cb), clock_t::now() + duration);
+            }
+
+            // Register a callback and get cancellation token.
+            template <concepts::IsNothrowInvokeable CbT>
+            [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
+            {
+                auto tp   = TimePointCast(timePoint);
+                auto iter = RegisterImpl(std::forward<CbT>(cb), tp);
+
+                if (iter.has_value())
                 {
-                }
+                    auto wPtr = this->weak_from_this();
 
-                // disable copy and move
-                SoftClockImpl(SoftClockImpl&&) = delete;
+                    return CancellationTokenT{[this, wPtr, it = iter.value(), tp] {
+                        if (auto sPtr = wPtr.lock())
+                        {
+                            // after we get the weak_ptr
+                            // we are safe to make operations on 'this' pointer
+                            std::scoped_lock lock{_mtx};
 
-                ~SoftClockImpl()
-                {
-                    // We just simply call RequestStop
-                    // it notifies the jthread to stop
-                    // and detaches all the tokens
-                    RequestStop();
-
-                    if (_thread.joinable())
-                    {
-                        // Explicitly join the jthread here to ensure proper destruction order.
-                        // Although jthread automatically joins in its destructor, we must ensure
-                        // that the jthread is the first member to be destroyed. This is because
-                        // if the jthread destructor calls join (thread still running) after other members
-                        // are destroyed, it could lead to dangling references or undefined behavior.
-                        //
-                        // By joining here, we guarantee that the jthread has stopped before
-                        // any other members are destroyed, avoiding potential race conditions
-                        // or access to invalid memory.
-                        _thread.join();
-                    }
-                }
-
-                // Register a callback with a custom duration (no cancellation possible)
-                template <concepts::IsNothrowInvokeable CbT>
-                void Register(CbT&& cb, concepts::IsDuration auto duration)
-                {
-                    Register(std::forward<CbT>(cb), clock_t::now() + duration);
-                }
-
-                // Register a callback with a custom duration (no cancellation possible)
-                template <concepts::IsNothrowInvokeable CbT>
-                void Register(CbT&& cb, concepts::IsTimePoint auto timePoint)
-                {
-                    auto tp = std::chrono::time_point_cast<typename timepoint_t::duration>(timePoint);
-                    RegisterImpl(std::forward<CbT>(cb), tp);
-                }
-
-                // Register a callback and get cancellation token.
-                template <concepts::IsNothrowInvokeable CbT>
-                [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
-                {
-                    return RegisterWithCancellation(std::forward<CbT>(cb), clock_t::now() + duration);
-                }
-
-                // Register a callback and get cancellation token.
-                template <concepts::IsNothrowInvokeable CbT>
-                [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
-                {
-                    auto tp   = std::chrono::time_point_cast<typename timepoint_t::duration>(timePoint);
-                    auto iter = RegisterImpl(std::forward<CbT>(cb), tp);
-
-                    if (iter.has_value())
-                    {
-                        auto wPtr = this->weak_from_this();
-
-                        return CancellationTokenT{[this, wPtr, it = iter.value(), tp] {
-                            if (auto sPtr = wPtr.lock())
+                            auto begin = _events.begin();
+                            if (begin != _events.end())
                             {
-                                // after we get the weak_ptr
-                                // we are safe to make operations on 'this' pointer
-                                std::scoped_lock lock{_mtx};
-
-                                auto begin = _events.begin();
-                                if (begin != _events.end())
+                                if (tp >= begin->first && StopRequested() == false)
                                 {
-                                    if (tp >= begin->first && StopRequested() == false)
-                                    {
-                                        // if the begin <= tp
-                                        // that means that that out iterator 
-                                        // is still valid
-                                        _events.erase(it);
-                                        return true;
-                                    }
+                                    // if the begin <= tp
+                                    // that means that that out iterator
+                                    // is still valid
+                                    _events.erase(it);
+                                    return true;
                                 }
                             }
-                            return false;
-                        }};
-                    }
+                        }
+                        return false;
+                    }};
+                }
 
+                return {};
+            }
+
+            bool RequestStop()
+            {
+
+                std::scoped_lock lock{_mtx};
+
+                // We can delegate the stop request
+                // directly to the jthread
+                return _thread.request_stop();
+            }
+
+            [[nodiscard]] auto StopRequested() const noexcept { return _thread.get_stop_token().stop_requested(); }
+
+            template <typename DurationT = precision_t>
+            [[nodiscard]] constexpr static auto Now() noexcept
+            {
+                return std::chrono::time_point_cast<DurationT>(clock_t::now());
+            }
+
+        private:
+            template <typename DurationT = timepoint_t::duration>
+            static constexpr auto TimePointCast(concepts::IsTimePoint auto timePoint) noexcept
+            {
+                return std::chrono::time_point_cast<DurationT>(timePoint);
+            }
+
+            template <concepts::IsNothrowInvokeable CbT>
+            std::optional<typename map_t::iterator> RegisterImpl(CbT&& cb, concepts::IsTimePoint auto timePoint)
+            {
+                std::unique_lock lock{_mtx};
+
+                if (StopRequested())
+                {
+                    // if the stop was requested
+                    // we just return an empty optional
                     return {};
                 }
 
-                bool RequestStop()
+                if (clock_t::now() >= timePoint)
                 {
-
-                    std::scoped_lock lock{_mtx};
-
-                    // We can delegate the stop request
-                    // directly to the jthread
-                    return _thread.request_stop();
+                    // check if we already passed the
+                    // timepoint
+                    // invoke the timeout callback
+                    // immediately
+                    cb();
+                    return {};
                 }
 
-                [[nodiscard]] auto Frequency() const noexcept { return _frequency; }
+                auto iter = _events.insert({timePoint, callback_t{std::forward<CbT>(cb)}});
 
-                [[nodiscard]] auto StopRequested() const noexcept { return _thread.get_stop_token().stop_requested(); }
-
-            private:
-                template <concepts::IsNothrowInvokeable CbT>
-                std::optional<map_t::iterator> RegisterImpl(CbT&& cb, concepts::IsTimePoint auto timePoint)
+                if (iter == _events.begin())
                 {
-                    std::unique_lock lock{_mtx};
+                    // we puhsed an element at the beginning.
+                    // so waiting time recalculation is necessary.
+                    _recalcWaitingTime = true;
 
-                    if (StopRequested())
-                    {
-                        // if the stop was requested
-                        // we just return an empty optional
-                        return {};
-                    }
-
-                    if(clock_t::now() >= timePoint)
-                    {
-                        // check if we already passed the
-                        // timepoint
-                        // invoke the timeout callback
-                        // immediately
-                        cb();
-                        return {};
-                    }
-
-                    auto iter = _events.insert({timePoint, callback_t{std::forward<CbT>(cb)}});
                     lock.unlock();
 
-                    // notify, that we have a new event in the list
+                    // notify, that we have a new event
+                    // at the beginning of the list.
                     _cv.notify_one();
-
-                    return iter;
                 }
 
-                // this std::stop_token comes from the jthread itself
-                // and this jthread token will be triggered through the stop_callback
-                // which is registered in the constructor
-                void Run(std::stop_token jthreadStopToken)
+                return iter;
+            }
+
+            // this std::stop_token comes from the jthread itself
+            // and this jthread token will be triggered through the stop_callback
+            // which is registered in the constructor
+            void Run(std::stop_token jthreadStopToken)
+            {
+                // this is a temporary container
+                // in which we copy the timed out callbacks
+                std::vector<callback_t> tempEvents;
+
+                auto transformer = [](auto& pair) { return std::move(pair.second); };
+
+                for (;;)
                 {
-                    // this is a temporary container
-                    // in which we copy the timed out callbacks
-                    std::vector<callback_t> tempEvents;
-                    auto transformer = [](auto& pair) { return std::move(pair.second); };
-
-                    for (;;)
+                    std::unique_lock lock{_mtx};
+                    if (_events.empty())
                     {
-                        std::unique_lock lock{_mtx};
-                        if (_events.empty())
-                        {
-                            // we go to sleep if the list is empty
-                            // until a new event is pushed and we get notified
-                            if (_cv.wait(lock, jthreadStopToken, [this] { return _events.empty() == false; }) == false)
-                            {
-                                // if the stop was requested
-                                // we can leave the scene
-                                break;
-                            }
-                        }
-
-                        // we have some events in the map
-                        auto timePoint = clock_t::now() + _frequency;
-                        if (_cv.wait_until(lock, jthreadStopToken, timePoint, [timePoint] { return timePoint <= clock_t::now(); }) == false)
+                        // we go to sleep if the list is empty
+                        // until a new event is pushed and we get notified
+                        if (_cv.wait(lock, jthreadStopToken, [this] { return _events.empty() == false; }) == false)
                         {
                             // if the stop was requested
                             // we can leave the scene
                             break;
                         }
-
-                        // getting the upper bound
-                        // returns an iterator to the first element greater than the given key (timepoint)
-                        auto upperBound = _events.upper_bound(std::chrono::time_point_cast<typename timepoint_t::duration>(clock_t::now()));
-
-                        // transform the callbacks into a tempEvents container
-                        // and we can release the lock earlier
-                        std::transform(_events.begin(), upperBound, std::back_inserter(tempEvents), transformer);
-
-                        // erase the event which were already timed out.
-                        _events.erase(_events.begin(), upperBound);
-
-                        // we can now release
-                        // the lock safely
-                        lock.unlock();
-
-                        for (auto& it : tempEvents)
-                        {
-                            // iterate over the timed out events
-                            // and notify the callee about that
-                            it();
-                        }
-
-                        // don't forget to clear the temp container
-                        tempEvents.clear();
                     }
+
+                    assert(lock.owns_lock());
+                    assert(_events.empty() == false);
+
+                    // Save the timeout in a local varaible.
+                    // this is necessary in order to prevent
+                    // "heap-use-after-free"
+                    // because the lock is released in wait_until()
+                    // right after it is invoked.
+                    auto timeout = _events.begin()->first;
+
+                    // Wait until we can invoke the first event.
+                    if (_cv.wait_until(lock, jthreadStopToken, timeout, [this] { return std::exchange(_recalcWaitingTime, false); }) == false)
+                    {
+                        // we need this check against stop_toke here,
+                        // becasue on timeout
+                        // wait_until() returns also false.
+                        //
+                        // This is different from wait()...
+                        if (jthreadStopToken.stop_requested())
+                        {
+                            // if the stop was requested
+                            // we can leave the scene
+                            break;
+                        }
+                    }
+
+                    // getting the upper bound
+                    // returns an iterator to the first element greater than the given key (timepoint)
+                    auto upperBound = _events.upper_bound(TimePointCast(clock_t::now()));
+
+                    // transform the callbacks into a tempEvents container
+                    // and we can release the lock earlier
+                    std::transform(_events.begin(), upperBound, std::back_inserter(tempEvents), transformer);
+
+                    // erase the event which were already timed out.
+                    _events.erase(_events.begin(), upperBound);
+
+                    // we can now release
+                    // the lock safely
+                    lock.unlock();
+
+                    for (auto& it : tempEvents)
+                    {
+                        // iterate over the timed out events
+                        // and notify the callee about that
+                        it();
+                    }
+
+                    // don't forget to clear the temp container
+                    tempEvents.clear();
                 }
+            }
 
-                // the minimum sleep time between 2 iterations
-                precision_t _frequency;
+            // The flag to indicate
+            // if the waiting time recalculation
+            // is necessary.
+            bool _recalcWaitingTime{false};
 
-                // The stop callback to trigger jthread to stop
-                std::stop_callback<std::function<void()>> _stopCallback;
+            // The stop callback to trigger jthread to stop
+            std::stop_callback<std::function<void()>> _stopCallback;
 
-                // Mutex to protect the _events container
-                std::mutex _mtx;
+            // Mutex to protect the _events container
+            std::mutex _mtx;
 
-                // conditional variable to notify if there is new events.
-                std::condition_variable_any _cv;
+            // conditional variable to notify if there is new events.
+            std::condition_variable_any _cv;
 
-                // syncronized pool for events
-                // It is more cache friendly if we iterate
-                // on the events.
-                std::pmr::synchronized_pool_resource _pool;
+            // syncronized pool for events
+            // It is more cache friendly if we iterate
+            // on the events.
+            std::pmr::synchronized_pool_resource _pool;
 
-                // Multimap is used, because multiple callbacks
-                // could be registered with the same timepoint
-                map_t _events;
+            // Multimap is used, because multiple callbacks
+            // could be registered with the same timepoint
+            map_t _events;
 
-                // the worker thread which triggers the
-                // events if they timed out
-                std::jthread _thread;
-            };
+            // the worker thread which triggers the
+            // events if they timed out
+            std::jthread _thread;
+        };
 
+        template <typename CancellationTokenT, concepts::IsDuration PrecisionT>
+        class SoftClock
+        {
         public:
-            using sharedImpl_t = SoftClockImpl;
+            using precision_t = PrecisionT;
 
-            // Constructor with custom update frequency
-            // the minimum frequency is defined in s_minFrequency
-            template <concepts::IsDuration T = precision_t>
-            SoftClock(T frequency = 100ms)
-            : _sharedImpl{std::make_shared<sharedImpl_t>(frequency)}
+            using sharedImpl_t = SoftClockImpl<CancellationTokenT, precision_t>;
+
+            using clock_t = sharedImpl_t::clock_t;
+            using timepoint_t = sharedImpl_t::timepoint_t;
+
+            // Default constructor
+            SoftClock()
+            : _sharedImpl{std::make_shared<sharedImpl_t>()}
             {
             }
 
-            // Constructor with custom update frequency and a stop token
-            // the minimum frequency is defined in s_minFrequency
-            template <concepts::IsDuration T = precision_t>
-            SoftClock(std::stop_token stopToken, T frequency = 100ms)
-            : _sharedImpl{std::make_shared<sharedImpl_t>(stopToken, frequency)}
+            // Constructor with custom stop token
+            SoftClock(std::stop_token stopToken)
+            : _sharedImpl{std::make_shared<sharedImpl_t>(stopToken)}
             {
             }
 
@@ -427,15 +462,13 @@ namespace tinycoro {
 
             void RequestStop() { _sharedImpl->RequestStop(); }
 
-            [[nodiscard]] auto Frequency() const noexcept { return _sharedImpl->Frequency(); }
-
             [[nodiscard]] auto StopRequested() const noexcept { return _sharedImpl->StopRequested(); }
 
             // This function using the std::steady_clock
             template <typename DurationT = precision_t>
             [[nodiscard]] constexpr static auto Now() noexcept
             {
-                return std::chrono::time_point_cast<DurationT>(clock_t::now());
+                return sharedImpl_t::template Now<DurationT>();
             }
 
         private:
@@ -445,8 +478,13 @@ namespace tinycoro {
 
     } // namespace detail
 
-    using CancellationToken = detail::CancellationToken<detail::SoftClock>;
-    using SoftClock         = detail::SoftClock<CancellationToken>;
+    template<concepts::IsDuration PrecisionT>
+    using CustomSoftClockCancelToken = detail::SoftClockCancelToken<detail::SoftClock, PrecisionT>;
+    template<concepts::IsDuration PrecisionT>
+    using CustomSoftClock = detail::SoftClock<CustomSoftClockCancelToken<PrecisionT>, PrecisionT>;
+
+    using SoftClockCancelToken = CustomSoftClockCancelToken<std::chrono::milliseconds>;
+    using SoftClock = CustomSoftClock<std::chrono::milliseconds>;
 
 } // namespace tinycoro
 

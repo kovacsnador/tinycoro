@@ -37,7 +37,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
     - [Task with exception](#exceptiontask)
     - [Nested task](#nestedtask)
     - [SoftClock](#softclock)
-    - [CancellationToken](#cancellationtoken)
+    - [SoftClockCancelToken](#SoftClockCancelToken)
     - [Generator](#generator)
     - [Multi Tasks](#multitasks)
     - [AsyncCallbackAwaiter](#asynccallbackawaiter)
@@ -783,18 +783,16 @@ The `tinycoro::SoftClock` class is a lightweight, thread-safe timer that allows 
 
 #### **Key Features**
 - **Thread Safety**: Protected by a mutex and uses `std::condition_variable_any` for event notification.
-- **Cancellation Support**: Events can be canceled using a `CancellationToken` or `std::stop_token`.
-- **Custom Frequency**: Allows setting a custom update frequency for the clock (minimum frequency is 40ms).
+- **Cancellation Support**: Events can be canceled using a `SoftClockCancelToken` or `std::stop_token`.
+- **Precision Flexibility**: Now supports **custom clock precision**, allowing the clock to operate with various e.g. `std::chrono::duration` types. Default precision is `std::chrono::milliseconds`.
 
 #### **Constructors**
-- **`SoftClock(Frequency frequency = 100ms)`**  
-  Constructs a `SoftClock` with a custom update frequency.  
-  - `frequency`: The frequency at which the clock checks for timed-out events (default is 100ms). The minimum allowed frequency is 40ms.
+- **`SoftClock()`**  
+  Default constructs a `SoftClock`
 
-- **`SoftClock(std::stop_token stopToken, Frequency frequency = 100ms)`**  
-  Constructs a `SoftClock` with a custom update frequency and a stop token.  
-  - `stopToken`: A `std::stop_token` to allow external control over the clock's execution.  
-  - `frequency`: The frequency at which the clock checks for timed-out events (default is 100ms). The minimum allowed frequency is 40ms.
+- **`SoftClock(std::stop_token stopToken)`**  
+  Constructs a `SoftClock` with stop token.  
+  - `stopToken`: A `std::stop_token` to allow external control over the clock's execution.
 
 #### **Public Methods**
 - **`Register(CbT&& cb, Duration duration)`**  
@@ -808,22 +806,19 @@ The `tinycoro::SoftClock` class is a lightweight, thread-safe timer that allows 
   - `timePoint`: Time point at which the callback will be executed.
 
 - **`RegisterWithCancellation(CbT&& cb, Duration duration)`**  
-  Registers a callback and returns a `CancellationToken` that can be used to cancel the event.  
+  Registers a callback and returns a `SoftClockCancelToken` that can be used to cancel the event.  
   - `cb`: Callback to execute (must be nothrow-invocable).  
   - `duration`: Time duration after which the callback will be executed.  
-  - Returns: A `CancellationToken` for canceling the event.
+  - Returns: A `SoftClockCancelToken` for canceling the event.
 
 - **`RegisterWithCancellation(CbT&& cb, TimePoint timePoint)`**  
-  Registers a callback and returns a `CancellationToken` that can be used to cancel the event.  
+  Registers a callback and returns a `SoftClockCancelToken` that can be used to cancel the event.  
   - `cb`: Callback to execute (must be nothrow-invocable).  
   - `timePoint`: Time point at which the callback will be executed.  
-  - Returns: A `CancellationToken` for canceling the event.
+  - Returns: A `SoftClockCancelToken` for canceling the event.
 
 - **`RequestStop()`**  
   Requests the `SoftClock` to stop processing events. This will stop the internal worker thread.
-
-- **`Frequency()`**  
-  Returns the current update frequency of the `SoftClock`.
 
 - **`StopRequested()`**  
   Returns `true` if a stop has been requested for the `SoftClock`.
@@ -831,9 +826,13 @@ The `tinycoro::SoftClock` class is a lightweight, thread-safe timer that allows 
 - **`Now()`**  
   Returns the current time point using `std::chrono::steady_clock`.
 
-### `CancellationToken`
+#### **Custom Precision Support**
 
-The `tinycoro::CancellationToken` class provides a mechanism to cancel registered events in the `SoftClock`. It is returned by the `RegisterWithCancellation` methods of the `SoftClock` class.
+The `SoftClock` is now templated and can be instantiated with any `std::chrono::duration` type that satisfies the `concepts::IsDuration` constraint. This allows you to fine-tune the clock's internal resolution depending on your application needs.
+
+### `SoftClockCancelToken`
+
+The `tinycoro::SoftClockCancelToken` class provides a mechanism to cancel registered events in the `SoftClock`. It is returned by the `RegisterWithCancellation` methods of the `SoftClock` class.
 
 ### **Key Features**
 - **Move-Only**: Supports move semantics but cannot be copied.
