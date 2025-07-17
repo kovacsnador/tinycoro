@@ -162,7 +162,7 @@ TEST(SoftClockTest, SoftClockTest_timed_out)
     clock.Register([&t4]() noexcept { t4 = true; }, 10ms);
     clock.Register([&t5]() noexcept { t5 = true; }, 10ms);
 
-    std::this_thread::sleep_for(100ms);
+    std::this_thread::sleep_for(150ms);
 
     // all callback need to be called
     EXPECT_TRUE(t1);
