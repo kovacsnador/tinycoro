@@ -75,9 +75,6 @@ namespace tinycoro { namespace detail {
         // Todo: consider to rename it to sharedState or so...
         detail::IntrusivePtr<PauseHandlerT> pauseHandler;
 
-        // Gets back the pause state.
-        [[nodiscard]] auto& PauseState() noexcept { return pauseHandler->pauseState; }
-
         // Creates the pause handler shared object
         template <typename... Args>
         auto MakePauseHandler(Args&&... args)
@@ -127,9 +124,9 @@ namespace tinycoro { namespace detail {
             return _currentAwaitable;
         }
 
-        [[nodiscard]] std::suspend_always initial_suspend() const noexcept { return {}; }
+        [[nodiscard]] constexpr std::suspend_always initial_suspend() const noexcept { return {}; }
 
-        [[nodiscard]] FinalAwaiterT final_suspend() const noexcept { return {}; }
+        [[nodiscard]] constexpr FinalAwaiterT final_suspend() const noexcept { return {}; }
 
         constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 

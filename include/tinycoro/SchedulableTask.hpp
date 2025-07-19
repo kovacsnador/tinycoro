@@ -66,9 +66,9 @@ namespace tinycoro { namespace detail {
             }
             catch (...)
             {
-                // if there was an exception
-                // save it in the promise.
-                _hdl.promise().exception = std::current_exception();
+                // Calling directly the Finish() function,
+                // if we have an exception.
+                _hdl.promise().Finish(std::current_exception());
             }
 
             // return the corouitne state.
@@ -146,15 +146,15 @@ namespace tinycoro { namespace detail {
     // in order to set the value in the
     // corresponding promise object.
     template <typename PromiseT, typename FutureStateT>
-    void OnTaskFinish(void* self, void* futureStatePtr)
+    void OnTaskFinish(void* self, void* futureStatePtr, std::exception_ptr exception)
     {
         auto promise = static_cast<PromiseT*>(self);
         auto future  = static_cast<FutureStateT*>(futureStatePtr);
 
-        if (promise->exception)
+        if (exception)
         {
             // if we had an exception we just set it
-            future->set_exception(promise->exception);
+            future->set_exception(std::move(exception));
         }
         else
         {
