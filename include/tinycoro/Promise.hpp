@@ -217,7 +217,19 @@ namespace tinycoro {
             // that we can not rely on the base class
             // destructor here, becasue in Finish() we
             // need the value from the derived promise object.
-            ~PromiseT() { this->Finish(); }
+            ~PromiseT() { 
+                if(this->HasException() == false)
+                {
+                    // If there was no exception yet,
+                    // trigger the Finish callback.
+                    //
+                    // Note:
+                    // In case of an exception,
+                    // Finish() is already triggered
+                    // in SchedulableTask::Resume().
+                    this->Finish({});
+                }
+            }
         };
 
         // Inline Promise class.

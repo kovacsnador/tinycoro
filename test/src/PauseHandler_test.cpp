@@ -141,6 +141,28 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
     EXPECT_TRUE(pauseHandler.IsCancellable());
 }
 
+TEST(PauseHandlerTest, PauseHandlerTest_ExceptionThrowned)
+{
+    tinycoro::PauseHandler pauseHandler{[]{}, tinycoro::noninitial_cancellable_t::value};
+    
+    EXPECT_FALSE(pauseHandler.HasException());
+    pauseHandler.Resume();
+    EXPECT_FALSE(pauseHandler.HasException());
+
+    // set the exception
+    pauseHandler.MarkException();
+
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+    EXPECT_FALSE(pauseHandler.IsPaused());
+    EXPECT_TRUE(pauseHandler.HasException());
+
+    pauseHandler.Resume();
+    EXPECT_TRUE(pauseHandler.HasException());
+
+    EXPECT_FALSE(pauseHandler.IsCancellable());
+    EXPECT_FALSE(pauseHandler.IsPaused());
+}
+
 struct Context_PauseHandlerMock
 {
     MOCK_METHOD(std::function<void()>, Pause, ());

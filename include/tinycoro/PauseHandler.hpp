@@ -56,6 +56,7 @@ namespace tinycoro {
     {
         static constexpr uint8_t c_pauseMask{0x01};
         static constexpr uint8_t c_cancelMask{0x02};
+        static constexpr uint8_t c_exceptionMask{0x04};
 
     public:
         PauseHandler(auto pr, bool cancellable = tinycoro::default_initial_cancellable_policy::value)
@@ -71,7 +72,10 @@ namespace tinycoro {
 
         void Resume() noexcept
         {
-            _state.store(0u, std::memory_order::relaxed);
+            // Reset all state flags before coroutine resumption,
+            // except the exception flag. The exception flag is persistent—
+            // once set, it cannot be cleared.
+            _state.fetch_and(c_exceptionMask, std::memory_order_relaxed);
         }
 
         void ResetCallback(concepts::PauseHandlerCb auto pr) { _resumerCallback = std::move(pr); }
@@ -99,6 +103,17 @@ namespace tinycoro {
                 _state.fetch_and(~c_cancelMask, std::memory_order_relaxed);
         }
 
+        void MarkException() noexcept
+        {
+            assert(HasException() == false);
+            _state.fetch_or(c_exceptionMask, std::memory_order_relaxed);
+        }
+
+        [[nodiscard]] bool HasException() const noexcept
+        {
+            return _state.load(std::memory_order_relaxed) & c_exceptionMask; 
+        }
+
         [[nodiscard]] bool IsPaused() const noexcept { return _state.load(std::memory_order_relaxed) & c_pauseMask; }
 
         [[nodiscard]] bool IsCancellable() const noexcept { return _state.load(std::memory_order_relaxed) & c_cancelMask; }
@@ -108,6 +123,8 @@ namespace tinycoro {
         // on all three major compilers: MSVC, GCC, and Clang.
         std::atomic<uint8_t> _state{};
 
+        // The resume callback, which is intented to
+        // resume the coroutine from a suspension state.
         PauseHandlerCallbackT _resumerCallback{};
     };
 

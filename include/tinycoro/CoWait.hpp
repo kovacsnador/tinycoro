@@ -33,9 +33,9 @@ namespace tinycoro {
             template <typename PromiseT, typename FutureStateT>
             [[nodiscard]] static constexpr auto Get() noexcept
             {
-                return [](void* promise, void* futureState) {
+                return [](void* promise, void* futureState, std::exception_ptr ex) {
                     // Call the default task finish handler to set the future.
-                    detail::OnTaskFinish<PromiseT, FutureStateT>(promise, futureState);
+                    detail::OnTaskFinish<PromiseT, FutureStateT>(promise, futureState, std::move(ex));
 
                     // Notify the current awaitable if all the coroutines are completed.
                     auto  p = static_cast<PromiseT*>(promise);

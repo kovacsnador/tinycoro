@@ -23,6 +23,10 @@ TEST_F(AtomicPtrStackTest, AtomicPtrStackTest_push)
     stack.try_push(&node3);
 
     EXPECT_FALSE(stack.empty());
+
+    std::cout << "task size: " << sizeof(tinycoro::detail::Promise<void>) << '\n';
+    std::cout << "inline task size: " << sizeof(tinycoro::detail::InlinePromise<void>) << '\n';
+
 }
 
 TEST_F(AtomicPtrStackTest, AtomicPtrStackTest_push_steal)

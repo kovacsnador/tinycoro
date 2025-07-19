@@ -31,7 +31,7 @@ namespace tinycoro
     {
         static_assert(BUFFER_SIZE >= PROMISE_BASE_BUFFER_SIZE, "SchedulablePromise: Buffer size is too small to hold the promise object.");
 
-        using OnFinishCallback_t = void (*)(void*, void*);
+        using OnFinishCallback_t = void (*)(void*, void*, std::exception_ptr);
 
         using PromiseBase_t = SchedulablePromise;
 
@@ -42,12 +42,6 @@ namespace tinycoro
 
         // Pause state needed by the scheduler.
         std::atomic<EPauseState> pauseState{EPauseState::IDLE};
-
-        // Stores the exception pointer
-        // if there was an unhandled_exception.
-        //
-        // It is set in the SchedulableTaskT.
-        std::exception_ptr exception{nullptr};
 
         // Saves the promise inside the coroutine promise object
         // "PromiseT" must not be an L value reference.  
@@ -67,8 +61,10 @@ namespace tinycoro
             _anyFunction = std::move(anyFunc);
         }
 
-        void Finish() noexcept
+        void Finish(std::exception_ptr exception) noexcept
         {
+            assert(this->HasException() == false);
+
             // This logic was previously in the destructor of SchedulablePromise,
             // but that caused a problem: the typed Promise, which holds
             // the return value, gets destroyed before the base Promise.
@@ -79,10 +75,35 @@ namespace tinycoro
             {
                 assert(_futureStateBuffer);
 
+                if(exception)
+                {
+                    // In case we have an exception, 
+                    // set the "exception thrown flag"
+                    // to true in the promise pauseHandler.
+                    this->MarkException();
+                }
+
                 // setting the promise object
                 // if there is one connected
-                _onFinish(this, _futureStateBuffer.RawData());
+                _onFinish(this, _futureStateBuffer.RawData(), std::move(exception));
             }
+        }
+
+        // Set the exception flag to true.
+        void MarkException() noexcept
+        {
+            assert(this->pauseHandler);
+            this->pauseHandler->MarkException();
+        }
+
+        // Check if there was already an exception.
+        [[nodiscard]] bool HasException() const noexcept
+        {
+            if(this->pauseHandler)
+            {
+                return this->pauseHandler->HasException();
+            }
+            return false;
         }
 
     private:

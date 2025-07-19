@@ -76,16 +76,15 @@ namespace tinycoro { namespace detail {
             {
                 auto& promise = handle.promise();
 
-                if constexpr (requires { promise.exception; })
+                if constexpr (requires { {promise.HasException()} -> std::same_as<bool>; })
                 {
-                    // exception is not supported by InlinePromise
-                    if (promise.exception)
+                    if(promise.HasException())
                     {
                         // if there was an unhandled
-                        // exception the task is done
+                        // exception, the task is done
                         return ETaskResumeState::DONE;
                     }
-                }
+                } 
 
                 const auto& pauseHandler = promise.pauseHandler;
                 const auto& stopSource   = promise.stopSource;
