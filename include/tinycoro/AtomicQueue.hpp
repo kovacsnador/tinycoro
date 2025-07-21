@@ -14,9 +14,32 @@
 
 namespace tinycoro { namespace detail {
 
-    // This is a multi-producer multi-consumer
-    // lockfree queue.
-    // Inside uses a ringbuffer therefor SIZE need to be a power of 2.
+    // A multi-producer, multi-consumer lock-free queue.
+    //
+    // Internally, this queue uses a fixed-size ring buffer of size `SIZE`,
+    // which must be a power of two.
+    //
+    // The queue supports concurrent `try_push` and `try_pop` operations without locks.
+    // Blocking variants (`wait_for_push`, `wait_for_pop`) are provided via C++20 atomic wait/notify.
+    //
+    // Sequence counters (`_head`, `_tail`, and `Element::sequence`) are 64-bit unsigned integers
+    // (`uint64_t`). These are used to coordinate access to buffer elements and enforce ordering.
+    //
+    // ⚠ Overflow Note:
+    // The sequence values are monotonically increasing and **not wrapped or masked**.
+    // This means that once a `uint64_t` sequence counter overflows (after `2^64` operations),
+    // the queue’s correctness is no longer guaranteed. However, at even extremely high
+    // message rates (billions of ops/sec), this would take hundreds of years to occur,
+    // so overflow is generally a theoretical issue in practice.
+    //
+    // ⚠ Lock-free Guarantee:
+    // This queue is only truly *lock-free* if `std::atomic<uint64_t>` is lock-free on
+    // the target platform. You can check this via `std::atomic<uint64_t>::is_always_lock_free`.
+    // On most modern 64-bit platforms, this condition holds.
+    // If it's not lock-free, atomic operations may fall back to locks or syscalls.
+    //
+    // This makes the queue a good fit for high-throughput, low-latency systems
+    // where long-term runtime and platform-specific atomic guarantees are understood.
     template <typename T, uint64_t SIZE>
         requires detail::IsPowerOf2<SIZE>::value
     class AtomicQueue
@@ -27,9 +50,9 @@ namespace tinycoro { namespace detail {
 
         AtomicQueue()
         {
-            for(sequence_t i = 0; i < _buffer.size(); ++i)
+            for (sequence_t i = 0; i < _buffer.size(); ++i)
             {
-                _buffer[i]._sequence.store(i, std::memory_order_relaxed);
+                _buffer[i].sequence.store(i, std::memory_order_relaxed);
             }
         }
 
@@ -43,9 +66,9 @@ namespace tinycoro { namespace detail {
             for (;;)
             {
                 // get the current enqueue position
-                auto pos  = _head.load(std::memory_order_relaxed);
+                auto  pos  = _head.load(std::memory_order_relaxed);
                 auto& elem = _buffer[pos & BUFFER_MASK];
-                auto seq  = elem._sequence.load(std::memory_order_acquire);
+                auto  seq  = elem.sequence.load(std::memory_order_acquire);
 
                 if (seq == pos)
                 {
@@ -53,10 +76,10 @@ namespace tinycoro { namespace detail {
                     {
                         // found the right place
                         // pushing the value into the queue
-                        elem._value = std::forward<U>(value);
+                        elem.value = std::forward<U>(value);
 
                         // store the new position as the next sequence
-                        elem._sequence.store(pos + 1, std::memory_order_release);
+                        elem.sequence.store(pos + 1, std::memory_order_release);
 
                         // notify waiter that
                         // we have a new value
@@ -85,9 +108,9 @@ namespace tinycoro { namespace detail {
             for (;;)
             {
                 // get the current dequeue position
-                auto pos  = _tail.load(std::memory_order_relaxed);
+                auto  pos  = _tail.load(std::memory_order_relaxed);
                 auto& elem = _buffer[pos & BUFFER_MASK];
-                auto seq  = elem._sequence.load(std::memory_order_acquire);
+                auto  seq  = elem.sequence.load(std::memory_order_acquire);
 
                 if (seq == pos + 1)
                 {
@@ -96,9 +119,9 @@ namespace tinycoro { namespace detail {
                     if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
                     {
                         // we got exclusive access to the element
-                        data = std::move(elem._value);
+                        data = std::move(elem.value);
 
-                        elem._sequence.store(pos + SIZE, std::memory_order_release);
+                        elem.sequence.store(pos + SIZE, std::memory_order_release);
 
                         // notify the waiters
                         // that a value is popped
@@ -107,7 +130,7 @@ namespace tinycoro { namespace detail {
                         return true;
                     }
                 }
-                else if (seq < pos + 1)
+                else if (seq == pos)
                 {
                     // the queue is empty
                     // no element can be popped
@@ -153,12 +176,11 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] bool full() const noexcept { return _head.load(std::memory_order_relaxed) - SIZE == _tail.load(std::memory_order_relaxed); }
 
-
     private:
         struct Element
         {
-            std::atomic<sequence_t> _sequence{};
-            value_type              _value{};
+            std::atomic<sequence_t> sequence{};
+            value_type              value{};
         };
 
         // the buffer mask. Should be for example 0xFFFFF
