@@ -46,6 +46,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
     - [Custom Awaiter](#customawaiter)
     - [AllOfAwaiter](#syncawaiter)
     - [AnyOfAwait](#anyofawait)
+    - [TimeoutAwait](#timeoutawait)
 * [Awaitables](#awaitables)
     - [Mutex](#mutex)
     - [Semaphore](#semaphore)
@@ -1151,6 +1152,79 @@ tinycoro::Task<void> Example_AnyOfCoAwait(tinycoro::Scheduler& scheduler)
     // Nonblocking wait for the first task to complete.
     auto [t1, t2, t3] = co_await tinycoro::AnyOfAwaitAsync(scheduler, task1(1s), task1(2s), task1(3s));
 }
+```
+
+
+### `TimeoutAwait`
+
+The `TimeoutAwait` wrapper allows you to add a timeout to **any** cancellable awaitable in Tinycoro.  
+It works with both **relative durations** (`wait_for`-style) and **absolute time points** (`wait_until`-style), resuming the coroutine when either:
+
+- The original awaitable completes, or
+- The specified timeout elapses.
+
+---
+
+#### Syntax
+
+```cpp
+auto resultOptional = tinycoro::TimeoutAwait{clock, awaitable, timeout}
+```
+
+#### Parameters
+
+| Parameter  | Type                                                                                 | Description                                                                 |
+|------------|--------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
+| `clock`    | `tinycoro::SoftClock` or compatible clock                                            | The clock used for scheduling the timeout and handling cancellation.        |
+| `awaitable`| Any cancellable awaitable (satisfying `concepts::IsCancellableAwait`)                 | The operation to wait on with a timeout.                                    |
+| `timeout`  | `std::chrono::duration` or `std::chrono::time_point`   | The timeout limit.
+
+#### Return Value
+
+`TimeoutAwait` always returns an `std::optional<T>` where:
+
+- `T` is the value type returned by the underlying awaitable’s `await_resume()`.
+- If the awaitable’s result type is `void`, it returns `std::optional<VoidType>` (where `VoidType` is Tinycoro's placeholder type).
+- If the timeout expires and the awaitable is cancelled successfully, the return value is an empty optional.
+- If the awaitable completes before the timeout, the optional contains the actual result.
+
+This makes timeout handling explicit — you can directly check if a timeout occurred by testing `has_value()`.
+
+```cpp
+// Waits for 100ms.
+auto result = co_await tinycoro::TimeoutAwait{clock, someAwaitable(), 100ms};
+if (!result) {
+    // Timeout occurred
+} else {
+    // result.value() contains the awaitable’s result
+}
+```
+#### Behavior
+
+- If the awaitable completes before the timeout → `std::optional` contains the result.
+- If the timeout expires first → `std::optional` is empty.
+- Works with all cancellable awaiter in Tinycoro (`Barrier`, `AutoEvent`, etc.).
+
+#### Full Example
+```cpp
+tinycoro::Scheduler scheduler;
+tinycoro::SoftClock clock;
+
+tinycoro::Barrier barrier{3};
+
+auto task = [&]() -> tinycoro::Task<> {
+    // Wait on barrier for max 10 milliseconds
+    auto res = co_await tinycoro::TimeoutAwait{clock, barrier.Wait(), 10ms};
+    if (!res) {
+        std::println("Timeout!");
+    } else {
+        std::println("Barrier passed!");
+    }
+};
+
+tinycoro::AllOf(scheduler, task());
+
+// prints "Timeout!"
 ```
 
 ## Awaitables
