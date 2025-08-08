@@ -98,7 +98,7 @@ TEST(LatchTest, LatchTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
+    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled](auto) { pauseCalled = true; });
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -111,7 +111,7 @@ TEST(LatchTest, LatchTest_await_suspend)
 
 struct LatchEventMockImpl
 {
-    MOCK_METHOD(void, Set, (std::function<void()>));
+    MOCK_METHOD(void, Set, (tinycoro::PauseHandlerCallbackT));
 };
 
 struct LatchEventMock
@@ -142,7 +142,7 @@ TEST(LatchTest, LatchAwaiter)
     tinycoro::detail::LatchAwaiter awaiter{mock, eventMock};
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled] { pauseCalled = true; });
+    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled](auto) { pauseCalled = true; });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
     EXPECT_FALSE(pauseCalled);
@@ -334,4 +334,60 @@ TEST_P(LatchTest, LatchTest_cancel_multi)
 
     auto finished = std::ranges::count_if(results | std::views::drop(1), [](const auto& it) { return it.has_value(); });
     EXPECT_EQ(finished, taskCount);
+}
+
+TEST_P(LatchTest, LatchTest_timeout)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    auto count = GetParam();
+
+    tinycoro::Latch latch{count};
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        co_await tinycoro::TimeoutAwait{clock, latch.Wait(), 10ms};
+        cc--;
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
+}
+
+TEST_P(LatchTest, LatchTest_timeout_race)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    auto count = GetParam();
+
+    tinycoro::Latch latch{std::max((count / 2), 1ul)};
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto consumer = [&]()->tinycoro::Task<void, LatchTest::Allocator> {
+        co_await tinycoro::TimeoutAwait{clock, latch.ArriveAndWait(), 10ms};
+        cc--;
+    };
+
+    std::vector<decltype(consumer())> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
 }

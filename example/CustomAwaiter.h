@@ -26,7 +26,7 @@ struct CustomAwaiter
             self->_userData++;
 
             // resume the coroutine (you need to make them exception safe)
-            self->_resumeTask();
+            self->_resumeTask(tinycoro::ENotifyPolicy::RESUME);
         };
 
         AsyncCallbackAPIvoid(cb, this);
@@ -36,7 +36,7 @@ struct CustomAwaiter
 
     int32_t _userData{41};
 
-    std::function<void()> _resumeTask;
+    tinycoro::PauseHandlerCallbackT _resumeTask;
 };
 
 void Example_CustomAwaiter(auto& scheduler)

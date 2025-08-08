@@ -195,9 +195,11 @@ namespace tinycoro {
                 return true;
             }
 
-            constexpr auto await_resume() noexcept { }
+            constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(); }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _manualEvent.Cancel(this); }
 

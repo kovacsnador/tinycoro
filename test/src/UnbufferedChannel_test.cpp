@@ -91,13 +91,13 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_open_push)
     auto pushAwaiter1 = channel.PushWait(42);
     EXPECT_TRUE(channel.IsOpen());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(pushAwaiter1.await_suspend(hdl1));
 
     auto pushAwaiter2 = channel.PushAndCloseWait(44);
     EXPECT_TRUE(channel.IsOpen());
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(pushAwaiter2.await_suspend(hdl2));
 
     int32_t val;
@@ -122,14 +122,14 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_ready)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     int32_t val2;
     auto    popAwaiter2 = channel.PopWait(val2);
     EXPECT_FALSE(popAwaiter2.await_ready());
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter2.await_suspend(hdl2));
 
     auto pushAwaiter1 = channel.PushWait(42);
@@ -151,7 +151,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_resume)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     auto pushAwaiter = channel.PushWait(42);
@@ -170,7 +170,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_push_await_resume_last)
     auto    popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     auto pushAwaiter = channel.PushAndCloseWait(42);
@@ -215,7 +215,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_suspend
     auto   popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     // testing the listener awaiter
@@ -233,7 +233,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_WaitForListeners_await_ready_c
     auto   popAwaiter = channel.PopWait(val);
     EXPECT_FALSE(popAwaiter.await_ready());
 
-    auto hdl1 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl1 = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(popAwaiter.await_suspend(hdl1));
 
     // close the channel
@@ -1048,6 +1048,150 @@ TEST_P(UnbufferedChannelTest, UnbufferedChannelTest_ListenerWait_cancel)
     {
         EXPECT_FALSE(result[i].has_value());
     }
+}
+
+struct UnbufferedChannelTimeoutTest : testing::TestWithParam<size_t>
+{
+    tinycoro::SoftClock clock;
+    tinycoro::Scheduler scheduler;
+    tinycoro::UnbufferedChannel<int32_t> channel;
+};
+
+INSTANTIATE_TEST_SUITE_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest, testing::Values(1, 10, 100, 1000, 10000));
+
+TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_all_push_wait)
+{
+    auto count = GetParam();
+
+    std::atomic<int32_t> done{0};
+
+    auto task = [&]() -> tinycoro::TaskNIC<> {
+        auto opt = co_await tinycoro::TimeoutAwait{clock, channel.PushWait(42), 10ms};
+        EXPECT_FALSE(opt.has_value());
+        done++;
+    };
+
+    std::vector<decltype(task())> tasks;
+    tasks.reserve(count);
+    for(size_t i = 0; i < count; i++)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(count, done);
+}
+
+TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_push_pop_wait)
+{
+    auto count = GetParam();
+
+    std::atomic<int32_t> popDone{0};
+    std::atomic<int32_t> pushDone{0};
+
+    auto producer = [&]() -> tinycoro::TaskNIC<> {
+        for(size_t i = 0; i < count; ++i)
+        {
+            co_await tinycoro::TimeoutAwait{clock, channel.PushWait(42), 1ms};
+            pushDone++;
+        }
+    };
+
+    auto consumer = [&]() -> tinycoro::TaskNIC<> {
+        for(size_t i = 0; i < count; ++i)
+        {
+            int32_t val;
+            co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
+            popDone++;
+        }
+    };
+
+    tinycoro::AllOf(scheduler, consumer(), producer());
+
+    EXPECT_EQ(count, popDone);
+    EXPECT_EQ(count, pushDone);
+}
+
+TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_listeners_wait)
+{
+    auto count = GetParam();
+
+    std::atomic<int32_t> listenerDone{0};
+
+    std::atomic_flag flag;
+
+    auto listener = [&]() -> tinycoro::TaskNIC<> {
+        for(size_t i = 0; i < count; ++i)
+        {
+            co_await tinycoro::TimeoutAwait{clock, channel.WaitForListeners(1), 1ms};
+            listenerDone++;
+        }
+
+        flag.test_and_set();
+    };
+
+    auto consumer = [&]() -> tinycoro::TaskNIC<> {
+        while(flag.test() == false)
+        {
+            std::this_thread::sleep_for(40ms);
+            int32_t val;
+            co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
+        }
+    };
+
+    tinycoro::AllOf(scheduler, listener(), consumer());
+
+    EXPECT_EQ(count, listenerDone);
+}
+
+TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_all_pop_wait)
+{
+    auto count = GetParam();
+
+    std::atomic<int32_t> done{0};
+
+    auto task = [&]() -> tinycoro::TaskNIC<> {
+        int32_t val;
+        auto opt = co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 10ms};
+        EXPECT_FALSE(opt.has_value());
+        done++;
+    };
+
+    std::vector<decltype(task())> tasks;
+    tasks.reserve(count);
+    for(size_t i=0; i < count; i++)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(count, done);
+}
+
+TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_all_listeners_wait)
+{
+    auto count = GetParam();
+
+    std::atomic<int32_t> done{0};
+
+    auto task = [&]() -> tinycoro::TaskNIC<> {
+        auto opt = co_await tinycoro::TimeoutAwait{clock, channel.WaitForListeners(1), 10ms};
+        EXPECT_FALSE(opt.has_value());
+        done++;
+    };
+
+    std::vector<decltype(task())> tasks;
+    tasks.reserve(count);
+    for(size_t i=0; i < count; i++)
+    {
+        tasks.emplace_back(task());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(count, done);
 }
 
 // TODO listener awaiter for closing need to be tested....

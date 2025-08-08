@@ -18,7 +18,7 @@ namespace tinycoro {
 
         struct FinalAwaiter
         {
-            [[nodiscard]] bool await_ready() const noexcept { return false; }
+            [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
             [[nodiscard]] std::coroutine_handle<> await_suspend(auto hdl) noexcept
             {
@@ -39,7 +39,7 @@ namespace tinycoro {
                 return std::noop_coroutine();
             }
 
-            void await_resume() const noexcept { }
+            constexpr void await_resume() const noexcept { }
         };
 
         template <typename... Args>

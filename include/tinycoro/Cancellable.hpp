@@ -65,7 +65,9 @@ namespace tinycoro {
                         // set the cancellable flag,
                         // we still need to notify the awaiter
                         // to trigger further actions.
-                        _awaiter.Notify();
+                        //
+                        // e.g. await_resume() will be not called.
+                        _awaiter.NotifyToDestroy();
                     }
                 });
             }

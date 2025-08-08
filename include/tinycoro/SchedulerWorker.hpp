@@ -206,7 +206,7 @@ namespace tinycoro { namespace detail {
         // It relays on a task pointer address
         PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
         {
-            return [this, promisePtr]() {
+            return [this, promisePtr](ENotifyPolicy policy) {
                 if (_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
@@ -236,9 +236,10 @@ namespace tinycoro { namespace detail {
                     // push back to the queue
                     // for resumption
                     Task_t task{promisePtr};
-                    if (_stopToken.stop_requested() == false)
+                    if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
-                        // no stop was requested
+                        // no stop was requested,
+                        // and no immediate destroy policy.
                         if (_sharedTasks.try_push(std::move(task)))
                         {
                             // push succeed

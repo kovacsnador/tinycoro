@@ -37,7 +37,7 @@ namespace tinycoro {
         template <typename TaskT, typename EventT, typename StopTokenT>
         void SetPauseResumerCallback(TaskT& task, EventT& event, StopTokenT stopToken)
         {
-            auto pauseResumerCallback = [&task, &event, stopToken] {
+            auto pauseResumerCallback = [&task, &event, stopToken] ([[maybe_unused]] ENotifyPolicy policy) {
                 auto pauseHandler = task.GetPauseHandler();
 
                 // checking if the task is cancelled

@@ -72,6 +72,12 @@ namespace tinycoro {
 
     } // namespace detail
 
+    enum class ENotifyPolicy
+    {
+        RESUME, // Notify for resumption
+        DESTROY // notify for destruction
+    };
+
     struct VoidType
     {
     };
@@ -82,7 +88,7 @@ namespace tinycoro {
 
     // The pause handler callback signature
     // used mainly by the scheduler
-    using PauseHandlerCallbackT = std::function<void()>;
+    using PauseHandlerCallbackT = std::function<void(ENotifyPolicy)>;
 
     enum class ETaskResumeState : uint8_t
     {
@@ -153,16 +159,16 @@ namespace tinycoro {
         concept IsNothrowInvokeable = std::is_nothrow_invocable_v<T>;
 
         template <typename T>
-        concept IsCancellableAwait = requires (T awaiter) {
-            { awaiter.Cancel() } -> std::same_as<bool>;
-            { awaiter.Notify() };
+        concept IsAwaiter = requires (T t, std::coroutine_handle<> hdl) {
+            { t.await_ready() };
+            { t.await_suspend(hdl) };
+            { t.await_resume() };
         };
 
         template <typename T>
-        concept IsAwaiter = requires (T t) {
-            { t.await_ready() };
-            { t.await_suspend(std::coroutine_handle<>{}) };
-            { t.await_resume() };
+        concept IsCancellableAwait = requires (T awaiter) {
+            { awaiter.Cancel() } -> std::same_as<bool>;
+            { awaiter.Notify() };
         };
 
         template <typename T>
@@ -207,31 +213,28 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename>
-        struct FutureReturnT;
+        template <typename T>
+        struct ReturnT
+        {
+            using value_type = T;
+        };
+
+        template <>
+        struct ReturnT<void>
+        {
+            using value_type = VoidType; // void;
+        };
 
         template <typename T>
         struct FutureReturnT
         {
-            using value_type = std::optional<T>;
-        };
-
-        template <>
-        struct FutureReturnT<void>
-        {
-            using value_type = std::optional<VoidType>; // void;
+            using value_type = std::optional<typename ReturnT<T>::value_type>;
         };
 
         template <typename T>
         struct TaskResultType
         {
-            using value_type = std::optional<T>;
-        };
-
-        template <>
-        struct TaskResultType<void>
-        {
-            using value_type = std::optional<VoidType>;
+            using value_type = std::optional<typename ReturnT<T>::value_type>;
         };
 
         template <typename T>
@@ -245,7 +248,8 @@ namespace tinycoro {
 
         namespace helper {
 
-            bool Contains(concepts::Linkable auto current, concepts::Linkable auto elem)
+            // Only for debug purposes.
+            constexpr bool Contains(concepts::Linkable auto current, concepts::Linkable auto elem) noexcept
             {
                 while (current)
                 {
@@ -287,8 +291,12 @@ namespace tinycoro {
 
     // Flags indicating whether tasks are initially cancellable
     // or non-cancellable.
-    struct initial_cancellable_t : std::true_type {};
-    struct noninitial_cancellable_t : std::false_type {};
+    struct initial_cancellable_t : std::true_type
+    {
+    };
+    struct noninitial_cancellable_t : std::false_type
+    {
+    };
 
     // Tinycoro is less conservative than usual
     // regarding initial cancellability.

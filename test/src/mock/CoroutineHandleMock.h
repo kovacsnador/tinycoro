@@ -34,7 +34,7 @@ namespace tinycoro { namespace test {
     };
 
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
-    auto MakeCoroutineHdl(std::regular_invocable auto pauseResumerCallback)
+    auto MakeCoroutineHdl(std::regular_invocable<tinycoro::ENotifyPolicy> auto pauseResumerCallback)
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
         hdl.promise().pauseHandler.emplace(pauseResumerCallback, InitialCancellablePolicyT::value);
@@ -45,7 +45,7 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace([]{}, InitialCancellablePolicyT::value);
+        hdl.promise().pauseHandler.emplace([]([[maybe_unused]] auto policy){}, InitialCancellablePolicyT::value);
         return hdl;
     }
 

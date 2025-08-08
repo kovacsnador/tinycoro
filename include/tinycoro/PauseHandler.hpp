@@ -20,30 +20,36 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-        concept PauseHandlerCb = std::regular_invocable<T>;
+        concept PauseHandlerCb = std::regular_invocable<T, ENotifyPolicy>;
 
     } // namespace concepts
 
     namespace detail {
 
+        // This class is intented to handle awaitable
+        // resumption from a paused state.
         struct PauseCallbackEvent
         {
         private:
+            // Need to be up there to make the
+            // "requirement" work for Set().
             PauseHandlerCallbackT _notifyCallback;
 
         public:
-            void Notify() const
+            void Notify(ENotifyPolicy policy = ENotifyPolicy::RESUME) const
             {
-                if (_notifyCallback)
-                {
-                    _notifyCallback();
-                }
+                assert(_notifyCallback);
+
+                // We notify the coroutine.
+                //
+                // This notify callback is responsible
+                // for the corouitne resumption.
+                _notifyCallback(policy);
             }
 
+            // Sets the notify callback
             template <typename T>
-                requires requires (T&& t) {
-                    { _notifyCallback = std::forward<T>(t) };
-                }
+                requires requires (T&& t) { { _notifyCallback = std::forward<T>(t) }; }
             void Set(T&& cb)
             {
                 _notifyCallback = std::forward<T>(cb);

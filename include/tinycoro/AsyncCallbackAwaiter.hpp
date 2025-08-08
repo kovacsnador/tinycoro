@@ -22,7 +22,7 @@ namespace tinycoro {
 
         template <typename E>
         concept AsyncCallbackEvent = requires (E e) {
-            { e.Notify() };
+            { e.Notify(ENotifyPolicy::RESUME) };
         };
 
     } // namespace concepts
@@ -63,45 +63,14 @@ namespace tinycoro {
     template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
     struct AsyncCallbackAwaiter_CStyle;
 
-    namespace detail {
-
-        struct AsyncCallbackEvent
-        {
-            template <typename T, std::invocable<T>, concepts::AsyncCallbackEvent, typename>
-            friend struct tinycoro::AsyncCallbackAwaiter;
-
-            template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
-            friend struct tinycoro::AsyncCallbackAwaiter_CStyle;
-
-            void Notify() const
-            {
-                if (_notifyCallback)
-                {
-                    _notifyCallback();
-                }
-            }
-
-        private:
-            void Set(std::invocable auto cb)
-            {
-                assert(_notifyCallback == nullptr);
-
-                _notifyCallback = cb;
-            }
-
-            std::function<void()> _notifyCallback;
-        };
-
-    } // namespace detail
-
     template <typename CallbackT,
               std::invocable<CallbackT>    AsyncFunctionT,
-              concepts::AsyncCallbackEvent EventT = detail::AsyncCallbackEvent,
+              concepts::AsyncCallbackEvent EventT = detail::PauseCallbackEvent,
               typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT>>
     struct AsyncCallbackAwaiter
     {
         AsyncCallbackAwaiter(AsyncFunctionT asyncFunc, CallbackT cb)
-        : _asyncFunction{asyncFunc}
+        : _asyncFunction{std::move(asyncFunc)}
         , _userCallback{cb}
         {
         }
@@ -142,7 +111,7 @@ namespace tinycoro {
             });
         }
 
-        [[nodiscard]] auto&& await_resume()
+        [[nodiscard]] constexpr auto await_resume()
         {
             if (_exception)
             {
@@ -209,7 +178,7 @@ namespace tinycoro {
             });
         }
 
-        void await_resume() const
+        constexpr void await_resume() const
         {
             if (_exception)
             {
@@ -247,7 +216,7 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename CallbackT, typename EventT = detail::AsyncCallbackEvent>
+        template <typename CallbackT, typename EventT = detail::PauseCallbackEvent>
         struct UserDataWrapper : private UserData
         {
             template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
@@ -271,12 +240,12 @@ namespace tinycoro {
     template <std::integral auto Nth,
               typename AsyncFunctionT,
               typename CallbackT,
-              concepts::AsyncCallbackEvent EventT = detail::AsyncCallbackEvent,
+              concepts::AsyncCallbackEvent EventT = detail::PauseCallbackEvent,
               typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
     struct AsyncCallbackAwaiter_CStyle
     {
         AsyncCallbackAwaiter_CStyle(AsyncFunctionT asyncFunc, CallbackT cb, IndexedUserData<Nth> userData)
-        : _asyncFunction{asyncFunc}
+        : _asyncFunction{std::move(asyncFunc)}
         , _userData{cb, userData.data}
         {
         }
@@ -331,7 +300,7 @@ namespace tinycoro {
                 std::addressof(_userData));
         }
 
-        [[nodiscard]] auto&& await_resume()
+        [[nodiscard]] constexpr auto await_resume()
         {
             if (_userData.exception)
             {

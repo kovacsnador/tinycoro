@@ -89,7 +89,7 @@ namespace tinycoro {
             friend struct AsyncAwaitOnFinishWrapper<AsyncAwaiterT*>;
 
             AsyncAwaiterT(SchedulerT& scheduler, EventT event, Args&&... args)
-            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, sizeof...(Args)}
+            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, std::move(event), sizeof...(Args)}
             , _coroutineTasks(std::forward<Args>(args)...)
             {
             }
@@ -119,7 +119,7 @@ namespace tinycoro {
             friend struct AsyncAwaitOnFinishWrapper<AsyncAwaiterT*>;
 
             AsyncAwaiterT(SchedulerT& scheduler, EventT event, ContainerT&& container)
-            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
+            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, std::move(event), std::size(container)}
             , _container{std::forward<ContainerT>(container)}
             {
             }
@@ -153,7 +153,7 @@ namespace tinycoro {
             friend struct AsyncAwaitOnFinishWrapper<AsyncAnyOfAwaiterT*>;
 
             AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, Args&&... args)
-            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, sizeof...(Args)}
+            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, std::move(event), sizeof...(Args)}
             , _stopSource{std::move(stopSource)}
             , _coroutineTasks(std::forward<Args>(args)...)
             {
@@ -185,7 +185,7 @@ namespace tinycoro {
             friend struct AsyncAwaitOnFinishWrapper<AsyncAnyOfAwaiterT*>;
 
             AsyncAnyOfAwaiterT(SchedulerT& scheduler, StopSourceT stopSource, EventT event, ContainerT&& container)
-            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, event, std::size(container)}
+            : AsyncAwaiterBase<SchedulerT, EventT, FuturesT>{scheduler, std::move(event), std::size(container)}
             , _stopSource{std::move(stopSource)}
             , _container{std::forward<ContainerT>(container)}
             {
