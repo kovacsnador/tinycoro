@@ -371,7 +371,7 @@ TEST_P(LatchTest, LatchTest_timeout_race)
 
     auto count = GetParam();
 
-    tinycoro::Latch latch{std::max((count / 2), 1ul)};
+    tinycoro::Latch latch{std::max((count / (size_t)2), (size_t)1)};
 
     std::atomic<decltype(count)> cc = count;
 
