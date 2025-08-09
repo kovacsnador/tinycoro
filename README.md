@@ -1193,10 +1193,10 @@ This makes timeout handling explicit — you can directly check if a timeout occ
 ```cpp
 // Waits for 100ms.
 auto result = co_await tinycoro::TimeoutAwait{clock, someAwaitable(), 100ms};
-if (!result) {
-    // Timeout occurred
-} else {
+if (result) {
     // result.value() contains the awaitable’s result
+} else {
+    // Timeout occurred
 }
 ```
 #### Behavior
@@ -1215,10 +1215,10 @@ tinycoro::Barrier barrier{3};
 auto task = [&]() -> tinycoro::Task<> {
     // Wait on barrier for max 10 milliseconds
     auto res = co_await tinycoro::TimeoutAwait{clock, barrier.Wait(), 10ms};
-    if (!res) {
-        std::println("Timeout!");
-    } else {
+    if (res) {
         std::println("Barrier passed!");
+    } else {
+        std::println("Timeout!");
     }
 };
 
