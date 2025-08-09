@@ -99,6 +99,7 @@ namespace tinycoro {
 
             bool Cancel() noexcept { return _barrier.Cancel(this); };
 
+        private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
@@ -107,7 +108,6 @@ namespace tinycoro {
                 context::UnpauseTask(parentCoro);
             }
 
-        private:
             BarrierT& _barrier;
             EventT    _event;
 

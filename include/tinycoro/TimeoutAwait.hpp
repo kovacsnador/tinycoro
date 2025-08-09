@@ -96,7 +96,7 @@ namespace tinycoro {
                 //
                 // We return with an std::optional<VoidType> 
                 _awaiter.await_resume();
-                return optional_t{{}};
+                return optional_t{std::in_place_t{}};
             }
             else
             {
