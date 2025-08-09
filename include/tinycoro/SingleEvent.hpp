@@ -39,7 +39,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
 
-            void SetValue(ValueT val)
+            void Set(ValueT val)
             {
                 std::unique_lock lock{_mtx};
 
@@ -48,7 +48,7 @@ namespace tinycoro {
                     throw SingleEventException{"SingleEvent: Value is already set!"};
                 }
 
-                _value = std::move(val);
+                _value.emplace(std::move(val));
 
                 if (_waiter)
                 {
@@ -64,7 +64,7 @@ namespace tinycoro {
             }
 
         private:
-            void Reset()
+            void Reset() noexcept
             {
                 std::scoped_lock lock{_mtx};
                 _value.reset();
@@ -103,13 +103,20 @@ namespace tinycoro {
             bool Cancel(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
-                if(_waiter == awaiter)
+                if (_waiter == awaiter)
                 {
                     // reset the waiter
                     _waiter = nullptr;
                     return true;
                 }
                 return false;
+            }
+
+            [[nodiscard]] auto Exchange() noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                _waiter = nullptr;
+                return std::exchange(_value, std::nullopt);
             }
 
             std::optional<ValueT> _value;
@@ -150,18 +157,16 @@ namespace tinycoro {
             }
 
             // Moving out the value.
-            [[nodiscard]] constexpr auto await_resume() noexcept {
+            [[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange().value()); }
 
-                typename SingleEventT::value_type temp{std::move(_singleEvent._value.value())};    
-                _singleEvent.Reset();
-                return temp;
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
 
-            void Notify() const noexcept { _event.Notify(); }
-
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _singleEvent.Cancel(this); }
+
+        private:
+            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
@@ -169,7 +174,6 @@ namespace tinycoro {
                 context::UnpauseTask(parentCoro);
             }
 
-        private:
             SingleEventT&  _singleEvent;
             CallbackEventT _event;
         };

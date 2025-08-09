@@ -111,7 +111,7 @@ class BarrierAwaiterMock : public tinycoro::detail::BarrierAwaiter<BarrierAwaite
 
 public:
     BarrierAwaiterMock(BarrierT& b, EventT e, auto p)
-    : BaseT{*this, e, p}
+    : BaseT{*this, std::move(e), p}
     , barrier{b}
     {
     }
@@ -141,7 +141,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -157,7 +157,7 @@ TEST(BarrierTest, BarrierTest_await_suspend)
 
     auto awaiter = barrier.ArriveAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -170,7 +170,7 @@ TEST(BarrierTest, BarrierTest_await_suspend_dropWait)
 
     auto awaiter = barrier.ArriveDropAndWait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -220,7 +220,7 @@ TEST(BarrierTest, BarrierTest_arriveAndWait_after)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -249,7 +249,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 }
 
@@ -263,7 +263,7 @@ TEST(BarrierTest, BarrierTest_await_ready_and_suspend_ready)
 
     EXPECT_FALSE(awaiter.await_ready());
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
 
@@ -277,7 +277,7 @@ TEST(BarrierTest, BarrierTest_notifyAndComplition)
 
     auto awaiter = barrier.Wait();
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -709,4 +709,60 @@ TEST(BarrierTest, BarrierTest_completionException)
 
     EXPECT_THROW(tinycoro::AllOf(scheduler, task(), task()), std::runtime_error);
     EXPECT_EQ(fullyCompleted, 1);
+}
+
+TEST_P(BarrierTest, BarrierTest_timeout)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    auto count = GetParam();
+
+    tinycoro::Barrier barrier{count};
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        co_await tinycoro::TimeoutAwait{clock, barrier.Wait(), 10ms};
+        cc--;
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
+}
+
+TEST_P(BarrierTest, BarrierTest_timeout_race)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    auto count = GetParam();
+
+    tinycoro::Barrier barrier{std::max((count / (size_t)2), (size_t)1)};
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        co_await tinycoro::TimeoutAwait{clock, barrier.ArriveAndWait(), 10ms};
+        cc--;
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
 }

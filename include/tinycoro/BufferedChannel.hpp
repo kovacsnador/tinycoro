@@ -41,7 +41,6 @@ namespace tinycoro {
                 ValueT value;
             };
 
-        public:
             friend class PopAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
             friend class ListenerAwaiterT<BufferedChannel, detail::PauseCallbackEvent>;
             friend class PushAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
@@ -51,6 +50,9 @@ namespace tinycoro {
             using push_awaiter_type     = PushAwaiterT<BufferedChannel, detail::PauseCallbackEvent, ValueT>;
 
             using cleanupFunction_t = std::function<void(ValueT&)>;
+
+        public:
+            using value_type = ValueT;
 
             // constructor
             BufferedChannel(size_t maxQueueSize = std::numeric_limits<decltype(maxQueueSize)>::max(), cleanupFunction_t cleanupFunc = {})
@@ -87,7 +89,7 @@ namespace tinycoro {
             {
                 return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
             }
-
+            
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
@@ -248,7 +250,7 @@ namespace tinycoro {
 
                 // create custom event for the push_awaiter
                 PauseCallbackEvent event;
-                event.Set([&latch] { latch.count_down(); });
+                event.Set([&latch](auto) { latch.count_down(); });
 
                 // create custom push_awaiter for inline waiting
                 // The channel is here unnecessary (first parameter), because non of the
@@ -566,11 +568,9 @@ namespace tinycoro {
                 return EChannelOpStatus::CLOSED;
             }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
@@ -636,11 +636,9 @@ namespace tinycoro {
 
             [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
@@ -726,11 +724,9 @@ namespace tinycoro {
                 return {_value, _lastElement};
             }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 

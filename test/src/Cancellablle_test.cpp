@@ -13,6 +13,7 @@ struct CancellableAwaiter_Mock
 
     MOCK_METHOD(bool, Cancel, ());
     MOCK_METHOD(void, Notify, ());
+    MOCK_METHOD(void, NotifyToDestroy, ());
 };
 
 TEST(CancellableTest, CancellableTest_mock_await_ready)
@@ -28,13 +29,13 @@ TEST(CancellableTest, CancellableTest_mock_await_ready)
 TEST(CancellableTest, CancellableTest_mock_await_suspend)
 {
     CancellableAwaiter_Mock mock;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     auto stopSource = hdl.promise().StopSource();
 
     EXPECT_CALL(mock, await_suspend).Times(1).WillOnce(testing::Return(true));
     EXPECT_CALL(mock, Cancel).WillOnce(testing::Return(true));
-    EXPECT_CALL(mock, Notify).Times(1);
+    EXPECT_CALL(mock, NotifyToDestroy).Times(1);
 
     tinycoro::Cancellable cancellable{std::move(mock)};
     EXPECT_TRUE(cancellable.await_suspend(hdl));
@@ -45,7 +46,7 @@ TEST(CancellableTest, CancellableTest_mock_await_suspend)
 TEST(CancellableTest, CancellableTest_mock_await_suspend_false)
 {
     CancellableAwaiter_Mock mock;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([]{});
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     auto stopSource = hdl.promise().StopSource();
 

@@ -110,10 +110,7 @@ namespace tinycoro {
                 return true;
             }
 
-            [[nodiscard]] constexpr auto await_resume() noexcept
-            {
-                return ReleaseGuard{_semaphore};
-            }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }
 
             void Notify() const noexcept { _event.Notify(); }
 

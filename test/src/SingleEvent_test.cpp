@@ -12,7 +12,7 @@ TEST(SingleEventTest, SingleEventTest_Set)
     tinycoro::SingleEvent<int32_t> singleEvent;
 
     EXPECT_FALSE(singleEvent.IsSet());
-    singleEvent.SetValue(42);
+    singleEvent.Set(42);
     EXPECT_TRUE(singleEvent.IsSet());
 }
 
@@ -40,14 +40,14 @@ TEST(SingleEventTest, SingleEventTest_await_resume)
     auto awaiter = singleEvent.operator co_await();
 
     EXPECT_FALSE(singleEvent.IsSet());
-    singleEvent.SetValue(42);
+    singleEvent.Set(42);
     EXPECT_TRUE(singleEvent.IsSet());
 
     auto val = awaiter.await_resume();
     EXPECT_EQ(val, 42);
     EXPECT_FALSE(singleEvent.IsSet());
 
-    singleEvent.SetValue(44);
+    singleEvent.Set(44);
     EXPECT_TRUE(singleEvent.IsSet());
 
     val = awaiter.await_resume();
@@ -64,7 +64,7 @@ TEST(SingleEventTest, SingleEventTest_await_ready)
     EXPECT_FALSE(awaiter.await_ready());
 
     EXPECT_FALSE(singleEvent.IsSet());
-    singleEvent.SetValue(42);
+    singleEvent.Set(42);
     EXPECT_TRUE(singleEvent.IsSet());
 
     EXPECT_TRUE(awaiter.await_ready());
@@ -79,34 +79,34 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled]() { pauseCalled = true; });
+    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled](auto) { pauseCalled = true; });
 
     awaiter.await_suspend(hdl);
     EXPECT_FALSE(pauseCalled);
 
     auto awaiter2 = singleEvent.operator co_await();
 
-    auto hdl2 = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl2 = tinycoro::test::MakeCoroutineHdl();
 
     // allow only 1 consumer
     EXPECT_THROW(awaiter2.await_suspend(hdl2), tinycoro::SingleEventException);
 
     EXPECT_FALSE(singleEvent.IsSet());
-    singleEvent.SetValue(42);
+    singleEvent.Set(42);
     EXPECT_TRUE(pauseCalled);
     EXPECT_TRUE(singleEvent.IsSet());
 }
 
 struct SingleNotifierMockImpl
 {
-    MOCK_METHOD(bool, Set, (std::function<void()>));
-    MOCK_METHOD(void, Notify, ());
+    MOCK_METHOD(bool, Set, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(void, Notify, (tinycoro::ENotifyPolicy));
 };
 
 struct SingleNotifierMock
 {
     bool Set(auto func) { return mock->Set(func); }
-    void Notify() { mock->Notify(); }
+    void Notify(tinycoro::ENotifyPolicy p = tinycoro::ENotifyPolicy::RESUME) { mock->Notify(p); }
 
     std::shared_ptr<SingleNotifierMockImpl> mock = std::make_shared<SingleNotifierMockImpl>();
 };
@@ -124,10 +124,10 @@ TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
     tinycoro::detail::SingleEventAwaiter awaiter{mock, notifier};
 
     EXPECT_CALL(mock, Add(std::addressof(awaiter))).Times(1).WillOnce(testing::Return(false));
-    EXPECT_CALL(*notifier.mock, Notify()).Times(0); // no call
+    EXPECT_CALL(*notifier.mock, Notify(tinycoro::ENotifyPolicy::RESUME)).Times(0); // no call
     EXPECT_CALL(*notifier.mock, Set).Times(2);
 
-    auto hdl = tinycoro::test::MakeCoroutineHdl([] { });
+    auto hdl = tinycoro::test::MakeCoroutineHdl();
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 }
@@ -138,7 +138,7 @@ TEST(SingleEventTest, SingleEventFunctionalTest_1)
     tinycoro::SingleEvent<int32_t> singleEvent;
 
     auto producer = [&singleEvent]() -> tinycoro::Task<void> {
-        singleEvent.SetValue(42);
+        singleEvent.Set(42);
         co_return;
     };
 
@@ -163,7 +163,7 @@ TEST(SingleEventTest, SingleEventFunctionalTest_2)
         {
             auto lastValue = val;
 
-            singleEvent1.SetValue(val + 1);
+            singleEvent1.Set(val + 1);
             val = co_await singleEvent2;
 
             EXPECT_EQ(lastValue + 2, val);
@@ -177,7 +177,7 @@ TEST(SingleEventTest, SingleEventFunctionalTest_2)
             auto lastValue = val;
 
             val = co_await singleEvent1;
-            singleEvent2.SetValue(val + 1);
+            singleEvent2.Set(val + 1);
 
             EXPECT_EQ(lastValue + 2, val);
         }
@@ -219,4 +219,79 @@ TEST(SingleEventTest, SingleEventTest_cancel_inline)
 
     EXPECT_FALSE(r1.has_value());
     EXPECT_TRUE(r2.has_value());
+}
+
+struct SingleEventTimeoutTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutTest, SingleEventTimeoutTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    tinycoro::SingleEvent<int32_t> event;
+    std::atomic<int32_t> doneCount{};
+
+    tinycoro::AutoEvent helperEvent{true};
+
+    auto count = GetParam(); 
+
+    auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+        {
+            auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
+            if(opt.has_value())
+            {
+                helperEvent.Set();
+            }
+            doneCount++;
+        }
+    };
+
+    auto sleep = [&]() -> tinycoro::TaskNIC<> {
+        for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+        {
+            co_await helperEvent;
+            event.Set(42);
+        }
+    };
+    
+    tinycoro::AllOf(scheduler, SingleEventConsumer(), sleep());
+
+    EXPECT_EQ(doneCount, count);
+}
+
+TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_all_timeout)
+{
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::SingleEvent<int32_t> event;
+    int32_t doneCount{};
+    tinycoro::AutoEvent helperEvent{true};
+
+    auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        co_await helperEvent;
+
+        auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 1ms};
+        EXPECT_FALSE(opt.has_value());
+        doneCount++;
+
+        helperEvent.Set();
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(SingleEventConsumer());
+    }
+
+    tinycoro::AllOfInline(std::move(tasks));
+
+    EXPECT_EQ(doneCount, count);
 }

@@ -17,7 +17,7 @@ struct AsyncCallbackAwaiterTest : public testing::Test
 
     AsyncCallbackAwaiterTest()
     {
-        hdl.promise().pauseHandler.emplace([this]() { pauseHandlerCalled = true; });
+        hdl.promise().pauseHandler.emplace([this]([[maybe_unused]] tinycoro::ENotifyPolicy policy) { pauseHandlerCalled = true; });
     }
 
     bool pauseHandlerCalled{false};

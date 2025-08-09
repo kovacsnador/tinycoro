@@ -50,7 +50,7 @@ namespace tinycoro {
         AwaiterValue() = default;
 
     public:
-        constexpr void await_resume() noexcept { }
+        constexpr void await_resume() const noexcept { }
     };
 
 } // namespace tinycoro

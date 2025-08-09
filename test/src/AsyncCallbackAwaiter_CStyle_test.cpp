@@ -17,7 +17,7 @@ struct AsyncCallbackAwaiter_CStyleTest : public testing::Test
 
     AsyncCallbackAwaiter_CStyleTest()
     {
-        hdl.promise().pauseHandler.emplace([this]() { pauseHandlerCalled = true; });
+        hdl.promise().pauseHandler.emplace([this]([[maybe_unused]] auto policy) { pauseHandlerCalled = true; });
     }
 
     bool pauseHandlerCalled{false};
@@ -52,10 +52,7 @@ void AsyncCallbackAwaiterTest1(const bool& pauseHandlerCalled, auto hdl)
     EXPECT_FALSE(awaiter.await_ready());
     awaiter.await_suspend(hdl);
 
-    if constexpr (!std::same_as<decltype(awaiter.await_resume()), void>)
-    {
-        EXPECT_TRUE(false) << "await_resume return not void!";
-    }
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), void>)) << "await_resume return not void!";
 
     EXPECT_EQ(uData.data, true);
     EXPECT_TRUE(pauseHandlerCalled);
@@ -83,10 +80,7 @@ void AsyncCallbackAwaiterTest2(const bool& pauseHandlerCalled, auto hdl)
     EXPECT_FALSE(awaiter.await_ready());
     awaiter.await_suspend(hdl);
 
-    if constexpr (!std::same_as<decltype(awaiter.await_resume()), int32_t&&>)
-    {
-        EXPECT_TRUE(false) << "await_resume return not int32_t&&!";
-    }
+    EXPECT_TRUE((std::same_as<decltype(awaiter.await_resume()), int32_t>)) << "await_resume return not int32_t!";
 
     EXPECT_EQ(awaiter.await_resume(), 44);
     EXPECT_EQ(uData, 42);

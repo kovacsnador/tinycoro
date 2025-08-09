@@ -69,7 +69,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]([[maybe_unused]] auto policy) { pauseCalled = true; });
 
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
@@ -95,7 +95,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
     event.Set();
 
     bool pauseCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]() { pauseCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]([[maybe_unused]] auto policy) { pauseCalled = true; });
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 
@@ -282,6 +282,72 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOfInline)
     {
         EXPECT_FALSE(results[i].has_value());
     }
+}
+
+struct AutoEventTimeoutTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(AutoEventTimeoutTest, AutoEventTimeoutTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(AutoEventTimeoutTest, AutoEventFunctionalTest_timeout)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent;
+    std::atomic<int32_t> doneCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 20ms};
+        doneCount++;
+    };
+
+    auto sleep = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::SleepFor(clock, 20ms);
+        autoEvent.Set();
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count + 1);
+    tasks.push_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(autoEventConsumer());
+    }
+    
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(doneCount, count);
+}
+
+TEST_P(AutoEventTimeoutTest, AutoEventFunctionalTest_all_timeout)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::AutoEvent autoEvent;
+    std::atomic<int32_t> doneCount{};
+
+    auto autoEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 10ms};
+        doneCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(autoEventConsumer());
+    }
+    
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(doneCount, count);
 }
 
 TEST_P(AutoEventTest, AutoEventFunctionalTest_multipleWaiters)

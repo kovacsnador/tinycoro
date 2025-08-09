@@ -76,7 +76,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend)
     auto awaiter = event.operator co_await();
 
     bool pauseResumerCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled](auto) { pauseResumerCalled = true; });
 
     event.Set();
     EXPECT_FALSE(awaiter.await_suspend(hdl));
@@ -91,7 +91,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_singleConsumer)
     EXPECT_FALSE(awaiter1.await_ready());
 
     bool pauseResumerCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled]() { pauseResumerCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl([&pauseResumerCalled](auto) { pauseResumerCalled = true; });
 
     EXPECT_TRUE(awaiter1.await_suspend(hdl));
     EXPECT_FALSE(pauseResumerCalled);
@@ -116,7 +116,7 @@ TEST(ManualEventTest, ManualEventTest_await_suspend_multiConsumer)
     EXPECT_FALSE(awaiter3.await_ready());
 
     size_t pauseResumerCalled   = 0;
-    auto   pauseResumerCallback = [&pauseResumerCalled]() { ++pauseResumerCalled; };
+    auto   pauseResumerCallback = [&pauseResumerCalled](auto) { ++pauseResumerCalled; };
 
     auto makeHdl = [&]() {
         return tinycoro::test::MakeCoroutineHdl(pauseResumerCallback);
@@ -326,4 +326,70 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_inline)
     auto finished = std::ranges::count_if(results | std::views::drop(1), [](const auto& it) { return it.has_value(); });
 
     EXPECT_EQ(finished, taskCount);
+}
+
+struct ManualEventTimeoutTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(ManualEventTimeoutTest, ManualEventTimeoutTest, testing::Values(1, 10, 100, 1000));
+
+TEST_P(ManualEventTimeoutTest, ManualEventFunctionalTest_timeout_race)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::ManualEvent event;
+    std::atomic<int32_t> doneCount{};
+
+    auto ManualEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
+        doneCount++;
+    };
+
+    auto sleep = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::SleepFor(clock, 10ms);
+        event.Set();
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count + 1);
+    tasks.push_back(sleep());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(ManualEventConsumer());
+    }
+    
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(doneCount, count);
+}
+
+TEST_P(ManualEventTimeoutTest, ManualEventFunctionalTest_all_timeout)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    const auto count = GetParam();
+
+    tinycoro::ManualEvent event;
+    std::atomic<int32_t> doneCount{};
+
+    auto ManualEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
+        doneCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.push_back(ManualEventConsumer());
+    }
+    
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(doneCount, count);
 }

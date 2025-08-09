@@ -93,13 +93,13 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept
-            {
-                _event.Notify();
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _barrier.Cancel(this); };
 
+        private:
             void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
@@ -108,7 +108,6 @@ namespace tinycoro {
                 context::UnpauseTask(parentCoro);
             }
 
-        private:
             BarrierT& _barrier;
             EventT    _event;
 

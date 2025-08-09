@@ -15,10 +15,10 @@ struct Concepts_PauseHandlerCbTest : public testing::Test
     using value_type = T;
 };
 
-using lambdaType1 = decltype([](){});
+using lambdaType1 = decltype([](tinycoro::ENotifyPolicy){});
 using lambdaType2 = decltype([](std::unique_ptr<tinycoro::PauseHandler>){});
 
-using FuncType1 = void (*)();
+using FuncType1 = void (*)(tinycoro::ENotifyPolicy);
 
 using PauseHandlerCbTestTypes = testing::Types<std::tuple<lambdaType1, std::true_type>,
                                                 std::tuple<lambdaType2, std::false_type>,
@@ -77,13 +77,13 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
 
     bool called = false;
 
-    hdl.promise().pauseHandler.emplace([&called](){ called = true; });
+    hdl.promise().pauseHandler.emplace([&called](auto){ called = true; });
 
     auto pauseResumerCallback = tinycoro::context::PauseTask(hdl);
 
     EXPECT_TRUE(hdl.promise().pauseHandler->IsPaused());
     
-    std::invoke(pauseResumerCallback);
+    std::invoke(pauseResumerCallback, tinycoro::ENotifyPolicy::RESUME);
 
     EXPECT_TRUE(called);
 }
@@ -92,12 +92,12 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 {
     bool called = false;
 
-    std::function<void()> func = [&called]{ called = true; };
+    auto func = [&called](tinycoro::ENotifyPolicy) { called = true; };
 
     tinycoro::PauseHandler pauseHandler{func};
 
     auto res = pauseHandler.Pause();
-    EXPECT_TRUE((std::same_as<decltype(func), decltype(res)>));
+    EXPECT_TRUE((std::assignable_from<decltype(res)&, decltype(func)>));
 
     EXPECT_TRUE(pauseHandler.IsPaused());
 
@@ -112,7 +112,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 {
-    tinycoro::PauseHandler pauseHandler{[]{}};
+    tinycoro::PauseHandler pauseHandler{[](auto){}};
     
     // initial cancellable as default
     EXPECT_TRUE(pauseHandler.IsCancellable());
@@ -126,7 +126,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
 {
-    tinycoro::PauseHandler pauseHandler{[]{}, tinycoro::noninitial_cancellable_t::value};
+    tinycoro::PauseHandler pauseHandler{[](auto){}, tinycoro::noninitial_cancellable_t::value};
     
     // initial cancellable as default
     EXPECT_FALSE(pauseHandler.IsCancellable());
@@ -143,7 +143,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
 
 TEST(PauseHandlerTest, PauseHandlerTest_ExceptionThrowned)
 {
-    tinycoro::PauseHandler pauseHandler{[]{}, tinycoro::noninitial_cancellable_t::value};
+    tinycoro::PauseHandler pauseHandler{[](auto){}, tinycoro::noninitial_cancellable_t::value};
     
     EXPECT_FALSE(pauseHandler.HasException());
     pauseHandler.Resume();
@@ -165,7 +165,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_ExceptionThrowned)
 
 struct Context_PauseHandlerMock
 {
-    MOCK_METHOD(std::function<void()>, Pause, ());
+    MOCK_METHOD(tinycoro::PauseHandlerCallbackT, Pause, ());
     MOCK_METHOD(void, SetCancellable, (bool));
     MOCK_METHOD(void, Unpause, ());
 };
@@ -188,7 +188,7 @@ TEST(ContextTest, ContextTest_PauseTask)
 {
     Context_CoroutineHandlerMock hdl;
 
-    EXPECT_CALL(*hdl.p->pauseHandler, Pause).Times(1).WillOnce(testing::Return([]{}));   
+    EXPECT_CALL(*hdl.p->pauseHandler, Pause).Times(1).WillOnce(testing::Return([](auto){}));   
     auto res = tinycoro::context::PauseTask(hdl);
 }
 

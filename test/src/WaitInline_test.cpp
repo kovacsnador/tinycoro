@@ -191,7 +191,7 @@ TEST(WaitInlineTest, WaitInlineTest_pause)
 
     EXPECT_CALL(mock, await_resume()).Times(1).WillOnce(testing::Return(42));
 
-    auto resumer = [&]()->tinycoro::Task<void> { mock.pauseHandlerMock->cb(); co_return;};
+    auto resumer = [&]()->tinycoro::Task<void> { mock.pauseHandlerMock->cb(tinycoro::ENotifyPolicy::RESUME); co_return;};
 
     auto [val, voidValue] = tinycoro::AllOfInline(mock, resumer());
     EXPECT_EQ(42, val);
@@ -388,7 +388,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_1)
     };
 
     // set the value
-    event.SetValue(42);
+    event.Set(42);
 
     auto value = tinycoro::AllOfInline(consumer());
     EXPECT_EQ(value, 42);
@@ -407,7 +407,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_2)
     auto producer = [&event, &clock]()->tinycoro::Task<>
     {
         co_await tinycoro::SleepFor(clock, 100ms);
-        event.SetValue(42);
+        event.Set(42);
     };
 
     tinycoro::Scheduler scheduler{1};

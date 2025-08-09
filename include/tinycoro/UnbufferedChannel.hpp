@@ -39,6 +39,8 @@ namespace tinycoro {
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
         public:
+            using value_type = ValueT;
+
             // default constructor
             UnbufferedChannel(cleanupFunction_t cleanupFunc = {})
             : _cleanupFunction{std::move(cleanupFunc)}
@@ -125,7 +127,7 @@ namespace tinycoro {
                 // prepare a special event for notification
                 detail::PauseCallbackEvent event;
 
-                event.Set([&latch] {
+                event.Set([&latch](auto) {
                     latch.count_down();
                 });
 
@@ -378,11 +380,9 @@ namespace tinycoro {
                 return EChannelOpStatus::CLOSED;
             }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
@@ -484,11 +484,9 @@ namespace tinycoro {
                 return {_value, _lastElement};
             }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+           void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
@@ -549,11 +547,9 @@ namespace tinycoro {
 
             [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
-            void Notify() const noexcept
-            {
-                // Notify scheduler to put coroutine back on CPU
-                _event.Notify();
-            }
+           void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            
+            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 

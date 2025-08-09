@@ -23,9 +23,12 @@
 namespace tinycoro {
     namespace detail {
 
-        // this is a cancellation token
-        // to be able to cancel the events
-        // after registration in the SoftClock
+        // Cancellation token for SoftClock.
+        // Allows cancellation of events after they have been registered.
+        //
+        // If the destructor is called while the token is still valid,
+        // it will attempt to cancel the associated event.
+        // To prevent this behavior, call Release() to invalidate the token beforehand.
         template <template <typename, typename> class ParentT, concepts::IsDuration PrecisionT>
         class SoftClockCancelToken
         {
@@ -82,6 +85,9 @@ namespace tinycoro {
             // We try to cancel the event
             // and at the same time we also make a detach
             // from the parent
+            //
+            // After this function call, the event is guaranteed to have either
+            // been cancelled successfully or already completed execution.
             bool TryCancel()
             {
                 std::unique_lock lock{_mtx};
@@ -178,6 +184,9 @@ namespace tinycoro {
             }
 
             // Register a callback with a custom duration (no cancellation possible)
+            //
+            // The callback must be noexcept, as it will be invoked without 
+            // exception handling. Violating this may lead to undefined behavior.
             template <concepts::IsNothrowInvokeable CbT>
             void Register(CbT&& cb, concepts::IsDuration auto duration)
             {
@@ -185,6 +194,9 @@ namespace tinycoro {
             }
 
             // Register a callback with a custom duration (no cancellation possible)
+            //
+            // The callback must be noexcept, as it will be invoked without 
+            // exception handling. Violating this may lead to undefined behavior.template <concepts::IsNothrowInvokeable CbT>
             template <concepts::IsNothrowInvokeable CbT>
             void Register(CbT&& cb, concepts::IsTimePoint auto timePoint)
             {
@@ -193,6 +205,9 @@ namespace tinycoro {
             }
 
             // Register a callback and get cancellation token.
+            //
+            // The callback must be noexcept, as it will be invoked without 
+            // exception handling. Violating this may lead to undefined behavior.template <concepts::IsNothrowInvokeable CbT>
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsDuration auto duration)
             {
@@ -200,6 +215,9 @@ namespace tinycoro {
             }
 
             // Register a callback and get cancellation token.
+            //
+            // The callback must be noexcept, as it will be invoked without 
+            // exception handling. Violating this may lead to undefined behavior.template <concepts::IsNothrowInvokeable CbT>
             template <concepts::IsNothrowInvokeable CbT>
             [[nodiscard]] CancellationTokenT RegisterWithCancellation(CbT&& cb, concepts::IsTimePoint auto timePoint)
             {
@@ -210,6 +228,9 @@ namespace tinycoro {
                 {
                     auto wPtr = this->weak_from_this();
 
+                    // This cancellation callback is safe even if the event is currently executing,
+                    // because the std::mutex _mtx ensures proper synchronization.
+                    // If we cannot remove it from the event list, it means it has already been processed.
                     return CancellationTokenT{[this, wPtr, it = iter.value(), tp] {
                         if (auto sPtr = wPtr.lock())
                         {
@@ -220,11 +241,11 @@ namespace tinycoro {
                             auto begin = _events.begin();
                             if (begin != _events.end())
                             {
-                                if (tp >= begin->first && StopRequested() == false)
+                                if (tp >= begin->first)
                                 {
                                     // if the begin <= tp
-                                    // that means that that out iterator
-                                    // is still valid
+                                    // that means that our iterator
+                                    // is still a valid one
                                     _events.erase(it);
                                     return true;
                                 }
@@ -237,11 +258,8 @@ namespace tinycoro {
                 return {};
             }
 
-            bool RequestStop()
+            bool RequestStop() noexcept
             {
-
-                std::scoped_lock lock{_mtx};
-
                 // We can delegate the stop request
                 // directly to the jthread
                 return _thread.request_stop();
@@ -307,12 +325,6 @@ namespace tinycoro {
             // which is registered in the constructor
             void Run(std::stop_token jthreadStopToken)
             {
-                // this is a temporary container
-                // in which we copy the timed out callbacks
-                std::vector<callback_t> tempEvents;
-
-                auto transformer = [](auto& pair) { return std::move(pair.second); };
-
                 for (;;)
                 {
                     std::unique_lock lock{_mtx};
@@ -358,26 +370,20 @@ namespace tinycoro {
                     // returns an iterator to the first element greater than the given key (timepoint)
                     auto upperBound = _events.upper_bound(TimePointCast(clock_t::now()));
 
-                    // transform the callbacks into a tempEvents container
-                    // and we can release the lock earlier
-                    std::transform(_events.begin(), upperBound, std::back_inserter(tempEvents), transformer);
-
-                    // erase the event which were already timed out.
-                    _events.erase(_events.begin(), upperBound);
-
-                    // we can now release
-                    // the lock safely
-                    lock.unlock();
-
-                    for (auto& it : tempEvents)
+                    for (auto it = _events.begin(); it != upperBound; ++it)
                     {
                         // iterate over the timed out events
                         // and notify the callee about that
-                        it();
+                        //
+                        // At this point we are still holding
+                        // the lock, to make sure in case we have a 
+                        // running cancellation, this (cancellation) will wait
+                        // until the callback is called.
+                        it->second();
                     }
 
-                    // don't forget to clear the temp container
-                    tempEvents.clear();
+                    // erase the event or events which were already executed.
+                    _events.erase(_events.begin(), upperBound);
                 }
             }
 
@@ -419,6 +425,7 @@ namespace tinycoro {
 
             using clock_t = sharedImpl_t::clock_t;
             using timepoint_t = sharedImpl_t::timepoint_t;
+            using cancelToken_t = CancellationTokenT;
 
             // Default constructor
             SoftClock()
