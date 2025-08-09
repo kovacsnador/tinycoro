@@ -1168,7 +1168,7 @@ It works with both **relative durations** (`wait_for`-style) and **absolute time
 #### Syntax
 
 ```cpp
-auto resultOptional = tinycoro::TimeoutAwait{clock, awaitable, timeout}
+std::optional<T> result = tinycoro::TimeoutAwait{clock, originalAwaitable, timeout}
 ```
 
 #### Parameters
@@ -1176,7 +1176,7 @@ auto resultOptional = tinycoro::TimeoutAwait{clock, awaitable, timeout}
 | Parameter  | Type                                                                                 | Description                                                                 |
 |------------|--------------------------------------------------------------------------------------|-----------------------------------------------------------------------------|
 | `clock`    | `tinycoro::SoftClock` or compatible clock                                            | The clock used for scheduling the timeout and handling cancellation.        |
-| `awaitable`| Any cancellable awaitable (satisfying `concepts::IsCancellableAwait`)                 | The operation to wait on with a timeout.                                    |
+| `originalAwaitable`| Any cancellable awaitable (satisfying `concepts::IsCancellableAwait`)                 | The operation to wait on with a timeout.                                    |
 | `timeout`  | `std::chrono::duration` or `std::chrono::time_point`   | The timeout limit.
 
 #### Return Value
