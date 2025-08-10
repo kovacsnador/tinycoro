@@ -32,7 +32,7 @@ using TimeoutAwaitTestTypes = testing::Types<void, void*, int32_t, std::thread, 
 
 TYPED_TEST_SUITE(TimeoutAwaitTest, TimeoutAwaitTestTypes);
 
-void TimeoutAwaitTestReturnValue(auto& awaitable)
+void TimeoutAwaitTestHelper(auto& awaitable, bool hasValue)
 {
     tinycoro::SoftClock clock;
 
@@ -46,13 +46,13 @@ void TimeoutAwaitTestReturnValue(auto& awaitable)
         {
             EXPECT_TRUE((std::same_as<std::optional<T>, decltype(res)>));
         }
-        EXPECT_FALSE(res); // no value
+        EXPECT_EQ(res.has_value(), hasValue); // value check
     };
 
     tinycoro::AllOfInline(task(awaitable));
 }
 
-TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed)
+TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed_timed_out)
 {
     using T = typename TestFixture::value_type;
 
@@ -67,11 +67,26 @@ TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed)
 
     EXPECT_CALL(awaitable, await_resume).Times(0);
 
-    TimeoutAwaitTestReturnValue(awaitable);
+    TimeoutAwaitTestHelper(awaitable, false /* no value */);
+}
+
+TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed)
+{
+    using T = typename TestFixture::value_type;
+
+    tinycoro::SoftClock clock;
+    TestAwaitable<T> awaitable;
+
+    // awaiter is ready, jump to await_resume.
+    EXPECT_CALL(awaitable, await_ready).Times(1).WillOnce(testing::Return(true));
+
+    EXPECT_CALL(awaitable, await_resume).Times(1);
+
+    TimeoutAwaitTestHelper(awaitable, true /* has value */);
 }
 
 template <typename AwaitableT, typename TimeT>
-void TimeoutAwaitRealTest(AwaitableT&& awaitable, TimeT time)
+void TimeoutAwaitFunctionalTest(AwaitableT&& awaitable, TimeT time)
 {
     tinycoro::SoftClock clock;
 
@@ -101,32 +116,32 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_ManualEvent)
 {
     tinycoro::ManualEvent event{};
 
-    TimeoutAwaitRealTest(event.Wait(), 100ms);
-    TimeoutAwaitRealTest(event.Wait(), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(event.Wait(), 100ms);
+    TimeoutAwaitFunctionalTest(event.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_AutoEvent)
 {
-    TimeoutAwaitRealTest(tinycoro::AutoEvent{}.Wait(), 100ms);
-    TimeoutAwaitRealTest(tinycoro::AutoEvent{}.Wait(), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::AutoEvent{}.Wait(), 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::AutoEvent{}.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_SingleEvent)
 {
-    TimeoutAwaitRealTest(tinycoro::SingleEvent<int32_t>{}.Wait(), 100ms);
-    TimeoutAwaitRealTest(tinycoro::SingleEvent<int32_t>{}.Wait(), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::SingleEvent<int32_t>{}.Wait(), 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::SingleEvent<int32_t>{}.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_Barrier)
 {
-    TimeoutAwaitRealTest(tinycoro::Barrier{3}.Wait(), 100ms);
-    TimeoutAwaitRealTest(tinycoro::Barrier{3}.Wait(), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::Barrier{3}.Wait(), 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::Barrier{3}.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_Latch)
 {
-    TimeoutAwaitRealTest(tinycoro::Latch{3}.Wait(), 100ms);
-    TimeoutAwaitRealTest(tinycoro::Latch{3}.Wait(), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::Latch{3}.Wait(), 100ms);
+    TimeoutAwaitFunctionalTest(tinycoro::Latch{3}.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_pop_wait)
@@ -134,8 +149,8 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_pop_wait)
     tinycoro::BufferedChannel<int32_t> channel;
     int32_t                            val{};
 
-    TimeoutAwaitRealTest(channel.PopWait(val), 100ms);
-    TimeoutAwaitRealTest(channel.PopWait(val), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PopWait(val), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PopWait(val), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_push_wait)
@@ -148,8 +163,8 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_push_wait)
 
     EXPECT_FALSE(channel.Empty());
 
-    TimeoutAwaitRealTest(channel.PushWait(val), 100ms);
-    TimeoutAwaitRealTest(channel.PushWait(val), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushWait(val), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushWait(val), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_push_and_close_wait)
@@ -162,16 +177,16 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_push_and_close_wait)
 
     EXPECT_FALSE(channel.Empty());
 
-    TimeoutAwaitRealTest(channel.PushAndCloseWait(val), 100ms);
-    TimeoutAwaitRealTest(channel.PushAndCloseWait(val), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushAndCloseWait(val), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushAndCloseWait(val), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_BufferedChannel_wait_for_listeners)
 {
     tinycoro::BufferedChannel<int32_t> channel{2};
 
-    TimeoutAwaitRealTest(channel.WaitForListeners(1), 100ms);
-    TimeoutAwaitRealTest(channel.WaitForListeners(1), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.WaitForListeners(1), 100ms);
+    TimeoutAwaitFunctionalTest(channel.WaitForListeners(1), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_UnbufferedChannel_pop_wait)
@@ -179,22 +194,22 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_UnbufferedChannel_pop_wait)
     tinycoro::UnbufferedChannel<int32_t> channel;
     int32_t                              val{};
 
-    TimeoutAwaitRealTest(channel.PopWait(val), 100ms);
-    TimeoutAwaitRealTest(channel.PopWait(val), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PopWait(val), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PopWait(val), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_UnbufferedChannel_push_wait)
 {
     tinycoro::UnbufferedChannel<int32_t> channel;
 
-    TimeoutAwaitRealTest(channel.PushWait(42), 100ms);
-    TimeoutAwaitRealTest(channel.PushWait(43), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushWait(42), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushWait(43), tinycoro::SoftClock::Now() + 100ms);
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_UnbufferedChannel_push_and_close_wait)
 {
     tinycoro::UnbufferedChannel<int32_t> channel;
 
-    TimeoutAwaitRealTest(channel.PushAndCloseWait(42), 100ms);
-    TimeoutAwaitRealTest(channel.PushAndCloseWait(43), tinycoro::SoftClock::Now() + 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushAndCloseWait(42), 100ms);
+    TimeoutAwaitFunctionalTest(channel.PushAndCloseWait(43), tinycoro::SoftClock::Now() + 100ms);
 }
