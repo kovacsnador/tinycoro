@@ -8,6 +8,7 @@
 
 #include <stop_token>
 #include <cassert>
+#include <utility>
 
 #include "TaskResumer.hpp"
 #include "Promise.hpp"
@@ -47,11 +48,7 @@ namespace tinycoro { namespace detail {
 
         SchedulableTaskT& operator=(SchedulableTaskT&& other) noexcept
         {
-            if (std::addressof(other) != this)
-            {
-                Destroy();
-                _hdl = std::exchange(other._hdl, nullptr);
-            }
+            SchedulableTaskT{std::move(other)}.swap(*this);
             return *this;
         }
 
@@ -118,6 +115,11 @@ namespace tinycoro { namespace detail {
         }
 
         [[nodiscard]] auto& PauseState() noexcept { return _hdl.promise().pauseState; }
+
+        void swap(SchedulableTaskT& other) noexcept
+        {
+            std::swap(other._hdl, _hdl);
+        }
 
     private:
         void Destroy() noexcept

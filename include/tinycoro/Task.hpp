@@ -11,6 +11,7 @@
 #include <optional>
 #include <cstddef>
 #include <stop_token>
+#include <utility>
 
 #include "Common.hpp"
 #include "Exception.hpp"
@@ -68,11 +69,7 @@ namespace tinycoro {
 
             CoroTask& operator=(CoroTask&& other) noexcept
             {
-                if (std::addressof(other) != this)
-                {
-                    destroy();
-                    _hdl = std::exchange(other._hdl, nullptr);
-                }
+                CoroTask{std::move(other)}.swap(*this);
                 return *this;
             }
 
@@ -122,6 +119,11 @@ namespace tinycoro {
             // Release the coroutine_handle object
             auto Release() noexcept { return std::exchange(_hdl, nullptr); }
 
+            void swap(CoroTask& other) noexcept
+            {
+                std::swap(other._hdl, _hdl);
+            }
+
         private:
             // Only used by MakeBound() to save
             // the coroutine function inside the
@@ -146,7 +148,7 @@ namespace tinycoro {
             [[no_unique_address]] CoroResumerT _coroResumer{};
 
             // The underlying coroutine_handle
-            coro_hdl_type _hdl;
+            coro_hdl_type _hdl{nullptr};
         };
 
     } // namespace detail
