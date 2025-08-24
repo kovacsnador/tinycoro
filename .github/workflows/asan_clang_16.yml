@@ -28,8 +28,8 @@ jobs:
           apt-get update -y
           apt-get install -y clang lld cmake python3
           ln -sf /usr/bin/python3 /usr/bin/python
-          update-alternatives --install /usr/bin/clang clang /usr/bin/clang 100
-          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++ 100
+          update-alternatives --install /usr/bin/clang clang /usr/bin/clang 100 --force
+          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++ 100 --force
 
     - name: Verify python version
       run: python --version
