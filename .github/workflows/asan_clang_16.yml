@@ -25,6 +25,7 @@ jobs:
 
     - name: Install Clang 16, CMake
       run: |
+           apt-get update -y
            apt update -y
            apt-get upgrade -y
            apt install -y wget lsb-release software-properties-common
