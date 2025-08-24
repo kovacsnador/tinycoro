@@ -118,7 +118,7 @@ namespace tinycoro {
 
             void swap(GeneratorT& other) noexcept
             {
-                std::swap(_hdl, other.hdl);
+                std::swap(_hdl, other._hdl);
             } 
 
         private:
