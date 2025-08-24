@@ -26,25 +26,10 @@ jobs:
     - name: Install Clang 16, CMake
       run: |
           apt-get update -y
-          apt-get install -y wget lsb-release gnupg python3 cmake
-          ln -sf /usr/bin/python3 /usr/bin/python  # Create a symlink for python
-            
-          # Download the LLVM key and save as .gpg
-          wget https://apt.llvm.org/llvm-snapshot.gpg.key -O llvm-snapshot.gpg.key
-          gpg --dearmor llvm-snapshot.gpg.key
-          mv llvm-snapshot.gpg.key.gpg /usr/share/keyrings/llvm-snapshot.gpg
-            
-          # Add LLVM 16 repo for Debian Trixie
-          echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/trixie/ llvm-toolchain-trixie-16 main" \
-            | tee /etc/apt/sources.list.d/llvm.list
-            
-          # Update and install Clang 16 + LLD
-          apt-get update -y
-          apt-get install -y clang-16 lld-16
-            
-          # Set alternatives for clang/clang++
-          update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
-          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
+          apt-get install -y clang lld cmake python3
+          ln -sf /usr/bin/python3 /usr/bin/python
+          update-alternatives --install /usr/bin/clang clang /usr/bin/clang 100
+          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++ 100
 
     - name: Verify python version
       run: python --version
