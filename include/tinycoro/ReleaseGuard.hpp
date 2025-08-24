@@ -27,8 +27,8 @@ namespace tinycoro {
 
         ReleaseGuard& operator=(ReleaseGuard&& other) noexcept
         {
-            unlock();
-            _device = std::exchange(other._device, nullptr);
+            ReleaseGuard{std::move(other)}.swap(*this);
+            return *this;
         }
 
         [[nodiscard]] bool owns_lock() const noexcept {
@@ -47,6 +47,11 @@ namespace tinycoro {
         ~ReleaseGuard()
         {
             unlock();
+        }
+
+        void swap(ReleaseGuard& other) noexcept
+        {
+            std::swap(other._device, _device);
         }
 
     private:

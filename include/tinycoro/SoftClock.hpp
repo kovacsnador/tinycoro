@@ -53,15 +53,7 @@ namespace tinycoro {
             // allow move assignment
             SoftClockCancelToken& operator=(SoftClockCancelToken&& other) noexcept
             {
-                if (this != std::addressof(other))
-                {
-                    TryCancel();
-
-                    std::scoped_lock lock{_mtx, other._mtx};
-                    _cancellationCallback       = std::move(other._cancellationCallback);
-                    other._cancellationCallback = nullptr;
-                }
-
+               SoftClockCancelToken{std::move(other)}.swap(*this);
                 return *this;
             }
 
@@ -104,6 +96,17 @@ namespace tinycoro {
                 return false;
             }
 
+            void swap(SoftClockCancelToken& other) noexcept
+            {
+                if (this != std::addressof(other))
+                {
+                    // need to compare the addresses here,
+                    // because we lock both mutexes at the same time
+                    std::scoped_lock lock{_mtx, other._mtx};
+                    std::swap(other._cancellationCallback, _cancellationCallback);
+                }
+            }
+
         private:
             // private constructor
             template <typename T>
@@ -115,7 +118,7 @@ namespace tinycoro {
 
             // this is a cancellation function
             // with this callback you can cancel the timeout
-            std::function<bool()> _cancellationCallback;
+            std::function<bool()> _cancellationCallback{nullptr};
 
             std::mutex _mtx;
         };

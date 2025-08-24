@@ -8,6 +8,7 @@
 
 #include <coroutine>
 #include <type_traits>
+#include <utility>
 
 namespace tinycoro {
     
@@ -105,11 +106,7 @@ namespace tinycoro {
 
             GeneratorT& operator=(GeneratorT&& other) noexcept
             {
-                if (std::addressof(other) != this)
-                {
-                    destroy();
-                    _hdl = std::exchange(other._hdl, nullptr);
-                }
+                GeneratorT{std::move(other)}.swap(*this);
                 return *this;
             }
 
@@ -118,6 +115,11 @@ namespace tinycoro {
             [[nodiscard]] auto begin() const { return GeneratorIterator<PromiseT>{_hdl}; }
 
             [[nodiscard]] auto end() const { return typename GeneratorIterator<PromiseT>::Sentinel{}; }
+
+            void swap(GeneratorT& other) noexcept
+            {
+                std::swap(_hdl, other._hdl);
+            } 
 
         private:
             void destroy()
@@ -129,7 +131,7 @@ namespace tinycoro {
                 }
             }
 
-            CoroHandleType _hdl;
+            CoroHandleType _hdl{nullptr};
         };
     } // namespace detail
 
