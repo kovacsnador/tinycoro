@@ -8,68 +8,43 @@ on:
 
 jobs:
   build:
-    runs-on: ubuntu-latest  # Or any supported runner, used to set up the container environment
-    container:
-      image: debian:latest  # The container image to use
+    runs-on: ubuntu-latest
 
     steps:
-    - name: Install Git
-      run: apt update && apt install -y git
-
-    - name: Verify Git Installation
-      run: git --version
-      
     - uses: actions/checkout@v4
       with:
         submodules: recursive
 
-    - name: Install Clang 16, CMake
+    - name: Install dependencies
       run: |
-          apt-get update -y
-          apt-get install -y clang lld cmake python3
-          ln -sf /usr/bin/python3 /usr/bin/python
-          update-alternatives --install /usr/bin/clang clang /usr/bin/clang 100 --force
-          update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++ 100 --force
+        sudo apt update
+        sudo apt install -y clang-16 lld cmake python3 python3-pip
+        sudo ln -sf /usr/bin/python3 /usr/bin/python
 
-    - name: Verify python version
-      run: python --version
-
-    - name: Add safe repo directory
+    - name: Verify installations
       run: |
-           git init
-           git config --global --add safe.directory /__w/tinycoro/tinycoro
+        clang --version
+        python --version
 
-    - name: Initialize Git submodules
-      run: git submodule update --init --recursive
-      working-directory: ${{ github.workspace }}
-
-    - name: Debug Git Config
-      run: cat .git/config
-      working-directory: ${{ github.workspace }}
-
-    - name: Debug Submodules
-      run: git submodule status
-      working-directory: ${{ github.workspace }}
-
-    - name: Configure with coverage flags using Clang
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_COMPILER=clang++-16 -D CMAKE_C_COMPILER=clang-16 -D WithASAN=ON -D BUILD_WITH_DIAGNOSTICS=ON
-      working-directory: ${{ github.workspace }}
+    - name: Configure project with Clang and ASAN
+      run: cmake -B build \
+        -D CMAKE_BUILD_TYPE=Debug \
+        -D CMAKE_CXX_COMPILER=clang++-16 \
+        -D CMAKE_C_COMPILER=clang-16 \
+        -D WithASAN=ON \
+        -D BUILD_WITH_DIAGNOSTICS=ON
 
     - name: Build
       run: cmake --build build
-      working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
       run: ./build/test/tinycoro_tests
-      working-directory: ${{ github.workspace }}
 
     - name: Run Examples
       run: ./build/tinycoro_example
-      working-directory: ${{ github.workspace }}
 
-    - name: Run echo server and stress test
+    - name: Run Echo Server and Stress Test
       run: |
         ./build/example/echo_server_example/tinycoro_echo_server &
         python ./example/echo_server_example/echo_server_stress_test.py 1000 true &
         wait
-      working-directory: ${{ github.workspace }}
