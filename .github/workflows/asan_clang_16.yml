@@ -23,22 +23,13 @@ jobs:
       with:
         submodules: recursive
 
-    - name: Install Clang 16, CMake
+    - name: Install Clang 16 and CMake
       run: |
-           apt-get update -y
-           apt update -y
-           apt-get upgrade -y
-           apt install -y wget lsb-release software-properties-common
-           wget https://apt.llvm.org/llvm-snapshot.gpg.key
-           apt-key add llvm-snapshot.gpg.key
-           wget -O - https://apt.llvm.org/llvm-snapshot.gpg.key | gpg --dearmor -o /usr/share/keyrings/llvm-snapshot.gpg
-           echo "deb [signed-by=/usr/share/keyrings/llvm-snapshot.gpg] http://apt.llvm.org/bookworm/ llvm-toolchain-bookworm-16 main" | tee /etc/apt/sources.list.d/llvm.list
-           apt update -y
-           apt install -y python3
-           ln -sf /usr/bin/python3 /usr/bin/python  # Create a symlink for python
-           apt install -y clang-16 lld-16 cmake
-           update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
-           update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
+        apt-get update -y
+        apt-get install -y python3 cmake clang-16 lld-16 wget lsb-release
+        ln -sf /usr/bin/python3 /usr/bin/python
+        update-alternatives --install /usr/bin/clang clang /usr/bin/clang-16 100
+        update-alternatives --install /usr/bin/clang++ clang++ /usr/bin/clang++-16 100
 
     - name: Verify python version
       run: python --version
