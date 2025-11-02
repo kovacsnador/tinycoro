@@ -53,7 +53,7 @@ namespace tinycoro {
 
             using value_type = typename promise_type::value_type;
 
-            using initial_cancellable_policy = InitialCancellablePolicyT;
+            using initial_cancellable_policy_t = InitialCancellablePolicyT;
 
             template <typename... Args>
                 requires std::constructible_from<coro_hdl_type, Args...>
@@ -108,21 +108,15 @@ namespace tinycoro {
                 _hdl.promise().SetStopSource(std::forward<T>(arg));
             }
 
-            //template <std::regular_invocable T>
-            void SetCurrentAwaitable(void* awaitable) noexcept
-            {
-                _hdl.promise().SetCurrentAwaitable(awaitable);
-            }
+            // template <std::regular_invocable T>
+            void SetCurrentAwaitable(void* awaitable) noexcept { _hdl.promise().SetCurrentAwaitable(awaitable); }
 
-            [[nodiscard]] address_t Address() const noexcept { return _hdl.address(); }
+            [[nodiscard]] detail::address_t Address() const noexcept { return _hdl.address(); }
 
             // Release the coroutine_handle object
-            auto Release() noexcept { return std::exchange(_hdl, nullptr); }
+            [[nodiscard]] constexpr auto Release() noexcept { return std::exchange(_hdl, nullptr); }
 
-            void swap(CoroTask& other) noexcept
-            {
-                std::swap(other._hdl, _hdl);
-            }
+            constexpr void swap(CoroTask& other) noexcept { std::swap(other._hdl, _hdl); }
 
         private:
             // Only used by MakeBound() to save

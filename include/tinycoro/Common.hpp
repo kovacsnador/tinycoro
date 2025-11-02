@@ -70,6 +70,10 @@ namespace tinycoro {
         {
         };
 
+        // this is the unique address type of
+        // an std::coroutine_handler::address
+        using address_t = void*;
+
     } // namespace detail
 
     enum class ENotifyPolicy
@@ -81,10 +85,6 @@ namespace tinycoro {
     struct VoidType
     {
     };
-
-    // this is the unique address type of
-    // an std::coroutine_handler::address
-    using address_t = void*;
 
     // The pause handler callback signature
     // used mainly by the scheduler
@@ -110,9 +110,11 @@ namespace tinycoro {
 
         template <typename T>
         concept IsSchedulable = requires (T t) {
-            { t->Resume() } -> std::same_as<ETaskResumeState>;
-            { t->SetPauseHandler(PauseHandlerCallbackT{}) } -> std::same_as<void>;
-            typename T::element_type;
+            { t.Release() };
+            { t.Address() } -> std::same_as<detail::address_t>;
+            typename T::value_type;
+            typename T::promise_type;
+            typename T::initial_cancellable_policy_t;
         };
 
         template <typename T>
@@ -294,6 +296,7 @@ namespace tinycoro {
     struct initial_cancellable_t : std::true_type
     {
     };
+    
     struct noninitial_cancellable_t : std::false_type
     {
     };

@@ -4,6 +4,7 @@
 #include <gmock/gmock.h>
 
 #include <tinycoro/PauseHandler.hpp>
+#include <tinycoro/Common.hpp>
 
 #include "CoroutineHandleMock.h"
 
@@ -30,11 +31,12 @@ namespace tinycoro { namespace test {
         using value_type = T;
     };
 
-    template <typename T>
+    template <typename T, typename CancellableT = tinycoro::initial_cancellable_t>
     struct TaskMock
     {
         using promise_type = PromiseMock<T>;
         using value_type = T;
+        using initial_cancellable_policy_t = CancellableT;
 
         TaskMock()
         : mock{std::make_shared<TaskMockImpl<T>>()}
