@@ -33,6 +33,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
     - [InlineTask](#inlinetask)
     - [Cancellation](#cancellation)
     - [MakeBound](#makebound)
+    - [Detach](#detach)
     - [Task with return value](#returnvaluetask)
     - [Task with exception](#exceptiontask)
     - [Nested task](#nestedtask)
@@ -686,7 +687,7 @@ void Example_MakeBound()
 ```
 
 #### ⚠️General recomendation
-Use statefull lambda functions (lambdas with capture block) with caution in a coroutine environment. They can cause lifetime issues. A better approach is to pass the necessary dependencies explicitly through function parameters, like so. `[](auto& dep1, auto& dep2... ) -> tinycoro::Task<void> {...}; `  
+Use statefull lambda functions (lambdas with capture block) with caution in a coroutine environment. They can cause lifetime issues. A better approach is to pass the necessary dependencies explicitly through function parameters, like so. `[](auto& dep1, auto& dep2... ) -> tinycoro::Task<void> {...}; `
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
@@ -706,6 +707,46 @@ struct MyClass
         return scheduler.Enqueue(tinycoro::MakeBound(coro));
     }
 };
+```
+
+### `Detach`
+If you want to start a coroutine task without waiting for its completion or result, you can use the `tinycoro::Detach` wrapper. This allows you to run *fire-and-forget* style tasks that execute independently in the background.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+void Example_Detach()
+{
+    tinycoro::Scheduler scheduler;
+
+    // Starting a task without waiting for its result.
+    tinycoro::AllOf(scheduler, tinycoro::Detach{task()});
+}
+```
+
+The `tinycoro::Detach` wrapper informs the scheduler that the wrapped task should run independently of the caller.
+This means:
+
+The task is scheduled and executed like a normal task.
+It does not block the caller or return a result.
+Ideal for background jobs such as logging, monitoring, or cleanup routines.
+
+If you need control over its lifetime, make sure the detached task can be cancelled or stopped safely when required — for example, using a shared cancellation token or other signaling mechanism.
+
+```cpp
+tinycoro::Task<> BackgroundTask()
+{
+    // Get the associated stop token (e.g. provided by the scheduler)
+    auto stopToken = co_await tinycoro::StopTokenAwaiter{};
+
+    while(stopToken.stop_requested() == false)
+    {
+        // do something...
+
+        // wait for one minute, while also listening for cancellation
+        co_await tinycoro::SleepForCancellable(softClock, 1min, stopToken);
+    }
+}
 ```
 
 ### `ReturnValueTask`
