@@ -97,12 +97,8 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_stop_source)
     };
 
     // create detached tasks
-    std::vector<decltype(tinycoro::Detach{task()})> vec;
-    vec.reserve(count);
     for(size_t i = 0; i < count; ++i)
-        vec.emplace_back(task());
-
-    tinycoro::AllOf(scheduler, std::move(vec));
+        tinycoro::AllOf(scheduler, tinycoro::Detach{task()});
 
     // this test is for the sanitizers
 }
