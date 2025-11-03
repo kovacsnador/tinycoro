@@ -121,6 +121,10 @@ namespace tinycoro {
         template <typename TupleT, typename StopSourceT = std::stop_source>
         class InlineScheduler
         {
+            static_assert([]<typename... T>(std::type_identity<std::tuple<T...>>) {
+                    return (!detail::IsDetached<T>::value && ...);
+                }(std::type_identity<TupleT>{}), "Detached task is not allowed in inline context.");
+
         public:
             // constructor
             InlineScheduler(TupleT tuple)
@@ -305,6 +309,8 @@ namespace tinycoro {
         template <concepts::Iterable ContainerT, typename StopSourceT>
         void WaitInlineImplContainer(ContainerT&& container, StopSourceT stopSource)
         {
+            static_assert(!detail::IsDetached<typename std::decay_t<ContainerT>::value_type>::value, "Detached task is not allowed in inline context.");
+
             std::exception_ptr     exception{};
             helper::AutoResetEvent event{};
 

@@ -74,3 +74,31 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
     EXPECT_TRUE(std::chrono::system_clock::now() - start < duration);
     EXPECT_EQ(cc, 1);
 }
+
+TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_stop_source)
+{
+    auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+
+    auto simpleTask = []() -> tinycoro::Task<int32_t>{
+        co_return 42;
+    };
+
+    auto task = [&]() -> tinycoro::Task<> {
+        // close the scheduler
+        scheduler.GetStopSource().request_stop();
+
+        for(size_t i=0; i < count; ++i)
+        {
+            auto res = co_await tinycoro::AllOfAwait(scheduler, simpleTask());
+            EXPECT_FALSE(res.has_value());
+        }
+    };
+
+    // create detached tasks
+    for(size_t i = 0; i < count; ++i)
+        tinycoro::AllOf(scheduler, tinycoro::Detach{task()});
+
+    // this test is for the sanitizers
+}

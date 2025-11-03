@@ -13,6 +13,8 @@
 #include "TaskResumer.hpp"
 #include "Promise.hpp"
 #include "Common.hpp"
+#include "DetachedTask.hpp"
+#include "DetachedFuture.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -116,10 +118,7 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] auto& PauseState() noexcept { return _hdl.promise().pauseState; }
 
-        void swap(SchedulableTaskT& other) noexcept
-        {
-            std::swap(other._hdl, _hdl);
-        }
+        void swap(SchedulableTaskT& other) noexcept { std::swap(other._hdl, _hdl); }
 
     private:
         void Destroy() noexcept
@@ -184,8 +183,8 @@ namespace tinycoro { namespace detail {
     }
 
     struct OnTaskFinishCallbackWrapper
-    {   
-        template<typename PromiseT, typename FutureStateT>
+    {
+        template <typename PromiseT, typename FutureStateT>
         [[nodiscard]] constexpr static auto Get() noexcept
         {
             // Returns the function pointer
@@ -195,12 +194,12 @@ namespace tinycoro { namespace detail {
         }
     };
 
-    template<typename ReturnT, template <typename> class FutureStateT>
+    template <typename ReturnT, template <typename> class FutureStateT>
     struct FutureTypeGetter
-    {   
+    {
         // futureReturn_t is packed in a std::optinal
         using futureReturn_t = typename detail::FutureReturnT<ReturnT>::value_type;
-        
+
         // this is the future state type
         //
         // e.g. std::promise<std::optinal<int32_t>>
@@ -208,24 +207,45 @@ namespace tinycoro { namespace detail {
 
         // and this is the corresponding future type
         //
-        // e.g. std::future<std::optinal<int32_t>> 
-        using future_t = decltype(std::declval<futureState_t>().get_future()); 
+        // e.g. std::future<std::optinal<int32_t>>
+        using future_t = decltype(std::declval<futureState_t>().get_future());
     };
 
     // The schedulable task factory function.
     //
     // Intented to save and connect the future state
     // (e.g std::promise<>) object with the corouitne itself.
-    template <typename OnFinishCallbackT, concepts::IsCorouitneTask CoroT, concepts::FutureState FutureStateT>
+    template <typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
         requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
-    auto MakeSchedulableTask(CoroT&& coro, FutureStateT&& futureState)
+    auto MakeSchedulableTask(CoroT&& coro, FutureStateT&& futureState) noexcept
+    {
+        if constexpr (tinycoro::detail::IsDetached<CoroT>::value)
+        {
+            // we want a detached task
+            //
+            // set the future to ready (no waiting on user side)
+            futureState.set_value(std::nullopt);
+
+            // create the schedulable task
+            return MakeSchedulableTaskImpl<OnFinishCallbackT>(std::move(coro), detail::DetachedPromise{});
+        }
+        else
+        {
+            // create the schedulable task
+            return MakeSchedulableTaskImpl<OnFinishCallbackT>(std::move(coro), std::move(futureState));
+        }
+    }
+
+    template <typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
+        requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
+    auto MakeSchedulableTaskImpl(CoroT&& coro, FutureStateT&& futureState) noexcept
     {
         // create std::corouitne_handle with
         // the common promise type
         auto  originalHandle = coro.Release();
         auto& promise        = originalHandle.promise();
 
-        using promise_t = std::remove_cvref_t<CoroT>::promise_type;
+        using promise_t     = std::remove_cvref_t<CoroT>::promise_type;
         using futureState_t = std::remove_cvref_t<FutureStateT>;
 
         // save the future state inside
@@ -236,9 +256,9 @@ namespace tinycoro { namespace detail {
         //
         // This is the right place to set it because this coroutine will act as a root
         // in the coroutine chain.
-        promise.MakePauseHandler(nullptr, CoroT::initial_cancellable_policy::value);
+        promise.MakePauseHandler(nullptr, CoroT::initial_cancellable_policy_t::value);
 
-        // create the common task
+        // create the universal schedulable task
         return detail::SchedulableTask{std::addressof(promise)};
     }
 

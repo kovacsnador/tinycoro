@@ -73,7 +73,7 @@ namespace tinycoro {
 
             template <template <typename> class FutureStateT = std::promise,
                       typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
-                      concepts::IsCorouitneTask... CoroTasksT>
+                      concepts::IsSchedulable... CoroTasksT>
                 requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
             [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
             {
@@ -112,15 +112,14 @@ namespace tinycoro {
             }
 
         private:
-            template <template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsCorouitneTask CoroTaksT>
-                requires (!std::is_reference_v<CoroTaksT>) && concepts::FutureState<FutureStateT<void>>
-            [[nodiscard]] auto EnqueueImpl(CoroTaksT&& coro)
+            template <template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsSchedulable CoroTaskT>
+                requires (!std::is_reference_v<CoroTaskT>) && concepts::FutureState<FutureStateT<void>>
+            [[nodiscard]] auto EnqueueImpl(CoroTaskT&& coro)
             {
-                using futureState_t = detail::FutureTypeGetter<typename CoroTaksT::value_type, FutureStateT>::futureState_t;
+                using futureState_t = detail::FutureTypeGetter<typename CoroTaskT::value_type, FutureStateT>::futureState_t;
 
                 futureState_t futureState;
-
-                auto future = futureState.get_future();
+                auto          future = futureState.get_future();
 
                 if (_stopSource.stop_requested() == false && coro.Address())
                 {
@@ -130,6 +129,11 @@ namespace tinycoro {
 
                     // push the task into the queue
                     helper::PushTask(std::move(task), _sharedTasks, _stopSource);
+                }
+                else
+                {
+                    // coroutine task is not scheduled.
+                    futureState.set_value(std::nullopt);
                 }
 
                 return future;
