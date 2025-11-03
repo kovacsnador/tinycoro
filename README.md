@@ -737,7 +737,7 @@ If you need control over its lifetime, make sure the detached task can be cancel
 tinycoro::Task<> BackgroundTask()
 {
     // Get the associated stop token (e.g. provided by the scheduler)
-    auto stopToken = co_await tinycoro::StopTokenAwaiter{};
+    auto stopToken = co_await tinycoro::this_coro::stop_token();
 
     while(stopToken.stop_requested() == false)
     {
