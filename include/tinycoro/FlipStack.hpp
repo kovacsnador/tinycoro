@@ -78,7 +78,11 @@ namespace tinycoro { namespace detail {
         }
 
         // Can only be pulled from the inactive stack
-        std::tuple<NodeT, NodeT> TryPull() noexcept { return {TryPullStack(0), TryPullStack(1)}; }
+        std::tuple<NodeT, NodeT> TryPull() noexcept
+        {
+            std::scoped_lock lock{_mtx};
+            return {TryPullStack(0), TryPullStack(1)};
+        }
 
         void Notify() noexcept
         {
@@ -107,6 +111,8 @@ namespace tinycoro { namespace detail {
 
         NodeT PopImpl(auto index) noexcept
         {
+            std::scoped_lock lock{_mtx};
+            
             auto head = _stacks[index].load(std::memory_order::acquire);
             do
             {
@@ -137,7 +143,7 @@ namespace tinycoro { namespace detail {
 
         auto TryPullStack(size_t index) noexcept
         {
-            auto head = _stacks[index].exchange(nullptr);
+            /*auto head = _stacks[index].exchange(nullptr);
 
             if (head)
             {
@@ -153,7 +159,9 @@ namespace tinycoro { namespace detail {
                 Push(temp, index);
             }
 
-            return head;
+            return head;*/
+
+            return _stacks[index].exchange(nullptr);
         }
 
         std::array<std::atomic<NodeT>, 2> _stacks = {nullptr, nullptr};
@@ -163,6 +171,8 @@ namespace tinycoro { namespace detail {
         // 1 => _stack2
         std::atomic<size_t> _stackIndex{0};
         std::atomic<size_t> _trafficFlag{0};
+
+        std::mutex _mtx;
 
         deleter_t _deleter{nullptr};
     };

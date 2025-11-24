@@ -3,6 +3,7 @@
 #include <memory>
 #include <stop_token>
 #include <thread>
+#include <latch>
 
 #include "tinycoro/FlipStack.hpp"
 
@@ -149,15 +150,13 @@ TEST_F(FlipStackTest, FlipStackTest_try_pull)
     auto [head1, head2] = stack.TryPull();
     EXPECT_EQ(head2, nullptr);
 
-    for(int32_t i=7; i > 0; --i)
+    for(int32_t i = 8; i > 0; --i)
     {
         EXPECT_EQ(head1->value, i);
         head1 = head1->next;
     }
 
-    auto [node, hint] = stack.PopWait(std::stop_token{});
-    EXPECT_EQ(node->value, 8);
-    EXPECT_EQ(hint, 1);
+    EXPECT_TRUE(stack.Empty());
 }
 
 TEST_F(FlipStackTest, FlipStackTest_deleter)
@@ -364,7 +363,11 @@ TEST_P(FlipStackDeleterTest, FlipStackTest_multi_threaded_trypull_delete)
 
     std::atomic<size_t> count{GetParam()};
 
+    std::stop_source ss;
+
     auto stack = std::make_unique<tinycoro::detail::FlipStack<FlipStackNode<int32_t>*>>([](auto p) { Deleter(p); });
+
+    std::latch latch{8};
 
     auto producer = [&] {
         for (size_t i = 0; i < count; ++i)
@@ -379,19 +382,19 @@ TEST_P(FlipStackDeleterTest, FlipStackTest_multi_threaded_trypull_delete)
             Delete(head1);
             Delete(head2);
         }
+
+        latch.arrive_and_wait();
+
+        ss.request_stop();
+        stack->Notify();
     };
 
     auto consumer = [&] {
-        for (size_t i = 0; i < GetParam(); ++i)
+        while (ss.stop_requested() == false)
         {
-            auto [node, hint] = stack->PopWait(std::stop_token{});
-            stack->Push(node, hint);
-        }
-
-        for (size_t i = 0; i < GetParam(); ++i)
-        {
-            auto [node, hint] = stack->PopWait(std::stop_token{});
-            stack->Push(node, hint);
+            auto [node, hint] = stack->PopWait(ss.get_token());
+            if(node)
+                stack->Push(node, hint);
         }
     };
 
