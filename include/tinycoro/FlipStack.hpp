@@ -112,7 +112,7 @@ namespace tinycoro { namespace detail {
         NodeT PopImpl(auto index) noexcept
         {
             std::scoped_lock lock{_mtx};
-            
+
             auto head = _stacks[index].load(std::memory_order::acquire);
             do
             {
@@ -164,7 +164,7 @@ namespace tinycoro { namespace detail {
             return _stacks[index].exchange(nullptr);
         }
 
-        std::array<std::atomic<NodeT>, 2> _stacks = {nullptr, nullptr};
+        std::array<std::atomic<NodeT>, 2> _stacks{nullptr, nullptr};
 
         // integer flag to indicate active stack for popping
         // and pushing  0 => _stack1
