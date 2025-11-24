@@ -7,6 +7,7 @@
 
 #include <atomic>
 #include <ranges>
+#include <array>
 
 #include "Common.hpp"
 
