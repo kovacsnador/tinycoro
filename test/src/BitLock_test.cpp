@@ -3,6 +3,7 @@
 #include <thread>
 #include <ranges>
 #include <mutex>
+#include <algorithm>
 
 #include "tinycoro/BitLock.hpp"
 
