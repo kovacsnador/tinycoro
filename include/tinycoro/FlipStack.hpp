@@ -9,6 +9,7 @@
 #include <ranges>
 
 #include "Common.hpp"
+#include "BitLock.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -33,18 +34,18 @@ namespace tinycoro { namespace detail {
                 Cleanup(it.load(std::memory_order::relaxed), _deleter);
         }
 
-        void Push(NodeT node) noexcept { PushImpl(node, _stacks[_stackIndex.load(std::memory_order::relaxed)]); }
+        void Push(NodeT node) noexcept { PushImpl(node, _stacks[StackIndex()]); }
 
         void Push(NodeT node, int32_t hint) noexcept { PushImpl(node, _stacks[hint]); }
 
         // pop can be called only from one thread!
         // pop can use the currently active stack
-        std::tuple<NodeT, int32_t> Pop() noexcept
+        [[nodiscard]] std::tuple<NodeT, int32_t> Pop() noexcept
         {
             // Try to pop something from the stacks
             for (size_t i = 0; i < _stacks.size(); ++i)
             {
-                auto index = _stackIndex.load(std::memory_order::relaxed);
+                auto index = StackIndex();
                 // try to pull from the currectly active stack
                 auto node = PopImpl(index);
 
@@ -57,7 +58,7 @@ namespace tinycoro { namespace detail {
             return {nullptr, 0};
         }
 
-        std::tuple<NodeT, int32_t> PopWait(auto stopToken) noexcept
+        [[nodiscard]] std::tuple<NodeT, int32_t> PopWait(auto stopToken) noexcept
         {
             while (stopToken.stop_requested() == false)
             {
@@ -80,7 +81,6 @@ namespace tinycoro { namespace detail {
         // Can only be pulled from the inactive stack
         std::tuple<NodeT, NodeT> TryPull() noexcept
         {
-            std::scoped_lock lock{_mtx};
             return {TryPullStack(0), TryPullStack(1)};
         }
 
@@ -90,7 +90,7 @@ namespace tinycoro { namespace detail {
             _trafficFlag.notify_one();
         }
 
-        bool Empty() const noexcept
+        [[nodiscard]] bool Empty() const noexcept
         {
             bool empty{true};
             for (auto& it : _stacks)
@@ -109,7 +109,7 @@ namespace tinycoro { namespace detail {
             Notify();
         }
 
-        NodeT PopImpl(auto index) noexcept
+        [[nodiscard]] NodeT PopImpl(auto index) noexcept
         {
             std::scoped_lock lock{_mtx};
 
@@ -123,7 +123,7 @@ namespace tinycoro { namespace detail {
             // check if this was the last elem in the stack
             // if yes, we flip the active stack
             if (head == nullptr || head->next == nullptr)
-                _stackIndex.exchange(!index, std::memory_order::release);
+                FlipStackIndex();
 
             if (head)
                 head->next = nullptr;
@@ -141,39 +141,36 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        auto TryPullStack(size_t index) noexcept
+        [[nodiscard]] auto TryPullStack(size_t index) noexcept
         {
-            /*auto head = _stacks[index].exchange(nullptr);
+            std::scoped_lock lock{_mtx};
+            return _stacks[index].exchange(nullptr, std::memory_order::release);
+        }
 
-            if (head)
-            {
-                // If the inactive stack has nodes, take the head node,
-                // advance the head pointer, and push the original head
-                // back into the queue. This ensures the node remains valid
-                // and avoids a race with PopImpl(), which might otherwise
-                // try to pop the same head concurrently.
-                auto temp = head;
-                head      = head->next;
+        // Gets the stack index,
+        // by checking the first bit
+        [[nodiscard]] size_t StackIndex() const noexcept
+        {
+            return 1ul & _stackIndex.load(std::memory_order::relaxed);
+        }
 
-                // push back temp
-                Push(temp, index);
-            }
-
-            return head;*/
-
-            return _stacks[index].exchange(nullptr);
+        void FlipStackIndex() noexcept
+        {
+            _stackIndex.fetch_xor(1ul, std::memory_order::release);
         }
 
         std::array<std::atomic<NodeT>, 2> _stacks{nullptr, nullptr};
 
-        // integer flag to indicate active stack for popping
-        // and pushing  0 => _stack1
-        // 1 => _stack2
-        std::atomic<size_t> _stackIndex{0};
-        std::atomic<size_t> _trafficFlag{0};
+        // First bit contanis the stack index. 0 => _stack1, 1 => _stack2
+        // 2. bit contains the lock flag. If it's set the resource lock
+        // is active.
+        std::atomic<uint32_t> _stackIndex{0};
+        std::atomic<uint32_t> _trafficFlag{0};
 
-        std::mutex _mtx;
+        // the 2 bit locker mutex
+        BitLock<uint32_t, 1> _mtx{_stackIndex};
 
+        // custom deleter for stucked elements
         deleter_t _deleter{nullptr};
     };
 

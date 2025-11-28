@@ -482,7 +482,7 @@ TEST(FlipStackTests, MultipleProducersSingleConsumer_PopWaitStopToken)
     bool stopped{false};
 
     std::thread consumer{[&] {
-        stack.PopWait(ss.get_token());
+        std::ignore = stack.PopWait(ss.get_token());
         stopped = true;
     }};
 
