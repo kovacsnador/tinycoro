@@ -19,20 +19,23 @@ namespace tinycoro { namespace detail {
             assert(_workers.size());
         }
 
-        template <typename T>
-        void Push(T&& task) noexcept
+        template <typename... Args>
+        void Push(Args&&... args) noexcept
         {
-            // forward it to the next worker
-            _workers[_current++]->Push(std::forward<T>(task));
-
             if (_current >= _workers.size())
                 _current = 0;
+
+            // forward it to the next worker
+            _workers[_current++]->Push(std::forward<Args>(args)...);  
         }
 
         bool Redistribute(auto worker) noexcept
         {
             for (auto& it : _workers)
             {
+                if(it.get() == worker)
+                    continue;
+
                 auto [list1, list2] = it->Pull();
 
                 if (list1 || list2)
@@ -71,7 +74,7 @@ namespace tinycoro { namespace detail {
         }
 
         std::span<WorkerT> _workers;
-        std::atomic<uint32_t> _current{};
+        uint32_t _current{};
     };
 
 }} // namespace tinycoro::detail

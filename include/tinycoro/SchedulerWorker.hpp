@@ -111,9 +111,10 @@ namespace tinycoro { namespace detail {
             _Cleanup(_pausedTasks.begin());
         }
 
-        void Push(auto promisePtr) noexcept
+        template<typename... Args>
+        void Push(Args&&... args) noexcept
         {
-            _tasks.Push(promisePtr);
+            _tasks.Push(std::forward<Args>(args)...);
         }
 
         [[nodiscard]] auto Pull() noexcept
@@ -149,8 +150,8 @@ namespace tinycoro { namespace detail {
 
                 // if there is no tasks try to
                 // ask the dispatcher for redistribution
-                if(_tasks.Empty())
-                    _dispatcher.Redistribute(this);
+                //if(_tasks.Empty())
+                //    _dispatcher.Redistribute(this);
 
 
                 /*if (_sharedTasks.try_pop(task))
@@ -273,6 +274,7 @@ namespace tinycoro { namespace detail {
                     
                     if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
+                        //_dispatcher.Push(task.release());
                         _tasks.Push(task.release(), hint);
                         return;
 
@@ -381,10 +383,10 @@ namespace tinycoro { namespace detail {
                         // with the current promisePtr execution
                         _cachedTasks.push(task.release());*/
 
-                        //_dispatcher.Push(taskPtr);
-                        //_tasks.Push(task.release(), hint);
+                        //_dispatcher.Push(task.release());
+                        _dispatcher.Push(task.release(), hint);
 
-                        continue;
+                        //continue;
                     }
                     return;
                 }
@@ -535,7 +537,7 @@ namespace tinycoro { namespace detail {
             RESUMING // want to resume task from pause
         };*/
 
-        DispatcherT<std::unique_ptr<SchedulerWorker>>& _dispatcher;
+        DispatcherT<std::unique_ptr<SchedulerWorker>> _dispatcher;
 
         detail::FlipStack<typename Task_t::element_type*> _tasks;
 
