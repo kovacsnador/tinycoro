@@ -112,7 +112,7 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] NodeT PopImpl(auto index) noexcept
         {
-            std::scoped_lock lock{_mtx};
+            //std::scoped_lock lock{_mtx};
 
             auto head = _stacks[index].load(std::memory_order::acquire);
             do
@@ -144,7 +144,7 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] auto TryPullStack(size_t index) noexcept
         {
-            std::scoped_lock lock{_mtx};
+            //std::scoped_lock lock{_mtx};
             return _stacks[index].exchange(nullptr, std::memory_order::release);
         }
 

@@ -7,6 +7,7 @@
 #define TINY_CORO_DISPATCHER_HPP
 
 #include <cassert>
+#include <span>
 
 namespace tinycoro { namespace detail {
     template <typename WorkerT>
@@ -36,8 +37,8 @@ namespace tinycoro { namespace detail {
 
                 if (list1 || list2)
                 {
-                    _Distribute(list1, worker, it);
-                    _Distribute(list2, worker, it);
+                    _Distribute(list1, it, worker);
+                    _Distribute(list2, it, worker);
 
                     return true;
                 }
@@ -70,7 +71,7 @@ namespace tinycoro { namespace detail {
         }
 
         std::span<WorkerT> _workers;
-        size_t             _current{};
+        std::atomic<uint32_t> _current{};
     };
 
 }} // namespace tinycoro::detail

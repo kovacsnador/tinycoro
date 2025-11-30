@@ -268,10 +268,12 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
+
+                    Task_t task{promisePtr};
                     
                     if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
-                        _tasks.Push(promisePtr, hint);
+                        _tasks.Push(task.release(), hint);
                         return;
 
                         // no stop was requested,
@@ -279,6 +281,7 @@ namespace tinycoro { namespace detail {
                         /*if (_sharedTasks.try_push(std::move(task)))
                         {
                             // push succeed
+                            
                             // we simply return
                             return;
                         }
@@ -332,9 +335,6 @@ namespace tinycoro { namespace detail {
                         }*/
                     }
                 }
-
-                // stop was called, destroy the task
-                Task_t destroyer{promisePtr};
             };
         }
 
@@ -382,7 +382,9 @@ namespace tinycoro { namespace detail {
                         _cachedTasks.push(task.release());*/
 
                         //_dispatcher.Push(taskPtr);
-                        _tasks.Push(task.release(), hint);
+                        //_tasks.Push(task.release(), hint);
+
+                        continue;
                     }
                     return;
                 }
@@ -533,7 +535,7 @@ namespace tinycoro { namespace detail {
             RESUMING // want to resume task from pause
         };*/
 
-        DispatcherT<std::unique_ptr<SchedulerWorker>> _dispatcher;
+        DispatcherT<std::unique_ptr<SchedulerWorker>>& _dispatcher;
 
         detail::FlipStack<typename Task_t::element_type*> _tasks;
 
