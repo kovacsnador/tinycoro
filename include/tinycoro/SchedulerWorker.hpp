@@ -13,6 +13,7 @@
 #include "LinkedPtrQueue.hpp"
 #include "AtomicPtrStack.hpp"
 #include "Common.hpp"
+#include "FlipStack.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -72,17 +73,17 @@ namespace tinycoro { namespace detail {
                 std::ignore = queue.try_pop(destroyer);
             }
         }
-
     } // namespace helper
 
-    template <typename QueueT>
+    template <template<typename> class DispatcherT, typename TaskT>
     class SchedulerWorker
     {
-        using Task_t = typename QueueT::value_type;
+        using Task_t = TaskT;
 
     public:
-        SchedulerWorker(QueueT& taskQueue, std::stop_token stopToken)
-        : _sharedTasks{taskQueue}
+        SchedulerWorker(auto& dispatcher, std::stop_token stopToken)
+        : _dispatcher{dispatcher}
+        , _tasks{[](auto p) { Task_t destroyer{p}; }}   // setup custom deleter
         , _stopToken{stopToken}
         , _thread{[this](std::stop_token st) { Run(st); }, stopToken}
         {
@@ -110,7 +111,22 @@ namespace tinycoro { namespace detail {
             _Cleanup(_pausedTasks.begin());
         }
 
-        void join() { _thread.join(); }
+        void Push(auto promisePtr) noexcept
+        {
+            _tasks.Push(promisePtr);
+        }
+
+        [[nodiscard]] auto Pull() noexcept
+        {
+            return _tasks.TryPull();
+        }
+
+        void Notify() noexcept
+        {
+            _tasks.Notify();
+        }
+
+        void join() noexcept { _thread.join(); }
 
         [[nodiscard]] auto joinable() const noexcept { return _thread.joinable(); }
 
@@ -119,8 +135,25 @@ namespace tinycoro { namespace detail {
         {
             while (stopToken.stop_requested() == false)
             {
-                Task_t task;
-                if (_sharedTasks.try_pop(task))
+                auto [promisePtr, hint] = _tasks.PopWait(stopToken);
+
+                if(promisePtr)
+                {
+                    // we have a valid task
+
+                    // Invoke the task.
+                    // wrapping the task into a Task_t
+                    // to make sure, there is a  proper destruction
+                    _InvokeTask(promisePtr, hint);
+                }
+
+                // if there is no tasks try to
+                // ask the dispatcher for redistribution
+                if(_tasks.Empty())
+                    _dispatcher.Redistribute(this);
+
+
+                /*if (_sharedTasks.try_pop(task))
                 {
                     // we could pop an element from the queue
                     //
@@ -190,23 +223,23 @@ namespace tinycoro { namespace detail {
                     // wrapping the task into a Task_t
                     // to make sure, there is a  proper destruction
                     _InvokeTask(std::move(task));
-                }
+                }*/
             }
 
             // close the notified cache
             // and make a proper task cleanup here
-            _Cleanup(_notifiedCachedTasks.close());
+            //_Cleanup(_notifiedCachedTasks.close());
 
             // clean up all the local cached tasks
             // this can be done asynchronously...
-            _Cleanup(_cachedTasks.begin());
+            //_Cleanup(_cachedTasks.begin());
         }
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
+        PauseHandlerCallbackT GeneratePauseResume(auto promisePtr, auto hint) noexcept
         {
-            return [this, promisePtr](ENotifyPolicy policy) {
+            return [this, promisePtr, hint](ENotifyPolicy policy) {
                 if (_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
@@ -235,12 +268,15 @@ namespace tinycoro { namespace detail {
 
                     // push back to the queue
                     // for resumption
-                    Task_t task{promisePtr};
+                    
                     if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
+                        _tasks.Push(promisePtr, hint);
+                        return;
+
                         // no stop was requested,
                         // and no immediate destroy policy.
-                        if (_sharedTasks.try_push(std::move(task)))
+                        /*if (_sharedTasks.try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -293,17 +329,22 @@ namespace tinycoro { namespace detail {
                                     return;
                                 }
                             }
-                        }
+                        }*/
                     }
                 }
+
+                // stop was called, destroy the task
+                Task_t destroyer{promisePtr};
             };
         }
 
-        inline void _InvokeTask(Task_t task) noexcept
+        inline void _InvokeTask(auto promisePtr, auto hint) noexcept
         {
+            Task_t task{promisePtr};
+
             // sets the corrent pause resume callback
             // before any resumption
-            task->SetPauseHandler(GeneratePauseResume(task.get()));
+            task.SetPauseHandler(GeneratePauseResume(promisePtr, hint));
 
             using enum ETaskResumeState;
             while (_stopToken.stop_requested() == false)
@@ -311,7 +352,7 @@ namespace tinycoro { namespace detail {
                 // resume the task and
                 // get the resume state from the
                 // coroutine (or from his continuation)
-                auto resumeState = task->Resume();
+                auto resumeState = task.Resume();
 
                 switch (resumeState)
                 {
@@ -324,7 +365,7 @@ namespace tinycoro { namespace detail {
                     if (_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
-                        if (_sharedTasks.try_push(std::move(task)))
+                        /*if (_sharedTasks.try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -338,13 +379,15 @@ namespace tinycoro { namespace detail {
                         //
                         // alternatively we could just continue here
                         // with the current promisePtr execution
-                        _cachedTasks.push(task.release());
+                        _cachedTasks.push(task.release());*/
+
+                        //_dispatcher.Push(taskPtr);
+                        _tasks.Push(task.release(), hint);
                     }
                     return;
                 }
                 case PAUSED: {
-
-                    auto expected = task->PauseState().load(std::memory_order_acquire);
+                    auto expected = task.PauseState().load(std::memory_order_acquire);
                     if (expected != EPauseState::NOTIFIED)
                     {
                         auto promisePtr = task.release();
@@ -371,8 +414,7 @@ namespace tinycoro { namespace detail {
 
                         pauseLock.unlock();
 
-                        // reassign the pointer
-                        // and continue with this task
+                        // put back into the guard
                         task.reset(promisePtr);
                     }
 
@@ -385,12 +427,12 @@ namespace tinycoro { namespace detail {
                 case DONE:
                     [[fallthrough]];
                 default:
-                    return;
+                    return;  // exit from the loop
                 }
             }
         }
 
-        inline void _TryToUploadCachedTasks() noexcept
+        /*inline void _TryToUploadCachedTasks() noexcept
         {
             // copy notified task to the cached tasks
             auto promisePtr = _notifiedCachedTasks.steal();
@@ -436,10 +478,10 @@ namespace tinycoro { namespace detail {
                     break;
                 }
             }
-        }
+        }*/
 
         // Enters the pop waiting state
-        inline void _WaitingAquire() noexcept
+        /*inline void _WaitingAquire() noexcept
         {
             // Change the state to WAITING...
             for (;;)
@@ -464,10 +506,10 @@ namespace tinycoro { namespace detail {
                     std::this_thread::yield();
                 }
             }
-        }
+        }*/
 
         // Exits the pop waiting state
-        inline void _WaitingRelease() noexcept { _popState.store(EPopWaitingState::IDLE, std::memory_order_release); }
+        //inline void _WaitingRelease() noexcept { _popState.store(EPopWaitingState::IDLE, std::memory_order_release); }
 
         void _Cleanup(auto promisePtr) noexcept
         {
@@ -482,18 +524,22 @@ namespace tinycoro { namespace detail {
         }
 
         // the queue which contains all the active tasks
-        QueueT& _sharedTasks;
+        //QueueT& _sharedTasks;
 
-        enum class EPopWaitingState : uint8_t
+        /*enum class EPopWaitingState : uint8_t
         {
             IDLE, // idle state
             WAITING, // worker is waiting for tasks
             RESUMING // want to resume task from pause
-        };
+        };*/
+
+        DispatcherT<std::unique_ptr<SchedulerWorker>> _dispatcher;
+
+        detail::FlipStack<typename Task_t::element_type*> _tasks;
 
         // Used to indicate if the worker is waiting for new task.
         // (need for task resumption after pause)
-        std::atomic<EPopWaitingState> _popState{EPopWaitingState::IDLE};
+        //std::atomic<EPopWaitingState> _popState{EPopWaitingState::IDLE};
 
         // mutext to protect the paused tasks map
         std::mutex _pausedTasksMtx;
@@ -506,14 +552,14 @@ namespace tinycoro { namespace detail {
         //
         // It's intented to mimic the basic task rotation
         // even with a full shared tasks queue.
-        detail::LinkedPtrQueue<typename Task_t::element_type> _cachedTasks;
+        //detail::LinkedPtrQueue<typename Task_t::element_type> _cachedTasks;
 
         // These pending tasks are waiting to be resumed.
         //
         // The tasks were in a paused state and have already been notified for resumption.
         // However, there was no space in the sharedTask queue,
         // so we store them here to guarantee their continued execution.
-        detail::AtomicPtrStack<typename Task_t::element_type> _notifiedCachedTasks;
+        //detail::AtomicPtrStack<typename Task_t::element_type> _notifiedCachedTasks;
 
         // The scheduler stop token
         std::stop_token _stopToken;

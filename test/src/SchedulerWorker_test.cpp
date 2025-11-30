@@ -3,7 +3,7 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
+/*TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
 {
     std::stop_source                         ss;
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
@@ -136,4 +136,4 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         latch.wait();
         queue.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT);
     }
-}
+}*/

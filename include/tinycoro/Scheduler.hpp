@@ -16,6 +16,7 @@
 #include <ranges>
 #include <cstddef>
 #include <memory_resource>
+#include <algorithm>
 
 #include "Common.hpp"
 #include "PauseHandler.hpp"
@@ -23,6 +24,7 @@
 #include "AtomicQueue.hpp"
 #include "SchedulerWorker.hpp"
 #include "SchedulableTask.hpp"
+#include "Dispatcher.hpp"
 
 namespace tinycoro {
 
@@ -34,9 +36,13 @@ namespace tinycoro {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
+            //, _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
+            , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.NotifyAll(); }}
+            , _workerThreads{workerThreadCount}
+            , _dispatcher{_workerThreads}
             {
-                _AddWorkers(workerThreadCount);
+                assert(workerThreadCount >= 1);
+                std::ranges::generate(_workerThreads, [&] { return std::make_unique<Worker_t>(_dispatcher, _stopSource.get_token()); });
             }
 
             ~CoroThreadPool()
@@ -57,9 +63,9 @@ namespace tinycoro {
                 // or access to invalid memory, if the code is extended in the future.
                 for (auto& it : _workerThreads)
                 {
-                    if (it.joinable())
+                    if (it->joinable())
                     {
-                        it.join();
+                        it->join();
                     }
                 }
             }
@@ -102,11 +108,15 @@ namespace tinycoro {
                 std::vector<future_t> futures;
                 futures.reserve(std::size(tasks));
 
-                for (auto&& task : tasks)
+                std::ranges::transform(tasks, std::back_inserter(futures), [&](auto& task) {
+                    return EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::move(task));
+                });
+
+                /*for (auto&& task : tasks)
                 {
                     // register tasks and collect all the futures
                     futures.emplace_back(EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::move(task)));
-                }
+                }*/
 
                 return futures;
             }
@@ -128,7 +138,8 @@ namespace tinycoro {
                     auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
                     // push the task into the queue
-                    helper::PushTask(std::move(task), _sharedTasks, _stopSource);
+                    //helper::PushTask(std::move(task), _sharedTasks, _stopSource);
+                    _dispatcher.Push(task.release());
                 }
                 else
                 {
@@ -139,18 +150,8 @@ namespace tinycoro {
                 return future;
             }
 
-            void _AddWorkers(size_t workerThreadCount)
-            {
-                assert(workerThreadCount >= 1);
-
-                for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
-                {
-                    _workerThreads.emplace_back(_sharedTasks, _stopSource.get_token());
-                }
-            }
-
             // currently active/scheduled tasks
-            detail::AtomicQueue<TaskT, CACHE_SIZE> _sharedTasks;
+            //detail::AtomicQueue<TaskT, CACHE_SIZE> _sharedTasks;
 
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
@@ -160,10 +161,14 @@ namespace tinycoro {
             std::stop_callback<std::function<void()>> _stopCallback;
 
             // Specialize the worker (thread) type
-            using Worker_t = SchedulerWorker<decltype(_sharedTasks)>;
+            using Worker_t = SchedulerWorker<detail::Dispatcher, TaskT>;
 
             // the worker threads which are running the tasks
-            std::list<Worker_t> _workerThreads;
+            // std::list<Worker_t> _workerThreads;
+            std::vector<std::unique_ptr<Worker_t>> _workerThreads;
+
+            // Task dispatcher
+            detail::Dispatcher<std::unique_ptr<Worker_t>> _dispatcher;
         };
 
         static constexpr uint64_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;

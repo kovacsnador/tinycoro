@@ -59,7 +59,7 @@ namespace tinycoro { namespace detail {
             return {nullptr, 0};
         }
 
-        [[nodiscard]] std::tuple<NodeT, int32_t> PopWait(auto stopToken) noexcept
+        [[nodiscard]] std::tuple<NodeT, int32_t> PopWait(const auto& stopToken) noexcept
         {
             while (stopToken.stop_requested() == false)
             {
