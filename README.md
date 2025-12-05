@@ -366,18 +366,18 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 ---
 
 - **`tinycoro::AnyOf(scheduler, tasks...)`**  
-  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes.
+  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes. Others are cancelled.
 
 - **`tinycoro::AnyOf(tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until the first finishes.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until the first finishes. Others are cancelled.
 
 ---
 
 - **`tinycoro::AnyOf(scheduler, stopSource, tasks...)`**  
-  Like `AnyOf` but supports cooperative cancellation of remaining tasks when one finishes.
+ Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`tinycoro::AnyOf(stopSource, tasks...)`**  
-  Like `AnyOf` but supports cooperative cancellation of remaining tasks when one finishes.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 
 ---
 
@@ -390,18 +390,18 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 ---
 
 - **`co_await tinycoro::AnyOfAwait(scheduler, tasks...)`**  
-  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes.
+  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes. All others are cancelled.
 
 - **`co_await tinycoro::AnyOfAwait(tasks...)`**  
-  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when the first finishes.
+  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when the first finishes. Others are cancelled.
 
 ---
 
 - **`co_await tinycoro::AnyOfAwait(scheduler, stopSource, tasks...)`**  
-  Like `AnyOfAwait` but supports cooperative cancellation of remaining tasks when one finishes.
+ Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`co_await tinycoro::AnyOfAwait(stopSource, tasks...)`**  
-  Like `AnyOfAwait` but supports cooperative cancellation of remaining tasks when one finishes.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 ---
 
 ### `AllOf`
@@ -531,7 +531,7 @@ tinycoro::AnyOf(stopSource, task1, task2, ...);               // synchronous (no
 tinycoro::AnyOf(scheduler, stopSource, task1, task2, ...);    // scheduler-based
 ```
 
-### Coroutine awaitbale With Scheduler (Parallel)
+### Coroutine awaitable With Scheduler (Parallel)
 
 Asynchronously races `tinycoro::Task`s via the scheduler.
 
@@ -546,7 +546,7 @@ co_await AnyOfAwait(scheduler, stopSource, task1, task2, ...);  // custom stopSo
 
 ---
 
-### Coroutine awaitbale inline execution (Synchronous)
+### Coroutine awaitable inline execution (Synchronous)
 
 Asynchronously races all tasks in the current coroutine context.
 
