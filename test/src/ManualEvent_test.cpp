@@ -318,7 +318,7 @@ TEST_P(ManualEventTest, ManualEventTest_set_reset_cancel_inline)
         tasks.emplace_back(task());
     }
 
-    auto results = tinycoro::AnyOfInline(std::move(tasks));
+    auto results = tinycoro::AnyOf(std::move(tasks));
 
     EXPECT_EQ(results.size(), count + 1);
     EXPECT_EQ(results[0].value(), 44);

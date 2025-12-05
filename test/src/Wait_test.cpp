@@ -278,7 +278,10 @@ TYPED_TEST(GetAllTestWithTupleMixedFutureState, GetAllTest_tuple_mixedTypes_std_
 template <typename ReturnT>
 struct SchedulerTestMock
 {
-    template<template<typename> class PromiseT>
+    template<typename T>
+    struct MockPromiseT{};
+
+    template<template<typename> class PromiseT = MockPromiseT>
     auto Enqueue(auto...)
     {
         return EnqueueMethod();

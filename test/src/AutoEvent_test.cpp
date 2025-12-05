@@ -247,7 +247,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel)
     EXPECT_EQ(results[0], 1);
 }
 
-TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOfInline)
+TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOf)
 {
     tinycoro::SoftClock clock;
 
@@ -274,7 +274,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_cancel_AnyOfInline)
         tasks.push_back(autoEventConsumer());
     }
 
-    auto results = tinycoro::AnyOfInline(tasks);
+    auto results = tinycoro::AnyOf(tasks);
 
     EXPECT_EQ(results[0], 1);
 

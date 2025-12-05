@@ -30,7 +30,7 @@ TEST(InlineTaskTest, InlineTaskTest_run_inline)
         co_return val += 1;
     };
 
-    auto val = tinycoro::AllOfInline(inlineTask1());
+    auto val = tinycoro::AllOf(inlineTask1());
 
     EXPECT_EQ(val, 42);
 }
@@ -58,7 +58,7 @@ TEST(InlineTaskTest, InlineTaskTest_nested_resume)
         co_return val;
     };
 
-    auto val = tinycoro::AllOfInline(task3(0));
+    auto val = tinycoro::AllOf(task3(0));
 
     EXPECT_EQ(val, 3);
 }
