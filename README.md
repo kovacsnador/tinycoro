@@ -357,51 +357,45 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 ### `SyncFunctions`
 #### Overview:
 
-- **`tinycoro::AllOf(scheduler, tasks...)`**  
-  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **all** complete.
-
 - **`tinycoro::AllOf(tasks...)`**  
   Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until all finish.
 
+- **`tinycoro::AllOf(scheduler, tasks...)`**  
+  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **all** complete.
+
 ---
-
-- **`tinycoro::AnyOf(scheduler, tasks...)`**  
-  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes. Others are cancelled.
-
 - **`tinycoro::AnyOf(tasks...)`**  
   Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until the first finishes. Others are cancelled.
 
+- **`tinycoro::AnyOf(scheduler, tasks...)`**  
+  Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes. Others are cancelled.
 ---
-
-- **`tinycoro::AnyOf(scheduler, stopSource, tasks...)`**  
- Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`tinycoro::AnyOf(stopSource, tasks...)`**  
   Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 
+- **`tinycoro::AnyOf(scheduler, stopSource, tasks...)`**  
+ Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
 ---
-
-- **`co_await tinycoro::AllOfAwait(scheduler, tasks...)`**  
-  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **all** complete.
-
+#### Helper Awaitables:
+---
 - **`co_await tinycoro::AllOfAwait(tasks...)`**  
   Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when all finish.
 
+- **`co_await tinycoro::AllOfAwait(scheduler, tasks...)`**  
+  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **all** complete.
 ---
-
-- **`co_await tinycoro::AnyOfAwait(scheduler, tasks...)`**  
-  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes. All others are cancelled.
-
 - **`co_await tinycoro::AnyOfAwait(tasks...)`**  
   Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when the first finishes. Others are cancelled.
 
+- **`co_await tinycoro::AnyOfAwait(scheduler, tasks...)`**  
+  Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes. All others are cancelled.
 ---
+- **`co_await tinycoro::AnyOfAwait(stopSource, tasks...)`**  
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`co_await tinycoro::AnyOfAwait(scheduler, stopSource, tasks...)`**  
  Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
-
-- **`co_await tinycoro::AnyOfAwait(stopSource, tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 ---
 
 ### `AllOf`
@@ -434,7 +428,7 @@ tinycoro::AllOf(scheduler, task1, task2, ...); // each task is a tinycoro::Task
 
 ---
 
-### Inline Execution without Scheduler (Synchronous)
+### Without Scheduler (Synchronous)
 
 Runs all given tasks on the current thread. Blocks until all finish.
 
@@ -508,7 +502,7 @@ tinycoro::AnyOf(scheduler, task1, task2, ...); // each task must be tinycoro::Ta
 
 ---
 
-### Inline Execution (Synchronous)
+### Without Scheduler (Synchronous)
 
 Runs all tasks cooperatively on the current thread.
 
