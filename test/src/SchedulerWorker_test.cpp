@@ -7,11 +7,12 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
 {
     std::stop_source                         ss;
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
-    EXPECT_TRUE(tinycoro::detail::helper::PushTask(1, queue, ss));
+    EXPECT_TRUE(tinycoro::detail::helper::PushTask(1, dispatcher, ss));
 
     ss.request_stop();
-    EXPECT_FALSE(tinycoro::detail::helper::PushTask(2, queue, ss));
+    EXPECT_FALSE(tinycoro::detail::helper::PushTask(2, dispatcher, ss));
 }
 
 TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
@@ -19,18 +20,21 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
     int32_t val{42};
 
     tinycoro::detail::AtomicQueue<int32_t*, 2> queue;
-    EXPECT_TRUE(queue.try_push(&val));
-    EXPECT_TRUE(queue.try_push(&val));
 
-    EXPECT_TRUE(queue.full());
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
-    tinycoro::detail::helper::RequestStopForQueue(queue);
+    EXPECT_TRUE(dispatcher.try_push(&val));
+    EXPECT_TRUE(dispatcher.try_push(&val));
+
+    EXPECT_TRUE(dispatcher.full());
+
+    tinycoro::detail::helper::RequestStopForQueue(dispatcher);
 
     int32_t* ptr;
-    EXPECT_TRUE(queue.try_pop(ptr));
+    EXPECT_TRUE(dispatcher.try_pop(ptr));
     EXPECT_EQ(*ptr, val);
 
-    EXPECT_TRUE(queue.try_pop(ptr));
+    EXPECT_TRUE(dispatcher.try_pop(ptr));
     EXPECT_EQ(ptr, nullptr);
 }
 
@@ -92,13 +96,14 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     EXPECT_CALL(task->mock, SetPauseHandler);
 
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
-    tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
+    tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
 
-    queue.try_push(std::move(task));
+    EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
     latch.wait();
-    queue.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT);
+    EXPECT_TRUE(dispatcher.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT));
 }
 
 struct SchedulerWorkerTest : testing::TestWithParam<size_t>
@@ -128,12 +133,14 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
 
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
+        tinycoro::detail::Dispatcher dispatcher{queue};
 
-        tinycoro::detail::SchedulerWorker worker{queue, ss.get_token()};
 
-        queue.try_push(std::move(task));
+        tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+
+        EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
         latch.wait();
-        queue.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT);
+        EXPECT_TRUE(dispatcher.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT));
     }
 }

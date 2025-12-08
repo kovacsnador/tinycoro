@@ -25,6 +25,8 @@ namespace tinycoro { namespace detail {
         {
             while (stopObject.stop_requested() == false)
             {
+                auto prevState = queue.PopState();
+
                 if (queue.try_push(std::move(task)))
                 {
                     // the task is pushed
@@ -34,7 +36,7 @@ namespace tinycoro { namespace detail {
                 else
                 {
                     // wait until we have space in the queue
-                    queue.wait_for_push();
+                    queue.wait_for_push(prevState);
                 }
             }
 
@@ -75,14 +77,14 @@ namespace tinycoro { namespace detail {
 
     } // namespace helper
 
-    template <typename QueueT>
+    template <typename DispatcherT>
     class SchedulerWorker
     {
-        using Task_t = typename QueueT::value_type;
+        using Task_t = typename DispatcherT::value_type;
 
     public:
-        SchedulerWorker(QueueT& taskQueue, std::stop_token stopToken)
-        : _sharedTasks{taskQueue}
+        SchedulerWorker(DispatcherT& dispatcher, std::stop_token stopToken)
+        : _dispatcher{dispatcher}
         , _stopToken{stopToken}
         , _thread{[this](std::stop_token st) { Run(st); }, stopToken}
         {
@@ -119,21 +121,21 @@ namespace tinycoro { namespace detail {
         {
             while (stopToken.stop_requested() == false)
             {
+                // we can try to upload the cached tasks
+                _TryToUploadCachedTasks();
+
                 Task_t task;
-                if (_sharedTasks.try_pop(task))
-                {
-                    // we could pop an element from the queue
-                    //
-                    // most likely this is a good timepoint
-                    // to upload some cached tasks...
-                    _TryToUploadCachedTasks();
-                }
-                else
+                auto   prevState = _dispatcher.PushState();
+                if (_dispatcher.try_pop(task) == false)
                 {
                     // there was no tasks in the queue
                     //
                     // Step in the "waiting for pop" state
-                    _WaitingAquire();
+                    // that means if we have some paused task
+                    // which is currently getting notfiied
+                    // we try to trigger the _dispatcher queue
+                    // in order to wake up the worker.
+                    //_WaitingAquire();
 
                     if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
                     {
@@ -143,21 +145,22 @@ namespace tinycoro { namespace detail {
                         // now if some tasks need resumption
                         // they will directly be pushed into the sharedTasks queue.
                         // (not in the cache)
-                        _sharedTasks.wait_for_pop();
+                        _dispatcher.wait_for_pop(prevState);
 
                         // waiting finished, possibly new tasks
                         // are arrived in the queue
-                        _WaitingRelease();
-                        continue;
+                        //_WaitingRelease();
+                        // continue;
                     }
 
                     // waiting finished, reset it
-                    _WaitingRelease();
+                    //_WaitingRelease();
+                    // continue;
 
                     // most likely we have something in the cache.
                     //
                     // try to upload them
-                    _TryToUploadCachedTasks();
+                    /*_TryToUploadCachedTasks();
 
                     if (_cachedTasks.empty())
                     {
@@ -168,28 +171,30 @@ namespace tinycoro { namespace detail {
                     }
 
                     // get the task from the cache
-                    task.reset(_cachedTasks.pop());
-                }
-
-                // If we reach that point, that means
-                // we successfully popped the next task
-                if (task == helper::SCHEDULER_STOP_EVENT)
-                {
-                    // if we popped the stop event
-                    // out from the queue,
-                    // we need to put back for other workers
-                    helper::RequestStopForQueue(_sharedTasks);
-
-                    // stop was requested we exit
-                    // from the working loop
-                    break;
+                    task.reset(_cachedTasks.pop());*/
                 }
                 else
                 {
-                    // Invoke the task.
-                    // wrapping the task into a Task_t
-                    // to make sure, there is a  proper destruction
-                    _InvokeTask(std::move(task));
+                    // If we reach that point, that means
+                    // we successfully popped the next task
+                    if (task == helper::SCHEDULER_STOP_EVENT)
+                    {
+                        // if we popped the stop event
+                        // out from the queue,
+                        // we need to put back for other workers
+                        helper::RequestStopForQueue(_dispatcher);
+
+                        // stop was requested we exit
+                        // from the working loop
+                        break;
+                    }
+                    else
+                    {
+                        // Invoke the task.
+                        // wrapping the task into a Task_t
+                        // to make sure, there is a  proper destruction
+                        _InvokeTask(std::move(task));
+                    }
                 }
             }
 
@@ -240,7 +245,7 @@ namespace tinycoro { namespace detail {
                     {
                         // no stop was requested,
                         // and no immediate destroy policy.
-                        if (_sharedTasks.try_push(std::move(task)))
+                        if (_dispatcher.try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -249,7 +254,7 @@ namespace tinycoro { namespace detail {
 
                         // In rare cases where the scheduler cache size is very small,
                         // it may happen that after inserting the task into the _notifiedCachedTasks
-                        // queue, all workers are waiting due to an empty _sharedTasks queue.
+                        // queue, all workers are waiting due to an empty _dispatcher queue.
                         //
                         // To prevent this scenario, we use the _popState just
                         // to indicate, if the owner worker is in a pop waiting state
@@ -262,9 +267,9 @@ namespace tinycoro { namespace detail {
                             // we try to set the _popState to RESUMING
                             // to indicate that we have a task, which need
                             // to be resumed.
-                            auto expected = EPopWaitingState::IDLE;
+                            /*auto expected = EPopWaitingState::IDLE;
                             if (_popState.compare_exchange_weak(
-                                    expected, EPopWaitingState::RESUMING, std::memory_order_release, std::memory_order_relaxed))
+                                    expected, EPopWaitingState::RESUMING, std::memory_order_release, std::memory_order_relaxed))*/
                             {
                                 // if the previous state was IDLE
                                 // our worker is not waiting
@@ -278,21 +283,23 @@ namespace tinycoro { namespace detail {
                                     task.reset(promisePtr);
                                 }
 
+                                _dispatcher.notify_pop_waiters();
+
                                 // set the state back to IDLE, to allow others to countinue
-                                _popState.store(EPopWaitingState::IDLE, std::memory_order_release);
+                                //_popState.store(EPopWaitingState::IDLE, std::memory_order_release);
                                 return;
                             }
-                            else
+                            /*else
                             {
                                 // Worker is in a waiting state.
                                 // Try to wake up.
-                                if (_sharedTasks.try_push(std::move(task)))
+                                if (_dispatcher.try_push(std::move(task)))
                                 {
                                     // push succeed
                                     // we simply return
                                     return;
                                 }
-                            }
+                            }*/
                         }
                     }
                 }
@@ -324,7 +331,7 @@ namespace tinycoro { namespace detail {
                     if (_stopToken.stop_requested() == false)
                     {
                         // no stop was requested
-                        if (_sharedTasks.try_push(std::move(task)))
+                        if (_dispatcher.try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -378,7 +385,7 @@ namespace tinycoro { namespace detail {
 
                     // we can continue with the current task
                     // it is already notified for resumption
-                    continue;
+                    break;
                 }
                 case STOPPED:
                     [[fallthrough]];
@@ -396,7 +403,7 @@ namespace tinycoro { namespace detail {
             auto promisePtr = _notifiedCachedTasks.steal();
             while (promisePtr)
             {
-                auto next     = promisePtr->next;
+                auto next        = promisePtr->next;
                 promisePtr->next = nullptr;
                 _cachedTasks.push(promisePtr);
                 promisePtr = next;
@@ -410,22 +417,22 @@ namespace tinycoro { namespace detail {
             // The worker thread may pick it up immediately and finish it very quickly.
             // (Most likely, the resumer thread is preempted or yielded by the OS.)
             // As a result, the task may complete before the GeneratePauseResume callback has even finished.
-            while (_popState.load(std::memory_order_relaxed) == EPopWaitingState::RESUMING)
+            /*while (_popState.load(std::memory_order::acquire) == EPopWaitingState::RESUMING)
             {
                 // friendly spinning
                 std::this_thread::yield();
-            }
+            }*/
 
-            while (_cachedTasks.empty() == false)
+            while (_cachedTasks.empty() == false && _stopToken.stop_requested() == false)
             {
                 // get the first task from the cache
-                auto promisePtr = _cachedTasks.pop();
+                promisePtr = _cachedTasks.pop();
 
                 assert(promisePtr != nullptr);
                 assert(promisePtr->next == nullptr);
 
                 Task_t task{promisePtr};
-                if (_sharedTasks.try_push(std::move(task)) == false)
+                if (_dispatcher.try_push(std::move(task)) == false)
                 {
                     // If the push fails,
                     // we stop and exit.
@@ -481,8 +488,8 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        // the queue which contains all the active tasks
-        QueueT& _sharedTasks;
+        // the task dispatcher
+        DispatcherT& _dispatcher;
 
         enum class EPopWaitingState : uint8_t
         {
@@ -490,6 +497,9 @@ namespace tinycoro { namespace detail {
             WAITING, // worker is waiting for tasks
             RESUMING // want to resume task from pause
         };
+
+        // This is the promise object type
+        using promise_t = typename Task_t::element_type;
 
         // Used to indicate if the worker is waiting for new task.
         // (need for task resumption after pause)

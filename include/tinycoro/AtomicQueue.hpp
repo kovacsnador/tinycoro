@@ -84,7 +84,7 @@ namespace tinycoro { namespace detail {
                         // notify waiter that
                         // we have a new value
                         // in the queue
-                        _head.notify_all();
+                        //_head.notify_all();
 
                         // success
                         return true;
@@ -125,7 +125,7 @@ namespace tinycoro { namespace detail {
 
                         // notify the waiters
                         // that a value is popped
-                        _tail.notify_all();
+                        //_tail.notify_all();
 
                         return true;
                     }

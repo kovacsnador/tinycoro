@@ -107,35 +107,38 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
     tinycoro::Scheduler scheduler{2};
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
     tinycoro::AutoEvent event;
 
     auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(queue.try_push(1u));
-        EXPECT_TRUE(queue.try_push(2u));
+        EXPECT_TRUE(dispatcher.try_push(1u));
+        EXPECT_TRUE(dispatcher.try_push(2u));
 
         event.Set();
 
         co_await tinycoro::SleepFor(clock, 100ms);
 
         size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 1u);
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         co_await event;
 
-        // here we wait for a possible push
-        queue.wait_for_push();
+        auto state = dispatcher.PopState();
 
-        EXPECT_TRUE(queue.try_push(3u));
+        // here we wait for a possible push
+        dispatcher.wait_for_push(state);
+
+        EXPECT_TRUE(dispatcher.try_push(3u));
 
         size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 2u);
 
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 3u);
     };
 
@@ -148,42 +151,47 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
     tinycoro::Scheduler scheduler{2};
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
     tinycoro::AutoEvent event;
 
     auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(queue.try_push(1u));
-        EXPECT_TRUE(queue.try_push(2u));
+        EXPECT_TRUE(dispatcher.try_push(1u));
+        EXPECT_TRUE(dispatcher.try_push(2u));
 
         size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 1u);
 
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 2u);
 
         event.Set();
 
         co_await tinycoro::SleepFor(clock, 100ms);
 
-        EXPECT_TRUE(queue.try_push(3u));
-        EXPECT_TRUE(queue.try_push(4u));
+        EXPECT_TRUE(dispatcher.try_push(3u));
+        EXPECT_TRUE(dispatcher.try_push(4u));
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
         co_await event;
 
+        auto state = dispatcher.PopState();
+
         // here we wait for a possible push
-        queue.wait_for_pop();
+        dispatcher.wait_for_pop(state);
 
         size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 3u);
 
-        // here we wait for a possible push
-        queue.wait_for_pop();
+        state = dispatcher.PopState();
 
-        EXPECT_TRUE(queue.try_pop(val));
+        // here we wait for a possible push
+        dispatcher.wait_for_pop(state);
+
+        EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 4u);
     };
 
@@ -359,15 +367,17 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
 
     tinycoro::Scheduler                      scheduler{8};
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
     std::atomic<size_t> totalCount{};
 
     auto producer = [&]() -> tinycoro::Task<void> {
         for (size_t i = 0; i <= count; ++i)
         {
-            while (queue.try_push(i) == false)
+            while (dispatcher.try_push(i) == false)
             {
-                queue.wait_for_push();
+                auto state = dispatcher.PushState();
+                dispatcher.wait_for_push(state);
             }
             totalCount++;
         }
@@ -377,10 +387,12 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     auto consumer = [&]() -> tinycoro::Task<void> {
         for (;;)
         {
+            auto state = dispatcher.PopState();
+
             size_t val;
-            if (queue.try_pop(val) == false)
+            if (dispatcher.try_pop(val) == false)
             {
-                queue.wait_for_pop();
+                dispatcher.wait_for_pop(state);
             }
             else
             {

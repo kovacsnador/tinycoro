@@ -23,6 +23,7 @@
 #include "AtomicQueue.hpp"
 #include "SchedulerWorker.hpp"
 #include "SchedulableTask.hpp"
+#include "Dispatcher.hpp"
 
 namespace tinycoro {
 
@@ -34,7 +35,9 @@ namespace tinycoro {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_sharedTasks); }}
+            , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_dispatcher); }}
+            //, _queues(workerThreadCount)
+            , _dispatcher{_sharedTasks}
             {
                 _AddWorkers(workerThreadCount);
             }
@@ -128,7 +131,7 @@ namespace tinycoro {
                     auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
                     // push the task into the queue
-                    helper::PushTask(std::move(task), _sharedTasks, _stopSource);
+                    helper::PushTask(std::move(task), _dispatcher, _stopSource);
                 }
                 else
                 {
@@ -145,12 +148,14 @@ namespace tinycoro {
 
                 for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
                 {
-                    _workerThreads.emplace_back(_sharedTasks, _stopSource.get_token());
+                    _workerThreads.emplace_back(_dispatcher, _stopSource.get_token());
                 }
             }
 
+            using queue_t = detail::AtomicQueue<TaskT, CACHE_SIZE>;
+
             // currently active/scheduled tasks
-            detail::AtomicQueue<TaskT, CACHE_SIZE> _sharedTasks;
+            queue_t _sharedTasks;
 
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
@@ -159,8 +164,11 @@ namespace tinycoro {
             // if a stop for _stopSource is requested.
             std::stop_callback<std::function<void()>> _stopCallback;
 
+            //std::vector<queue_t> _queues;
+            Dispatcher<queue_t> _dispatcher;
+
             // Specialize the worker (thread) type
-            using Worker_t = SchedulerWorker<decltype(_sharedTasks)>;
+            using Worker_t = SchedulerWorker<decltype(_dispatcher)>;
 
             // the worker threads which are running the tasks
             std::list<Worker_t> _workerThreads;

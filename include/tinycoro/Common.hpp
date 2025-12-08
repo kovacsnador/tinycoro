@@ -76,6 +76,14 @@ namespace tinycoro {
 
     } // namespace detail
 
+    namespace helper
+    {
+        constexpr auto PowerOf2(auto val) noexcept
+        {
+            return (val > 0 && ((val & (val - 1)) == 0));
+        }
+    }
+
     enum class ENotifyPolicy
     {
         RESUME, // Notify for resumption
@@ -245,7 +253,7 @@ namespace tinycoro {
         template <auto Number>
         struct IsPowerOf2
         {
-            static constexpr bool value = (Number > 0) && (Number & (Number - 1)) == 0;
+            static constexpr bool value = helper::PowerOf2(Number);
         };
 
         namespace helper {
