@@ -58,7 +58,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_WaitInline)
         co_return i;
     };
 
-    auto ret = tinycoro::AllOfInline(task());
+    auto ret = tinycoro::AllOf(task());
     EXPECT_EQ(ret, 1);
 }
 
@@ -86,7 +86,7 @@ void bad_alloc(auto& mock, auto task)
     EXPECT_CALL(mock, allocate_bytes_noexcept).Times(1).WillRepeatedly([]([[maybe_unused]] size_t nbytes) { return nullptr; });
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(task(0)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -118,7 +118,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_multi)
         i++;
         co_return i;
     };
-    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -134,7 +134,7 @@ void second_bad_alloc_multi(auto& mock, auto task)
 
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }
@@ -172,7 +172,7 @@ void third_bad_alloc_multi_syncwait(auto& mock, auto task)
 
     EXPECT_CALL(mock, get_return_object_on_allocation_failure).Times(1).WillRepeatedly([] { throw std::bad_alloc{}; });
 
-    auto func = [&] { tinycoro::AllOfInline(task()); };
+    auto func = [&] { tinycoro::AllOf(task()); };
     EXPECT_THROW(func(), std::bad_alloc);
 }
 
@@ -236,7 +236,7 @@ void throw_in_operator_new(auto& mock, auto task)
 
     EXPECT_CALL(mock, deallocate_bytes).Times(1).WillOnce([](void* p, [[maybe_unused]] size_t nbytes) { return std::free(p); });
 
-    auto func = [&] { std::ignore = tinycoro::AllOfInline(task(0), task(1), task(2)); };
+    auto func = [&] { std::ignore = tinycoro::AllOf(task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
 }

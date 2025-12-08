@@ -278,7 +278,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_completion_token)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::AllOfInline(waiter());
+    tinycoro::AllOf(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_requestStop_test)
@@ -331,7 +331,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::AllOfInline(waiter());
+    tinycoro::AllOf(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
@@ -360,7 +360,7 @@ TEST_P(SoftClockTest, SoftClockFunctionalTest_wait_complition_token_cancel)
     auto waiter = [&latch]() -> tinycoro::Task<void> { co_await latch; };
 
     // waits for all the events
-    tinycoro::AllOfInline(waiter());
+    tinycoro::AllOf(waiter());
 }
 
 TEST_P(SoftClockTest, SoftClockFunctionalTest_multiThreaded)

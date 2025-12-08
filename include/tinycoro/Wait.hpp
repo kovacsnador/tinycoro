@@ -191,9 +191,7 @@ namespace tinycoro {
     }
 
     template <typename SchedulerT, typename... Args>
-        requires requires (SchedulerT s, Args... a) {
-            { s.Enqueue(std::forward<Args>(a)...) };
-        }
+        requires (sizeof...(Args) > 0) && concepts::IsScheduler<SchedulerT, Args...>
     [[nodiscard]] auto AllOf(SchedulerT& scheduler, Args&&... args)
     {
         auto future = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...);
@@ -220,13 +218,14 @@ namespace tinycoro {
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... CoroTasksT>
-        requires (sizeof...(CoroTasksT) > 0)
+        requires (sizeof...(CoroTasksT) > 0) && concepts::IsScheduler<SchedulerT, CoroTasksT...>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroTasksT&&... tasks)
     {
         return AnyOf(scheduler, StopSourceT{}, std::forward<CoroTasksT>(tasks)...);
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::Iterable CoroContainerT>
+        requires concepts::IsScheduler<SchedulerT, CoroContainerT>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroContainerT&& tasks)
     {
         return AnyOf(scheduler, StopSourceT{}, std::forward<CoroContainerT>(tasks));

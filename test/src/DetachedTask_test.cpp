@@ -110,7 +110,7 @@ TEST_P(DetachedTaskFunctionalTest, DetachedTaskFunctionalTest_functional_01)
         co_await latch;
     };
 
-    tinycoro::AllOfInline(waiter());
+    tinycoro::AllOf(waiter());
 
     EXPECT_EQ(count, c);
 }

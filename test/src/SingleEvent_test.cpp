@@ -215,7 +215,7 @@ TEST(SingleEventTest, SingleEventTest_cancel_inline)
         co_return result;
     };
 
-    auto [r1, r2] = tinycoro::AnyOfInline(receiver(), tinycoro::SleepFor(clock, 100ms));
+    auto [r1, r2] = tinycoro::AnyOf(receiver(), tinycoro::SleepFor(clock, 100ms));
 
     EXPECT_FALSE(r1.has_value());
     EXPECT_TRUE(r2.has_value());
@@ -291,7 +291,7 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_all_timeout)
         tasks.push_back(SingleEventConsumer());
     }
 
-    tinycoro::AllOfInline(std::move(tasks));
+    tinycoro::AllOf(std::move(tasks));
 
     EXPECT_EQ(doneCount, count);
 }

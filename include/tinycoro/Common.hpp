@@ -117,6 +117,11 @@ namespace tinycoro {
             typename T::initial_cancellable_policy_t;
         };
 
+        template<typename T, typename... Tasks>
+        concept IsScheduler = requires(T s, Tasks&&... t) {
+            { s.Enqueue(std::forward<Tasks>(t)...) };
+        };
+
         template <typename T>
         concept IsCorouitneTask = std::move_constructible<T> && requires (T c) {
             { c.Resume() } -> std::same_as<void>;
