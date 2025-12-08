@@ -374,9 +374,9 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     auto producer = [&]() -> tinycoro::Task<void> {
         for (size_t i = 0; i <= count; ++i)
         {
+            auto state = dispatcher.PushState();
             while (dispatcher.try_push(i) == false)
             {
-                auto state = dispatcher.PushState();
                 dispatcher.wait_for_push(state);
             }
             totalCount++;
