@@ -120,13 +120,12 @@ namespace tinycoro { namespace detail {
         void Run(std::stop_token stopToken) noexcept
         {
             while (stopToken.stop_requested() == false)
-            {
+            {   
                 // we can try to upload the cached tasks
-                _TryToUploadCachedTasks();
+                Task_t task = _TryToUploadCachedTasks();
 
-                Task_t task;
-                auto   prevState = _dispatcher.PushState();
-                if (_dispatcher.try_pop(task) == false)
+                auto prevState = _dispatcher.PushState();
+                if (task == nullptr && _dispatcher.try_pop(task) == false)
                 {
                     // there was no tasks in the queue
                     //
@@ -397,7 +396,7 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        inline void _TryToUploadCachedTasks() noexcept
+        [[nodiscard]] inline auto _TryToUploadCachedTasks() noexcept
         {
             // copy notified task to the cached tasks
             auto promisePtr = _notifiedCachedTasks.steal();
@@ -423,6 +422,8 @@ namespace tinycoro { namespace detail {
                 std::this_thread::yield();
             }*/
 
+            auto promise = _cachedTasks.pop();
+
             while (_cachedTasks.empty() == false && _stopToken.stop_requested() == false)
             {
                 // get the first task from the cache
@@ -440,9 +441,10 @@ namespace tinycoro { namespace detail {
                     // The task is pushed back to the front of the cache
                     // to help preserve the task order at least partially...
                     _cachedTasks.push_front(task.release());
-                    break;
                 }
             }
+
+            return Task_t{promise};
         }
 
         // Enters the pop waiting state
