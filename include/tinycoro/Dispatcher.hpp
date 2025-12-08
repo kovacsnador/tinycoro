@@ -90,8 +90,6 @@ namespace tinycoro { namespace detail {
         std::atomic<uint32_t> _popEvent;
 
         QueueT& _queue;
-
-        std::atomic<size_t> _current{};
     };
 
 }} // namespace tinycoro::detail
