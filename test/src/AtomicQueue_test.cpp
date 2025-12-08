@@ -202,7 +202,7 @@ struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest, testing::Values(1, 10, 100, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000, 1000, 2000));
+INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest, testing::Values(1, 10, 100, 1000, 2000));
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_single_threaded)
 {
