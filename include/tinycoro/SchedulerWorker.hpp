@@ -136,6 +136,8 @@ namespace tinycoro { namespace detail {
                     // in order to wake up the worker.
                     //_WaitingAquire();
 
+                    assert(_cachedTasks.empty());
+
                     if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
                     {
                         // the all the caches are empty, we can
@@ -396,7 +398,7 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        [[nodiscard]] inline auto _TryToUploadCachedTasks() noexcept
+        [[nodiscard]] auto _TryToUploadCachedTasks() noexcept
         {
             // copy notified task to the cached tasks
             auto promisePtr = _notifiedCachedTasks.steal();
@@ -441,6 +443,7 @@ namespace tinycoro { namespace detail {
                     // The task is pushed back to the front of the cache
                     // to help preserve the task order at least partially...
                     _cachedTasks.push_front(task.release());
+                    break;
                 }
             }
 
