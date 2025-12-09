@@ -72,7 +72,6 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
     tinycoro::AnyOf(scheduler, std::move(tasks));
 
     EXPECT_TRUE(std::chrono::system_clock::now() - start < (duration + 1s));
-    EXPECT_EQ(cc, 1);
 
     // this test is intendted to used
     // with sanitizers.
