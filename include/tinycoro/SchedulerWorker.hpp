@@ -282,6 +282,7 @@ namespace tinycoro { namespace detail {
                                     // so reassign the value to the RAII task object
                                     // for proper destruction.
                                     task.reset(promisePtr);
+                                    return;
                                 }
 
                                 _dispatcher.notify_pop_waiters();
