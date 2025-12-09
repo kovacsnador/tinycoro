@@ -921,13 +921,14 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest)
 
     tinycoro::BufferedChannel<std::variant<int32_t, CloseChannelBuffer>> bufferedChannel;
 
+    int32_t expected = 1;
+
     auto consumer = [&]() -> tinycoro::Task<void> {
         std::variant<int32_t, CloseChannelBuffer> val;
         while (tinycoro::EChannelOpStatus::SUCCESS == co_await bufferedChannel.PopWait(val))
         {
             if (std::holds_alternative<int32_t>(val))
             {
-                static int32_t expected = 1;
                 EXPECT_EQ(expected++, std::get<int32_t>(val));
             }
             else
@@ -958,6 +959,8 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_singleThreadedS
     struct CloseChannelBuffer
     {
     };
+    
+    int32_t expected = 1;
 
     tinycoro::BufferedChannel<std::variant<int32_t, CloseChannelBuffer>> bufferedChannel;
 
@@ -967,7 +970,6 @@ TEST(BufferedChannelTest, BufferedChannelFunctionalTest_pushWait_singleThreadedS
         {
             if (std::holds_alternative<int32_t>(val))
             {
-                static int32_t expected = 1;
                 EXPECT_EQ(expected++, std::get<int32_t>(val));
             }
         }
