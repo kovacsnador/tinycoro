@@ -203,7 +203,7 @@ namespace tinycoro {
 
             bool Cancel() noexcept { return _manualEvent.Cancel(this); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {

@@ -127,7 +127,7 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
     auto consumer = [&]() -> tinycoro::Task<void> {
         co_await event;
 
-        auto state = dispatcher.PopState();
+        auto state = dispatcher.pop_state();
 
         // here we wait for a possible push
         dispatcher.wait_for_push(state);
@@ -177,7 +177,7 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
     auto consumer = [&]() -> tinycoro::Task<void> {
         co_await event;
 
-        auto state = dispatcher.PushState();
+        auto state = dispatcher.push_state();
 
         // here we wait for a possible push
         dispatcher.wait_for_pop(state);
@@ -186,7 +186,7 @@ TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
         EXPECT_TRUE(dispatcher.try_pop(val));
         EXPECT_EQ(val, 3u);
 
-        state = dispatcher.PushState();
+        state = dispatcher.push_state();
 
         // here we wait for a possible push
         dispatcher.wait_for_pop(state);
@@ -374,7 +374,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     auto producer = [&]() -> tinycoro::Task<void> {
         for (size_t i = 0; i <= count; ++i)
         {
-            auto state = dispatcher.PopState();
+            auto state = dispatcher.pop_state();
             while (dispatcher.try_push(i) == false)
             {
                 dispatcher.wait_for_push(state);
@@ -387,7 +387,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     auto consumer = [&]() -> tinycoro::Task<void> {
         for (;;)
         {
-            auto state = dispatcher.PushState();
+            auto state = dispatcher.push_state();
 
             size_t val;
             if (dispatcher.try_pop(val) == false)

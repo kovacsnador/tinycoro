@@ -16,7 +16,7 @@ namespace tinycoro { namespace detail {
     namespace local {
         template <template <typename> class AtomT, typename T>
             requires std::unsigned_integral<T>
-        void notify(AtomT<T>& atom) noexcept
+        void Notify(AtomT<T>& atom) noexcept
         {
             atom.fetch_add(1, std::memory_order::release);
             atom.notify_all();
@@ -33,8 +33,8 @@ namespace tinycoro { namespace detail {
         {
         }
 
-        [[nodiscard]] auto PushState(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
-        [[nodiscard]] auto PopState(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
+        [[nodiscard]] auto push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
+        [[nodiscard]] auto pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
 
         void wait_for_push(auto prevState) const noexcept
         {
@@ -48,9 +48,9 @@ namespace tinycoro { namespace detail {
                 _pushEvent.wait(prevState);
         }
 
-        void notify_push_waiters() noexcept { local::notify(_pushEvent); }
+        void notify_push_waiters() noexcept { local::Notify(_pushEvent); }
 
-        void notify_pop_waiters() noexcept { local::notify(_popEvent); }
+        void notify_pop_waiters() noexcept { local::Notify(_popEvent); }
 
         template <typename T>
         [[nodiscard]] auto try_push(T&& elem) noexcept
@@ -58,8 +58,7 @@ namespace tinycoro { namespace detail {
             if (_queue.try_push(std::forward<T>(elem)))
             {
                 // push was ok
-                _pushEvent.fetch_add(1, std::memory_order::release);
-                _pushEvent.notify_all();
+                local::Notify(_pushEvent);
                 return true;
             }
 
@@ -72,12 +71,11 @@ namespace tinycoro { namespace detail {
             if (_queue.try_pop(elem))
             {
                 // pop was ok
-                _popEvent.fetch_add(1, std::memory_order::release);
-                _popEvent.notify_all();
+                local::Notify(_popEvent);
                 return true;
             }
 
-            // every queue is full
+            // every queue is empty
             return false;
         }
 

@@ -101,16 +101,13 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-            constexpr auto await_suspend(auto parentCoro) noexcept
-            {
-                return !_semaphore.TryAcquire(this, parentCoro);
-            }
+            [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore.TryAcquire(this, parentCoro); }
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }
 
             void Notify() const noexcept { _event.Notify(); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
         private:
             SemaphoreT& _semaphore;
