@@ -66,7 +66,7 @@ namespace tinycoro {
                 }
             }
 
-            auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
+            [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -103,11 +103,7 @@ namespace tinycoro {
 
             constexpr auto await_suspend(auto parentCoro) noexcept
             {
-                if (_semaphore.TryAcquire(this, parentCoro))
-                {
-                    return false;
-                }
-                return true;
+                return !_semaphore.TryAcquire(this, parentCoro);
             }
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }

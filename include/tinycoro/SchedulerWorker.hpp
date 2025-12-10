@@ -244,9 +244,13 @@ namespace tinycoro { namespace detail {
                     Task_t task{promisePtr};
                     if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
+
+                        // save dispatcher pointer, to solve heap use after free.
+                        auto dispatcherPtr = std::addressof(_dispatcher);
+
                         // no stop was requested,
                         // and no immediate destroy policy.
-                        if (_dispatcher.try_push(std::move(task)))
+                        if (dispatcherPtr->try_push(std::move(task)))
                         {
                             // push succeed
                             // we simply return
@@ -263,7 +267,7 @@ namespace tinycoro { namespace detail {
                         // (which is waiting for resumption)
                         // into the sharedTasks queue. In order to wake up the worker,
                         // and guarantie the forward motion in the scheduler.
-                        while (_stopToken.stop_requested() == false)
+                        //while (_stopToken.stop_requested() == false)
                         {
                             // we try to set the _popState to RESUMING
                             // to indicate that we have a task, which need
@@ -285,7 +289,8 @@ namespace tinycoro { namespace detail {
                                     return;
                                 }
 
-                                _dispatcher.notify_pop_waiters();
+                                // wake up waiters, in case we are waiting for pop
+                                dispatcherPtr->notify_pop_waiters();
 
                                 // set the state back to IDLE, to allow others to countinue
                                 //_popState.store(EPopWaitingState::IDLE, std::memory_order_release);
