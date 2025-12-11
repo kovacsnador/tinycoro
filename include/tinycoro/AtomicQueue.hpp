@@ -142,9 +142,11 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
+        // Currently not used
+        //
         // wait for new element to pop
         // if the queue is empty
-        /*void wait_for_pop() const noexcept
+        void wait_for_pop() const noexcept
         {
             auto head = _head.load(std::memory_order_relaxed);
             auto tail = _tail.load(std::memory_order_relaxed);
@@ -157,6 +159,8 @@ namespace tinycoro { namespace detail {
             }
         }
 
+        // Currently not used
+        //
         // wait for new element to push
         // in case the queue is full
         void wait_for_push() const noexcept
@@ -170,7 +174,7 @@ namespace tinycoro { namespace detail {
                 // we wait until someone pops an element
                 _tail.wait(tail);
             }
-        }*/
+        }
 
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
 

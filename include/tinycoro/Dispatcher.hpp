@@ -28,7 +28,7 @@ namespace tinycoro { namespace detail {
     {
         using value_type = typename QueueT::value_type;
 
-        Dispatcher(QueueT& queue)
+        explicit Dispatcher(QueueT& queue)
         : _queue{queue}
         {
         }

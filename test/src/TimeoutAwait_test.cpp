@@ -120,6 +120,7 @@ TEST(TimeoutAwaitTest, TimeoutAwaitTest_ManualEvent)
     TimeoutAwaitFunctionalTest(event.Wait(), tinycoro::SoftClock::Now() + 100ms);
 }
 
+// STUCK HERE??
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_AutoEvent)
 {
     TimeoutAwaitFunctionalTest(tinycoro::AutoEvent{}.Wait(), 100ms);
