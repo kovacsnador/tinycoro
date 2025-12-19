@@ -43,11 +43,14 @@ TEST(SingleEventTest, SingleEventTest_await_resume)
     singleEvent.Set(42);
     EXPECT_TRUE(singleEvent.IsSet());
 
+    EXPECT_TRUE(awaiter.await_ready());
+
     auto val = awaiter.await_resume();
     EXPECT_EQ(val, 42);
     EXPECT_FALSE(singleEvent.IsSet());
 
     singleEvent.Set(44);
+    EXPECT_TRUE(awaiter.await_ready());
     EXPECT_TRUE(singleEvent.IsSet());
 
     val = awaiter.await_resume();
