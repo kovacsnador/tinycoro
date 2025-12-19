@@ -81,7 +81,7 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     bool pauseCalled = false;
     auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled](auto) { pauseCalled = true; });
 
-    awaiter.await_suspend(hdl);
+    EXPECT_TRUE(awaiter.await_suspend(hdl));
     EXPECT_FALSE(pauseCalled);
 
     auto awaiter2 = singleEvent.operator co_await();
@@ -196,7 +196,7 @@ TEST(SingleEventTest, SingleEventTest_cancel)
     auto receiver = [&]() -> tinycoro::TaskNIC<int32_t> {
         auto result = co_await tinycoro::Cancellable(event.Wait());
         co_return result;
-    }; 
+    };
 
     auto [r1, r2] = tinycoro::AnyOf(scheduler, receiver(), tinycoro::SleepFor(clock, 100ms));
 
@@ -227,38 +227,48 @@ struct SingleEventTimeoutTest : testing::TestWithParam<size_t>
 
 INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutTest, SingleEventTimeoutTest, testing::Values(1, 10, 100, 1000));
 
+// THIS TEST CAN HANG!!!
 TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
 {
-    tinycoro::Scheduler scheduler;
+
+    tinycoro::Scheduler scheduler{2};
     tinycoro::SoftClock clock;
 
     tinycoro::SingleEvent<int32_t> event;
-    std::atomic<int32_t> doneCount{};
+    std::atomic<int32_t>           doneCount{};
 
-    tinycoro::AutoEvent helperEvent{true};
+    // tinycoro::AutoEvent helperEvent{true};
+    std::binary_semaphore sema{1};
 
-    auto count = GetParam(); 
+    auto count = GetParam();
+
+    size_t releaseCount{};
 
     auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
-        for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+        while (doneCount < count)
         {
             auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
-            if(opt.has_value())
+            if (opt.has_value())
             {
-                helperEvent.Set();
+                releaseCount++;
+                sema.release();
+                // helperEvent.Set();
+                doneCount++;
             }
-            doneCount++;
         }
     };
 
     auto sleep = [&]() -> tinycoro::TaskNIC<> {
-        for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+        for ([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
         {
-            co_await helperEvent;
+            sema.acquire();
+            // co_await helperEvent;
             event.Set(42);
         }
+
+        co_return;
     };
-    
+
     tinycoro::AllOf(scheduler, SingleEventConsumer(), sleep());
 
     EXPECT_EQ(doneCount, count);
@@ -271,8 +281,8 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_all_timeout)
     const auto count = GetParam();
 
     tinycoro::SingleEvent<int32_t> event;
-    int32_t doneCount{};
-    tinycoro::AutoEvent helperEvent{true};
+    int32_t                        doneCount{};
+    tinycoro::AutoEvent            helperEvent{true};
 
     auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
         co_await helperEvent;
@@ -294,4 +304,20 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_all_timeout)
     tinycoro::AllOfInline(std::move(tasks));
 
     EXPECT_EQ(doneCount, count);
+}
+
+TEST(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_one_task)
+{
+
+    tinycoro::Scheduler scheduler{2};
+    tinycoro::SoftClock clock;
+
+    tinycoro::SingleEvent<int32_t> event;
+
+    auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
+        EXPECT_FALSE(opt.has_value());
+    };
+
+    tinycoro::AllOf(scheduler, SingleEventConsumer());
 }

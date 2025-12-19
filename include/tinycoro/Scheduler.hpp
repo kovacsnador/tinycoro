@@ -131,7 +131,7 @@ namespace tinycoro {
                     auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
                     // push the task into the queue
-                    helper::PushTask(std::move(task), _dispatcher, _stopSource);
+                    helper::PushTask(std::move(task), _dispatcher, _stopSource, _popState);
                 }
                 else
                 {
@@ -166,6 +166,9 @@ namespace tinycoro {
 
             //std::vector<queue_t> _queues;
             Dispatcher<queue_t> _dispatcher;
+
+            using state_t = typename decltype(_dispatcher)::state_type;
+            std::atomic<state_t> _popState{};
 
             // Specialize the worker (thread) type
             using Worker_t = SchedulerWorker<decltype(_dispatcher)>;

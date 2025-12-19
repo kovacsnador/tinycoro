@@ -16,16 +16,18 @@
 
 namespace tinycoro { namespace detail {
 
+    static inline thread_local size_t count{};
+
     namespace helper {
         // With this variable we indicate that
         // a stop purposed by the scheduler
         static constexpr std::nullptr_t SCHEDULER_STOP_EVENT{nullptr};
 
-        bool PushTask(auto task, auto& queue, const auto& stopObject) noexcept
+        bool PushTask(auto task, auto& queue, const auto& stopObject, auto& popState) noexcept
         {
             while (stopObject.stop_requested() == false)
             {
-                auto prevState = queue.pop_state();
+                //auto prevState = queue.pop_state();
 
                 if (queue.try_push(std::move(task)))
                 {
@@ -36,7 +38,7 @@ namespace tinycoro { namespace detail {
                 else
                 {
                     // wait until we have space in the queue
-                    queue.wait_for_push(prevState);
+                    queue.wait_for_push(popState.fetch_add(1, std::memory_order::release));
                 }
             }
 
@@ -119,12 +121,12 @@ namespace tinycoro { namespace detail {
     private:
         void Run(std::stop_token stopToken) noexcept
         {
+            typename DispatcherT::state_type prevState{};
             while (stopToken.stop_requested() == false)
             {
                 // we can try to upload the cached tasks
                 Task_t task = _TryToUploadCachedTasks();
 
-                auto prevState = _dispatcher.push_state();
                 if (task == nullptr && _dispatcher.try_pop(task) == false)
                 {
                     assert(_cachedTasks.empty());
@@ -137,7 +139,7 @@ namespace tinycoro { namespace detail {
                         // now if some tasks need resumption
                         // they will directly be pushed into the sharedTasks queue.
                         // (not in the cache)
-                        _dispatcher.wait_for_pop(prevState);
+                        _dispatcher.wait_for_pop(prevState++);
                     }
 
                 }
@@ -183,7 +185,7 @@ namespace tinycoro { namespace detail {
                 if (_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
-                    while (expected != EPauseState::PAUSED)
+                    while (expected == EPauseState::IDLE)
                     {
                         // If the notify callback invoked very quickly
                         // we have here a little time window to tell to
@@ -191,19 +193,32 @@ namespace tinycoro { namespace detail {
                         if (promisePtr->pauseState.compare_exchange_weak(
                                 expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
                         {
+
+                            promisePtr->alreadyPaused = true;
                             // The task is notified
                             // in time, so we are done.
                             return;
                         }
                     }
 
+                    assert(expected == EPauseState::PAUSED);
+
                     // If we reach this point
                     // that means that the task is already in paused state
                     // So we need to resume it manually
+
+                    auto erased{false};
+
                     {
                         std::scoped_lock pauseLock{_pausedTasksMtx};
                         // remove the tasks from paused tasks
-                        _pausedTasks.erase(promisePtr);
+                        erased = _pausedTasks.erase(promisePtr);
+                    }
+
+                    if(erased == false)
+                    {
+                        // somebody already notified the task
+                        return;
                     }
 
                     // push back task to the queue for resumption
@@ -282,9 +297,10 @@ namespace tinycoro { namespace detail {
                     return;
                 }
                 case PAUSED: {
-
                     auto expected = task->PauseState().load(std::memory_order_acquire);
-                    if (expected != EPauseState::NOTIFIED)
+                    assert(expected != EPauseState::PAUSED);
+
+                    if (expected == EPauseState::IDLE)
                     {
                         auto promisePtr = task.release();
 
@@ -315,6 +331,8 @@ namespace tinycoro { namespace detail {
                         task.reset(promisePtr);
                     }
 
+                    //std::this_thread::sleep_for(std::chrono::milliseconds(10));
+
                     // we can continue with the current task
                     // it is already notified for resumption
                     break;
@@ -322,6 +340,7 @@ namespace tinycoro { namespace detail {
                 case STOPPED:
                     [[fallthrough]];
                 case DONE:
+                    count++;
                     [[fallthrough]];
                 default:
                     return;

@@ -10,16 +10,21 @@
 #include <concepts>
 
 #include "Common.hpp"
+#include "CachelineAlign.hpp"
 
 namespace tinycoro { namespace detail {
 
     namespace local {
+
+        template<template <typename> class AtomT, typename T>
+        using notifyFunc_t = void(*)(AtomT<T>*);
+
         template <template <typename> class AtomT, typename T>
             requires std::unsigned_integral<T>
-        void Notify(AtomT<T>& atom) noexcept
+        void Notify(AtomT<T>& atom, notifyFunc_t<AtomT, T> notifyFunc, std::memory_order order = std::memory_order::release) noexcept
         {
-            atom.fetch_add(1, std::memory_order::release);
-            atom.notify_all();
+            atom.fetch_add(1, order);
+            notifyFunc(std::addressof(atom));
         }
     } // namespace local
 
@@ -27,6 +32,7 @@ namespace tinycoro { namespace detail {
     struct Dispatcher
     {
         using value_type = typename QueueT::value_type;
+        using state_type = size_t;
 
         explicit Dispatcher(QueueT& queue)
         : _queue{queue}
@@ -36,21 +42,19 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
         [[nodiscard]] auto pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
 
-        void wait_for_push(auto prevState) const noexcept
+        void wait_for_push(state_type prevState) const noexcept
         {
-            if (full())
-                _popEvent.wait(prevState);
+            _popEvent.wait(prevState);
         }
 
-        void wait_for_pop(auto prevState) const noexcept
+        void wait_for_pop(state_type prevState) const noexcept
         {
-            if (empty())
-                _pushEvent.wait(prevState);
+            _pushEvent.wait(prevState);
         }
 
-        void notify_push_waiters() noexcept { local::Notify(_pushEvent); }
+        void notify_push_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
 
-        void notify_pop_waiters() noexcept { local::Notify(_popEvent); }
+        void notify_pop_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
 
         template <typename T>
         [[nodiscard]] auto try_push(T&& elem) noexcept
@@ -58,7 +62,7 @@ namespace tinycoro { namespace detail {
             if (_queue.try_push(std::forward<T>(elem)))
             {
                 // push was ok
-                local::Notify(_pushEvent);
+                local::Notify(_pushEvent, std::atomic_notify_one);
                 return true;
             }
 
@@ -71,7 +75,7 @@ namespace tinycoro { namespace detail {
             if (_queue.try_pop(elem))
             {
                 // pop was ok
-                local::Notify(_popEvent);
+                local::Notify(_popEvent, std::atomic_notify_one);
                 return true;
             }
 
@@ -84,8 +88,8 @@ namespace tinycoro { namespace detail {
 
     private:
         // uint32_t for safe overflow
-        std::atomic<uint32_t> _pushEvent;
-        std::atomic<uint32_t> _popEvent;
+        alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent;
+        alignas(CACHELINE_SIZE) std::atomic<state_type> _popEvent;
 
         QueueT& _queue;
     };

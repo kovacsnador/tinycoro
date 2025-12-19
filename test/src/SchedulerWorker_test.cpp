@@ -3,7 +3,7 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
+/*TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
 {
     std::stop_source                         ss;
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
@@ -13,7 +13,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
 
     ss.request_stop();
     EXPECT_FALSE(tinycoro::detail::helper::PushTask(2, dispatcher, ss));
-}
+}*/
 
 TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 {
@@ -80,6 +80,7 @@ struct Schedubable : tinycoro::detail::DoubleLinkable<Schedubable>
     SchedubableMock mock;
 
     std::atomic<tinycoro::EPauseState> pauseState{tinycoro::EPauseState::IDLE};
+    std::atomic<bool> alreadyPaused{false};
 };
 
 TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)

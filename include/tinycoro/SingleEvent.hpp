@@ -50,11 +50,11 @@ namespace tinycoro {
 
                 _value.emplace(std::move(val));
 
-                if (_waiter)
-                {
-                    lock.unlock();
-                    _waiter->Notify();
-                }
+                auto waiter = _waiter;
+                lock.unlock();
+
+                if (waiter)
+                    waiter->Notify();
             }
 
             [[nodiscard]] bool IsSet() const noexcept
@@ -64,16 +64,12 @@ namespace tinycoro {
             }
 
         private:
-            void Reset() noexcept
-            {
-                std::scoped_lock lock{_mtx};
-                _value.reset();
-                _waiter = nullptr;
-            }
 
             [[nodiscard]] bool IsReady(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
+
+                assert(_waiter == nullptr);
 
                 if (_value.has_value() && _waiter == nullptr)
                 {
@@ -87,7 +83,7 @@ namespace tinycoro {
                 return false;
             }
 
-            bool Add(awaiter_type* awaiter)
+            [[nodiscard]] bool Add(awaiter_type* awaiter)
             {
                 std::scoped_lock lock{_mtx};
                 if (_waiter)
@@ -100,7 +96,7 @@ namespace tinycoro {
                 return !_value.has_value();
             }
 
-            bool Cancel(const awaiter_type* awaiter) noexcept
+            [[nodiscard]] bool Cancel(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
                 if (_waiter == awaiter)
@@ -112,9 +108,14 @@ namespace tinycoro {
                 return false;
             }
 
-            [[nodiscard]] auto Exchange() noexcept
+            [[nodiscard]] auto Exchange(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
+
+                assert(_waiter);
+                assert(_waiter == awaiter);
+                //assert(_value.has_value());
+
                 _waiter = nullptr;
                 return std::exchange(_value, std::nullopt);
             }
@@ -141,10 +142,11 @@ namespace tinycoro {
             [[nodiscard]] constexpr bool await_ready() const noexcept
             {
                 // check if already set the event.
-                return _singleEvent.IsReady(this);
+                awaitReadyFlag.store(_singleEvent.IsReady(this));
+                return awaitReadyFlag.load();
             }
 
-            constexpr auto await_suspend(auto parentCoro)
+            [[nodiscard]] constexpr auto await_suspend(auto parentCoro)
             {
                 PutOnPause(parentCoro);
                 if (_singleEvent.Add(this) == false)
@@ -153,17 +155,21 @@ namespace tinycoro {
                     ResumeFromPause(parentCoro);
                     return false;
                 }
+
+                awaitSuspendFlag = true;
                 return true;
             }
 
             // Moving out the value.
-            [[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange().value()); }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange(this).value()); }
 
             void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
 
             void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
-            bool Cancel() noexcept { return _singleEvent.Cancel(this); }
+            [[nodiscard]] bool Cancel() noexcept { 
+                cancelledFlag = true;
+                return _singleEvent.Cancel(this); }
 
         private:
             void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
@@ -176,6 +182,9 @@ namespace tinycoro {
 
             SingleEventT&  _singleEvent;
             CallbackEventT _event;
+            std::atomic<bool> cancelledFlag{};
+            mutable std::atomic<bool> awaitReadyFlag{};
+            std::atomic<bool> awaitSuspendFlag{};
         };
 
     } // namespace detail
