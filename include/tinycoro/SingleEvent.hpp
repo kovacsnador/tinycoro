@@ -14,13 +14,14 @@
 
 #include "PauseHandler.hpp"
 #include "Exception.hpp"
+#include "Common.hpp"
 
 namespace tinycoro {
 
     namespace detail {
 
         // This is an auto reset event, with one consumer and one producer.
-        template <typename ValueT, template <typename, typename> class AwaiterT>
+        template <concepts::NothrowMoveAssignable ValueT, template <typename, typename> class AwaiterT>
         class SingleEvent
         {
         public:
@@ -39,22 +40,29 @@ namespace tinycoro {
 
             [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
 
-            void Set(ValueT val)
+            bool Set(ValueT val)
             {
                 std::unique_lock lock{_mtx};
 
                 if (_value.has_value())
                 {
-                    throw SingleEventException{"SingleEvent: Value is already set!"};
+                    // we already set the value.
+                    return false;
+                    //throw SingleEventException{"SingleEvent: Value is already set!"};
                 }
 
                 _value.emplace(std::move(val));
 
-                auto waiter = _waiter;
-                lock.unlock();
+                if(auto waiter = std::exchange(_waiter, nullptr))
+                {
+                    waiter->SwapValue(_value);
+                    lock.unlock();
 
-                if (waiter)
                     waiter->Notify();
+                }
+
+                // value was set
+                return true;
             }
 
             [[nodiscard]] bool IsSet() const noexcept
@@ -65,7 +73,7 @@ namespace tinycoro {
 
         private:
 
-            [[nodiscard]] bool IsReady(const awaiter_type* awaiter) noexcept
+            /*[[nodiscard]] bool IsReady(const awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -81,6 +89,21 @@ namespace tinycoro {
                 }
 
                 return false;
+            }*/
+
+            [[nodiscard]] bool IsReady(awaiter_type* awaiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+
+                assert(_waiter == nullptr);
+
+                if (_value.has_value())
+                {
+                    awaiter->SwapValue(_value);
+                    return true;
+                }
+
+                return false;
             }
 
             [[nodiscard]] bool Add(awaiter_type* awaiter)
@@ -91,12 +114,18 @@ namespace tinycoro {
                     throw SingleEventException{"SingleEvent: Only 1 consumer allowed."};
                 }
 
+                if (_value.has_value())
+                {
+                    awaiter->SwapValue(_value);
+                    return false;
+                }
+
                 // save the first awaiter
                 _waiter = awaiter;
-                return !_value.has_value();
+                return true;
             }
 
-            [[nodiscard]] bool Cancel(const awaiter_type* awaiter) noexcept
+            [[nodiscard]] bool Cancel(awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
                 if (_waiter == awaiter)
@@ -108,7 +137,7 @@ namespace tinycoro {
                 return false;
             }
 
-            [[nodiscard]] auto Exchange(const awaiter_type* awaiter) noexcept
+            [[nodiscard]] auto Exchange(awaiter_type* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -122,13 +151,15 @@ namespace tinycoro {
 
             std::optional<ValueT> _value;
 
-            const awaiter_type* _waiter{nullptr};
+            awaiter_type* _waiter{nullptr};
             mutable std::mutex  _mtx;
         };
 
         template <typename SingleEventT, typename CallbackEventT>
         class SingleEventAwaiter
         {
+            mutable size_t notifyCount{};
+
         public:
             SingleEventAwaiter(SingleEventT& singleEvent, CallbackEventT event)
             : _singleEvent{singleEvent}
@@ -139,7 +170,7 @@ namespace tinycoro {
             // disable move and copy
             SingleEventAwaiter(SingleEventAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() const noexcept
+            [[nodiscard]] constexpr bool await_ready() noexcept
             {
                 // check if already set the event.
                 awaitReadyFlag.store(_singleEvent.IsReady(this));
@@ -161,15 +192,25 @@ namespace tinycoro {
             }
 
             // Moving out the value.
-            [[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange(this).value()); }
+            //[[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange(this).value()); }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return _value.value(); }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            void Notify() const noexcept { 
+                notifyCount++;
+                _event.Notify(ENotifyPolicy::RESUME); }
 
             void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
 
             [[nodiscard]] bool Cancel() noexcept { 
                 cancelledFlag = true;
                 return _singleEvent.Cancel(this); }
+
+            template<typename T>
+            void SwapValue(T& val) noexcept
+            {   
+                assert(_value.has_value() == false);
+                std::swap(_value, val);
+            }
 
         private:
             void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
@@ -182,6 +223,9 @@ namespace tinycoro {
 
             SingleEventT&  _singleEvent;
             CallbackEventT _event;
+
+            std::optional<typename SingleEventT::value_type> _value;
+
             std::atomic<bool> cancelledFlag{};
             mutable std::atomic<bool> awaitReadyFlag{};
             std::atomic<bool> awaitSuspendFlag{};

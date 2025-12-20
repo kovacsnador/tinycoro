@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include <concepts>
+#include <semaphore>
 
 #include "mock/CoroutineHandleMock.h"
 
@@ -114,14 +115,17 @@ struct SingleNotifierMock
     std::shared_ptr<SingleNotifierMockImpl> mock = std::make_shared<SingleNotifierMockImpl>();
 };
 
+template<typename T>
 struct SingleEventMock
 {
+    using value_type = T;
+
     MOCK_METHOD(bool, Add, (void*));
 };
 
 TEST(SingleEventTest, SingleEventTest_await_suspend_noSuspend)
 {
-    SingleEventMock    mock;
+    SingleEventMock<int32_t>    mock;
     SingleNotifierMock notifier;
 
     tinycoro::detail::SingleEventAwaiter awaiter{mock, notifier};
@@ -237,15 +241,13 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
     tinycoro::Scheduler scheduler{2};
     tinycoro::SoftClock clock;
 
-    tinycoro::SingleEvent<int32_t> event;
-    std::atomic<int32_t>           doneCount{};
+    tinycoro::SingleEvent<uint32_t> event;
+    uint32_t         doneCount{};
 
     // tinycoro::AutoEvent helperEvent{true};
     std::binary_semaphore sema{1};
 
     auto count = GetParam();
-
-    size_t releaseCount{};
 
     auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
         while (doneCount < count)
@@ -253,7 +255,6 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
             auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
             if (opt.has_value())
             {
-                releaseCount++;
                 sema.release();
                 // helperEvent.Set();
                 doneCount++;
@@ -262,11 +263,11 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
     };
 
     auto sleep = [&]() -> tinycoro::TaskNIC<> {
-        for ([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+        for ([[maybe_unused]] auto it : std::ranges::views::iota(0u, count))
         {
             sema.acquire();
             // co_await helperEvent;
-            event.Set(42);
+            event.Set(it);
         }
 
         co_return;

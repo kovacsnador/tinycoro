@@ -68,10 +68,15 @@ namespace tinycoro {
             // We detach ourself from the parent
             // and clear the cancellation callback,
             // but the event is NOT cancelled
-            void Release()
+            bool Release()
             {
                 std::scoped_lock lock{_mtx};
-                _cancellationCallback = nullptr;
+                if(_cancellationCallback)
+                {
+                    _cancellationCallback = nullptr;
+                    return true;
+                }
+                return false;
             }
 
             // We try to cancel the event
@@ -93,7 +98,7 @@ namespace tinycoro {
                     // return true if cancellation was success.
                     return cancelCallback();
                 }
-                return false;
+                return true;
             }
 
             void swap(SoftClockCancelToken& other) noexcept

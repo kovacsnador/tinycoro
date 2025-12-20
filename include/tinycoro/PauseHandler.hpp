@@ -11,6 +11,7 @@
 #include <concepts>
 #include <coroutine>
 #include <atomic>
+#include <mutex>
 
 #include "Common.hpp"
 #include "IntrusiveObject.hpp"
@@ -34,8 +35,16 @@ namespace tinycoro {
             // Need to be up there to make the
             // "requirement" work for Set().
             PauseHandlerCallbackT _notifyCallback;
+            mutable std::once_flag _flag{};
 
         public:
+            PauseCallbackEvent() = default;
+
+            PauseCallbackEvent(PauseCallbackEvent&& other) noexcept
+            : _notifyCallback{std::move(other._notifyCallback)}
+            {
+            }
+
             void Notify(ENotifyPolicy policy = ENotifyPolicy::RESUME) const
             {
                 assert(_notifyCallback);
@@ -44,7 +53,8 @@ namespace tinycoro {
                 //
                 // This notify callback is responsible
                 // for the corouitne resumption.
-                _notifyCallback(policy);
+                std::call_once(_flag, _notifyCallback, policy);
+                //_notifyCallback(policy);
             }
 
             // Sets the notify callback

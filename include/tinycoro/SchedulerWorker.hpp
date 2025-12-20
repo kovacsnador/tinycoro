@@ -16,8 +16,6 @@
 
 namespace tinycoro { namespace detail {
 
-    static inline thread_local size_t count{};
-
     namespace helper {
         // With this variable we indicate that
         // a stop purposed by the scheduler
@@ -83,6 +81,8 @@ namespace tinycoro { namespace detail {
     class SchedulerWorker
     {
         using Task_t = typename DispatcherT::value_type;
+
+        size_t doneCount{};
 
     public:
         SchedulerWorker(DispatcherT& dispatcher, std::stop_token stopToken)
@@ -207,18 +207,11 @@ namespace tinycoro { namespace detail {
                     // that means that the task is already in paused state
                     // So we need to resume it manually
 
-                    auto erased{false};
-
                     {
                         std::scoped_lock pauseLock{_pausedTasksMtx};
                         // remove the tasks from paused tasks
-                        erased = _pausedTasks.erase(promisePtr);
-                    }
-
-                    if(erased == false)
-                    {
-                        // somebody already notified the task
-                        return;
+                        [[maybe_unused]] auto erased = _pausedTasks.erase(promisePtr);
+                        assert(erased);
                     }
 
                     // push back task to the queue for resumption
@@ -340,7 +333,7 @@ namespace tinycoro { namespace detail {
                 case STOPPED:
                     [[fallthrough]];
                 case DONE:
-                    count++;
+                    doneCount++;
                     [[fallthrough]];
                 default:
                     return;

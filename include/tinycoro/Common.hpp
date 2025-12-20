@@ -219,6 +219,9 @@ namespace tinycoro {
             { T{std::nostopstate} };
         };
 
+        template<typename T>
+        concept NothrowMoveAssignable = std::is_nothrow_move_assignable_v<T>;
+
     } // namespace concepts
 
     namespace detail {
