@@ -424,7 +424,7 @@ TEST_P(AllOfAwaiterDynamicTest, AllOfAwaiterDynamicFuntionalTest_1)
         }
     };
 
-    tinycoro::AllOfInline(coro());
+    tinycoro::AllOf(coro());
 }
 
 TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
@@ -461,7 +461,7 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_1)
         }
     };
 
-    tinycoro::AllOfInline(coro());
+    tinycoro::AllOf(coro());
 }
 
 TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
@@ -494,7 +494,7 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
         EXPECT_EQ(count, std::ranges::count_if(results, [](auto& it) { return it.has_value(); }));
     };
 
-    tinycoro::AllOfInline(coro());
+    tinycoro::AllOf(coro());
 }
 
 TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
@@ -530,7 +530,7 @@ TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_3)
         EXPECT_EQ(count, 1);
     };
 
-    tinycoro::AllOfInline(coro());
+    tinycoro::AllOf(coro());
 }
 
 TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
@@ -564,5 +564,5 @@ TEST(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_exception)
         EXPECT_EQ(count, 0);
     };
 
-    tinycoro::AllOfInline(coro());
+    tinycoro::AllOf(coro());
 }

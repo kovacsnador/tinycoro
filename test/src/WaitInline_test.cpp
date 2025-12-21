@@ -122,7 +122,7 @@ TEST(WaitInlineTest, WaitInlineTest_void)
     EXPECT_CALL(*mock.mock, ResumeState()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
 
  
-    tinycoro::AllOfInline(mock);
+    tinycoro::AllOf(mock);
 }
 
 TEST(WaitInlineTest, WaitInlineTest_int32)
@@ -150,7 +150,7 @@ TEST(WaitInlineTest, WaitInlineTest_int32)
         .Times(1)
         .WillOnce(testing::Return(42));
 
-    auto val = tinycoro::AllOfInline(mock);
+    auto val = tinycoro::AllOf(mock);
     EXPECT_EQ(42, val);
 }
 
@@ -193,7 +193,7 @@ TEST(WaitInlineTest, WaitInlineTest_pause)
 
     auto resumer = [&]()->tinycoro::Task<void> { mock.pauseHandlerMock->cb(tinycoro::ENotifyPolicy::RESUME); co_return;};
 
-    auto [val, voidValue] = tinycoro::AllOfInline(mock, resumer());
+    auto [val, voidValue] = tinycoro::AllOf(mock, resumer());
     EXPECT_EQ(42, val);
 }
 
@@ -220,7 +220,7 @@ TEST(WaitInlineTest, WaitInlineTest_cancelled)
 
     EXPECT_CALL(*mock.mock, await_resume()).Times(0);
  
-    auto val = tinycoro::AllOfInline(mock);
+    auto val = tinycoro::AllOf(mock);
     EXPECT_TRUE((std::same_as<decltype(val), std::optional<int32_t>>));
     EXPECT_FALSE(val.has_value());
 }
@@ -276,7 +276,7 @@ TEST(WaitInlineTest, WaitInlineTest_multiTasks)
 
     EXPECT_CALL(mock2, await_resume()).Times(1).WillOnce(testing::Return(43));
 
-    auto [result1, result2] = tinycoro::AllOfInline(mock1, mock2);
+    auto [result1, result2] = tinycoro::AllOf(mock1, mock2);
     EXPECT_EQ(42, result1);
     EXPECT_EQ(43, result2);
 }
@@ -310,7 +310,7 @@ TEST(WaitInlineTest, WaitInlineTest_dynamicTasks)
         EXPECT_CALL(*tasks[i].mock, await_resume()).Times(1).WillOnce(testing::Return(42));
     }
 
-    auto results = tinycoro::AllOfInline(tasks);
+    auto results = tinycoro::AllOf(tasks);
     std::ranges::for_each(results, [](const auto& v) {
         EXPECT_EQ(42, v);
     });
@@ -345,7 +345,7 @@ TEST(WaitInlineTest, WaitInlineTest_dynamicTasks_cancelled)
         EXPECT_CALL(*tasks[i].mock, await_resume()).Times(0);
     }
 
-    auto results = tinycoro::AllOfInline(tasks);
+    auto results = tinycoro::AllOf(tasks);
 
     std::ranges::for_each(results, [](const auto& v) {
         EXPECT_FALSE(v.has_value());
@@ -374,7 +374,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_voidTasks)
         co_return; 
     };
 
-    tinycoro::AllOfInline(consumer1(), consumer2(), consumer3());
+    tinycoro::AllOf(consumer1(), consumer2(), consumer3());
     EXPECT_EQ(i, 3);
 }
 
@@ -390,7 +390,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_1)
     // set the value
     event.Set(42);
 
-    auto value = tinycoro::AllOfInline(consumer());
+    auto value = tinycoro::AllOf(consumer());
     EXPECT_EQ(value, 42);
 }
 
@@ -414,7 +414,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_2)
 
     std::ignore = scheduler.Enqueue(producer());
 
-    auto value = tinycoro::AllOfInline(consumer());
+    auto value = tinycoro::AllOf(consumer());
     EXPECT_EQ(value, 42);
 }
 
@@ -447,7 +447,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_3)
         co_return ++count; 
     };
 
-    auto [v1, v2, v3, v4, v5] = tinycoro::AllOfInline(task1(), task2(), task3(), task4(), task5());
+    auto [v1, v2, v3, v4, v5] = tinycoro::AllOf(task1(), task2(), task3(), task4(), task5());
     
     EXPECT_EQ(v1, 1);
     EXPECT_EQ(v2, 2);
@@ -472,7 +472,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_4)
     tasks.push_back(task());
     tasks.push_back(task());
 
-    auto results = tinycoro::AllOfInline(tasks);
+    auto results = tinycoro::AllOf(tasks);
     
     EXPECT_EQ(results[0], 1);
     EXPECT_EQ(results[1], 2);
@@ -506,7 +506,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_5)
         co_return; 
     };
 
-    auto [v1, v2, v3] = tinycoro::AllOfInline(task1(), task2(), task3());
+    auto [v1, v2, v3] = tinycoro::AllOf(task1(), task2(), task3());
     
     EXPECT_TRUE((std::same_as<decltype(v1), std::optional<bool>>));
     EXPECT_TRUE((std::same_as<decltype(v2), std::optional<uint32_t>>));
@@ -542,7 +542,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_exception)
         co_return; 
     };
 
-    auto func = [&]{std::ignore = tinycoro::AllOfInline(task1(), task2(), task3()); };
+    auto func = [&]{std::ignore = tinycoro::AllOf(task1(), task2(), task3()); };
 
     EXPECT_THROW(func(), std::runtime_error);
     EXPECT_EQ(count, 3);
@@ -569,7 +569,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_exception2)
     tasks.push_back(task());
     tasks.push_back(task());
 
-    auto func = [&]{std::ignore = tinycoro::AllOfInline(tasks); };
+    auto func = [&]{std::ignore = tinycoro::AllOf(tasks); };
 
     EXPECT_THROW(func(), std::runtime_error);
     EXPECT_EQ(3, count);
@@ -602,7 +602,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_pauseTask)
         EXPECT_EQ(i++, 4);
     };
 
-    tinycoro::AllOfInline(consumer1(), consumer2(), consumer3());
+    tinycoro::AllOf(consumer1(), consumer2(), consumer3());
     EXPECT_EQ(i, 6);
 }
 
@@ -644,7 +644,7 @@ TEST(WaitInlineTest, WaitInline_FunctionalTest_pauseTask_stoped)
     auto task3 = consumer3();
     task3.SetStopSource(ssource);
 
-    tinycoro::AllOfInline(consumer1(), consumer2(), std::move(task3));
+    tinycoro::AllOf(consumer1(), consumer2(), std::move(task3));
     EXPECT_EQ(i, 4);
 }
 
@@ -669,7 +669,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_with_scheduler)
     auto [fut1, fut2] = scheduler.Enqueue(deferedTask(40), deferedTask(43));
 
     // Run intline the 2 task which are notified by other scheduler
-    auto [ret1, ret2] = tinycoro::AllOfInline(task(41), task(42));
+    auto [ret1, ret2] = tinycoro::AllOf(task(41), task(42));
 
     EXPECT_EQ(ret1, 41);
     EXPECT_EQ(ret2, 42);
@@ -688,7 +688,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleep)
     };
 
     auto start = tinycoro::SoftClock::Now();
-    auto res = tinycoro::AllOfInline(deferedTask(42));
+    auto res = tinycoro::AllOf(deferedTask(42));
 
     EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
     EXPECT_EQ(res, 42);
@@ -704,7 +704,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti)
     };
 
     auto start = tinycoro::SoftClock::Now();
-    auto [r1, r2, r3] = tinycoro::AllOfInline(deferedTask(41), deferedTask(42), deferedTask(43));
+    auto [r1, r2, r3] = tinycoro::AllOf(deferedTask(41), deferedTask(42), deferedTask(43));
 
     // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
     EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
@@ -725,7 +725,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_sleepMulti_dynamic)
     std::array<tinycoro::Task<int32_t>, 3> tasks{deferedTask(41), deferedTask(42), deferedTask(43)};
 
     auto start = tinycoro::SoftClock::Now();
-    auto results = tinycoro::AllOfInline(tasks);
+    auto results = tinycoro::AllOf(tasks);
 
     // tinycoro::Sleep is running async so the only guarantie that it takes longer then 200ms
     EXPECT_TRUE(tinycoro::SoftClock::Now() >= start + 200ms);
@@ -750,13 +750,13 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_pushawait)
             co_await channel.PushWait(42);
         };
 
-        auto [val1, val2] = tinycoro::AllOfInline(consumer(), producer());
+        auto [val1, val2] = tinycoro::AllOf(consumer(), producer());
 
         EXPECT_TRUE((std::same_as<decltype(val2), std::optional<tinycoro::VoidType>>));
         co_return val1.value();
     };
 
-    auto fortyTwo = tinycoro::AllOfInline(task1());
+    auto fortyTwo = tinycoro::AllOf(task1());
     EXPECT_EQ(fortyTwo, 42);
 }
 
@@ -775,7 +775,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled)
         co_await tinycoro::SleepFor(clock, 100ms);
     };
 
-    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
 
     // task should be cancelled
     EXPECT_FALSE(r1.has_value());
@@ -804,7 +804,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_latch)
         co_await tinycoro::SleepFor(clock, 100ms);
     };
 
-    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
 
     // task should be cancelled
     EXPECT_FALSE(r1.has_value());
@@ -839,7 +839,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_dynamic)
 
     tasks.emplace_back(sleepTask());
 
-    auto results = tinycoro::AnyOfInline(tasks);
+    auto results = tinycoro::AnyOf(tasks);
 
     // task should be cancelled
     EXPECT_FALSE(results[0].has_value());
@@ -868,7 +868,7 @@ TEST(WaitInlineTest, WaitInlineTest_FunctionalTest_cancelled_manual)
         co_await tinycoro::SleepFor(clock, 100ms);
     };
 
-    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(waitTask(), waitTask(), waitTask(), waitTask(), waitTask(), sleepTask());
 
     // task should be cancelled
     EXPECT_FALSE(r1.has_value());

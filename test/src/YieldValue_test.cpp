@@ -86,7 +86,7 @@ TEST(YieldValueTest, YieldValueTest_variant_yield_runinline)
         EXPECT_EQ(std::get<bool>(val), true);
     };
 
-    tinycoro::AllOfInline(runner());
+    tinycoro::AllOf(runner());
 }
 
 #endif /* !TINY_CORO_GCC_11 */
@@ -99,7 +99,7 @@ TEST(YieldValueTest, YieldValueTest_direct_invoke_runinline)
     };
 
     // in this case co_yield is just ignored
-    auto val = tinycoro::AllOfInline(func());
+    auto val = tinycoro::AllOf(func());
     EXPECT_EQ(*(val.value()), 42);
 }
 

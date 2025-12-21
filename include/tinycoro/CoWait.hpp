@@ -249,13 +249,14 @@ namespace tinycoro {
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... Args>
-        requires (sizeof...(Args) > 0)
+        requires (sizeof...(Args) > 0) && concepts::IsScheduler<SchedulerT, Args...>
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, Args&&... tasks)
     {
         return AnyOfAwait(scheduler, StopSourceT{}, std::forward<Args>(tasks)...);
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::Iterable ContainerT>
+        requires concepts::IsScheduler<SchedulerT, ContainerT>
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, ContainerT&& tasks)
     {
         return AnyOfAwait(scheduler, StopSourceT{}, std::forward<ContainerT>(tasks));

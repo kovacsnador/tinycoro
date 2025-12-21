@@ -602,14 +602,14 @@ TEST(BarrierTest, BarrierTest_preset_stopSource_inline)
     auto task2 = [&]() -> tinycoro::Task<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
     stopSource.request_stop();
-    tinycoro::AnyOfInline(stopSource, task2(), task1());
+    tinycoro::AnyOf(stopSource, task2(), task1());
 
     EXPECT_EQ(count, 0);
 
     auto taskNic1 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.Wait()); };
     auto taskNic2 = [&]() -> tinycoro::TaskNIC<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
-    tinycoro::AnyOfInline(stopSource, taskNic2(), taskNic1());
+    tinycoro::AnyOf(stopSource, taskNic2(), taskNic1());
 
     EXPECT_EQ(count, 2);
 }
@@ -625,7 +625,7 @@ TEST(BarrierTest, BarrierTest_functionalTest_cancel_inline)
         co_return 42;
     };
 
-    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOfInline(task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
+    auto [r1, r2, r3, r4, r5, r6] = tinycoro::AnyOf(task(), task(), task(), task(), task(), tinycoro::SleepFor(clock, 100ms));
 
     EXPECT_FALSE(r1.has_value());
     EXPECT_FALSE(r2.has_value());

@@ -263,7 +263,7 @@ namespace tinycoro {
     // and you anyway want to wait for the result. (No need for a scheduler)
     template <typename... TaskT>
         requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
-    [[nodiscard]] auto AllOfInline(TaskT&&... tasks)
+    [[nodiscard]] auto AllOf(TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
         return inlineScheduler.Run();
@@ -271,7 +271,7 @@ namespace tinycoro {
 
     template <typename... TaskT>
         requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
-    void AllOfInline(TaskT&&... tasks)
+    void AllOf(TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
         std::ignore = inlineScheduler.Run();
@@ -279,7 +279,7 @@ namespace tinycoro {
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename... TaskT>
         requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
-    [[nodiscard]] auto AnyOfInline(StopSourceT stopSource, TaskT&&... tasks)
+    [[nodiscard]] auto AnyOf(StopSourceT stopSource, TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
         return inlineScheduler.Run();
@@ -287,18 +287,18 @@ namespace tinycoro {
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename... TaskT>
         requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
-    void AnyOfInline(StopSourceT stopSource, TaskT&&... tasks)
+    void AnyOf(StopSourceT stopSource, TaskT&&... tasks)
     {
         detail::InlineScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
         std::ignore = inlineScheduler.Run();
     }
 
-    template <concepts::IsStopSource StopSourceT = std::stop_source, concepts::NonIterable... TaskT>
+    template <concepts::IsStopSource StopSourceT = std::stop_source, concepts::IsCorouitneTask... TaskT>
         requires (sizeof...(TaskT) > 0)
-    [[nodiscard]] auto AnyOfInline(TaskT&&... tasks)
+    [[nodiscard]] auto AnyOf(TaskT&&... tasks)
     {
         StopSourceT stopSource{};
-        return AnyOfInline(stopSource, std::forward<TaskT>(tasks)...);
+        return AnyOf(stopSource, std::forward<TaskT>(tasks)...);
     }
 
     namespace detail {
@@ -387,7 +387,7 @@ namespace tinycoro {
         }
 
         template <typename ContainerT>
-        auto CollectResults(ContainerT&& container)
+        [[nodiscard]] auto CollectResults(ContainerT&& container)
         {
             // container to hold the result values.
             std::vector<TaskResult_t<TaskReturnT<ContainerT>>> results;
@@ -417,7 +417,7 @@ namespace tinycoro {
 
     template <concepts::Iterable ContainerT>
         requires (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
-    [[nodiscard]] auto AllOfInline(ContainerT&& container)
+    [[nodiscard]] auto AllOf(ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
@@ -426,7 +426,7 @@ namespace tinycoro {
 
     template <concepts::Iterable ContainerT>
         requires std::same_as<detail::TaskReturnT<ContainerT>, void>
-    void AllOfInline(ContainerT&& container)
+    void AllOf(ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
@@ -434,7 +434,7 @@ namespace tinycoro {
 
     template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
         requires (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
-    [[nodiscard]] auto AnyOfInline(StopSourceT stopSource, ContainerT&& container)
+    [[nodiscard]] auto AnyOf(StopSourceT stopSource, ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, stopSource);
@@ -443,17 +443,17 @@ namespace tinycoro {
 
     template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
         requires std::same_as<detail::TaskReturnT<ContainerT>, void>
-    void AnyOfInline(StopSourceT stopSource, ContainerT&& container)
+    void AnyOf(StopSourceT stopSource, ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, stopSource);
     }
 
     template < concepts::IsStopSource StopSourceT = std::stop_source, concepts::Iterable ContainerT>
-    [[nodiscard]] auto AnyOfInline(ContainerT&& container)
+    [[nodiscard]] auto AnyOf(ContainerT&& container)
     {
         StopSourceT stopSource{};
-        return AnyOfInline(stopSource, std::forward<ContainerT>(container));
+        return AnyOf(stopSource, std::forward<ContainerT>(container));
     }
 
 } // namespace tinycoro

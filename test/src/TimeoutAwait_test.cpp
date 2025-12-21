@@ -49,7 +49,7 @@ void TimeoutAwaitTestHelper(auto& awaitable, bool hasValue)
         EXPECT_EQ(res.has_value(), hasValue); // value check
     };
 
-    tinycoro::AllOfInline(task(awaitable));
+    tinycoro::AllOf(task(awaitable));
 }
 
 TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed_timed_out)
@@ -109,7 +109,7 @@ void TimeoutAwaitFunctionalTest(AwaitableT&& awaitable, TimeT time)
         }
     };
 
-    tinycoro::AllOfInline(task());
+    tinycoro::AllOf(task());
 }
 
 TEST(TimeoutAwaitTest, TimeoutAwaitTest_ManualEvent)

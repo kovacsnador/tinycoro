@@ -411,7 +411,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cleanup_callback_pushWait)
         channel.Close();
     };
 
-    tinycoro::AllOfInline(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
+    tinycoro::AllOf(producer(40), producer(41), producer(42), producer(43), producer(44), consumer(40), consumer(41), closer());
 
     EXPECT_EQ(coll.size(), 3);
 
@@ -436,7 +436,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_pop_awaiter_listener)
         EXPECT_EQ(val, expected);
     };
 
-    tinycoro::AllOfInline(waitForListeners(), consumer(40), consumer(41), consumer(42), producer(40), producer(41), producer(42));
+    tinycoro::AllOf(waitForListeners(), consumer(40), consumer(41), consumer(42), producer(40), producer(41), producer(42));
 }
 
 TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel)
@@ -488,7 +488,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_cancel_inline)
 
     auto listenerWaiter = [&]() -> tinycoro::TaskNIC<void> { co_await tinycoro::Cancellable(channel.WaitForListeners(10)); };
 
-    auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOfInline(listener(),
+    auto [r1, r2, r3, r4, r5, r6, r7, r8, r9] = tinycoro::AnyOf(listener(),
                                                                       listener(),
                                                                       listener(),
                                                                       listener(),
@@ -1009,7 +1009,7 @@ TEST_P(UnbufferedChannelTest,UnbufferedChannelTest_Push_and_Pop_Wait_cancel_inli
         tasks.emplace_back(consumer());
     }
 
-    auto result = tinycoro::AnyOfInline(std::move(tasks));
+    auto result = tinycoro::AnyOf(std::move(tasks));
 
     EXPECT_EQ(result[0].value(), 44);
 }
