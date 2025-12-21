@@ -101,103 +101,6 @@ TEST(AtomicQueueTest, AtomicQueueTest_empty)
     EXPECT_TRUE(queue.empty());
 }
 
-/*TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
-{
-    tinycoro::SoftClock clock;
-    tinycoro::Scheduler scheduler{2};
-
-    tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher dispatcher{queue};
-
-    tinycoro::AutoEvent event;
-
-    auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(dispatcher.try_push(1u));
-        EXPECT_TRUE(dispatcher.try_push(2u));
-
-        event.Set();
-
-        co_await tinycoro::SleepFor(clock, 100ms);
-
-        size_t val;
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 1u);
-    };
-
-    auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await event;
-
-        auto state = dispatcher.pop_state();
-
-        // here we wait for a possible push
-        dispatcher.wait_for_push(state);
-
-        EXPECT_TRUE(dispatcher.try_push(3u));
-
-        size_t val;
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 2u);
-
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 3u);
-    };
-
-    tinycoro::AllOf(scheduler, producer(), consumer());
-}*/
-
-/*TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
-{
-    tinycoro::SoftClock clock;
-    tinycoro::Scheduler scheduler{2};
-
-    tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher dispatcher{queue};
-
-    tinycoro::AutoEvent event;
-
-    auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(dispatcher.try_push(1u));
-        EXPECT_TRUE(dispatcher.try_push(2u));
-
-        size_t val;
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 1u);
-
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 2u);
-
-        event.Set();
-
-        co_await tinycoro::SleepFor(clock, 100ms);
-
-        EXPECT_TRUE(dispatcher.try_push(3u));
-        EXPECT_TRUE(dispatcher.try_push(4u));
-    };
-
-    auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await event;
-
-        auto state = dispatcher.push_state();
-
-        // here we wait for a possible push
-        dispatcher.wait_for_pop(state);
-
-        size_t val;
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 3u);
-
-        state = dispatcher.push_state();
-
-        // here we wait for a possible push
-        dispatcher.wait_for_pop(state);
-
-        EXPECT_TRUE(dispatcher.try_pop(val));
-        EXPECT_EQ(val, 4u);
-    };
-
-    tinycoro::AllOf(scheduler, producer(), consumer());
-}*/
-
 struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
@@ -369,7 +272,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     EXPECT_EQ(count * 8, sum);
 }
 
-/*TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
+TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
 {
     const auto count = GetParam();
 
@@ -380,12 +283,13 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     std::atomic<size_t> totalCount{};
 
     auto producer = [&]() -> tinycoro::Task<void> {
+        
+        size_t state{};
         for (size_t i = 0; i <= count; ++i)
         {
-            auto state = dispatcher.pop_state();
             while (dispatcher.try_push(i) == false)
             {
-                dispatcher.wait_for_push(state);
+                dispatcher.wait_for_push(state++);
             }
             totalCount++;
         }
@@ -393,14 +297,13 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t state{};
         for (;;)
         {
-            auto state = dispatcher.push_state();
-
             size_t val;
             if (dispatcher.try_pop(val) == false)
             {
-                dispatcher.wait_for_pop(state);
+                dispatcher.wait_for_pop(state++);
             }
             else
             {
@@ -425,53 +328,3 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
 
     EXPECT_EQ(totalCount, 0);
 }
-
-TEST(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_wait_for_stress_test)
-{
-    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-
-    // this need to move
-    queue.wait_for_push();
-
-    // make the queue full
-    EXPECT_TRUE(queue.try_push(0));
-    EXPECT_TRUE(queue.try_push(1));
-
-    // this need to move
-    queue.wait_for_pop();
-
-    auto fut = std::async(std::launch::async, [&] {
-        for (size_t i = 0; i < 100;)
-        {
-            // wait until we can pop
-            queue.wait_for_pop();
-
-            EXPECT_FALSE(queue.empty());
-
-            int32_t val;
-            auto succeed = queue.try_pop(val);
-            if(succeed)
-                i++;
-
-            EXPECT_TRUE(succeed);
-        }
-
-        SUCCEED();
-    });
-
-    for (size_t i = 2; i < 100;)
-    {
-        queue.wait_for_push();
-
-        EXPECT_FALSE(queue.full());
-
-        auto succeed = queue.try_push(i);
-        if(succeed)
-            i++;
-
-        EXPECT_TRUE(succeed);
-    }
-
-    // wait for the future
-    fut.get();
-}*/

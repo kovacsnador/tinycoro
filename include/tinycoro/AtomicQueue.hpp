@@ -51,13 +51,7 @@ namespace tinycoro { namespace detail {
         using value_type = T;
         using sequence_t = uint64_t;
 
-        AtomicQueue()
-        {
-            /*for (sequence_t i = 0; i < _buffer.size(); ++i)
-            {
-                _buffer[i].sequence.store(i, std::memory_order_relaxed);
-            }*/
-        }
+        AtomicQueue() = default; 
 
         // disable copy and move
         AtomicQueue(AtomicQueue&&) = delete;
@@ -81,11 +75,6 @@ namespace tinycoro { namespace detail {
                         // store the new position as the next sequence
                         elem.sequence.store(turn(pos) * 2 + 1, std::memory_order_release);
 
-                        // notify waiter that
-                        // we have a new value
-                        // in the queue
-                        _head.notify_all();
-
                         // success
                         return true;
                     }
@@ -102,41 +91,6 @@ namespace tinycoro { namespace detail {
                     }
                 }
             }
-
-            /*for (;;)
-            {
-                // get the current enqueue position
-                auto  pos  = _head.load(std::memory_order_relaxed);
-                auto& elem = _buffer[pos & BUFFER_MASK];
-                auto  seq  = elem.sequence.load(std::memory_order_acquire);
-
-                if (seq == pos)
-                {
-                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
-                    {
-                        // found the right place
-                        // pushing the value into the queue
-                        elem.value = std::forward<U>(value);
-
-                        // store the new position as the next sequence
-                        elem.sequence.store(pos + 1, std::memory_order_release);
-
-                        // notify waiter that
-                        // we have a new value
-                        // in the queue
-                        //_head.notify_all();
-
-                        // success
-                        return true;
-                    }
-                }
-                else if (pos > seq)
-                {
-                    // the queue is full
-                    // push failed
-                    return false;
-                }
-            }*/
 
             // should be never reached..
             return false;
@@ -158,10 +112,6 @@ namespace tinycoro { namespace detail {
 
                         elem.sequence.store(turn(pos) * 2 + 2, std::memory_order_release);
 
-                        // notify the waiters
-                        // that a value is popped
-                        _tail.notify_all();
-
                         return true;
                     }
                 }
@@ -176,75 +126,8 @@ namespace tinycoro { namespace detail {
                 }
             }
 
-            /*for (;;)
-            {
-                // get the current dequeue position
-                auto  pos  = _tail.load(std::memory_order_relaxed);
-                auto& elem = _buffer[pos & BUFFER_MASK];
-                auto  seq  = elem.sequence.load(std::memory_order_acquire);
-
-                if (seq == pos + 1)
-                {
-                    // we found the right place
-                    // try to access the underlying element...
-                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
-                    {
-                        // we got exclusive access to the element
-                        data = std::move(elem.value);
-
-                        elem.sequence.store(pos + SIZE, std::memory_order_release);
-
-                        // notify the waiters
-                        // that a value is popped
-                        //_tail.notify_all();
-
-                        return true;
-                    }
-                }
-                else if (seq == pos)
-                {
-                    // the queue is empty
-                    // no element can be popped
-                    return false;
-                }
-            }*/
-
             // should be never reached..
             return false;
-        }
-
-        // Currently not used
-        //
-        // wait for new element to pop
-        // if the queue is empty
-        void wait_for_pop() const noexcept
-        {
-            auto head = _head.load(std::memory_order_relaxed);
-            auto tail = _tail.load(std::memory_order_relaxed);
-
-            if (tail == head)
-            {
-                // if the queue is empty
-                // we wait for the next element to pop
-                _head.wait(head);
-            }
-        }
-
-        // Currently not used
-        //
-        // wait for new element to push
-        // in case the queue is full
-        void wait_for_push() const noexcept
-        {
-            auto head = _head.load(std::memory_order_relaxed);
-            auto tail = _tail.load(std::memory_order_relaxed);
-
-            if ((head - SIZE) == tail)
-            {
-                // if the queue is full
-                // we wait until someone pops an element
-                _tail.wait(tail);
-            }
         }
 
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
@@ -254,13 +137,6 @@ namespace tinycoro { namespace detail {
     private:
         constexpr size_t idx(size_t i) const noexcept { return i % SIZE; }
         constexpr size_t turn(size_t i) const noexcept { return i / SIZE; }
-
-        /*constexpr auto increment(auto i) const noexcept
-        {
-            if (++i > SIZE)
-                return 0;
-            return i;
-        };*/
 
         struct Element
         {

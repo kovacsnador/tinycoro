@@ -48,7 +48,6 @@ namespace tinycoro {
                 {
                     // we already set the value.
                     return false;
-                    //throw SingleEventException{"SingleEvent: Value is already set!"};
                 }
 
                 _value.emplace(std::move(val));
@@ -76,24 +75,6 @@ namespace tinycoro {
             }
 
         private:
-
-            /*[[nodiscard]] bool IsReady(const awaiter_type* awaiter) noexcept
-            {
-                std::scoped_lock lock{_mtx};
-
-                assert(_waiter == nullptr);
-
-                if (_value.has_value() && _waiter == nullptr)
-                {
-                    // save the first awaiter
-                    _waiter = awaiter;
-
-                    // coroutine is ready, we can continue
-                    return true;
-                }
-
-                return false;
-            }*/
 
             [[nodiscard]] bool IsReady(awaiter_type* awaiter) noexcept
             {
@@ -162,8 +143,6 @@ namespace tinycoro {
         template <typename SingleEventT, typename CallbackEventT>
         class SingleEventAwaiter
         {
-            mutable size_t notifyCount{};
-
         public:
             SingleEventAwaiter(SingleEventT& singleEvent, CallbackEventT event)
             : _singleEvent{singleEvent}
@@ -174,16 +153,10 @@ namespace tinycoro {
             // disable move and copy
             SingleEventAwaiter(SingleEventAwaiter&&) = delete;
 
-            /*~SingleEventAwaiter()
-            {
-                awaitDeleted.store(true);
-            }*/
-
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
                 // check if already set the event.
-                awaitReadyFlag.store(_singleEvent.IsReady(this));
-                return awaitReadyFlag.load();
+                return _singleEvent.IsReady(this);
             }
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro)
@@ -195,24 +168,16 @@ namespace tinycoro {
                     ResumeFromPause(parentCoro);
                     return false;
                 }
-
-                awaitSuspendFlag = true;
                 return true;
             }
 
-            // Moving out the value.
-            //[[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange(this).value()); }
             [[nodiscard]] constexpr auto await_resume() noexcept { return _value.value(); }
 
-            bool Notify() const noexcept { 
-                notifyCount++;
-                return _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
 
             bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
-            [[nodiscard]] bool Cancel() noexcept { 
-                cancelledFlag = true;
-                return _singleEvent.Cancel(this); }
+            [[nodiscard]] bool Cancel() noexcept { return _singleEvent.Cancel(this); }
 
             template<typename T>
             void SwapValue(T& val) noexcept
@@ -234,11 +199,6 @@ namespace tinycoro {
             CallbackEventT _event;
 
             std::optional<typename SingleEventT::value_type> _value;
-
-            std::atomic<bool> cancelledFlag{};
-            mutable std::atomic<bool> awaitReadyFlag{};
-            std::atomic<bool> awaitSuspendFlag{};
-            std::atomic<bool> awaitDeleted{};
         };
 
     } // namespace detail

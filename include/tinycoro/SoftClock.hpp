@@ -64,10 +64,10 @@ namespace tinycoro {
                 TryCancel();
             }
 
-            // release the parent and the callback
-            // We detach ourself from the parent
-            // and clear the cancellation callback,
-            // but the event is NOT cancelled
+            // Release the callback.
+            // We detach ourself from the parent clock
+            // and clear the cancellation callback.
+            // But the event is NOT cancelled!
             bool Release()
             {
                 std::scoped_lock lock{_mtx};

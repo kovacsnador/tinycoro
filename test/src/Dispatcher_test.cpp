@@ -61,18 +61,19 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
     EXPECT_TRUE(dispatcher.empty());
 }
 
-/*TEST(DispatcherTest, DispatcherTest_wait_for_pop)
+TEST(DispatcherTest, DispatcherTest_wait_for_pop)
 {
     tinycoro::detail::AtomicQueue<int32_t, 256> queue;
     tinycoro::detail::Dispatcher                dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&] {
+
+        size_t state{};
+
         for (auto it : std::views::iota(0, 100))
         {
-            auto state = dispatcher.push_state();
-
             // wait until we can pop
-            dispatcher.wait_for_pop(state);
+            dispatcher.wait_for_pop(state++);
 
             int32_t val;
             EXPECT_TRUE(dispatcher.try_pop(val));
@@ -90,7 +91,7 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
 
     // wait for the future
     fut.get();
-}*/
+}
 
 // TODO check and fix this!!!!
 TEST(DispatcherTest, DispatcherTest_wait_for_push)
@@ -135,7 +136,7 @@ TEST(DispatcherTest, DispatcherTest_wait_for_push)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    for (size_t i = 2; i < 100;)
+    for (int32_t i = 2; i < 100;)
     {
         dispatcher.wait_for_push(popState++);
 
