@@ -105,7 +105,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }
 
-            void Notify() const noexcept { _event.Notify(); }
+            bool Notify() const noexcept { return _event.Notify(); }
 
             void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 

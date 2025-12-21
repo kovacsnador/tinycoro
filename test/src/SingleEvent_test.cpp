@@ -51,10 +51,13 @@ TEST(SingleEventTest, SingleEventTest_await_resume)
     EXPECT_FALSE(singleEvent.IsSet());
 
     singleEvent.Set(44);
-    EXPECT_TRUE(awaiter.await_ready());
-    EXPECT_TRUE(singleEvent.IsSet());
 
-    val = awaiter.await_resume();
+    auto awaiter2 = singleEvent.operator co_await();
+
+    EXPECT_TRUE(singleEvent.IsSet());
+    EXPECT_TRUE(awaiter2.await_ready());
+
+    val = awaiter2.await_resume();
     EXPECT_EQ(val, 44);
     EXPECT_FALSE(singleEvent.IsSet());
 }
@@ -92,13 +95,18 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
 
     auto hdl2 = tinycoro::test::MakeCoroutineHdl();
 
+    auto func = [&]{std::ignore = awaiter2.await_suspend(hdl2); };
     // allow only 1 consumer
-    EXPECT_THROW(awaiter2.await_suspend(hdl2), tinycoro::SingleEventException);
+    EXPECT_THROW(func(), tinycoro::SingleEventException);
 
     EXPECT_FALSE(singleEvent.IsSet());
-    singleEvent.Set(42);
+    EXPECT_TRUE(singleEvent.Set(42));
     EXPECT_TRUE(pauseCalled);
+    EXPECT_FALSE(singleEvent.IsSet());
+
+    EXPECT_TRUE(singleEvent.Set(43));
     EXPECT_TRUE(singleEvent.IsSet());
+
 }
 
 struct SingleNotifierMockImpl
@@ -258,6 +266,7 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
                 sema.release();
                 // helperEvent.Set();
                 doneCount++;
+                //EXPECT_EQ(doneCount++, *opt);
             }
         }
     };
@@ -267,7 +276,8 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
         {
             sema.acquire();
             // co_await helperEvent;
-            event.Set(it);
+            [[maybe_unused]] auto succeed = event.Set(it);
+            //EXPECT_TRUE(succeed);
         }
 
         co_return;

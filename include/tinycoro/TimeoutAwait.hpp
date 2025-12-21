@@ -42,18 +42,19 @@ namespace tinycoro {
 
         constexpr auto await_suspend(auto parentCoro)
         {
-            // we suspend, and set the flag which we need to wait
-            // to make sure the cancellation is done.
-            //
-            // We wait for this in await_resume. This is necessary becasue it
-            // can happen that cancellation token stays in the softclock queue
-            // and will be executed after the actual awaiter is already destroyed.
-            _awaiterSuspended.store(true, std::memory_order::release);
-
             auto suspend = _awaiter.await_suspend(parentCoro);
 
             if (suspend)
             {
+                // we suspend, and set the flag which we need to wait
+                // to make sure the cancellation is done.
+                //
+                // We wait for this in await_resume. This is necessary becasue it
+                // can happen that cancellation token stays in the softclock queue
+                // and will be executed after the actual awaiter is already destroyed.
+                //_awaiterSuspended.store(true, std::memory_order::release);
+                _awaiterSuspended++;
+
                 // set the event callback for the clock
                 // which is intented to force resume the awaiter
                 // after the timeout was reached.
@@ -62,25 +63,23 @@ namespace tinycoro {
                     // try to cancel the awaiter.
                     if(_awaiter.Cancel())
                     {   
-                        _awaiterCancelled.store(true, std::memory_order::release);
+                        //_awaiterCancelled.fetch_add(1, std::memory_order::release);
 
                         // At this point the awaiter is already
                         // cancelled, but we still force the resumption,
                         // in order to notify the awaiter.
-                        _awaiter.Notify();
+                        if(_awaiter.Notify())
+                            _awaiterCancelled.test_and_set(std::memory_order::release);
                     }
 
                     // cancellation is done
-                    _awaiterSuspended.store(false, std::memory_order::release);
+                    //_awaiterSuspended.store(false, std::memory_order::release);
+                    _awaiterSuspended++;
                     _awaiterSuspended.notify_all();
                 };
 
                 // initialize the cancel token for the event
                 _clockCancelToken = _clock.RegisterWithCancellation(cancellCallback, _time);
-            }
-            else
-            {
-                _awaiterSuspended.store(false, std::memory_order::release);
             }
 
             return suspend;
@@ -96,11 +95,31 @@ namespace tinycoro {
             auto suspended = _awaiterSuspended.load(std::memory_order::acquire);
  
             // We can try to cancel the clock callback.
-            if(suspended && _clockCancelToken.Release() == false)
+            if(suspended && _clockCancelToken.TryCancel() == false)
             {
                 // wait until the cancellation is done.
-                _awaiterSuspended.wait(true);   
+                _awaiterSuspended.wait(1);
+
+                /*if(_awaiterCancelled.load(std::memory_order::acquire) == false)
+                {
+                    // ERROR!!!!!!
+                    int k=0;
+                    ++k;
+                }
+
+                assert(_awaiterCancelled.load(std::memory_order::acquire));*/
+                
+                // check if the awaiter is cancelled,
+                // by the clock event. See await_suspend().
+                //if(_awaiterCancelled.load(std::memory_order::acquire))
+                {
+                    // The cancellation succeeded,
+                    // we return an empty optional
+                    //return optional_t{};
+                }
             }
+
+            //assert(_clockCancelToken.TryCancel() == false);
 
             // We can try to cancel the clock callback.
             // We will resume the coroutine anyway here.
@@ -110,7 +129,7 @@ namespace tinycoro {
 
             // check if the awaiter is cancelled,
             // by the clock event. See await_suspend().
-            if(_awaiterCancelled.load(std::memory_order::acquire))
+            if(_awaiterCancelled.test(std::memory_order::acquire))
             {
                 // The cancellation succeeded,
                 // we return an empty optional
@@ -154,15 +173,16 @@ namespace tinycoro {
         // or a duration which will be passed
         // together with the callback event to the clock.
         TimeT _time;
-
-        std::atomic<bool> _awaiterSuspended{false};
+        
+        // 0 => await ready
+        // 1 => resumed normaly
+        // 2 => resumed with timeout
+        std::atomic<uint8_t> _awaiterSuspended{0};
 
         // Flag to indicate if we cancel the awaiter.
-        std::atomic<bool> _awaiterCancelled{false};
+        std::atomic_flag _awaiterCancelled;
 
         std::atomic<bool> _awaiterResumed{false};
-
-        std::mutex _mtx;
     };
 
 } // namespace tinycoro

@@ -16,7 +16,7 @@ struct TestAwaitable
         return true;
     }
 
-    MOCK_METHOD(void, Notify, ());
+    MOCK_METHOD(bool, Notify, ());
     MOCK_METHOD(bool, Cancel, ());
 
     tinycoro::detail::PauseCallbackEvent event;
@@ -63,7 +63,7 @@ TYPED_TEST(TimeoutAwaitTest, TimeoutAwaitTest_typed_timed_out)
 
     // return that we could cancel the awaitable
     EXPECT_CALL(awaitable, Cancel).WillOnce(testing::Return(true));
-    EXPECT_CALL(awaitable, Notify).Times(1).WillOnce([&] { awaitable.event.Notify(); });
+    EXPECT_CALL(awaitable, Notify).Times(1).WillOnce([&] { return awaitable.event.Notify(); });
 
     EXPECT_CALL(awaitable, await_resume).Times(0);
 

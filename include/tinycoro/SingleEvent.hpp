@@ -56,6 +56,10 @@ namespace tinycoro {
                 if(auto waiter = std::exchange(_waiter, nullptr))
                 {
                     waiter->SwapValue(_value);
+
+                    assert(_waiter == nullptr);
+                    assert(_value.has_value() == false);
+
                     lock.unlock();
 
                     waiter->Notify();
@@ -170,6 +174,11 @@ namespace tinycoro {
             // disable move and copy
             SingleEventAwaiter(SingleEventAwaiter&&) = delete;
 
+            /*~SingleEventAwaiter()
+            {
+                awaitDeleted.store(true);
+            }*/
+
             [[nodiscard]] constexpr bool await_ready() noexcept
             {
                 // check if already set the event.
@@ -195,11 +204,11 @@ namespace tinycoro {
             //[[nodiscard]] constexpr auto await_resume() noexcept { return std::move(_singleEvent.Exchange(this).value()); }
             [[nodiscard]] constexpr auto await_resume() noexcept { return _value.value(); }
 
-            void Notify() const noexcept { 
+            bool Notify() const noexcept { 
                 notifyCount++;
-                _event.Notify(ENotifyPolicy::RESUME); }
+                return _event.Notify(ENotifyPolicy::RESUME); }
 
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             [[nodiscard]] bool Cancel() noexcept { 
                 cancelledFlag = true;
@@ -229,6 +238,7 @@ namespace tinycoro {
             std::atomic<bool> cancelledFlag{};
             mutable std::atomic<bool> awaitReadyFlag{};
             std::atomic<bool> awaitSuspendFlag{};
+            std::atomic<bool> awaitDeleted{};
         };
 
     } // namespace detail

@@ -11,10 +11,10 @@
 #include <concepts>
 #include <coroutine>
 #include <atomic>
-#include <mutex>
 
 #include "Common.hpp"
 #include "IntrusiveObject.hpp"
+#include "CallOnce.hpp"
 
 namespace tinycoro {
 
@@ -35,7 +35,7 @@ namespace tinycoro {
             // Need to be up there to make the
             // "requirement" work for Set().
             PauseHandlerCallbackT _notifyCallback;
-            mutable std::once_flag _flag{};
+            mutable std::atomic_flag _flag;
 
         public:
             PauseCallbackEvent() = default;
@@ -45,7 +45,7 @@ namespace tinycoro {
             {
             }
 
-            void Notify(ENotifyPolicy policy = ENotifyPolicy::RESUME) const
+            auto Notify(ENotifyPolicy policy = ENotifyPolicy::RESUME) const
             {
                 assert(_notifyCallback);
 
@@ -53,7 +53,7 @@ namespace tinycoro {
                 //
                 // This notify callback is responsible
                 // for the corouitne resumption.
-                std::call_once(_flag, _notifyCallback, policy);
+                return CallOnce(_flag, std::memory_order::acquire, _notifyCallback, policy);
                 //_notifyCallback(policy);
             }
 

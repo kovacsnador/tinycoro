@@ -28,7 +28,7 @@ class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T,
 public:
     PopAwaiterMock(auto&, auto) { }
 
-    void Notify() const noexcept { }
+    bool Notify() const noexcept { return true; }
 };
 
 TEST(ManualEventTest, ManualEventTest_coawaitReturn)

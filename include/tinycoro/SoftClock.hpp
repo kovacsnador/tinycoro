@@ -98,7 +98,7 @@ namespace tinycoro {
                     // return true if cancellation was success.
                     return cancelCallback();
                 }
-                return true;
+                return false;
             }
 
             void swap(SoftClockCancelToken& other) noexcept
@@ -111,6 +111,12 @@ namespace tinycoro {
                     std::swap(other._cancellationCallback, _cancellationCallback);
                 }
             }
+
+            operator bool() const noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _cancellationCallback.operator bool();
+            } 
 
         private:
             // private constructor
@@ -125,7 +131,7 @@ namespace tinycoro {
             // with this callback you can cancel the timeout
             std::function<bool()> _cancellationCallback{nullptr};
 
-            std::mutex _mtx;
+            mutable std::mutex _mtx;
         };
 
         template <typename CancellationTokenT, concepts::IsDuration PrecisionT>

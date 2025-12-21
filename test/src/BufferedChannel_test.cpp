@@ -180,7 +180,7 @@ class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T,
 public:
     PopAwaiterMock(auto&, auto, auto) { }
 
-    void Notify() const noexcept { };
+    bool Notify() const noexcept { return true; };
 };
 
 template <typename C, typename E>
@@ -192,7 +192,7 @@ public:
     {
     }
 
-    void Notify() const noexcept { };
+    bool Notify() const noexcept { return true; };
 
     auto value() { return val; }
 
@@ -205,7 +205,7 @@ class PushAwaiterMock : public tinycoro::detail::SingleLinkable<PushAwaiterMock<
 public:
     PushAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept { }
+    bool Notify() const noexcept { return true; }
 };
 
 TEST(BufferedChannelTest, BufferedChannelTest_coawaitReturn)

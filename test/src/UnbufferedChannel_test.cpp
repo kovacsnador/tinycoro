@@ -19,7 +19,7 @@ class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T,
 public:
     PopAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept { };
+    bool Notify() const noexcept { return true; }
 };
 
 template <typename T, typename U, typename V>
@@ -28,7 +28,7 @@ class PushAwaiterMock : public tinycoro::detail::SingleLinkable<PushAwaiterMock<
 public:
     PushAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept { };
+    bool Notify() const noexcept { return true; }
 };
 
 template <typename T, typename U>
@@ -37,7 +37,7 @@ class ListenerAwaiterMock : public tinycoro::detail::SingleLinkable<ListenerAwai
 public:
     ListenerAwaiterMock(auto&, auto...) { }
 
-    void Notify() const noexcept { };
+    bool Notify() const noexcept { return true; }
 
     size_t value() { return 42; }
 };

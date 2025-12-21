@@ -13,6 +13,7 @@
 #include "LinkedPtrQueue.hpp"
 #include "AtomicPtrStack.hpp"
 #include "Common.hpp"
+#include "Finally.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -82,7 +83,7 @@ namespace tinycoro { namespace detail {
     {
         using Task_t = typename DispatcherT::value_type;
 
-        size_t doneCount{};
+        //size_t doneCount{};
 
     public:
         SchedulerWorker(DispatcherT& dispatcher, std::stop_token stopToken)
@@ -177,11 +178,21 @@ namespace tinycoro { namespace detail {
             _Cleanup(_cachedTasks.begin());
         }
 
+        //std::atomic_flag _resumer{false};
+
         // Generates the pause resume callback
         // It relays on a task pointer address
         PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
         {
             return [this, promisePtr](ENotifyPolicy policy) {
+
+                /*if(_resumer.test_and_set() == true)
+                {
+                    assert(false);
+                }
+
+                auto finally = Finally([&]{ _resumer.clear(); });*/
+
                 if (_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
@@ -193,8 +204,6 @@ namespace tinycoro { namespace detail {
                         if (promisePtr->pauseState.compare_exchange_weak(
                                 expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
                         {
-
-                            promisePtr->alreadyPaused = true;
                             // The task is notified
                             // in time, so we are done.
                             return;
@@ -207,12 +216,14 @@ namespace tinycoro { namespace detail {
                     // that means that the task is already in paused state
                     // So we need to resume it manually
 
-                    {
+                    /*{
                         std::scoped_lock pauseLock{_pausedTasksMtx};
                         // remove the tasks from paused tasks
                         [[maybe_unused]] auto erased = _pausedTasks.erase(promisePtr);
                         assert(erased);
-                    }
+                    }*/
+                    _EraseFromPausedList(promisePtr);
+
 
                     // push back task to the queue for resumption
                     Task_t task{promisePtr};
@@ -297,11 +308,13 @@ namespace tinycoro { namespace detail {
                     {
                         auto promisePtr = task.release();
 
-                        std::unique_lock pauseLock{_pausedTasksMtx};
+                        /*std::unique_lock pauseLock{_pausedTasksMtx};
                         // push back into the pause state
                         _pausedTasks.push_front(promisePtr);
 
-                        pauseLock.unlock();
+                        pauseLock.unlock();*/
+                        _InsertInPausedList(promisePtr);
+
 
                         if (promisePtr->pauseState.compare_exchange_strong(
                                 expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
@@ -311,13 +324,15 @@ namespace tinycoro { namespace detail {
                             return;
                         }
 
-                        pauseLock.lock();
+                        /*pauseLock.lock();
                         // in the meantime the task is notified for resumption
                         // so we need to remove it from the paused task queue
                         // and resume the task
                         _pausedTasks.erase(promisePtr);
 
-                        pauseLock.unlock();
+                        pauseLock.unlock();*/
+
+                        _EraseFromPausedList(promisePtr);
 
                         // reassign the pointer
                         // and continue with this task
@@ -333,7 +348,7 @@ namespace tinycoro { namespace detail {
                 case STOPPED:
                     [[fallthrough]];
                 case DONE:
-                    doneCount++;
+                    //doneCount++;
                     [[fallthrough]];
                 default:
                     return;
@@ -390,6 +405,20 @@ namespace tinycoro { namespace detail {
                 Task_t destroyer{promisePtr};
                 promisePtr = next;
             }
+        }
+
+        void _InsertInPausedList(auto promisePtr)
+        {
+            std::scoped_lock lock{_pausedTasksMtx};
+            _pausedTasks.push_front(promisePtr);
+        }
+
+        void _EraseFromPausedList(auto promisePtr)
+        {
+            std::scoped_lock lock{_pausedTasksMtx};
+            [[maybe_unused]] auto erased = _pausedTasks.erase(promisePtr);
+
+            assert(erased);
         }
 
         // the task dispatcher
