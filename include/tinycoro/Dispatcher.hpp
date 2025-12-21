@@ -62,7 +62,7 @@ namespace tinycoro { namespace detail {
             if (_queue.try_push(std::forward<T>(elem)))
             {
                 // push was ok
-                local::Notify(_pushEvent, std::atomic_notify_one);
+                local::Notify(_pushEvent, std::atomic_notify_all);
                 return true;
             }
 
@@ -75,7 +75,7 @@ namespace tinycoro { namespace detail {
             if (_queue.try_pop(elem))
             {
                 // pop was ok
-                local::Notify(_popEvent, std::atomic_notify_one);
+                local::Notify(_popEvent, std::atomic_notify_all);
                 return true;
             }
 
