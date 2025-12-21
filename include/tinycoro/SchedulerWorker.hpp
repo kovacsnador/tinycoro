@@ -18,9 +18,6 @@
 namespace tinycoro { namespace detail {
 
     namespace helper {
-        // With this variable we indicate that
-        // a stop purposed by the scheduler
-        static constexpr std::nullptr_t SCHEDULER_STOP_EVENT{nullptr};
 
         bool PushTask(auto task, auto& queue, const auto& stopObject, auto& popState) noexcept
         {
@@ -45,36 +42,48 @@ namespace tinycoro { namespace detail {
         }
 
         template <typename DispatcherT>
-        void RequestStopForQueue(DispatcherT& dispatcher) noexcept
+        void WakeUpAllWaiter(DispatcherT& dispatcher) noexcept
         {
-            // this is necessary to trigger/wake up
-            // wait_for_push() waiters
-            //
-            // this should happen before we push
-            // the SCHEDULER_STOP_EVENT into the queue,
-            // because this could also remove the
-            // SCHEDULER_STOP_EVENT from the queue if we invoke
-            // after SCHEDULER_STOP_EVENT push...
-            while (dispatcher.full())
+            // wake up every waiter.
+            dispatcher.notify_push_waiters();
+            dispatcher.notify_pop_waiters();
+        }
+
+        // A minimal thread-safe wrapper around a LinkedPtrList.
+        //
+        // ThreadSafeList<T> provides a small set of atomic operations used by
+        // SchedulerWorker for managing paused tasks. The wrapper protects the
+        // underlying list with a mutex. Only the operations required by the
+        // scheduler are exposed: iterating (begin), inserting at front and
+        // erasing an element by pointer.
+        template<typename T>
+        struct ThreadSafeList
+        {
+            auto begin() const noexcept { return _list.begin(); }
+
+            void insert(T* elem) noexcept
             {
-                typename DispatcherT::value_type destroyer{};
-                if (dispatcher.try_pop(destroyer))
-                {
-                    // erase at least 1 element
-                    break;
-                }
+                std::scoped_lock lock{_mtx};
+                _list.push_front(elem);
             }
 
-            // try to push the close event into the task dispatcher
-            while (dispatcher.try_push(SCHEDULER_STOP_EVENT) == false)
+            bool erase(T* elem) noexcept
             {
-                // try to remove one element
-                // in order to make place for
-                // SCHEDULER_STOP_EVENT
-                typename DispatcherT::value_type destroyer{};
-                std::ignore = dispatcher.try_pop(destroyer);
+                std::scoped_lock lock{_mtx};
+                
+                auto erased = _list.erase(elem);
+                assert(erased);
+
+                return erased;
             }
-        }
+
+        private:
+            // mutext to protect the list
+            std::mutex _mtx;
+
+            // List of elements
+            detail::LinkedPtrList<T> _list;
+        };
 
     } // namespace helper
 
@@ -82,8 +91,6 @@ namespace tinycoro { namespace detail {
     class SchedulerWorker
     {
         using Task_t = typename DispatcherT::value_type;
-
-        //size_t doneCount{};
 
     public:
         SchedulerWorker(DispatcherT& dispatcher, std::stop_token stopToken)
@@ -138,34 +145,17 @@ namespace tinycoro { namespace detail {
                         // wait safely for new tasks...
                         //
                         // now if some tasks need resumption
-                        // they will directly be pushed into the sharedTasks queue.
-                        // (not in the cache)
+                        // they will directly be pushed into the dispatcher queue.
+                        // (not in the local cache)
                         _dispatcher.wait_for_pop(prevState++);
                     }
-
                 }
                 else
                 {
-                    // If we reach that point, that means
-                    // we successfully popped the next task
-                    if (task == helper::SCHEDULER_STOP_EVENT)
-                    {
-                        // if we popped the stop event
-                        // out from the queue,
-                        // we need to put back for other workers
-                        helper::RequestStopForQueue(_dispatcher);
-
-                        // stop was requested we exit
-                        // from the working loop
-                        break;
-                    }
-                    else
-                    {
-                        // Invoke the task.
-                        // wrapping the task into a Task_t
-                        // to make sure, there is a  proper destruction
-                        _InvokeTask(std::move(task));
-                    }
+                    // Invoke the task.
+                    // wrapping the task into a Task_t
+                    // to make sure, there is a  proper destruction
+                    _InvokeTask(std::move(task));
                 }
             }
 
@@ -178,20 +168,11 @@ namespace tinycoro { namespace detail {
             _Cleanup(_cachedTasks.begin());
         }
 
-        //std::atomic_flag _resumer{false};
-
         // Generates the pause resume callback
         // It relays on a task pointer address
         PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
         {
             return [this, promisePtr](ENotifyPolicy policy) {
-
-                /*if(_resumer.test_and_set() == true)
-                {
-                    assert(false);
-                }
-
-                auto finally = Finally([&]{ _resumer.clear(); });*/
 
                 if (_stopToken.stop_requested() == false)
                 {
@@ -215,14 +196,7 @@ namespace tinycoro { namespace detail {
                     // If we reach this point
                     // that means that the task is already in paused state
                     // So we need to resume it manually
-
-                    /*{
-                        std::scoped_lock pauseLock{_pausedTasksMtx};
-                        // remove the tasks from paused tasks
-                        [[maybe_unused]] auto erased = _pausedTasks.erase(promisePtr);
-                        assert(erased);
-                    }*/
-                    _EraseFromPausedList(promisePtr);
+                    _pausedTasks.erase(promisePtr);
 
 
                     // push back task to the queue for resumption
@@ -308,13 +282,8 @@ namespace tinycoro { namespace detail {
                     {
                         auto promisePtr = task.release();
 
-                        /*std::unique_lock pauseLock{_pausedTasksMtx};
                         // push back into the pause state
-                        _pausedTasks.push_front(promisePtr);
-
-                        pauseLock.unlock();*/
-                        _InsertInPausedList(promisePtr);
-
+                        _pausedTasks.insert(promisePtr);
 
                         if (promisePtr->pauseState.compare_exchange_strong(
                                 expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
@@ -324,22 +293,15 @@ namespace tinycoro { namespace detail {
                             return;
                         }
 
-                        /*pauseLock.lock();
                         // in the meantime the task is notified for resumption
                         // so we need to remove it from the paused task queue
                         // and resume the task
                         _pausedTasks.erase(promisePtr);
 
-                        pauseLock.unlock();*/
-
-                        _EraseFromPausedList(promisePtr);
-
                         // reassign the pointer
                         // and continue with this task
                         task.reset(promisePtr);
                     }
-
-                    //std::this_thread::sleep_for(std::chrono::milliseconds(10));
 
                     // we can continue with the current task
                     // it is already notified for resumption
@@ -348,7 +310,6 @@ namespace tinycoro { namespace detail {
                 case STOPPED:
                     [[fallthrough]];
                 case DONE:
-                    //doneCount++;
                     [[fallthrough]];
                 default:
                     return;
@@ -407,28 +368,11 @@ namespace tinycoro { namespace detail {
             }
         }
 
-        void _InsertInPausedList(auto promisePtr)
-        {
-            std::scoped_lock lock{_pausedTasksMtx};
-            _pausedTasks.push_front(promisePtr);
-        }
-
-        void _EraseFromPausedList(auto promisePtr)
-        {
-            std::scoped_lock lock{_pausedTasksMtx};
-            [[maybe_unused]] auto erased = _pausedTasks.erase(promisePtr);
-
-            assert(erased);
-        }
-
         // the task dispatcher
         DispatcherT& _dispatcher;
 
-        // mutext to protect the paused tasks map
-        std::mutex _pausedTasksMtx;
-
         // tasks which are in pause state
-        detail::LinkedPtrList<typename Task_t::element_type> _pausedTasks;
+        helper::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.

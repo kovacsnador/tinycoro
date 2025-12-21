@@ -35,8 +35,7 @@ namespace tinycoro {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [this] { helper::RequestStopForQueue(_dispatcher); }}
-            //, _queues(workerThreadCount)
+            , _stopCallback{_stopSource.get_token(), [this] { helper::WakeUpAllWaiter(_dispatcher); }}
             , _dispatcher{_sharedTasks}
             {
                 _AddWorkers(workerThreadCount);

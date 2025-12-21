@@ -28,14 +28,16 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 
     EXPECT_TRUE(dispatcher.full());
 
-    tinycoro::detail::helper::RequestStopForQueue(dispatcher);
+    tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
 
-    int32_t* ptr;
+    EXPECT_TRUE(dispatcher.full());
+
+    /* int32_t* ptr;
     EXPECT_TRUE(dispatcher.try_pop(ptr));
     EXPECT_EQ(*ptr, val);
 
     EXPECT_TRUE(dispatcher.try_pop(ptr));
-    EXPECT_EQ(ptr, nullptr);
+    EXPECT_EQ(ptr, nullptr);*/
 }
 
 struct AtomicQueueMock
@@ -45,19 +47,22 @@ struct AtomicQueueMock
     MOCK_METHOD(bool, try_pop, (int32_t*));
     MOCK_METHOD(bool, try_push, (int32_t*));
     MOCK_METHOD(bool, full, ());
+    MOCK_METHOD(void, notify_push_waiters, ());
+    MOCK_METHOD(void, notify_pop_waiters, ());
 };
 
 TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
 {
     AtomicQueueMock mock;
 
-    EXPECT_CALL(mock, full).WillOnce(testing::Return(true));
+    //EXPECT_CALL(mock, full).WillOnce(testing::Return(true));
+    //EXPECT_CALL(mock, try_pop).WillOnce(testing::Return(true)).WillOnce(testing::Return(true));
+    //EXPECT_CALL(mock, try_push).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
+    EXPECT_CALL(mock, notify_push_waiters).Times(1);
+    EXPECT_CALL(mock, notify_pop_waiters).Times(1);
 
-    EXPECT_CALL(mock, try_pop).WillOnce(testing::Return(true)).WillOnce(testing::Return(true));
 
-    EXPECT_CALL(mock, try_push).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
-
-    tinycoro::detail::helper::RequestStopForQueue(mock);
+    tinycoro::detail::helper::WakeUpAllWaiter(mock);
 }
 
 struct SchedubableMock
@@ -104,7 +109,9 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
     latch.wait();
-    EXPECT_TRUE(dispatcher.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT));
+
+    ss.request_stop();
+    tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
 }
 
 struct SchedulerWorkerTest : testing::TestWithParam<size_t>
@@ -142,6 +149,8 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
         latch.wait();
-        EXPECT_TRUE(dispatcher.try_push(tinycoro::detail::helper::SCHEDULER_STOP_EVENT));
+
+        ss.request_stop();
+        tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
     }
 }
