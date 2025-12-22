@@ -19,7 +19,7 @@ struct TestAwaitable
     MOCK_METHOD(bool, Notify, ());
     MOCK_METHOD(bool, Cancel, ());
 
-    tinycoro::detail::PauseCallbackEvent event;
+    tinycoro::detail::ResumeSignalEvent event;
 };
 
 template <typename T>

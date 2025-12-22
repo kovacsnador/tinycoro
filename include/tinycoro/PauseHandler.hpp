@@ -21,26 +21,26 @@ namespace tinycoro {
     namespace concepts {
 
         template <typename T>
-        concept PauseHandlerCb = std::regular_invocable<T, ENotifyPolicy>;
+        concept IsResumeCallbackType = std::regular_invocable<T, ENotifyPolicy>;
 
     } // namespace concepts
 
-    namespace detail {
+    /* namespace detail {
 
         // This class is intented to handle awaitable
         // resumption from a paused state.
-        struct PauseCallbackEvent
+        struct ResumeSignalEvent
         {
         private:
             // Need to be up there to make the
             // "requirement" work for Set().
-            PauseHandlerCallbackT _notifyCallback;
+            ResumeCallback_t _notifyCallback;
             mutable std::atomic_flag _flag;
 
         public:
-            PauseCallbackEvent() = default;
+            ResumeSignalEvent() = default;
 
-            PauseCallbackEvent(PauseCallbackEvent&& other) noexcept
+            ResumeSignalEvent(ResumeSignalEvent&& other) noexcept
             : _notifyCallback{std::move(other._notifyCallback)}
             {
             }
@@ -54,7 +54,6 @@ namespace tinycoro {
                 // This notify callback is responsible
                 // for the corouitne resumption.
                 return CallOnce(_flag, std::memory_order::acquire, _notifyCallback, policy);
-                //_notifyCallback(policy);
             }
 
             // Sets the notify callback
@@ -62,11 +61,13 @@ namespace tinycoro {
                 requires requires (T&& t) { { _notifyCallback = std::forward<T>(t) }; }
             void Set(T&& cb)
             {
+                assert(_flag.test() == false);
+
                 _notifyCallback = std::forward<T>(cb);
             }
         };
 
-    } // namespace detail
+    } // namespace detail*/
 
     class PauseHandler : public detail::IntrusiveObject<PauseHandler>
     {
@@ -94,7 +95,7 @@ namespace tinycoro {
             _state.fetch_and(c_exceptionMask, std::memory_order_relaxed);
         }
 
-        void ResetCallback(concepts::PauseHandlerCb auto pr) { _resumerCallback = std::move(pr); }
+        void ResetCallback(concepts::IsResumeCallbackType auto pr) { _resumerCallback = std::move(pr); }
 
         [[nodiscard]] auto Pause() noexcept
         {
@@ -141,7 +142,7 @@ namespace tinycoro {
 
         // The resume callback, which is intented to
         // resume the coroutine from a suspension state.
-        PauseHandlerCallbackT _resumerCallback{};
+        ResumeCallback_t _resumerCallback{};
     };
 
     namespace context {

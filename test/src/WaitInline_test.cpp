@@ -8,7 +8,7 @@
 struct WaitInline_PauseHandlerMock
 {
     WaitInline_PauseHandlerMock() = default;
-    WaitInline_PauseHandlerMock(tinycoro::PauseHandlerCallbackT c)
+    WaitInline_PauseHandlerMock(tinycoro::ResumeCallback_t c)
     : cb{c}
     {
     }
@@ -16,7 +16,7 @@ struct WaitInline_PauseHandlerMock
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(bool, IsCancellable, (), (const));
 
-    tinycoro::PauseHandlerCallbackT cb;
+    tinycoro::ResumeCallback_t cb;
 };
 
 template<typename T>
@@ -32,7 +32,7 @@ struct WaitInline_TaskMock
 
     MOCK_METHOD(ReturnT, await_resume, ());
     MOCK_METHOD(std::shared_ptr<PauseHandlerT>, GetPauseHandler, ());
-    MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::ResumeCallback_t));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
@@ -66,7 +66,7 @@ struct WaitInline_TaskMockWrapper
 
     }
 
-    std::shared_ptr<PauseHandlerT> SetPauseHandler(tinycoro::PauseHandlerCallbackT cb)
+    std::shared_ptr<PauseHandlerT> SetPauseHandler(tinycoro::ResumeCallback_t cb)
     {
         return mock->SetPauseHandler(cb);
     }

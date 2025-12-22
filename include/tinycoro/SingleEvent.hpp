@@ -27,9 +27,9 @@ namespace tinycoro {
         public:
             using value_type = ValueT;
 
-            friend class AwaiterT<SingleEvent, detail::PauseCallbackEvent>;
+            friend class AwaiterT<SingleEvent, detail::ResumeSignalEvent>;
 
-            using awaiter_type = AwaiterT<SingleEvent, detail::PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<SingleEvent, detail::ResumeSignalEvent>;
 
             SingleEvent() = default;
 
@@ -38,7 +38,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
 
-            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::ResumeSignalEvent{}}; }
 
             bool Set(ValueT val)
             {

@@ -33,7 +33,7 @@ TYPED_TEST(Concepts_PauseHandlerCbTest, Concepts_PauseHandlerCbTest_test)
     using firstParamT = std::decay_t<decltype(std::get<0>(std::declval<T>()))>;
     using secondParamT = std::decay_t<decltype(std::get<1>(std::declval<T>()))>;
 
-    if constexpr (tinycoro::concepts::PauseHandlerCb<firstParamT>)
+    if constexpr (tinycoro::concepts::IsResumeCallbackType<firstParamT>)
     {
         EXPECT_TRUE(secondParamT::value);
     }
@@ -165,7 +165,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_ExceptionThrowned)
 
 struct Context_PauseHandlerMock
 {
-    MOCK_METHOD(tinycoro::PauseHandlerCallbackT, Pause, ());
+    MOCK_METHOD(tinycoro::ResumeCallback_t, Pause, ());
     MOCK_METHOD(void, SetCancellable, (bool));
     MOCK_METHOD(void, Unpause, ());
 };

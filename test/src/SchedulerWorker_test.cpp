@@ -71,14 +71,14 @@ struct SchedubableMock
 
     MOCK_METHOD(std::atomic<tinycoro::EPauseState>&, PauseState, ());
 
-    MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(void, SetPauseHandler, (tinycoro::ResumeCallback_t));
 };
 
 struct Schedubable : tinycoro::detail::DoubleLinkable<Schedubable>
 {
     tinycoro::ETaskResumeState Resume() { return mock.Resume(); };
 
-    void SetPauseHandler(tinycoro::PauseHandlerCallbackT cb) { mock.SetPauseHandler(cb); };
+    void SetPauseHandler(tinycoro::ResumeCallback_t cb) { mock.SetPauseHandler(cb); };
 
     auto& PauseState() { return mock.PauseState(); }
 

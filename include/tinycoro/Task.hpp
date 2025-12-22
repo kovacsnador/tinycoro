@@ -84,7 +84,7 @@ namespace tinycoro {
 
             [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-            void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
+            void SetPauseHandler(concepts::IsResumeCallbackType auto pauseResume) noexcept
             {
                 auto& pauseHandler = _hdl.promise().pauseHandler;
                 if (pauseHandler)

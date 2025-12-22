@@ -74,7 +74,7 @@ namespace tinycoro { namespace detail {
             return _coroResumer.ResumeState(_hdl);
         }
 
-        void SetPauseHandler(concepts::PauseHandlerCb auto pauseResume) noexcept
+        void SetPauseHandler(concepts::IsResumeCallbackType auto pauseResume) noexcept
         {
             // At this point the pauseHandler should have been initialized
             // through the MakeSchedulableTask() function.

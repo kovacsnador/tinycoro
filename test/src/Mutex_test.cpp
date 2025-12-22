@@ -35,7 +35,7 @@ TEST(MutexTest, MutexTest_coawaitReturn)
 
     auto awaiter = mutex.operator co_await();
 
-    using expectedAwaiterType = PopAwaiterMock<decltype(mutex), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(mutex), tinycoro::detail::ResumeSignalEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

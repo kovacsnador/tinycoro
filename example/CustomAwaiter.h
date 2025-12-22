@@ -36,7 +36,7 @@ struct CustomAwaiter
 
     int32_t _userData{41};
 
-    tinycoro::PauseHandlerCallbackT _resumeTask;
+    tinycoro::ResumeCallback_t _resumeTask;
 };
 
 void Example_CustomAwaiter(auto& scheduler)

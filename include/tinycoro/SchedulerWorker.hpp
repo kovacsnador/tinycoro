@@ -170,7 +170,7 @@ namespace tinycoro { namespace detail {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        PauseHandlerCallbackT GeneratePauseResume(auto promisePtr) noexcept
+        ResumeCallback_t GeneratePauseResume(auto promisePtr) noexcept
         {
             return [this, promisePtr](ENotifyPolicy policy) {
 

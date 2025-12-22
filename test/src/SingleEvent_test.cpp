@@ -30,7 +30,7 @@ TEST(SingleEventTest, SingleEventTest_coawaitReturn)
 
     auto awaiter = singleEvent.operator co_await();
 
-    using expectedAwaiterType = PopAwaiterMock<decltype(singleEvent), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(singleEvent), tinycoro::detail::ResumeSignalEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -111,7 +111,7 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
 
 struct SingleNotifierMockImpl
 {
-    MOCK_METHOD(bool, Set, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(bool, Set, (tinycoro::ResumeCallback_t));
     MOCK_METHOD(void, Notify, (tinycoro::ENotifyPolicy));
 };
 

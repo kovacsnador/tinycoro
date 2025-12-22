@@ -49,7 +49,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannelTest_PopWait_return)
     int32_t val;
     auto    awaiter = channel.PopWait(val);
 
-    using expectedAwaiterType = PopAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(channel), tinycoro::detail::ResumeSignalEvent, int32_t>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -59,7 +59,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannel_PushWait_return)
 
     auto awaiter = channel.PushWait(1);
 
-    using expectedAwaiterType = PushAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    using expectedAwaiterType = PushAwaiterMock<decltype(channel), tinycoro::detail::ResumeSignalEvent, int32_t>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -69,7 +69,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannel_PushWaitAndClose_return)
 
     auto awaiter = channel.PushAndCloseWait(1);
 
-    using expectedAwaiterType = PushAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent, int32_t>;
+    using expectedAwaiterType = PushAwaiterMock<decltype(channel), tinycoro::detail::ResumeSignalEvent, int32_t>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -79,7 +79,7 @@ TEST(UnbufferedChannelTest, UnbufferedChannel_WaitForListeners_return)
 
     auto awaiter = channel.WaitForListeners(1);
 
-    using expectedAwaiterType = ListenerAwaiterMock<decltype(channel), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = ListenerAwaiterMock<decltype(channel), tinycoro::detail::ResumeSignalEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

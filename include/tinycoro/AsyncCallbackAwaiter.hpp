@@ -14,6 +14,7 @@
 #include <cassert>
 
 #include "PauseHandler.hpp"
+#include "ResumeSignalEvent.hpp"
 #include "Finally.hpp"
 
 namespace tinycoro {
@@ -65,7 +66,7 @@ namespace tinycoro {
 
     template <typename CallbackT,
               std::invocable<CallbackT>    AsyncFunctionT,
-              concepts::AsyncCallbackEvent EventT = detail::PauseCallbackEvent,
+              concepts::AsyncCallbackEvent EventT = detail::ResumeSignalEvent,
               typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT>>
     struct AsyncCallbackAwaiter
     {
@@ -216,7 +217,7 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename CallbackT, typename EventT = detail::PauseCallbackEvent>
+        template <typename CallbackT, typename EventT = detail::ResumeSignalEvent>
         struct UserDataWrapper : private UserData
         {
             template <std::integral auto, typename, typename, concepts::AsyncCallbackEvent, typename>
@@ -240,7 +241,7 @@ namespace tinycoro {
     template <std::integral auto Nth,
               typename AsyncFunctionT,
               typename CallbackT,
-              concepts::AsyncCallbackEvent EventT = detail::PauseCallbackEvent,
+              concepts::AsyncCallbackEvent EventT = detail::ResumeSignalEvent,
               typename ReturnT                    = std::invoke_result_t<AsyncFunctionT, CallbackT, void*>>
     struct AsyncCallbackAwaiter_CStyle
     {

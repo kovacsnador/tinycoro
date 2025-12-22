@@ -18,11 +18,11 @@ namespace tinycoro { namespace test {
         MOCK_METHOD(T, await_resume, ());
         MOCK_METHOD(bool, IsPaused, (), (const noexcept));
         MOCK_METHOD(bool, IsDone, (), (const noexcept));
-        MOCK_METHOD(void, SetPauseHandler, (tinycoro::PauseHandlerCallbackT));
+        MOCK_METHOD(void, SetPauseHandler, (tinycoro::ResumeCallback_t));
         MOCK_METHOD(void*, Address, (), (const noexcept));
         MOCK_METHOD(CoroutineHandleMock<tinycoro::detail::Promise<void>>, Release, (), (noexcept));
 
-        tinycoro::PauseHandlerCallbackT pauseCallback;
+        tinycoro::ResumeCallback_t pauseCallback;
     };
 
     template <typename T>
@@ -52,7 +52,7 @@ namespace tinycoro { namespace test {
 
         bool IsDone() { return mock->IsDone(); }
 
-        void SetPauseHandler(tinycoro::PauseHandlerCallbackT func)
+        void SetPauseHandler(tinycoro::ResumeCallback_t func)
         {
             mock->SetPauseHandler(func);
             mock->pauseCallback = func;

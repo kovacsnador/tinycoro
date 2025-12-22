@@ -96,7 +96,7 @@ namespace tinycoro {
 
     // The pause handler callback signature
     // used mainly by the scheduler
-    using PauseHandlerCallbackT = std::function<void(ENotifyPolicy)>;
+    using ResumeCallback_t = std::function<void(ENotifyPolicy)>;
 
     enum class ETaskResumeState : uint8_t
     {
@@ -137,7 +137,7 @@ namespace tinycoro {
             { c.await_resume() };
             { c.Release() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            { c.SetPauseHandler(PauseHandlerCallbackT{}) };
+            { c.SetPauseHandler(ResumeCallback_t{}) };
             typename T::value_type;
         };
 
@@ -187,7 +187,7 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
+        concept PauseHandler = std::constructible_from<T, ResumeCallback_t> && requires (T t) {
             { t.IsPaused() } -> std::same_as<bool>;
         };
 

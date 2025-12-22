@@ -28,13 +28,13 @@ namespace tinycoro {
                   class ListenerAwaiterT>
         class UnbufferedChannel
         {
-            friend class PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            friend class PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            friend class ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
+            friend class PopAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            friend class PushAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            friend class ListenerAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent>;
 
-            using pop_awaiter_type      = PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
+            using pop_awaiter_type      = PopAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent>;
 
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
@@ -50,23 +50,23 @@ namespace tinycoro {
             // disable move and copy
             UnbufferedChannel(UnbufferedChannel&&) = delete;
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::ResumeSignalEvent{}, val}; }
 
             template <typename... Args>
             [[nodiscard]] auto PushWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::ResumeSignalEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
             }
 
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::ResumeSignalEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
             }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
             {
-                return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
+                return listener_awaiter_type{*this, detail::ResumeSignalEvent{}, listenerCount};
             }
 
             /*
@@ -125,7 +125,7 @@ namespace tinycoro {
                 std::latch latch{1};
 
                 // prepare a special event for notification
-                detail::PauseCallbackEvent event;
+                detail::ResumeSignalEvent event;
 
                 event.Set([&latch](auto) {
                     latch.count_down();

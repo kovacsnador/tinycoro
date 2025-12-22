@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "PauseHandler.hpp"
+#include "ResumeSignalEvent.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "ReleaseGuard.hpp"
 #include "LinkedUtils.hpp"
@@ -29,9 +30,9 @@ namespace tinycoro {
         class Semaphore
         {
         public:
-            using awaitable_type = AwaitableT<Semaphore, detail::PauseCallbackEvent>;
+            using awaitable_type = AwaitableT<Semaphore, detail::ResumeSignalEvent>;
 
-            friend class AwaitableT<Semaphore, detail::PauseCallbackEvent>;
+            friend class AwaitableT<Semaphore, detail::ResumeSignalEvent>;
             friend class ReleaseGuard<Semaphore>;
 
             Semaphore(size_t initCount)
@@ -48,7 +49,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
 
-            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::ResumeSignalEvent{}}; }
 
         private:
             void Release() noexcept
