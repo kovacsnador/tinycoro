@@ -1,6 +1,6 @@
 // -----------------------------------------------------------------------------
 //  Copyright (c) 2024 Tamas Kovacs
-//  Licensed under the MIT License – see LICENSE.txt for details.
+//  Licensed under the MIT License â€“ see LICENSE.txt for details.
 // -----------------------------------------------------------------------------
 
 #ifndef TINY_CORO_RESUME_SIGNAL_EVENT_HPP

@@ -11,18 +11,18 @@ TEST(ResumeSignalEventTest, ResumeSignalEventTest_basic)
 
     uint32_t flag{};
 
-    tinycoro::ResumeCallback_t cb = [&](auto policy) { flag++; };
+    tinycoro::ResumeCallback_t cb = [&]([[maybe_unused]] auto policy) { flag++; };
 
     event.Set(cb);
 
     EXPECT_EQ(flag, 0);
 
-    event.Notify();
+    EXPECT_TRUE(event.Notify());
 
     EXPECT_EQ(flag, 1);
 
-    event.Notify();
-    event.Notify();
+    EXPECT_FALSE(event.Notify());
+    EXPECT_FALSE(event.Notify());
 
     EXPECT_EQ(flag, 1);
 }
@@ -38,13 +38,19 @@ TEST_P(ResumeSignalEventTest, ResumeSignalEventTest_multithreaded)
     auto count = GetParam();
 
     tinycoro::detail::ResumeSignalEvent event;
-    uint32_t flag{};
 
-    event.Set([&](auto policy) { flag++; });
+    // no sync is necessary
+    uint32_t flag{};
+    uint32_t notifyCount{};
+
+    event.Set([&]([[maybe_unused]] auto policy) { flag++; });
 
     auto work = [&] { 
         for (size_t i = 0; i < count; ++i)
-            event.Notify();
+        {
+            if(event.Notify())
+                notifyCount++;
+        }
     };
 
     {
@@ -58,4 +64,5 @@ TEST_P(ResumeSignalEventTest, ResumeSignalEventTest_multithreaded)
     }
 
     EXPECT_EQ(flag, 1);
+    EXPECT_EQ(notifyCount, 1);
 }
