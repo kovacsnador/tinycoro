@@ -38,6 +38,7 @@ jobs:
       run: cmake --build build
 
     - name: Run Unit Tests
+      timeout-minutes: 20
       run: ./build/test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
 
     - name: Run Examples
