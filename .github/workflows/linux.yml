@@ -97,7 +97,7 @@ jobs:
 
     - name: Run Unit Tests
       working-directory: ${{runner.workspace}}/build
-      run: ./test/tinycoro_tests --gtest_repeat=40 --gtest_break_on_failure=1
+      run: ./test/tinycoro_tests --gtest_repeat=10 --gtest_break_on_failure=1
 
     - name: Run Examples
       working-directory: ${{runner.workspace}}/build

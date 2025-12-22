@@ -161,9 +161,6 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_pop)
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
 {
-    try
-    {
-        /* code */
         const auto count = GetParam();
 
         tinycoro::Scheduler scheduler;
@@ -200,11 +197,6 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
         auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
         EXPECT_EQ(count * 8, sum);
-    }
-    catch (const std::exception& e)
-    {
-        std::cerr << e.what() << '\n';
-    }
 }
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_together)
