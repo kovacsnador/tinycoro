@@ -15,32 +15,51 @@
 
 namespace tinycoro { namespace detail {
 
-    // A multi-producer, multi-consumer lock-free queue.
+    // A multi-producer, multi-consumer (MPMC) lock-free queue.
     //
     // Internally, this queue uses a fixed-size ring buffer of size `SIZE`,
-    // which must be a power of two.
+    // which **must be a power of two**. Indexing is done via masking for efficiency.
     //
-    // The queue supports concurrent `try_push` and `try_pop` operations without locks.
-    // Blocking variants (`wait_for_push`, `wait_for_pop`) are provided via C++20 atomic wait/notify.
+    // The queue supports concurrent `try_push` and `try_pop` operations
+    // without using mutexes. All synchronization is done via atomics and
+    // carefully chosen memory orderings.
     //
-    // Sequence counters (`_head`, `_tail`, and `Element::sequence`) are 64-bit unsigned integers
-    // (`uint64_t`). These are used to coordinate access to buffer elements and enforce ordering.
+    // Design overview:
+    // - `_head` and `_tail` are monotonically increasing sequence counters
+    //   that represent global push and pop positions.
+    // - Each buffer slot (`Element`) has its own `sequence` counter that
+    //   encodes the state of that slot across wraparounds.
+    // - The combination of `(position / SIZE)` (the “turn”) and the
+    //   per-element sequence number ensures correct coordination between
+    //   producers and consumers, even when indices wrap around the ring.
     //
-    // ⚠ Overflow Note:
-    // The sequence values are monotonically increasing and **not wrapped or masked**.
-    // This means that once a `uint64_t` sequence counter overflows (after `2^64` operations),
-    // the queue’s correctness is no longer guaranteed. However, at even extremely high
-    // message rates (billions of ops/sec), this would take hundreds of years to occur,
-    // so overflow is generally a theoretical issue in practice.
+    // Sequence counters:
+    // - `_head`, `_tail`, and `Element::sequence` are 64-bit unsigned integers
+    //   (`uint64_t`).
+    // - Sequence values are monotonically increasing and are **not wrapped
+    //   or masked**.
     //
-    // ⚠ Lock-free Guarantee:
-    // This queue is only truly *lock-free* if `std::atomic<uint64_t>` is lock-free on
-    // the target platform. You can check this via `std::atomic<uint64_t>::is_always_lock_free`.
-    // On most modern 64-bit platforms, this condition holds.
-    // If it's not lock-free, atomic operations may fall back to locks or syscalls.
+    // ⚠ Overflow note:
+    // If any sequence counter overflows (after 2^64 operations), correctness
+    // is no longer guaranteed. In practice, this would require an unrealistically
+    // high number of operations (even at billions of ops/sec, hundreds of years),
+    // so this is considered a theoretical limitation.
     //
-    // This makes the queue a good fit for high-throughput, low-latency systems
-    // where long-term runtime and platform-specific atomic guarantees are understood.
+    // ⚠ Lock-free guarantee:
+    // The queue is lock-free only if `std::atomic<uint64_t>` is lock-free on
+    // the target platform.
+    // You can check this via `std::atomic<uint64_t>::is_always_lock_free`.
+    // On most modern 64-bit platforms, this condition holds. If not, the
+    // implementation may internally fall back to locks or syscalls.
+    //
+    // Properties:
+    // - Multiple producers and multiple consumers
+    // - Lock-free (subject to atomic guarantees)
+    // - Bounded capacity (`SIZE`)
+    // - Non-blocking API (`try_push`, `try_pop`)
+    //
+    // This queue is well suited for high-throughput, low-latency systems
+    // where bounded capacity and platform atomic guarantees are acceptable.
     template <typename T, uint64_t SIZE>
         requires detail::IsPowerOf2<SIZE>::value
     class AtomicQueue
