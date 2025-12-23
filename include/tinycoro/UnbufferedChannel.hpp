@@ -28,13 +28,13 @@ namespace tinycoro {
                   class ListenerAwaiterT>
         class UnbufferedChannel
         {
-            friend class PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            friend class PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            friend class ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
+            friend class PopAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            friend class PushAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            friend class ListenerAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent>;
 
-            using pop_awaiter_type      = PopAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent, ValueT>;
-            using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::PauseCallbackEvent>;
+            using pop_awaiter_type      = PopAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            using push_awaiter_type     = PushAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent, ValueT>;
+            using listener_awaiter_type = ListenerAwaiterT<UnbufferedChannel, detail::ResumeSignalEvent>;
 
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
@@ -50,23 +50,23 @@ namespace tinycoro {
             // disable move and copy
             UnbufferedChannel(UnbufferedChannel&&) = delete;
 
-            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::PauseCallbackEvent{}, val}; }
+            [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::ResumeSignalEvent{}, val}; }
 
             template <typename... Args>
             [[nodiscard]] auto PushWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::ResumeSignalEvent{}, _cleanupFunction, false, std::forward<Args>(args)...};
             }
 
             template <typename... Args>
             [[nodiscard]] auto PushAndCloseWait(Args&&... args)
             {
-                return push_awaiter_type{*this, detail::PauseCallbackEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
+                return push_awaiter_type{*this, detail::ResumeSignalEvent{}, _cleanupFunction, true, std::forward<Args>(args)...};
             }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
             {
-                return listener_awaiter_type{*this, detail::PauseCallbackEvent{}, listenerCount};
+                return listener_awaiter_type{*this, detail::ResumeSignalEvent{}, listenerCount};
             }
 
             /*
@@ -125,7 +125,7 @@ namespace tinycoro {
                 std::latch latch{1};
 
                 // prepare a special event for notification
-                detail::PauseCallbackEvent event;
+                detail::ResumeSignalEvent event;
 
                 event.Set([&latch](auto) {
                     latch.count_down();
@@ -380,9 +380,9 @@ namespace tinycoro {
                 return EChannelOpStatus::CLOSED;
             }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
@@ -397,7 +397,7 @@ namespace tinycoro {
             }
 
         private:
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
@@ -484,14 +484,14 @@ namespace tinycoro {
                 return {_value, _lastElement};
             }
 
-           void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
         private:
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {
@@ -547,14 +547,14 @@ namespace tinycoro {
 
             [[nodiscard]] auto value() const noexcept { return _listenersCount; }
 
-           void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _channel.Cancel(this); }
 
         private:
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {

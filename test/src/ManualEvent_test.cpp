@@ -28,7 +28,7 @@ class PopAwaiterMock : public tinycoro::detail::SingleLinkable<PopAwaiterMock<T,
 public:
     PopAwaiterMock(auto&, auto) { }
 
-    void Notify() const noexcept { }
+    bool Notify() const noexcept { return true; }
 };
 
 TEST(ManualEventTest, ManualEventTest_coawaitReturn)
@@ -37,7 +37,7 @@ TEST(ManualEventTest, ManualEventTest_coawaitReturn)
 
     auto awaiter = event.operator co_await();
 
-    using expectedAwaiterType = PopAwaiterMock<decltype(event), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(event), tinycoro::detail::ResumeSignalEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 

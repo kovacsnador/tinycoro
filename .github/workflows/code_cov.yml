@@ -34,6 +34,7 @@ jobs:
       working-directory: ${{ github.workspace }}
 
     - name: Run Unit Tests
+      timeout-minutes: 20
       run: ./build/test/tinycoro_tests
       working-directory: ${{ github.workspace }}
 

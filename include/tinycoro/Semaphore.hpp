@@ -11,6 +11,7 @@
 #include <stdexcept>
 
 #include "PauseHandler.hpp"
+#include "ResumeSignalEvent.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "ReleaseGuard.hpp"
 #include "LinkedUtils.hpp"
@@ -29,9 +30,9 @@ namespace tinycoro {
         class Semaphore
         {
         public:
-            using awaitable_type = AwaitableT<Semaphore, detail::PauseCallbackEvent>;
+            using awaitable_type = AwaitableT<Semaphore, detail::ResumeSignalEvent>;
 
-            friend class AwaitableT<Semaphore, detail::PauseCallbackEvent>;
+            friend class AwaitableT<Semaphore, detail::ResumeSignalEvent>;
             friend class ReleaseGuard<Semaphore>;
 
             Semaphore(size_t initCount)
@@ -48,7 +49,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
 
-            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::ResumeSignalEvent{}}; }
 
         private:
             void Release() noexcept
@@ -66,7 +67,7 @@ namespace tinycoro {
                 }
             }
 
-            auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
+            [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
@@ -101,20 +102,13 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
-            constexpr auto await_suspend(auto parentCoro) noexcept
-            {
-                if (_semaphore.TryAcquire(this, parentCoro))
-                {
-                    return false;
-                }
-                return true;
-            }
+            [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore.TryAcquire(this, parentCoro); }
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }
 
-            void Notify() const noexcept { _event.Notify(); }
+            bool Notify() const noexcept { return _event.Notify(); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
         private:
             SemaphoreT& _semaphore;

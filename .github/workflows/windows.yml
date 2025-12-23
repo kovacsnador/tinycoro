@@ -48,5 +48,6 @@ jobs:
       run: ./tinycoro_example.exe
     
     - name: Run Unit Tests
+      timeout-minutes: 20
       working-directory: ${{runner.workspace}}/build
-      run: ./test/tinycoro_tests.exe
+      run: ./test/tinycoro_tests.exe --gtest_repeat=3 --gtest_break_on_failure=1

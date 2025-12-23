@@ -76,6 +76,14 @@ namespace tinycoro {
 
     } // namespace detail
 
+    namespace helper
+    {
+        constexpr auto PowerOf2(auto val) noexcept
+        {
+            return (val > 0 && ((val & (val - 1)) == 0));
+        }
+    }
+
     enum class ENotifyPolicy
     {
         RESUME, // Notify for resumption
@@ -88,7 +96,7 @@ namespace tinycoro {
 
     // The pause handler callback signature
     // used mainly by the scheduler
-    using PauseHandlerCallbackT = std::function<void(ENotifyPolicy)>;
+    using ResumeCallback_t = std::function<void(ENotifyPolicy)>;
 
     enum class ETaskResumeState : uint8_t
     {
@@ -129,7 +137,7 @@ namespace tinycoro {
             { c.await_resume() };
             { c.Release() };
             { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            { c.SetPauseHandler(PauseHandlerCallbackT{}) };
+            { c.SetPauseHandler(ResumeCallback_t{}) };
             typename T::value_type;
         };
 
@@ -179,7 +187,7 @@ namespace tinycoro {
         };
 
         template <typename T>
-        concept PauseHandler = std::constructible_from<T, PauseHandlerCallbackT> && requires (T t) {
+        concept PauseHandler = std::constructible_from<T, ResumeCallback_t> && requires (T t) {
             { t.IsPaused() } -> std::same_as<bool>;
         };
 
@@ -216,6 +224,9 @@ namespace tinycoro {
             { T{std::nostopstate} };
         };
 
+        template<typename T>
+        concept NothrowMoveAssignable = std::is_nothrow_move_assignable_v<T>;
+
     } // namespace concepts
 
     namespace detail {
@@ -250,7 +261,7 @@ namespace tinycoro {
         template <auto Number>
         struct IsPowerOf2
         {
-            static constexpr bool value = (Number > 0) && (Number & (Number - 1)) == 0;
+            static constexpr bool value = helper::PowerOf2(Number);
         };
 
         namespace helper {

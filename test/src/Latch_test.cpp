@@ -74,7 +74,7 @@ TEST(LatchTest, LatchTest_coawaitReturn)
 
     auto awaiter = latch.operator co_await();
 
-    using expectedAwaiterType = PopAwaiterMock<decltype(latch), tinycoro::detail::PauseCallbackEvent>;
+    using expectedAwaiterType = PopAwaiterMock<decltype(latch), tinycoro::detail::ResumeSignalEvent>;
     EXPECT_TRUE((std::same_as<expectedAwaiterType, decltype(awaiter)>));
 }
 
@@ -111,7 +111,7 @@ TEST(LatchTest, LatchTest_await_suspend)
 
 struct LatchEventMockImpl
 {
-    MOCK_METHOD(void, Set, (tinycoro::PauseHandlerCallbackT));
+    MOCK_METHOD(void, Set, (tinycoro::ResumeCallback_t));
 };
 
 struct LatchEventMock

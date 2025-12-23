@@ -46,6 +46,14 @@ namespace tinycoro {
 
             if (suspend)
             {
+                // we suspend, and set the flag which we need to wait
+                // to make sure the cancellation is done.
+                //
+                // We wait for this in await_resume. This is necessary becasue it
+                // can happen that cancellation token stays in the softclock queue
+                // and will be executed after the actual awaiter is already destroyed.
+                _resumeState.store(EResumeState::AWAIT_RESUMED, std::memory_order::release);
+
                 // set the event callback for the clock
                 // which is intented to force resume the awaiter
                 // after the timeout was reached.
@@ -54,13 +62,15 @@ namespace tinycoro {
                     // try to cancel the awaiter.
                     if(_awaiter.Cancel())
                     {
-                        _awaiterCancelled.store(true, std::memory_order::release);
-                        
                         // At this point the awaiter is already
                         // cancelled, but we still force the resumption,
                         // in order to notify the awaiter.
-                        _awaiter.Notify();
+                        _awaiterCancelled = _awaiter.Notify();
                     }
+
+                    // cancellation is done
+                    _resumeState.store(EResumeState::AWAIT_TIMEOUT_RESUME, std::memory_order::release);
+                    _resumeState.notify_all();
                 };
 
                 // initialize the cancel token for the event
@@ -75,13 +85,21 @@ namespace tinycoro {
             using return_t   = decltype(std::declval<AwaiterT>().await_resume());
             using optional_t = detail::TaskResult_t<return_t>;
             
-            // We can try to cancel the clock callback.
-            // We will resume the coroutine anyway here.
-            _clockCancelToken.TryCancel();
+            auto suspended = _resumeState.load(std::memory_order::acquire);
+ 
+            // Check if we are in a cancelling state, and until it's finished.
+            if (suspended != EResumeState::AWAIT_READY_RESUME && _clockCancelToken.TryCancel() == false)
+            {
+                // At this point we need to wait for the cancellation callback.
+                //
+                // std::memory_order::acquire is necessary here, we want a guarantie,
+                // that _awaiterCancelled is properly updated.
+                _resumeState.wait(EResumeState::AWAIT_RESUMED, std::memory_order::acquire);
+            }
 
             // check if the awaiter is cancelled,
             // by the clock event. See await_suspend().
-            if(_awaiterCancelled.load(std::memory_order::acquire))
+            if(_awaiterCancelled)
             {
                 // The cancellation succeeded,
                 // we return an empty optional
@@ -126,8 +144,18 @@ namespace tinycoro {
         // together with the callback event to the clock.
         TimeT _time;
 
-        // Flag to indicate if we could cancel the awaiter.
-        std::atomic<bool> _awaiterCancelled{false};
+        enum class EResumeState : uint8_t
+        {
+            AWAIT_READY_RESUME = 0,     // await resumed with await_ready()
+            AWAIT_RESUMED,              // await resumed after it was suspended with await_suspend()
+            AWAIT_TIMEOUT_RESUME,       // await resumed after timeout through SoftClock
+        };
+        
+        std::atomic<EResumeState> _resumeState{EResumeState::AWAIT_READY_RESUME};
+
+        // Flag to indicate if we cancel the awaiter.
+        //std::atomic_flag _awaiterCancelled;
+        bool _awaiterCancelled{false};
     };
 
 } // namespace tinycoro

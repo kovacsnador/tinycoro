@@ -219,7 +219,7 @@ namespace tinycoro {
     [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, ContainerT&& container)
     {
         using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
-        return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FuturesType, ContainerT>{
+        return detail::AsyncAwaiterT<SchedulerT, detail::ResumeSignalEvent, FuturesType, ContainerT>{
             scheduler, {}, std::forward<ContainerT>(container)};
     }
 
@@ -228,14 +228,14 @@ namespace tinycoro {
     [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...));
-        return detail::AsyncAwaiterT<SchedulerT, detail::PauseCallbackEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
+        return detail::AsyncAwaiterT<SchedulerT, detail::ResumeSignalEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
     template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, ContainerT&& container)
     {
         using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
-        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FuturesType, ContainerT>{
+        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::ResumeSignalEvent, FuturesType, ContainerT>{
             scheduler, std::move(stopSource), {}, std::forward<ContainerT>(container)};
     }
 
@@ -244,7 +244,7 @@ namespace tinycoro {
     [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
     {
         using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...));
-        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::PauseCallbackEvent, FutureTupleType, Args...>{
+        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::ResumeSignalEvent, FutureTupleType, Args...>{
             scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
     }
 

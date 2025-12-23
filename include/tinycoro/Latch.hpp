@@ -20,9 +20,9 @@ namespace tinycoro {
         class Latch
         {
         public:
-            friend class AwaiterT<Latch, detail::PauseCallbackEvent>;
+            friend class AwaiterT<Latch, detail::ResumeSignalEvent>;
 
-            using awaiter_type = AwaiterT<Latch, detail::PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<Latch, detail::ResumeSignalEvent>;
 
             Latch(size_t count)
             : _count{count}
@@ -38,7 +38,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::ResumeSignalEvent{}}; }
 
             [[nodiscard]] auto ArriveAndWait() noexcept
             {
@@ -123,13 +123,13 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _latch.Cancel(this); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {

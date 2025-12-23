@@ -14,49 +14,16 @@
 
 #include "Common.hpp"
 #include "IntrusiveObject.hpp"
+#include "CallOnce.hpp"
 
 namespace tinycoro {
 
     namespace concepts {
 
         template <typename T>
-        concept PauseHandlerCb = std::regular_invocable<T, ENotifyPolicy>;
+        concept IsResumeCallbackType = std::regular_invocable<T, ENotifyPolicy>;
 
     } // namespace concepts
-
-    namespace detail {
-
-        // This class is intented to handle awaitable
-        // resumption from a paused state.
-        struct PauseCallbackEvent
-        {
-        private:
-            // Need to be up there to make the
-            // "requirement" work for Set().
-            PauseHandlerCallbackT _notifyCallback;
-
-        public:
-            void Notify(ENotifyPolicy policy = ENotifyPolicy::RESUME) const
-            {
-                assert(_notifyCallback);
-
-                // We notify the coroutine.
-                //
-                // This notify callback is responsible
-                // for the corouitne resumption.
-                _notifyCallback(policy);
-            }
-
-            // Sets the notify callback
-            template <typename T>
-                requires requires (T&& t) { { _notifyCallback = std::forward<T>(t) }; }
-            void Set(T&& cb)
-            {
-                _notifyCallback = std::forward<T>(cb);
-            }
-        };
-
-    } // namespace detail
 
     class PauseHandler : public detail::IntrusiveObject<PauseHandler>
     {
@@ -84,7 +51,7 @@ namespace tinycoro {
             _state.fetch_and(c_exceptionMask, std::memory_order_relaxed);
         }
 
-        void ResetCallback(concepts::PauseHandlerCb auto pr) { _resumerCallback = std::move(pr); }
+        void ResetCallback(concepts::IsResumeCallbackType auto pr) { _resumerCallback = std::move(pr); }
 
         [[nodiscard]] auto Pause() noexcept
         {
@@ -131,7 +98,7 @@ namespace tinycoro {
 
         // The resume callback, which is intented to
         // resume the coroutine from a suspension state.
-        PauseHandlerCallbackT _resumerCallback{};
+        ResumeCallback_t _resumerCallback{};
     };
 
     namespace context {

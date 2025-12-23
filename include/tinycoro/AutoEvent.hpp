@@ -21,9 +21,9 @@ namespace tinycoro {
         class AutoEvent
         {
         public:
-            using awaiter_type = AwaiterT<AutoEvent, detail::PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<AutoEvent, detail::ResumeSignalEvent>;
 
-            friend class AwaiterT<AutoEvent, detail::PauseCallbackEvent>;
+            friend class AwaiterT<AutoEvent, detail::ResumeSignalEvent>;
 
             AutoEvent(bool initialySet = false)
             : _state{initialySet ? this : nullptr}
@@ -106,7 +106,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::ResumeSignalEvent{}}; };
 
         private:
             bool IsReady() noexcept
@@ -274,9 +274,9 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _autoEvent.Cancel(this); }
 

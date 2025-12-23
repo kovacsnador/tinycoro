@@ -64,14 +64,19 @@ namespace tinycoro {
                 TryCancel();
             }
 
-            // release the parent and the callback
-            // We detach ourself from the parent
-            // and clear the cancellation callback,
-            // but the event is NOT cancelled
-            void Release()
+            // Release the callback.
+            // We detach ourself from the parent clock
+            // and clear the cancellation callback.
+            // But the event is NOT cancelled!
+            bool Release()
             {
                 std::scoped_lock lock{_mtx};
-                _cancellationCallback = nullptr;
+                if(_cancellationCallback)
+                {
+                    _cancellationCallback = nullptr;
+                    return true;
+                }
+                return false;
             }
 
             // We try to cancel the event
@@ -107,6 +112,12 @@ namespace tinycoro {
                 }
             }
 
+            operator bool() const noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _cancellationCallback.operator bool();
+            } 
+
         private:
             // private constructor
             template <typename T>
@@ -120,7 +131,7 @@ namespace tinycoro {
             // with this callback you can cancel the timeout
             std::function<bool()> _cancellationCallback{nullptr};
 
-            std::mutex _mtx;
+            mutable std::mutex _mtx;
         };
 
         template <typename CancellationTokenT, concepts::IsDuration PrecisionT>

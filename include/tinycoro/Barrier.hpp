@@ -93,9 +93,9 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _barrier.Cancel(this); };
 
@@ -118,8 +118,8 @@ namespace tinycoro {
     template <typename CompletionCallbackT = detail::NoopComplitionCallback, template <typename, typename> class AwaiterT = detail::BarrierAwaiter>
     class Barrier
     {
-        using awaiter_type = AwaiterT<Barrier, detail::PauseCallbackEvent>;
-        friend class AwaiterT<Barrier, detail::PauseCallbackEvent>;
+        using awaiter_type = AwaiterT<Barrier, detail::ResumeSignalEvent>;
+        friend class AwaiterT<Barrier, detail::ResumeSignalEvent>;
 
     public:
         Barrier(size_t initCount, CompletionCallbackT callback = {})
@@ -190,7 +190,7 @@ namespace tinycoro {
             return false;
         }
 
-        [[nodiscard]] auto MakeAwaiter(detail::EBarrierAwaiterState policy) { return awaiter_type{*this, detail::PauseCallbackEvent{}, policy}; }
+        [[nodiscard]] auto MakeAwaiter(detail::EBarrierAwaiterState policy) { return awaiter_type{*this, detail::ResumeSignalEvent{}, policy}; }
 
         [[nodiscard]] bool Add(awaiter_type* waiter, detail::EBarrierAwaiterState policy)
         {

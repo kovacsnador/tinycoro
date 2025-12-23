@@ -21,9 +21,9 @@ namespace tinycoro {
         class ManualEvent
         {
         public:
-            using awaiter_type = AwaiterT<ManualEvent, detail::PauseCallbackEvent>;
+            using awaiter_type = AwaiterT<ManualEvent, detail::ResumeSignalEvent>;
 
-            friend class AwaiterT<ManualEvent, detail::PauseCallbackEvent>;
+            friend class AwaiterT<ManualEvent, detail::ResumeSignalEvent>;
 
             ManualEvent(bool preSet = false)
             {
@@ -57,7 +57,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
 
-            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::PauseCallbackEvent{}}; };
+            [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::ResumeSignalEvent{}}; };
 
         private:
             [[nodiscard]] bool Add(awaiter_type* awaiter)
@@ -197,13 +197,13 @@ namespace tinycoro {
 
             constexpr void await_resume() const noexcept { }
 
-            void Notify() const noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
             
-            void NotifyToDestroy() const noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
             bool Cancel() noexcept { return _manualEvent.Cancel(this); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {

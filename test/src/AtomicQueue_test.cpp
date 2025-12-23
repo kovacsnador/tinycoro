@@ -101,95 +101,6 @@ TEST(AtomicQueueTest, AtomicQueueTest_empty)
     EXPECT_TRUE(queue.empty());
 }
 
-TEST(AtomicQueueTest, AtomicQueueTest_wait_for_push)
-{
-    tinycoro::SoftClock clock;
-    tinycoro::Scheduler scheduler{2};
-
-    tinycoro::detail::AtomicQueue<size_t, 2> queue;
-
-    tinycoro::AutoEvent event;
-
-    auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(queue.try_push(1u));
-        EXPECT_TRUE(queue.try_push(2u));
-
-        event.Set();
-
-        co_await tinycoro::SleepFor(clock, 100ms);
-
-        size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 1u);
-    };
-
-    auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await event;
-
-        // here we wait for a possible push
-        queue.wait_for_push();
-
-        EXPECT_TRUE(queue.try_push(3u));
-
-        size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 2u);
-
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 3u);
-    };
-
-    tinycoro::AllOf(scheduler, producer(), consumer());
-}
-
-TEST(AtomicQueueTest, AtomicQueueTest_wait_for_pop)
-{
-    tinycoro::SoftClock clock;
-    tinycoro::Scheduler scheduler{2};
-
-    tinycoro::detail::AtomicQueue<size_t, 2> queue;
-
-    tinycoro::AutoEvent event;
-
-    auto producer = [&]() -> tinycoro::Task<void> {
-        EXPECT_TRUE(queue.try_push(1u));
-        EXPECT_TRUE(queue.try_push(2u));
-
-        size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 1u);
-
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 2u);
-
-        event.Set();
-
-        co_await tinycoro::SleepFor(clock, 100ms);
-
-        EXPECT_TRUE(queue.try_push(3u));
-        EXPECT_TRUE(queue.try_push(4u));
-    };
-
-    auto consumer = [&]() -> tinycoro::Task<void> {
-        co_await event;
-
-        // here we wait for a possible push
-        queue.wait_for_pop();
-
-        size_t val;
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 3u);
-
-        // here we wait for a possible push
-        queue.wait_for_pop();
-
-        EXPECT_TRUE(queue.try_pop(val));
-        EXPECT_EQ(val, 4u);
-    };
-
-    tinycoro::AllOf(scheduler, producer(), consumer());
-}
-
 struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
@@ -250,42 +161,42 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_pop)
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded)
 {
-    const auto count = GetParam();
+        const auto count = GetParam();
 
-    tinycoro::Scheduler scheduler;
+        tinycoro::Scheduler scheduler;
 
-    tinycoro::detail::AtomicQueue<size_t, (1 << 15)> queue; // make sure you have enough cache size
+        tinycoro::detail::AtomicQueue<size_t, (1 << 15)> queue; // make sure you have enough cache size
 
-    auto producer = [&]() -> tinycoro::Task<void> {
-        for (auto i : std::views::iota(0u, count))
-        {
-            while (queue.try_push(i) == false)
-                ;
-        }
+        auto producer = [&]() -> tinycoro::Task<void> {
+            for (auto i : std::views::iota(0u, count))
+            {
+                while (queue.try_push(i) == false)
+                    ;
+            }
 
-        co_return;
-    };
+            co_return;
+        };
 
-    tinycoro::AllOf(scheduler, producer(), producer(), producer(), producer(), producer(), producer(), producer(), producer());
+        tinycoro::AllOf(scheduler, producer(), producer(), producer(), producer(), producer(), producer(), producer(), producer());
 
-    EXPECT_FALSE(queue.empty());
+        EXPECT_FALSE(queue.empty());
 
-    auto consumer = [&]() -> tinycoro::Task<size_t> {
-        size_t c{};
-        size_t val;
-        while (queue.try_pop(val))
-        {
-            c++;
-        }
-        co_return c;
-    };
+        auto consumer = [&]() -> tinycoro::Task<size_t> {
+            size_t c{};
+            size_t val;
+            while (queue.try_pop(val))
+            {
+                c++;
+            }
+            co_return c;
+        };
 
-    auto [v1, v2, v3, v4, v5, v6, v7, v8]
-        = tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+        auto [v1, v2, v3, v4, v5, v6, v7, v8]
+            = tinycoro::AllOf(scheduler, consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
 
-    auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
+        auto sum = *v1 + *v2 + *v3 + *v4 + *v5 + *v6 + *v7 + *v8;
 
-    EXPECT_EQ(count * 8, sum);
+        EXPECT_EQ(count * 8, sum);
 }
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_together)
@@ -329,22 +240,22 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_toget
     };
 
     auto [v9, v10, v11, v12, v13, v14, v15, v16, v1, v2, v3, v4, v5, v6, v7, v8] = tinycoro::AllOf(scheduler,
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    producer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer(),
-                                                                                                    consumer());
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   producer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer(),
+                                                                                                   consumer());
 
     EXPECT_TRUE(queue.empty());
 
@@ -359,15 +270,18 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
 
     tinycoro::Scheduler                      scheduler{8};
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
     std::atomic<size_t> totalCount{};
 
     auto producer = [&]() -> tinycoro::Task<void> {
+        
+        size_t state{};
         for (size_t i = 0; i <= count; ++i)
         {
-            while (queue.try_push(i) == false)
+            while (dispatcher.try_push(i) == false)
             {
-                queue.wait_for_push();
+                dispatcher.wait_for_push(state++);
             }
             totalCount++;
         }
@@ -375,12 +289,13 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
+        size_t state{};
         for (;;)
         {
             size_t val;
-            if (queue.try_pop(val) == false)
+            if (dispatcher.try_pop(val) == false)
             {
-                queue.wait_for_pop();
+                dispatcher.wait_for_pop(state++);
             }
             else
             {

@@ -55,7 +55,7 @@ struct PauseHandlerMock
 
     void ResetCallback(auto) noexcept { }
 
-    tinycoro::PauseHandlerCallbackT pauseResume;
+    tinycoro::ResumeCallback_t pauseResume;
     std::atomic<bool>               pause{true};
 };
 

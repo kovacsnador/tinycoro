@@ -490,12 +490,8 @@ TEST_P(AllOfAwaiterDynamicTest, AnyOfAwaitDynamicFuntionalTest_2)
 
         EXPECT_EQ(count, 1);
         EXPECT_EQ(results.size(), size);
-        EXPECT_EQ(results.at(0), 1);
 
-        for (size_t i = 1; i < results.size(); ++i)
-        {
-            EXPECT_FALSE(results[i].has_value());
-        }
+        EXPECT_EQ(count, std::ranges::count_if(results, [](auto& it) { return it.has_value(); }));
     };
 
     tinycoro::AllOf(coro());

@@ -25,7 +25,7 @@ struct SemaphoreAwaiterTest : public testing::Test
     using value_type = int32_t;
 
     SemaphoreAwaiterTest()
-    : awaiter{mock, tinycoro::detail::PauseCallbackEvent{}}
+    : awaiter{mock, tinycoro::detail::ResumeSignalEvent{}}
     {
     }
 
@@ -37,7 +37,7 @@ struct SemaphoreAwaiterTest : public testing::Test
     SemaphoreMock<value_type>                                          mock;
     tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<value_type>> hdl;
 
-    tinycoro::detail::SemaphoreAwaiter<decltype(mock), tinycoro::detail::PauseCallbackEvent> awaiter;
+    tinycoro::detail::SemaphoreAwaiter<decltype(mock), tinycoro::detail::ResumeSignalEvent> awaiter;
 };
 
 TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)

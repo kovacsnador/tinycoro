@@ -19,9 +19,9 @@ namespace tinycoro {
         class Mutex
         {
         public:
-            using awaitable_type = AwaitableT<Mutex, detail::PauseCallbackEvent>;
+            using awaitable_type = AwaitableT<Mutex, detail::ResumeSignalEvent>;
 
-            friend class AwaitableT<Mutex, detail::PauseCallbackEvent>;
+            friend class AwaitableT<Mutex, detail::ResumeSignalEvent>;
             friend class ReleaseGuard<Mutex>;
 
             Mutex() = default;
@@ -31,7 +31,7 @@ namespace tinycoro {
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); }
 
-            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::PauseCallbackEvent{}}; }
+            [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::ResumeSignalEvent{}}; }
 
         private:
             // Checks only if the mutex is free to take,
@@ -158,9 +158,9 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_mutex}; }
 
-            void Notify() const noexcept { _event.Notify(); }
+            bool Notify() const noexcept { return _event.Notify(); }
 
-            void PutOnPause(auto parentCoro) { _event.Set(context::PauseTask(parentCoro)); }
+            void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
             void ResumeFromPause(auto parentCoro)
             {

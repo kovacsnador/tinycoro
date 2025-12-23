@@ -8,53 +8,69 @@
 
 #include <concepts>
 #include <array>
+#include <type_traits>
 
 #include "CachelineAlign.hpp"
 #include "Common.hpp"
 
 namespace tinycoro { namespace detail {
 
-    // A multi-producer, multi-consumer lock-free queue.
+    // A multi-producer, multi-consumer (MPMC) lock-free queue.
     //
     // Internally, this queue uses a fixed-size ring buffer of size `SIZE`,
-    // which must be a power of two.
+    // which **must be a power of two**. Indexing is done via masking for efficiency.
     //
-    // The queue supports concurrent `try_push` and `try_pop` operations without locks.
-    // Blocking variants (`wait_for_push`, `wait_for_pop`) are provided via C++20 atomic wait/notify.
+    // The queue supports concurrent `try_push` and `try_pop` operations
+    // without using mutexes. All synchronization is done via atomics and
+    // carefully chosen memory orderings.
     //
-    // Sequence counters (`_head`, `_tail`, and `Element::sequence`) are 64-bit unsigned integers
-    // (`uint64_t`). These are used to coordinate access to buffer elements and enforce ordering.
+    // Design overview:
+    // - `_head` and `_tail` are monotonically increasing sequence counters
+    //   that represent global push and pop positions.
+    // - Each buffer slot (`Element`) has its own `sequence` counter that
+    //   encodes the state of that slot across wraparounds.
+    // - The combination of `(position / SIZE)` (the “turn”) and the
+    //   per-element sequence number ensures correct coordination between
+    //   producers and consumers, even when indices wrap around the ring.
     //
-    // ⚠ Overflow Note:
-    // The sequence values are monotonically increasing and **not wrapped or masked**.
-    // This means that once a `uint64_t` sequence counter overflows (after `2^64` operations),
-    // the queue’s correctness is no longer guaranteed. However, at even extremely high
-    // message rates (billions of ops/sec), this would take hundreds of years to occur,
-    // so overflow is generally a theoretical issue in practice.
+    // Sequence counters:
+    // - `_head`, `_tail`, and `Element::sequence` are 64-bit unsigned integers
+    //   (`uint64_t`).
+    // - Sequence values are monotonically increasing and are **not wrapped
+    //   or masked**.
     //
-    // ⚠ Lock-free Guarantee:
-    // This queue is only truly *lock-free* if `std::atomic<uint64_t>` is lock-free on
-    // the target platform. You can check this via `std::atomic<uint64_t>::is_always_lock_free`.
-    // On most modern 64-bit platforms, this condition holds.
-    // If it's not lock-free, atomic operations may fall back to locks or syscalls.
+    // ⚠ Overflow note:
+    // If any sequence counter overflows (after 2^64 operations), correctness
+    // is no longer guaranteed. In practice, this would require an unrealistically
+    // high number of operations (even at billions of ops/sec, hundreds of years),
+    // so this is considered a theoretical limitation.
     //
-    // This makes the queue a good fit for high-throughput, low-latency systems
-    // where long-term runtime and platform-specific atomic guarantees are understood.
+    // ⚠ Lock-free guarantee:
+    // The queue is lock-free only if `std::atomic<uint64_t>` is lock-free on
+    // the target platform.
+    // You can check this via `std::atomic<uint64_t>::is_always_lock_free`.
+    // On most modern 64-bit platforms, this condition holds. If not, the
+    // implementation may internally fall back to locks or syscalls.
+    //
+    // Properties:
+    // - Multiple producers and multiple consumers
+    // - Lock-free (subject to atomic guarantees)
+    // - Bounded capacity (`SIZE`)
+    // - Non-blocking API (`try_push`, `try_pop`)
+    //
+    // This queue is well suited for high-throughput, low-latency systems
+    // where bounded capacity and platform atomic guarantees are acceptable.
     template <typename T, uint64_t SIZE>
         requires detail::IsPowerOf2<SIZE>::value
     class AtomicQueue
     {
     public:
+        static_assert(std::is_default_constructible_v<T>, "AtomicQueue::T needs to be default constructible");
+
         using value_type = T;
         using sequence_t = uint64_t;
 
-        AtomicQueue()
-        {
-            for (sequence_t i = 0; i < _buffer.size(); ++i)
-            {
-                _buffer[i].sequence.store(i, std::memory_order_relaxed);
-            }
-        }
+        AtomicQueue() = default; 
 
         // disable copy and move
         AtomicQueue(AtomicQueue&&) = delete;
@@ -63,38 +79,35 @@ namespace tinycoro { namespace detail {
         template <typename U>
         bool try_push(U&& value) noexcept
         {
+            auto pos = _head.load(std::memory_order_acquire);
             for (;;)
             {
-                // get the current enqueue position
-                auto  pos  = _head.load(std::memory_order_relaxed);
                 auto& elem = _buffer[pos & BUFFER_MASK];
-                auto  seq  = elem.sequence.load(std::memory_order_acquire);
-
-                if (seq == pos)
+                if (turn(pos) * 2 == elem.sequence.load(std::memory_order_acquire))
                 {
-                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
+                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // found the right place
                         // pushing the value into the queue
                         elem.value = std::forward<U>(value);
 
                         // store the new position as the next sequence
-                        elem.sequence.store(pos + 1, std::memory_order_release);
-
-                        // notify waiter that
-                        // we have a new value
-                        // in the queue
-                        _head.notify_all();
+                        elem.sequence.store(turn(pos) * 2 + 1, std::memory_order_release);
 
                         // success
                         return true;
                     }
                 }
-                else if (pos > seq)
+                else
                 {
-                    // the queue is full
-                    // push failed
-                    return false;
+                    const auto prevHead = pos;
+
+                    pos = _head.load(std::memory_order_acquire);
+                    if (pos == prevHead)
+                    {
+                        // queue is full
+                        return false;
+                    }
                 }
             }
 
@@ -105,36 +118,30 @@ namespace tinycoro { namespace detail {
         // try to pop the next value from the queue
         bool try_pop(value_type& data) noexcept
         {
+            auto pos = _tail.load(std::memory_order_acquire);
             for (;;)
             {
-                // get the current dequeue position
-                auto  pos  = _tail.load(std::memory_order_relaxed);
                 auto& elem = _buffer[pos & BUFFER_MASK];
-                auto  seq  = elem.sequence.load(std::memory_order_acquire);
-
-                if (seq == pos + 1)
+                if (turn(pos) * 2 + 1 == elem.sequence.load(std::memory_order_acquire))
                 {
-                    // we found the right place
-                    // try to access the underlying element...
-                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order_release, std::memory_order_relaxed))
+                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // we got exclusive access to the element
                         data = std::move(elem.value);
 
-                        elem.sequence.store(pos + SIZE, std::memory_order_release);
-
-                        // notify the waiters
-                        // that a value is popped
-                        _tail.notify_all();
+                        elem.sequence.store(turn(pos) * 2 + 2, std::memory_order_release);
 
                         return true;
                     }
                 }
-                else if (seq == pos)
+                else
                 {
-                    // the queue is empty
-                    // no element can be popped
-                    return false;
+                    auto const prevTail = pos;
+                    pos                 = _tail.load(std::memory_order_acquire);
+                    if (pos == prevTail)
+                    {
+                        return false;
+                    }
                 }
             }
 
@@ -142,41 +149,14 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
-        // wait for new element to pop
-        // if the queue is empty
-        void wait_for_pop() const noexcept
-        {
-            auto head = _head.load(std::memory_order_relaxed);
-            auto tail = _tail.load(std::memory_order_relaxed);
-
-            if (tail == head)
-            {
-                // if the queue is empty
-                // we wait for the next element to pop
-                _head.wait(head);
-            }
-        }
-
-        // wait for new element to push
-        // in case the queue is full
-        void wait_for_push() const noexcept
-        {
-            auto head = _head.load(std::memory_order_relaxed);
-            auto tail = _tail.load(std::memory_order_relaxed);
-
-            if ((head - SIZE) == tail)
-            {
-                // if the queue is full
-                // we wait until someone pops an element
-                _tail.wait(tail);
-            }
-        }
-
         [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
 
         [[nodiscard]] bool full() const noexcept { return _head.load(std::memory_order_relaxed) - SIZE == _tail.load(std::memory_order_relaxed); }
 
     private:
+        constexpr size_t idx(size_t i) const noexcept { return i % SIZE; }
+        constexpr size_t turn(size_t i) const noexcept { return i / SIZE; }
+
         struct Element
         {
             std::atomic<sequence_t> sequence{};
