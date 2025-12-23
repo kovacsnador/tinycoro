@@ -2,6 +2,7 @@
 
 #include <thread>
 #include <vector>
+#include <ranges>
 
 #include <tinycoro/ResumeSignalEvent.hpp>
 
@@ -37,32 +38,39 @@ TEST_P(ResumeSignalEventTest, ResumeSignalEventTest_multithreaded)
 {
     auto count = GetParam();
 
-    tinycoro::detail::ResumeSignalEvent event;
-
-    // no sync is necessary
-    uint32_t flag{};
-    uint32_t notifyCount{};
-
-    event.Set([&]([[maybe_unused]] auto policy) { flag++; });
-
-    auto work = [&] { 
-        for (size_t i = 0; i < count; ++i)
-        {
-            if(event.Notify())
-                notifyCount++;
-        }
-    };
-
+    for (size_t i = 0; i < count; i++)
     {
-        std::vector<std::jthread> threads;
-        for (size_t i = 0; i < 8; ++i)
+        tinycoro::detail::ResumeSignalEvent event;
+
+        // No extra synchronization is necessary here:
+        // `ResumeSignalEvent` is one-shot so only a single thread will observe `Notify()` == true
+        // and perform the increments. The main thread reads the counters after joining the threads.
+        uint32_t flag{};
+        uint32_t notifyCount{};
+
+        event.Set([&]([[maybe_unused]] auto policy) { flag++; });
+
+        auto work = [&] {
+            for (size_t i = 0; i < count; ++i)
+            {
+                if (event.Notify())
+                {
+                    notifyCount++;
+                    std::atomic_thread_fence(std::memory_order::release);
+                }
+            }
+        };
+
         {
-            threads.emplace_back(work);
+            std::vector<std::jthread> threads;
+            for ([[maybe_unused]] auto _ : std::views::iota(0u, 8u))
+            {
+                threads.emplace_back(work);
+            }
         }
-
         // join all the threads
-    }
 
-    EXPECT_EQ(flag, 1);
-    EXPECT_EQ(notifyCount, 1);
+        EXPECT_EQ(flag, 1);
+        EXPECT_EQ(notifyCount, 1);
+    }
 }

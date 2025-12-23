@@ -240,7 +240,7 @@ struct SingleEventTimeoutTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutTest, SingleEventTimeoutTest, testing::Values(1, 10, 100, 1000));
+INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutTest, SingleEventTimeoutTest, testing::Values(1, 10, 100, 1000, 10000, 20000));
 
 // THIS TEST CAN HANG!!!
 TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
@@ -288,7 +288,56 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
     EXPECT_EQ(doneCount, count);
 }
 
-TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_all_timeout)
+// THIS TEST CAN HANG!!!
+TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race_auto_event)
+{
+
+    tinycoro::Scheduler scheduler{2};
+    tinycoro::SoftClock clock;
+
+    tinycoro::SingleEvent<uint32_t> event;
+    uint32_t                        doneCount{};
+
+    tinycoro::AutoEvent helperEvent{true};
+
+    auto count = GetParam();
+
+    auto SingleEventConsumer = [&]() -> tinycoro::TaskNIC<> {
+        while (doneCount < count)
+        {
+            auto opt = co_await tinycoro::TimeoutAwait{clock, event.Wait(), 10ms};
+            if (opt.has_value())
+            {
+                helperEvent.Set();
+                doneCount++;
+            }
+        }
+    };
+
+    auto sleep = [&]() -> tinycoro::TaskNIC<> {
+        for ([[maybe_unused]] auto it : std::ranges::views::iota(0u, count))
+        {
+            co_await helperEvent;
+            [[maybe_unused]] auto succeed = event.Set(it);
+            EXPECT_TRUE(succeed);
+        }
+
+        co_return;
+    };
+
+    tinycoro::AllOf(scheduler, SingleEventConsumer(), sleep());
+
+    EXPECT_EQ(doneCount, count);
+}
+
+
+struct SingleEventTimeoutAllTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutAllTest, SingleEventTimeoutAllTest, testing::Values(1, 10, 100, 200));
+
+TEST_P(SingleEventTimeoutAllTest, SingleEventFunctionalTest_all_timeout)
 {
     tinycoro::SoftClock clock;
 

@@ -91,7 +91,10 @@ namespace tinycoro {
             if (suspended != EResumeState::AWAIT_READY_RESUME && _clockCancelToken.TryCancel() == false)
             {
                 // At this point we need to wait for the cancellation callback.
-                _resumeState.wait(EResumeState::AWAIT_RESUMED);
+                //
+                // std::memory_order::acquire is necessary here, we want a guarantie,
+                // that _awaiterCancelled is properly updated.
+                _resumeState.wait(EResumeState::AWAIT_RESUMED, std::memory_order::acquire);
             }
 
             // check if the awaiter is cancelled,
