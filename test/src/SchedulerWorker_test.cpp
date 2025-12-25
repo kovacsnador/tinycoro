@@ -105,7 +105,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     EXPECT_CALL(task->mock, SetPauseHandler);
 
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-    tinycoro::detail::Dispatcher                                     dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
 
     tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
 
@@ -144,7 +144,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
 
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-        tinycoro::detail::Dispatcher                                     dispatcher{queue, {}};
+        tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
 
 
         tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
