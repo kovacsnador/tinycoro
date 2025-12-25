@@ -1,13 +1,15 @@
 #include <gtest/gtest.h>
 #include <gmock/gmock.h>
 
+#include <latch>
+
 #include <tinycoro/tinycoro_all.h>
 
-/*TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
+/* TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
 {
     std::stop_source                         ss;
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher dispatcher{queue};
+    tinycoro::detail::Dispatcher             dispatcher{queue, ss.get_token()};
 
     EXPECT_TRUE(tinycoro::detail::helper::PushTask(1, dispatcher, ss));
 
@@ -21,14 +23,15 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 
     tinycoro::detail::AtomicQueue<int32_t*, 2> queue;
 
-    tinycoro::detail::Dispatcher dispatcher{queue};
+    tinycoro::detail::Dispatcher dispatcher{queue, {}};
 
     EXPECT_TRUE(dispatcher.try_push(&val));
     EXPECT_TRUE(dispatcher.try_push(&val));
 
     EXPECT_TRUE(dispatcher.full());
 
-    tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
+    //tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
+    dispatcher.notify_all();
 
     EXPECT_TRUE(dispatcher.full());
 
@@ -51,7 +54,7 @@ struct AtomicQueueMock
     MOCK_METHOD(void, notify_pop_waiters, ());
 };
 
-TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
+/* TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
 {
     AtomicQueueMock mock;
 
@@ -63,7 +66,7 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
 
 
     tinycoro::detail::helper::WakeUpAllWaiter(mock);
-}
+}*/
 
 struct SchedubableMock
 {
@@ -102,7 +105,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     EXPECT_CALL(task->mock, SetPauseHandler);
 
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-    tinycoro::detail::Dispatcher dispatcher{queue};
+    tinycoro::detail::Dispatcher                                     dispatcher{queue, {}};
 
     tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
 
@@ -111,7 +114,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     latch.wait();
 
     ss.request_stop();
-    tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
+    dispatcher.notify_all();
 }
 
 struct SchedulerWorkerTest : testing::TestWithParam<size_t>
@@ -141,7 +144,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
 
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-        tinycoro::detail::Dispatcher dispatcher{queue};
+        tinycoro::detail::Dispatcher                                     dispatcher{queue, {}};
 
 
         tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
@@ -151,6 +154,6 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         latch.wait();
 
         ss.request_stop();
-        tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
+        dispatcher.notify_all();
     }
 }

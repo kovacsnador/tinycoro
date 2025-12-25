@@ -32,29 +32,40 @@ namespace tinycoro { namespace detail {
     struct Dispatcher
     {
         using value_type = typename QueueT::value_type;
+
+        // size_t for safe overflow
         using state_type = size_t;
 
-        explicit Dispatcher(QueueT& queue)
+        static_assert(std::unsigned_integral<state_type>, "state_type needs to be unsigned for safe overflow");
+
+        explicit Dispatcher(QueueT& queue, std::stop_token stopToken)
         : _queue{queue}
+        , _stopToken{std::move(stopToken)}
         {
         }
 
-        [[nodiscard]] auto push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
-        [[nodiscard]] auto pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
-
-        void wait_for_push(state_type prevState) const noexcept
-        {
-            _popEvent.wait(prevState);
+        void wait_for_push() const noexcept
+        {  
+            auto state = _popEvent.load(std::memory_order::acquire);
+            if (full() && _stopToken.stop_requested() == false)
+                _popEvent.wait(state, std::memory_order::acquire);
         }
 
-        void wait_for_pop(state_type prevState) const noexcept
+        void wait_for_pop() const noexcept
         {
-            _pushEvent.wait(prevState);
+            auto state = _pushEvent.load(std::memory_order::acquire);
+            if (empty() && _stopToken.stop_requested() == false)
+                _pushEvent.wait(state, std::memory_order::acquire);
         }
 
         void notify_push_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
-
         void notify_pop_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
+
+        void notify_all() noexcept
+        {
+            notify_pop_waiters();
+            notify_push_waiters();
+        }
 
         template <typename T>
         [[nodiscard]] auto try_push(T&& elem) noexcept
@@ -87,11 +98,12 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] auto empty() const noexcept { return _queue.empty(); }
 
     private:
-        // uint32_t for safe overflow
-        alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent;
-        alignas(CACHELINE_SIZE) std::atomic<state_type> _popEvent;
+        alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent{};
+        alignas(CACHELINE_SIZE) std::atomic<state_type> _popEvent{};
 
         QueueT& _queue;
+
+        std::stop_token _stopToken;
     };
 
 }} // namespace tinycoro::detail

@@ -17,37 +17,7 @@
 
 namespace tinycoro { namespace detail {
 
-    namespace helper {
-
-        bool PushTask(auto task, auto& queue, const auto& stopObject, auto& popState) noexcept
-        {
-            while (stopObject.stop_requested() == false)
-            {
-                //auto prevState = queue.pop_state();
-
-                if (queue.try_push(std::move(task)))
-                {
-                    // the task is pushed
-                    // into the tasks queue
-                    return true;
-                }
-                else
-                {
-                    // wait until we have space in the queue
-                    queue.wait_for_push(popState.fetch_add(1, std::memory_order::release));
-                }
-            }
-
-            return false;
-        }
-
-        template <typename DispatcherT>
-        void WakeUpAllWaiter(DispatcherT& dispatcher) noexcept
-        {
-            // wake up every waiter.
-            dispatcher.notify_push_waiters();
-            dispatcher.notify_pop_waiters();
-        }
+    namespace local {
 
         // A minimal thread-safe wrapper around a LinkedPtrList.
         //
@@ -129,7 +99,6 @@ namespace tinycoro { namespace detail {
     private:
         void Run(std::stop_token stopToken) noexcept
         {
-            typename DispatcherT::state_type prevState{};
             while (stopToken.stop_requested() == false)
             {
                 // we can try to upload the cached tasks
@@ -147,7 +116,7 @@ namespace tinycoro { namespace detail {
                         // now if some tasks need resumption
                         // they will directly be pushed into the dispatcher queue.
                         // (not in the local cache)
-                        _dispatcher.wait_for_pop(prevState++);
+                        _dispatcher.wait_for_pop();
                     }
                 }
                 else
@@ -158,6 +127,10 @@ namespace tinycoro { namespace detail {
                     _InvokeTask(std::move(task));
                 }
             }
+
+            // Not strictly necessary, but notify others
+            // in case somebody missed the stop request
+            _dispatcher.notify_all();
 
             // close the notified cache
             // and make a proper task cleanup here
@@ -372,7 +345,7 @@ namespace tinycoro { namespace detail {
         DispatcherT& _dispatcher;
 
         // tasks which are in pause state
-        helper::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
+        local::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.

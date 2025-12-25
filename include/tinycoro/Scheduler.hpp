@@ -35,8 +35,8 @@ namespace tinycoro {
         public:
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
-            , _stopCallback{_stopSource.get_token(), [this] { helper::WakeUpAllWaiter(_dispatcher); }}
-            , _dispatcher{_sharedTasks}
+            , _dispatcher{_sharedTasks, _stopSource.get_token()}
+            , _stopCallback { _stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
             {
                 _AddWorkers(workerThreadCount);
             }
@@ -129,8 +129,20 @@ namespace tinycoro {
                     // or if the a stop is requested
                     auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
-                    // push the task into the queue
-                    helper::PushTask(std::move(task), _dispatcher, _stopSource, _popState);
+                    while (_stopSource.stop_requested() == false)
+                    {
+                        if (_dispatcher.try_push(std::move(task)))
+                        {
+                            // the task is pushed
+                            // into the tasks queue
+                            break;
+                        }
+                        else
+                        {
+                            // wait until we have space in the queue
+                            _dispatcher.wait_for_push();
+                        }
+                    }
                 }
                 else
                 {
@@ -159,15 +171,12 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
 
-            // the stop callback, which will be triggered
-            // if a stop for _stopSource is requested.
-            std::stop_callback<std::function<void()>> _stopCallback;
-
             //std::vector<queue_t> _queues;
             Dispatcher<queue_t> _dispatcher;
 
-            using state_t = typename decltype(_dispatcher)::state_type;
-            std::atomic<state_t> _popState{};
+            // the stop callback, which will be triggered
+            // if a stop for _stopSource is requested.
+            std::stop_callback<std::function<void()>> _stopCallback;
 
             // Specialize the worker (thread) type
             using Worker_t = SchedulerWorker<decltype(_dispatcher)>;
