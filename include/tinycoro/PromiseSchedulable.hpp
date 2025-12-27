@@ -43,8 +43,6 @@ namespace tinycoro
         // Pause state needed by the scheduler.
         std::atomic<EPauseState> pauseState{EPauseState::IDLE};
 
-        std::atomic<bool> alreadyPaused{};
-
         // Saves the promise inside the coroutine promise object
         // "PromiseT" must not be an L value reference.  
         template <typename PromiseT, typename OnFinishCallbackT>

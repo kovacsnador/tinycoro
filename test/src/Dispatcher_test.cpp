@@ -41,7 +41,7 @@ namespace test {
 TEST(DispatcherTest, DispatcherTest_try_push_pop)
 {
     tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue};
+    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -63,29 +63,26 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
 
 TEST(DispatcherTest, DispatcherTest_wait_for_pop)
 {
-    tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue};
+    tinycoro::detail::AtomicQueue<int32_t, 1024> queue;
+    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     auto fut = std::async(std::launch::async, [&] {
 
-        size_t state{};
-
-        for (auto it : std::views::iota(0, 100))
+        for (size_t i = 0; i < 1000;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(state++);
+            dispatcher.wait_for_pop();
 
             int32_t val;
-            EXPECT_TRUE(dispatcher.try_pop(val));
-            EXPECT_EQ(val, it);
+            if (dispatcher.try_pop(val))
+            {
+                EXPECT_EQ(val, i++);
+            }
         }
-
-        SUCCEED();
     });
 
-    for (auto it : std::views::iota(0, 100))
+    for (auto it : std::views::iota(0, 1000))
     {
-        std::this_thread::sleep_for(10ms);
         EXPECT_TRUE(dispatcher.try_push(it));
     }
 
@@ -97,37 +94,27 @@ TEST(DispatcherTest, DispatcherTest_wait_for_pop)
 TEST(DispatcherTest, DispatcherTest_wait_for_push)
 {
     tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue};
-
-    auto pushState = dispatcher.push_state(std::memory_order::acquire);
-    auto popState = dispatcher.pop_state(std::memory_order::acquire);
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     // this need to move
-    //dispatcher.wait_for_push(0);
+    dispatcher.wait_for_push();
 
     // make the queue full
     EXPECT_TRUE(dispatcher.try_push(0));
     EXPECT_TRUE(dispatcher.try_push(1));
 
     // this need to move
-    //dispatcher.wait_for_pop(0);
+    dispatcher.wait_for_pop();
 
     auto asyncFunc = [&] {
-        for (size_t i = 0; i < 100;)
+        for (size_t i = 0; i < 1000;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(pushState++);
-
-            //pushState = dispatcher.push_state(std::memory_order::acquire);
-
-            EXPECT_FALSE(dispatcher.empty());
+            dispatcher.wait_for_pop();
 
             int32_t val;
-            auto succeed = dispatcher.try_pop(val);
-            if(succeed)
-                i++;
-
-            EXPECT_TRUE(succeed);
+            if (dispatcher.try_pop(val))
+                EXPECT_EQ(val, i++);
         }
 
         SUCCEED();
@@ -136,19 +123,12 @@ TEST(DispatcherTest, DispatcherTest_wait_for_push)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    for (int32_t i = 2; i < 100;)
+    for (int32_t i = 2; i < 1000;)
     {
-        dispatcher.wait_for_push(popState++);
+        dispatcher.wait_for_push();
 
-        //popState = dispatcher.pop_state(std::memory_order::acquire);
-
-        EXPECT_FALSE(dispatcher.full());
-
-        auto succeed = dispatcher.try_push(i);
-        if(succeed)
+        if (dispatcher.try_push(i))
             i++;
-
-        EXPECT_TRUE(succeed);
     }
 
     // wait for the future

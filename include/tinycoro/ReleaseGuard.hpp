@@ -35,6 +35,8 @@ namespace tinycoro {
             return _device;
         }
 
+        constexpr auto release() noexcept { return std::exchange(_device, nullptr); }
+
         void unlock() noexcept
         {
             if (_device)
