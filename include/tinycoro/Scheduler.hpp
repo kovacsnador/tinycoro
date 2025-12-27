@@ -134,7 +134,7 @@ namespace tinycoro {
                         if (_dispatcher.try_push(std::move(task)))
                         {
                             // the task is pushed
-                            // into the tasks queue
+                            // into the queue
                             break;
                         }
                         else

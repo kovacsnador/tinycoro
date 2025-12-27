@@ -18,30 +18,25 @@
 
 namespace tinycoro {
 
-    struct SemaphoreException : std::runtime_error
-    {
-        using BaseT = std::runtime_error;
-        using BaseT::BaseT;
-    };
-
     namespace detail {
 
-        template <template <typename, typename> class AwaitableT, template <typename> class StackT>
+        template <size_t LeastMaxValue, template <typename, typename> class AwaitableT, template <typename> class QueueT>
         class Semaphore
         {
+            static_assert(LeastMaxValue > 0, "Semaphore LeastMaxValue needs to be bigger than 0");
+
         public:
+            constexpr static size_t max = LeastMaxValue;
+
             using awaitable_type = AwaitableT<Semaphore, detail::ResumeSignalEvent>;
 
             friend class AwaitableT<Semaphore, detail::ResumeSignalEvent>;
             friend class ReleaseGuard<Semaphore>;
 
-            Semaphore(size_t initCount)
-            : _counter{initCount}
+            Semaphore(size_t initCount = LeastMaxValue)
+            : _counter{std::min(LeastMaxValue, initCount)}
             {
-                if (_counter == 0)
-                {
-                    throw SemaphoreException{"Initial semaphore counter can't be 0!"};
-                }
+                assert(initCount <= LeastMaxValue);
             }
 
             // disable move and copy
@@ -51,39 +46,93 @@ namespace tinycoro {
 
             [[nodiscard]] auto Wait() noexcept { return awaitable_type{*this, detail::ResumeSignalEvent{}}; }
 
-        private:
-            void Release() noexcept
+            void Release(size_t count = 1) noexcept
             {
-                std::unique_lock lock{_mtx};
+                for (size_t i = 0; i < count; ++i)
+                {
+                    if (std::unique_lock lock{_mtx}; auto topAwaiter = _waiters.pop())
+                    {
+                        lock.unlock();
 
-                if (auto topAwaiter = _waiters.pop())
-                {
-                    lock.unlock();
-                    topAwaiter->Notify();
-                }
-                else
-                {
-                    ++_counter;
+                        // Wake up the awaiter for resumption
+                        topAwaiter->Notify();
+                    }
+                    else
+                    {
+                        assert(lock.owns_lock());
+
+                        auto old = _counter.load(std::memory_order::acquire);
+                        while(old < LeastMaxValue)
+                        {
+                            if(_counter.compare_exchange_strong(old, old + 1, std::memory_order::release, std::memory_order::relaxed))
+                            {
+                                // we notify only one awaiter here
+                                // because only one can get the semaphore anyway
+                                _counter.notify_one();
+                                break;
+                            }
+                        }
+                    }
                 }
             }
 
-            [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
+            // This Acquire is blocking
+            void Acquire() noexcept
             {
-                std::scoped_lock lock{_mtx};
-
-                if (_counter > 0)
+                for (;;)
                 {
-                    --_counter;
-                    return true;
-                }
+                    if (TryAcquire())
+                    {
+                        // we got the semaphore
+                        return;
+                    }
 
-                awaiter->PutOnPause(parentCoro);
-                _waiters.push(awaiter);
+                    // TryAcquire is failed (_counter was zero at some point), so we need
+                    // to wait for a _counter to be increased again.
+                    _counter.wait(0);
+                }
+            }
+
+            // Nonblocking try acquire
+            [[nodiscard]] bool TryAcquire() noexcept
+            {
+                auto old = _counter.load(std::memory_order::acquire);
+                while (old > 0)
+                {
+                    if (_counter.compare_exchange_strong(old, old - 1, std::memory_order::release, std::memory_order::relaxed))
+                    {
+                        // we got the semaphore
+                        return true;
+                    }
+                }
                 return false;
             }
 
-            size_t                 _counter;
-            StackT<awaitable_type> _waiters;
+            // Get the least maximum value as counter from the semaphore
+            static constexpr auto Max() noexcept { return LeastMaxValue; };
+
+        private:
+            [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
+            {
+                // needs to held the lock here
+                // because somebody may called release...
+                std::scoped_lock lock{_mtx};
+
+                if (TryAcquire())
+                {
+                    // we got the semaphore
+                    return true;
+                }
+                
+                // we need to wait for the semaphore
+                awaiter->PutOnPause(parentCoro);
+                _waiters.push(awaiter);
+           
+                return false;
+            }
+
+            std::atomic<size_t>    _counter;
+            QueueT<awaitable_type> _waiters;
             std::mutex             _mtx;
         };
 
@@ -100,7 +149,7 @@ namespace tinycoro {
             // disable move and copy
             SemaphoreAwaiter(SemaphoreAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
+            [[nodiscard]] constexpr bool await_ready() const noexcept { return _semaphore.TryAcquire(); }
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore.TryAcquire(this, parentCoro); }
 
@@ -117,7 +166,10 @@ namespace tinycoro {
 
     } // namespace detail
 
-    using Semaphore = detail::Semaphore<detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
+    template <auto LeastMaxValue>
+    using Semaphore = detail::Semaphore<LeastMaxValue, detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
+
+    using BinarySemaphore = detail::Semaphore<1, detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
 
 } // namespace tinycoro
 

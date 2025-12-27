@@ -58,8 +58,8 @@ namespace tinycoro { namespace detail {
                 _pushEvent.wait(state, std::memory_order::acquire);
         }
 
-        void notify_push_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
-        void notify_pop_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
+        void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
+        void notify_pop_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
 
         void notify_all() noexcept
         {

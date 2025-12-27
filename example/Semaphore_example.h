@@ -5,7 +5,7 @@
 
 void Example_Semaphore(tinycoro::Scheduler& scheduler)
 {
-    tinycoro::Semaphore semaphore{1};
+    tinycoro::Semaphore<1> semaphore;
 
     int32_t count{0};
 

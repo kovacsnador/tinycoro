@@ -88,7 +88,6 @@ struct Schedubable : tinycoro::detail::DoubleLinkable<Schedubable>
     SchedubableMock mock;
 
     std::atomic<tinycoro::EPauseState> pauseState{tinycoro::EPauseState::IDLE};
-    std::atomic<bool> alreadyPaused{false};
 };
 
 TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)

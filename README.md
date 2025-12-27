@@ -1299,7 +1299,7 @@ The `co_await` operator returns a `tinycoro::ReleaseGuard` object, which utilize
 ```cpp
     void Example_Semaphore(tinycoro::Scheduler& scheduler)
     {
-        tinycoro::Semaphore semaphore{1};
+        tinycoro::Semaphore<1> semaphore{1};
 
         int32_t count{0};
 

@@ -18,6 +18,7 @@ struct SemaphoreMock
 {
     MOCK_METHOD(void, Release, ());
     MOCK_METHOD(bool, TryAcquire, (void*, tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>>));
+    MOCK_METHOD(bool, TryAcquire, ());
 };
 
 struct SemaphoreAwaiterTest : public testing::Test
@@ -93,9 +94,14 @@ struct EventMock
 {
 };
 
-struct SemaphoreTest : public testing::TestWithParam<size_t>
+template<typename T>
+struct SemaphoreTest : testing::Test
 {
-    using semaphore_type  = tinycoro::detail::Semaphore<PopAwaiterMock, tinycoro::detail::LinkedPtrQueue>;
+    using value_type = T;
+
+    static constexpr auto count = value_type::value;
+
+    using semaphore_type  = tinycoro::detail::Semaphore<count, PopAwaiterMock, tinycoro::detail::LinkedPtrQueue>;
     using corohandle_type = tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>>;
 
     void SetUp() override
@@ -106,20 +112,21 @@ struct SemaphoreTest : public testing::TestWithParam<size_t>
     corohandle_type hdl;
 };
 
-INSTANTIATE_TEST_SUITE_P(SemaphoreTest, SemaphoreTest, testing::Values(1, 5, 10, 100));
-
-TEST_F(SemaphoreTest, SemaphoreTest_constructorTest)
+template<size_t V>
+struct SizeValue
 {
-    EXPECT_THROW(semaphore_type{0}, tinycoro::SemaphoreException);
+    static constexpr size_t value = V;
+};
 
-    EXPECT_NO_THROW(semaphore_type{1});
-    EXPECT_NO_THROW(semaphore_type{10});
-    EXPECT_NO_THROW(semaphore_type{100});
-}
+using SemaphoreTestTypes = testing::Types<SizeValue<1>, SizeValue<5>, SizeValue<10>, SizeValue<100>, SizeValue<1000>>; 
 
-TEST_F(SemaphoreTest, SemaphoreTest_counter_1)
+TYPED_TEST_SUITE(SemaphoreTest, SemaphoreTestTypes);
+
+using SemaphoreFixture = SemaphoreTest<SizeValue<1>>;
+
+TEST_F(SemaphoreFixture, SemaphoreTest_counter_1)
 {
-    semaphore_type semaphore{1};
+    semaphore_type semaphore;
 
     auto mock = semaphore.operator co_await();
 
@@ -137,17 +144,19 @@ TEST_F(SemaphoreTest, SemaphoreTest_counter_1)
     EXPECT_TRUE(mock.TestTryAcquire(hdl));
 }
 
-TEST_P(SemaphoreTest, SemaphoreTest_counter_param)
+TYPED_TEST(SemaphoreTest, SemaphoreTest_counter_param)
 {
-    const auto count = GetParam();
+    using T = typename TestFixture::value_type;
 
-    semaphore_type semaphore{count};
+    const auto count = T::value;
+
+    typename TestFixture::semaphore_type semaphore;
 
     auto mock = semaphore.operator co_await();
 
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
-        EXPECT_TRUE(mock.TestTryAcquire(hdl));
+        EXPECT_TRUE(mock.TestTryAcquire(this->hdl));
     }
 
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
@@ -157,31 +166,33 @@ TEST_P(SemaphoreTest, SemaphoreTest_counter_param)
 
     for ([[maybe_unused]] auto it : std::views::iota(0u, count))
     {
-        EXPECT_TRUE(mock.TestTryAcquire(hdl));
+        EXPECT_TRUE(mock.TestTryAcquire(this->hdl));
     }
 
     EXPECT_CALL(mock, PutOnPause).Times(1);
     EXPECT_CALL(mock, Notify()).Times(1);
 
-    EXPECT_FALSE(mock.TestTryAcquire(hdl));
+    EXPECT_FALSE(mock.TestTryAcquire(this->hdl));
     mock.TestRelease();
     mock.TestRelease();
 
-    EXPECT_TRUE(mock.TestTryAcquire(hdl));
+    EXPECT_TRUE(mock.TestTryAcquire(this->hdl));
 }
 
-struct SemapthoreFunctionalTest : public testing::TestWithParam<int32_t>
+struct SemaphoreFunctionalTest : public testing::TestWithParam<int32_t>
 {
     //tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 
-    tinycoro::CustomScheduler<2> scheduler{std::thread::hardware_concurrency()};
+    tinycoro::CustomScheduler<2> scheduler{2};
 };
 
-INSTANTIATE_TEST_SUITE_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest, testing::Values(1, 5, 10, 100, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(SemaphoreFunctionalTest,
+                         SemaphoreFunctionalTest,
+                         testing::Values(1, 5, 10, 100, 1000, 1000, 1000, 1000, 1000, 1000, 1000, 10000));
 
-TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
+TEST_F(SemaphoreFunctionalTest, SemaphoreFunctionalTest_exampleTest)
 {
-    tinycoro::Semaphore semaphore{1};
+    tinycoro::Semaphore<1> semaphore{1};
 
     int32_t count{0};
 
@@ -196,11 +207,11 @@ TEST_F(SemapthoreFunctionalTest, SemapthoreFunctionalTest_exampleTest)
     EXPECT_EQ(count, 3);
 }
 
-TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
+TEST_P(SemaphoreFunctionalTest, SemaphoreFunctionalTest_counter)
 {
     const auto param = GetParam();
 
-    tinycoro::Semaphore semaphore{1};
+    tinycoro::BinarySemaphore semaphore{1};
 
     int32_t count{0};
 
@@ -219,11 +230,11 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter)
     EXPECT_EQ(count, param);
 }
 
-TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_double)
+TEST_P(SemaphoreFunctionalTest, SemaphoreFunctionalTest_counter_double)
 {
     const auto param = GetParam();
 
-    tinycoro::Semaphore semaphore{1};
+    tinycoro::BinarySemaphore semaphore{1};
 
     int32_t count{0};
 
@@ -248,11 +259,11 @@ TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_double)
     EXPECT_EQ(count, param * 2);
 }
 
-TEST_P(SemapthoreFunctionalTest, SemapthoreFunctionalTest_counter_max)
+TEST_P(SemaphoreFunctionalTest, SemaphoreFunctionalTest_counter_max)
 {
     const auto param = GetParam();
 
-    tinycoro::Semaphore semaphore{4};
+    tinycoro::Semaphore<4> semaphore;
 
     std::atomic_int32_t currentAllowed{0};
     int32_t             max{0};
@@ -292,7 +303,7 @@ INSTANTIATE_TEST_SUITE_P(SemaphoreStressTest, SemaphoreStressTest, testing::Valu
 
 TEST_P(SemaphoreStressTest, SemaphoreStressTest_1)
 {
-    tinycoro::Semaphore semaphore{1};
+    tinycoro::BinarySemaphore semaphore;
 
     tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
 

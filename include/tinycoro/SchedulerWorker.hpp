@@ -266,6 +266,8 @@ namespace tinycoro { namespace detail {
                             return;
                         }
 
+                        assert(expected == EPauseState::NOTIFIED);
+
                         // in the meantime the task is notified for resumption
                         // so we need to remove it from the paused task queue
                         // and resume the task
