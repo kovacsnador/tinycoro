@@ -8,7 +8,6 @@
 
 #include <mutex>
 #include <coroutine>
-#include <stdexcept>
 
 #include "PauseHandler.hpp"
 #include "ResumeSignalEvent.hpp"
@@ -48,7 +47,7 @@ namespace tinycoro {
 
             void Release(size_t count = 1) noexcept
             {
-                for (size_t i = 0; i < count; ++i)
+                for (; count > 0; --count)
                 {
                     if (std::unique_lock lock{_mtx}; auto topAwaiter = _waiters.pop())
                     {
@@ -64,12 +63,13 @@ namespace tinycoro {
                         auto old = _counter.load(std::memory_order::acquire);
                         while(old < LeastMaxValue)
                         {
-                            if(_counter.compare_exchange_strong(old, old + 1, std::memory_order::release, std::memory_order::relaxed))
+                            auto desired = std::min(old + count, LeastMaxValue);
+                            if (_counter.compare_exchange_strong(old, desired, std::memory_order::release, std::memory_order::relaxed))
                             {
-                                // we notify only one awaiter here
-                                // because only one can get the semaphore anyway
-                                _counter.notify_one();
-                                break;
+                                // we notify all waiters here.
+                                // in case we release more than once free space.
+                                _counter.notify_all();
+                                return;
                             }
                         }
                     }
@@ -112,6 +112,7 @@ namespace tinycoro {
             static constexpr auto Max() noexcept { return LeastMaxValue; };
 
         private:
+
             [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
             {
                 // needs to held the lock here

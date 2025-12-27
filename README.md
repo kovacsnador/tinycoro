@@ -1291,6 +1291,9 @@ The `co_await` operator returns a `tinycoro::ReleaseGuard` object, which utilize
 ### `Semaphore`
 
 The tinycoro::Semaphore is a counting semaphore designed for controlling concurrent access to shared resources in a coroutine-friendly manner. It ensures that only a limited number of tasks can acquire the semaphore at any given time, and the remaining tasks will be suspended until the semaphore becomes available.
+In addition to coroutine-based synchronization via co_await, the semaphore also supports blocking and non-blocking acquisition for non-coroutine code.
+
+Via its API functions, the semaphore supports coroutine-based acquisition using **co_await**, blocking acquisition using `Acquire()`, and non-blocking attempts using `TryAcquire()`. Permits are released using `Release()`, which can return one or multiple permits at once and resumes suspended coroutines or wakes blocked threads as needed. This makes the semaphore suitable for both coroutine and traditional multithreaded synchronization scenarios.
 
 In the example below, a semaphore with an initial count of 1 is created, ensuring that only one task can access the shared resource (in this case, incrementing a counter) at a time. The example demonstrates the use of a semaphore to synchronize multiple coroutines, where each task acquires the semaphore, increments the counter, and then releases it.
 
@@ -1299,13 +1302,15 @@ The `co_await` operator returns a `tinycoro::ReleaseGuard` object, which utilize
 ```cpp
     void Example_Semaphore(tinycoro::Scheduler& scheduler)
     {
-        tinycoro::Semaphore<1> semaphore{1};
+        tinycoro::Semaphore<1> semaphore;
 
         int32_t count{0};
 
         auto task = [&semaphore, &count]() -> tinycoro::Task<int32_t> {
             auto lock = co_await semaphore;
             co_return ++count;
+
+            // semaphore release happens here...
         };
 
         auto [ c1, c2, c3] = tinycoro::AllOf(scheduler, task(), task(), task());

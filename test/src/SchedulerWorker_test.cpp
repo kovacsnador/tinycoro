@@ -5,18 +5,6 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-/* TEST(SchedulerWorkerTest, SchedulerWorkerTest_PushTask)
-{
-    std::stop_source                         ss;
-    tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher             dispatcher{queue, ss.get_token()};
-
-    EXPECT_TRUE(tinycoro::detail::helper::PushTask(1, dispatcher, ss));
-
-    ss.request_stop();
-    EXPECT_FALSE(tinycoro::detail::helper::PushTask(2, dispatcher, ss));
-}*/
-
 TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 {
     int32_t val{42};
@@ -30,17 +18,9 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 
     EXPECT_TRUE(dispatcher.full());
 
-    //tinycoro::detail::helper::WakeUpAllWaiter(dispatcher);
     dispatcher.notify_all();
 
     EXPECT_TRUE(dispatcher.full());
-
-    /* int32_t* ptr;
-    EXPECT_TRUE(dispatcher.try_pop(ptr));
-    EXPECT_EQ(*ptr, val);
-
-    EXPECT_TRUE(dispatcher.try_pop(ptr));
-    EXPECT_EQ(ptr, nullptr);*/
 }
 
 struct AtomicQueueMock
@@ -53,20 +33,6 @@ struct AtomicQueueMock
     MOCK_METHOD(void, notify_push_waiters, ());
     MOCK_METHOD(void, notify_pop_waiters, ());
 };
-
-/* TEST(RequestStopForQueueTest, RequestStopForQueue_mockQueue)
-{
-    AtomicQueueMock mock;
-
-    //EXPECT_CALL(mock, full).WillOnce(testing::Return(true));
-    //EXPECT_CALL(mock, try_pop).WillOnce(testing::Return(true)).WillOnce(testing::Return(true));
-    //EXPECT_CALL(mock, try_push).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
-    EXPECT_CALL(mock, notify_push_waiters).Times(1);
-    EXPECT_CALL(mock, notify_pop_waiters).Times(1);
-
-
-    tinycoro::detail::helper::WakeUpAllWaiter(mock);
-}*/
 
 struct SchedubableMock
 {

@@ -43,6 +43,8 @@ struct SemaphoreAwaiterTest : public testing::Test
 
 TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)
 {
+    EXPECT_CALL(mock, TryAcquire()).Times(1).WillOnce(testing::Return(false));
+
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_EQ(awaiter.next, nullptr);
 
@@ -57,6 +59,8 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)
 
 TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
 {
+    EXPECT_CALL(mock, TryAcquire()).Times(1).WillOnce(testing::Return(false));
+
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_EQ(awaiter.next, nullptr);
 
@@ -90,10 +94,6 @@ public:
     EventT event;
 };
 
-struct EventMock
-{
-};
-
 template<typename T>
 struct SemaphoreTest : testing::Test
 {
@@ -118,7 +118,7 @@ struct SizeValue
     static constexpr size_t value = V;
 };
 
-using SemaphoreTestTypes = testing::Types<SizeValue<1>, SizeValue<5>, SizeValue<10>, SizeValue<100>, SizeValue<1000>>; 
+using SemaphoreTestTypes = testing::Types<SizeValue<1>, SizeValue<5>, SizeValue<10>, SizeValue<100>, SizeValue<1000>, SizeValue<10000>>; 
 
 TYPED_TEST_SUITE(SemaphoreTest, SemaphoreTestTypes);
 
@@ -179,11 +179,122 @@ TYPED_TEST(SemaphoreTest, SemaphoreTest_counter_param)
     EXPECT_TRUE(mock.TestTryAcquire(this->hdl));
 }
 
+TYPED_TEST(SemaphoreTest, SemaphoreTest_multi_release)
+{
+    using T = typename TestFixture::value_type;
+
+    constexpr auto count = T::value;
+
+    // blocked semaphore
+    tinycoro::Semaphore<count> semaphore{0};
+
+    tinycoro::Scheduler scheduler;
+
+    std::atomic<size_t> counter{};
+
+    auto starter = [&]() -> tinycoro::Task<> { 
+        // release all the semaphores
+        semaphore.Release(count);
+        co_return;
+    };
+
+    auto worker = [&]() -> tinycoro::Task<> { 
+        auto guard = co_await semaphore;
+        guard.release();    // no auto release
+
+        counter.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count + 1);
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(worker());
+    }
+    tasks.emplace_back(starter());
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(count, counter);
+}
+
+TEST(SemaphoreTest, SemaphoreTest_closedAtBegin)
+{
+    tinycoro::Scheduler    scheduler;
+    tinycoro::Semaphore<2> semaphore{0};
+
+    int32_t count{0};
+
+    auto releaser = [&semaphore, &count]() -> tinycoro::Task<int32_t> {
+        auto ret = count;
+        semaphore.Release(2);
+        co_return ret;
+    };
+
+    auto acquires = [&semaphore, &count](int32_t v) -> tinycoro::Task<int32_t> {
+        auto guard = co_await semaphore;
+        co_return count + v;
+    };
+
+    auto [c1, c2, c3] = tinycoro::AllOf(scheduler, releaser(), acquires(1), acquires(2));
+
+    EXPECT_EQ(c1, 0);
+    EXPECT_EQ(c2, 1);
+    EXPECT_EQ(c3, 2);
+}
+
+TEST(SemaphoreTest, SemaphoreTest_closedAtBegin_blocking_acquire)
+{
+    tinycoro::Scheduler    scheduler;
+    tinycoro::Semaphore<2> semaphore{0};
+
+    int32_t count{0};
+
+    auto releaser = [&semaphore, &count]() -> tinycoro::Task<int32_t> {
+        auto ret = count;
+        semaphore.Release(2);
+        co_return ret;
+    };
+
+    auto acquires = [&semaphore, &count](int32_t v) -> tinycoro::Task<int32_t> {
+        semaphore.Acquire();    // blocking wait
+        co_return count + v;
+    };
+
+    auto [c1, c2, c3] = tinycoro::AllOf(scheduler, releaser(), acquires(1), acquires(2));
+
+    EXPECT_EQ(c1, 0);
+    EXPECT_EQ(c2, 1);
+    EXPECT_EQ(c3, 2);
+}
+
+TEST(SemaphoreTest, SemaphoreTest_TryAcquire_failed)
+{
+    tinycoro::Semaphore<2> semaphore{0};
+
+    for (size_t i = 0; i < 1000; ++i)
+        EXPECT_FALSE(semaphore.TryAcquire());
+}
+
+TEST(SemaphoreTest, SemaphoreTest_TryAcquire_with_release)
+{
+    tinycoro::Semaphore<100> semaphore;
+
+    for (size_t i = 0; i < 100; ++i)
+        EXPECT_TRUE(semaphore.TryAcquire());
+
+    for (size_t i = 0; i < 100; ++i)
+        EXPECT_FALSE(semaphore.TryAcquire());
+
+    semaphore.Release(semaphore.Max());
+
+    for (size_t i = 0; i < 100; ++i)
+        EXPECT_TRUE(semaphore.TryAcquire());
+}
+
 struct SemaphoreFunctionalTest : public testing::TestWithParam<int32_t>
 {
-    //tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
-
-    tinycoro::CustomScheduler<2> scheduler{2};
+    tinycoro::CustomScheduler<2> scheduler;
 };
 
 INSTANTIATE_TEST_SUITE_P(SemaphoreFunctionalTest,
@@ -323,4 +434,63 @@ TEST_P(SemaphoreStressTest, SemaphoreStressTest_1)
     tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
     EXPECT_EQ(count, size * 8);
+}
+
+TEST_P(SemaphoreStressTest, SemaphoreStressTest_blocking)
+{
+    const size_t taskCount = 8;
+
+    tinycoro::BinarySemaphore semaphore;
+
+    tinycoro::Scheduler scheduler{taskCount};
+
+    const auto size = GetParam();
+
+    size_t count{0};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < size; ++i)
+        {
+            semaphore.Acquire();
+            ++count;
+            semaphore.Release();
+        }
+
+        co_return;
+    };
+
+    // starting 8 async tasks at the same time
+    tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+
+    EXPECT_EQ(count, size * taskCount);
+}
+
+TEST_P(SemaphoreStressTest, SemaphoreStressTest_blocking_try_acquire)
+{
+    const size_t taskCount = 8;
+
+    tinycoro::BinarySemaphore semaphore;
+
+    tinycoro::Scheduler scheduler{taskCount};
+
+    const auto size = GetParam();
+
+    size_t count{0};
+
+    auto task = [&]() -> tinycoro::Task<void> {
+        for (size_t i = 0; i < size; ++i)
+        {
+            // spin acquire
+            while (semaphore.TryAcquire() == false) ;
+            ++count;
+            semaphore.Release();
+        }
+
+        co_return;
+    };
+
+    // starting 8 async tasks at the same time
+    tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
+
+    EXPECT_EQ(count, size * taskCount);
 }

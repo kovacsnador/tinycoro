@@ -13,7 +13,6 @@ namespace tinycoro
     namespace detail
     {
         template<concepts::Linkable ObjT, typename MemberFuncT, typename... Args>
-            //requires std::invocable<MemberFuncT, Args&&...>
         inline void IterInvoke(ObjT top, MemberFuncT func, Args&&... args)
         {
             while (top != nullptr)
