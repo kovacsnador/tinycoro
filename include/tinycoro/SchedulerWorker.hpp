@@ -99,6 +99,7 @@ namespace tinycoro { namespace detail {
     private:
         void Run(std::stop_token stopToken) noexcept
         {
+            typename DispatcherT::state_type state{};
             while (stopToken.stop_requested() == false)
             {
                 // we can try to upload the cached tasks
@@ -116,7 +117,7 @@ namespace tinycoro { namespace detail {
                         // now if some tasks need resumption
                         // they will directly be pushed into the dispatcher queue.
                         // (not in the local cache)
-                        _dispatcher.wait_for_pop();
+                        _dispatcher.wait_for_pop(state++);
                     }
                 }
                 else

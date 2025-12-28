@@ -67,11 +67,11 @@ TEST(DispatcherTest, DispatcherTest_wait_for_pop)
     tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     auto fut = std::async(std::launch::async, [&] {
-
+        decltype(dispatcher)::state_type state{};
         for (size_t i = 0; i < 1000;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop();
+            dispatcher.wait_for_pop(state++);
 
             int32_t val;
             if (dispatcher.try_pop(val))
@@ -97,20 +97,21 @@ TEST(DispatcherTest, DispatcherTest_wait_for_push)
     tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     // this need to move
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(0);
 
     // make the queue full
     EXPECT_TRUE(dispatcher.try_push(0));
     EXPECT_TRUE(dispatcher.try_push(1));
 
     // this need to move
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(0);
 
     auto asyncFunc = [&] {
+        decltype(dispatcher)::state_type state{};
         for (size_t i = 0; i < 1000;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop();
+            dispatcher.wait_for_pop(state++);
 
             int32_t val;
             if (dispatcher.try_pop(val))
@@ -123,9 +124,10 @@ TEST(DispatcherTest, DispatcherTest_wait_for_push)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
+    decltype(dispatcher)::state_type state{};
     for (int32_t i = 2; i < 1000;)
     {
-        dispatcher.wait_for_push();
+        dispatcher.wait_for_push(state++);
 
         if (dispatcher.try_push(i))
             i++;

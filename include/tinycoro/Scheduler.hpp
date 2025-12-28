@@ -140,7 +140,7 @@ namespace tinycoro {
                         else
                         {
                             // wait until we have space in the queue
-                            _dispatcher.wait_for_push();
+                            _dispatcher.wait_for_push(_dispatcherState.fetch_add(1, std::memory_order::relaxed));
                         }
                     }
                 }
@@ -164,6 +164,7 @@ namespace tinycoro {
             }
 
             using queue_t = detail::AtomicQueue<TaskT, CACHE_SIZE>;
+            using dispatcher_t = detail::Dispatcher<queue_t>; 
 
             // currently active/scheduled tasks
             queue_t _sharedTasks;
@@ -171,8 +172,11 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
 
+            // last dispatcher state.
+            std::atomic<typename dispatcher_t::state_type> _dispatcherState{};
+
             //std::vector<queue_t> _queues;
-            Dispatcher<queue_t> _dispatcher;
+            dispatcher_t _dispatcher;
 
             // the stop callback, which will be triggered
             // if a stop for _stopSource is requested.

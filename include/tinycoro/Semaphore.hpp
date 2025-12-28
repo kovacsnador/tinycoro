@@ -67,7 +67,9 @@ namespace tinycoro {
                             if (_counter.compare_exchange_strong(old, desired, std::memory_order::release, std::memory_order::relaxed))
                             {
                                 // we notify all waiters here.
-                                // in case we release more than once free space.
+                                // in case we release more than one free spot
+                                // at the same time. 
+                                // e.g (count > 1)
                                 _counter.notify_all();
                                 return;
                             }

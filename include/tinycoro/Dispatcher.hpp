@@ -44,18 +44,17 @@ namespace tinycoro { namespace detail {
         {
         }
 
-        void wait_for_push() const noexcept
+        void wait_for_push(state_type prev) const noexcept
         {  
-            auto state = _popEvent.load(std::memory_order::acquire);
-            if (full() && _stopToken.stop_requested() == false)
-                _popEvent.wait(state, std::memory_order::acquire);
+            if (_stopToken.stop_requested() == false)
+                _popEvent.wait(prev, std::memory_order::acquire);
         }
 
-        void wait_for_pop() const noexcept
+        void wait_for_pop(state_type prev) const noexcept
         {
-            auto state = _pushEvent.load(std::memory_order::acquire);
-            if (empty() && _stopToken.stop_requested() == false)
-                _pushEvent.wait(state, std::memory_order::acquire);
+            if (_stopToken.stop_requested() == false) 
+                _pushEvent.wait(prev, std::memory_order::acquire);
+            
         }
 
         void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
@@ -99,7 +98,7 @@ namespace tinycoro { namespace detail {
 
     private:
         alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent{};
-        alignas(CACHELINE_SIZE) std::atomic<state_type> _popEvent{};
+        alignas(CACHELINE_SIZE) std::atomic<state_type> _popEvent{QueueT::capacity()};
 
         QueueT& _queue;
 
