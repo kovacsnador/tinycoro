@@ -21,7 +21,7 @@ namespace tinycoro { namespace test {
 
         EXPECT_EQ(vec.size(), stack.size());
 
-        std::for_each(vec.rbegin(), vec.rend(), [&](auto& it) { stack.erase(&it); });
+        std::for_each(vec.rbegin(), vec.rend(), [&](auto& it) { std::ignore = stack.erase(&it); });
         EXPECT_EQ(stack.size(), 0);
     }
 
@@ -40,7 +40,7 @@ namespace tinycoro { namespace test {
 
         EXPECT_EQ(vec.size(), stack.size());
 
-        std::ranges::for_each(vec, [&](auto& it) { stack.erase(&it); });
+        std::ranges::for_each(vec, [&](auto& it) { std::ignore = stack.erase(&it); });
         EXPECT_EQ(stack.size(), 0);
     }
 

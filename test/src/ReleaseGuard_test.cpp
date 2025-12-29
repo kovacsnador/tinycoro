@@ -8,59 +8,78 @@ struct ReleaseGuardDeviceMock
     MOCK_METHOD(void, Release, ());
 };
 
-TEST(ReleaseGuardTest, ReleaseGuardTest_constructor)
+template<typename T>
+struct ReleaseGuardTest : testing::Test
 {
+    using value_type = T;
+};
+
+using ReleaseGuardTest_Types = testing::Types<tinycoro::ReleaseGuard<ReleaseGuardDeviceMock>,
+    tinycoro::ReleaseGuardRelaxed<ReleaseGuardDeviceMock>>;
+
+TYPED_TEST_SUITE(ReleaseGuardTest, ReleaseGuardTest_Types);
+
+TYPED_TEST(ReleaseGuardTest, ReleaseGuardTest_constructor)
+{
+    using ReleaseGuard_t = TestFixture::value_type;
+
     ReleaseGuardDeviceMock mock;
 
     EXPECT_CALL(mock, Release()).Times(1);
 
-    tinycoro::ReleaseGuard lock{mock};
+    ReleaseGuard_t lock{mock};
 }
 
-TEST(ReleaseGuardTest, ReleaseGuardTest_move_constructor)
+TYPED_TEST(ReleaseGuardTest, ReleaseGuardTest_move_constructor)
 {
+    using ReleaseGuard_t = TestFixture::value_type;
+
     ReleaseGuardDeviceMock mock;
 
     EXPECT_CALL(mock, Release()).Times(1);
     
-    tinycoro::ReleaseGuard lock1{mock};
-    tinycoro::ReleaseGuard lock2{std::move(lock1)};
+    ReleaseGuard_t         lock1{mock};
+    ReleaseGuard_t lock2{std::move(lock1)};
     
     // empty guard
-    tinycoro::ReleaseGuard lock3{std::move(lock1)};
+    ReleaseGuard_t lock3{std::move(lock1)};
 }
 
-TEST(ReleaseGuardTest, ReleaseGuardTest_move_assign_operator)
+TYPED_TEST(ReleaseGuardTest, ReleaseGuardTest_move_assign_operator)
 {
+    using ReleaseGuard_t = TestFixture::value_type;
+
     ReleaseGuardDeviceMock mock;
 
     EXPECT_CALL(mock, Release()).Times(1);
     
-    tinycoro::ReleaseGuard lock1{mock};
-    tinycoro::ReleaseGuard lock2 = std::move(lock1);
+    ReleaseGuard_t         lock1{mock};
+    ReleaseGuard_t lock2 = std::move(lock1);
     
     // empty gurad
-    tinycoro::ReleaseGuard lock3 = std::move(lock1);
+    ReleaseGuard_t lock3 = std::move(lock1);
 }
 
-TEST(ReleaseGuardTest, ReleaseGuardTest_owns_lock)
+TYPED_TEST(ReleaseGuardTest, ReleaseGuardTest_owns_lock)
 {
+    using ReleaseGuard_t = TestFixture::value_type;
+
     ReleaseGuardDeviceMock mock;
 
     EXPECT_CALL(mock, Release()).Times(1);
     
-    tinycoro::ReleaseGuard lock1{mock};
+    ReleaseGuard_t lock1{mock};
     EXPECT_TRUE(lock1.owns_lock());
 
-    tinycoro::ReleaseGuard lock2 = std::move(lock1);
+    ReleaseGuard_t lock2 = std::move(lock1);
     EXPECT_FALSE(lock1.owns_lock());
     EXPECT_TRUE(lock2.owns_lock());
     
     // empty gurad
-    tinycoro::ReleaseGuard lock3 = std::move(lock1);
+    ReleaseGuard_t lock3 = std::move(lock1);
     EXPECT_FALSE(lock3.owns_lock());
 
-    tinycoro::ReleaseGuard lock4{std::move(lock2)};
+    ReleaseGuard_t lock4{std::move(lock2)};
     EXPECT_FALSE(lock2.owns_lock());
     EXPECT_TRUE(lock4.owns_lock());
 }

@@ -17,7 +17,7 @@ template <typename T>
 struct SemaphoreMock
 {
     MOCK_METHOD(void, Release, ());
-    MOCK_METHOD(bool, TryAcquire, (void*, tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>>));
+    MOCK_METHOD(bool, _TryAcquire, (void*, tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>>));
     MOCK_METHOD(bool, TryAcquire, ());
 };
 
@@ -35,7 +35,8 @@ struct SemaphoreAwaiterTest : public testing::Test
         hdl.promise().pauseHandler.emplace([](auto) { /* resumer callback */ });
     }
 
-    SemaphoreMock<value_type>                                          mock;
+    SemaphoreMock<value_type> mock;
+
     tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<value_type>> hdl;
 
     tinycoro::detail::SemaphoreAwaiter<decltype(mock), tinycoro::detail::ResumeSignalEvent> awaiter;
@@ -48,7 +49,7 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireSucceded)
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_EQ(awaiter.next, nullptr);
 
-    EXPECT_CALL(mock, TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(true));
+    EXPECT_CALL(mock, _TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(true));
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 
     EXPECT_CALL(mock, Release()).Times(1);
@@ -64,7 +65,7 @@ TEST_F(SemaphoreAwaiterTest, SemaphoreAwaiterTest_AcquireFalied)
     EXPECT_FALSE(awaiter.await_ready());
     EXPECT_EQ(awaiter.next, nullptr);
 
-    EXPECT_CALL(mock, TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(false));
+    EXPECT_CALL(mock, _TryAcquire(&awaiter, hdl)).Times(1).WillOnce(testing::Return(false));
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
     EXPECT_CALL(mock, Release()).Times(1);
@@ -86,7 +87,7 @@ public:
     MOCK_METHOD(void, Notify, (), (const));
     MOCK_METHOD(void, PutOnPause, (tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>>));
 
-    auto TestTryAcquire(auto parentCoro) { return semaphore.TryAcquire(this, parentCoro); }
+    auto TestTryAcquire(auto parentCoro) { return semaphore._TryAcquire(this, parentCoro); }
 
     auto TestRelease() { return semaphore.Release(); }
 
@@ -199,8 +200,10 @@ TYPED_TEST(SemaphoreTest, SemaphoreTest_multi_release)
     };
 
     auto worker = [&]() -> tinycoro::Task<> { 
-        auto guard = co_await semaphore;
-        guard.release();    // no auto release
+        // auto guard = co_await semaphore;
+        // guard.release();    // no auto release
+        // or
+        tinycoro::ReleaseImmediately{co_await semaphore};
 
         counter.fetch_add(1, std::memory_order::relaxed);
     };

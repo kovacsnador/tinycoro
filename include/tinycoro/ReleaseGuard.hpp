@@ -11,9 +11,27 @@
 
 namespace tinycoro {
 
+    namespace detail
+    {
+        template <template<typename> class GuardT, typename DeviceT>
+        class ReleaseGuardRelaxedImpl : public GuardT<DeviceT>
+        {
+        public:
+            // expose the release() member function as public
+            using GuardT<DeviceT>::release;
+
+            explicit ReleaseGuardRelaxedImpl(DeviceT& device)
+            : GuardT<DeviceT>{device}
+            {
+            }
+        };
+    }
+
     template <typename DeviceT>
     class ReleaseGuard
     {
+        friend class detail::ReleaseGuardRelaxedImpl<ReleaseGuard, DeviceT>;
+
     public:
         explicit ReleaseGuard(DeviceT& d)
         : _device{std::addressof(d)}
@@ -21,7 +39,7 @@ namespace tinycoro {
         }
 
         ReleaseGuard(ReleaseGuard&& other) noexcept
-        : _device{std::exchange(other._device, nullptr)}
+        : _device{other.release()}
         {
         }
 
@@ -35,15 +53,10 @@ namespace tinycoro {
             return _device;
         }
 
-        constexpr auto release() noexcept { return std::exchange(_device, nullptr); }
-
         void unlock() noexcept
         {
-            if (_device)
-            {
-                _device->Release();
-                _device = nullptr;
-            }
+            if (auto dev = release())
+                dev->Release();
         }
 
         ~ReleaseGuard()
@@ -57,7 +70,21 @@ namespace tinycoro {
         }
 
     private:
+        constexpr auto release() noexcept { return std::exchange(_device, nullptr); }
+
         DeviceT* _device{nullptr};
+    };
+
+    template<typename DeviceT>
+    using ReleaseGuardRelaxed = detail::ReleaseGuardRelaxedImpl<ReleaseGuard, DeviceT>;
+
+    struct ReleaseImmediately
+    {
+        template<typename T>
+        ReleaseImmediately(ReleaseGuardRelaxed<T>&& guard)
+        {
+            guard.release();
+        }
     };
 
 } // namespace tinycoro

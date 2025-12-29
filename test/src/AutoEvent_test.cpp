@@ -301,7 +301,7 @@ TEST_P(AutoEventTimeoutTest, AutoEventFunctionalTest_timeout)
     std::atomic<int32_t> doneCount{};
 
     auto autoEventConsumer = [&]() -> tinycoro::TaskNIC<> {
-        co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 20ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 20ms};
         doneCount++;
     };
 
@@ -334,7 +334,7 @@ TEST_P(AutoEventTimeoutTest, AutoEventFunctionalTest_all_timeout)
     std::atomic<int32_t> doneCount{};
 
     auto autoEventConsumer = [&]() -> tinycoro::TaskNIC<> {
-        co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 10ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, autoEvent.Wait(), 10ms};
         doneCount++;
     };
 

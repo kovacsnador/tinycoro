@@ -118,7 +118,7 @@ namespace tinycoro { namespace detail {
             return std::exchange(_first, nullptr);
         }
 
-        bool erase(value_type* elem)
+        [[nodiscard]] bool erase(value_type* elem) noexcept
         {
             assert(elem);
 

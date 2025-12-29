@@ -33,14 +33,14 @@ namespace tinycoro {
         {
         }
 
-        constexpr auto await_ready() noexcept
+        [[nodiscard]] constexpr auto await_ready() noexcept
         {
             // delegate the call directly
             // to the awaiter.
             return _awaiter.await_ready();
         }
 
-        constexpr auto await_suspend(auto parentCoro)
+        [[nodiscard]] constexpr auto await_suspend(auto parentCoro)
         {
             auto suspend = _awaiter.await_suspend(parentCoro);
 
@@ -80,7 +80,7 @@ namespace tinycoro {
             return suspend;
         }
 
-        constexpr auto await_resume() noexcept
+        [[nodiscard]] constexpr auto await_resume() noexcept
         {
             using return_t   = decltype(std::declval<AwaiterT>().await_resume());
             using optional_t = detail::TaskResult_t<return_t>;

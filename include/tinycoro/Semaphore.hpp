@@ -30,7 +30,6 @@ namespace tinycoro {
             using awaitable_type = AwaitableT<Semaphore, detail::ResumeSignalEvent>;
 
             friend class AwaitableT<Semaphore, detail::ResumeSignalEvent>;
-            friend class ReleaseGuard<Semaphore>;
 
             Semaphore(size_t initCount = LeastMaxValue)
             : _counter{std::min(LeastMaxValue, initCount)}
@@ -114,8 +113,7 @@ namespace tinycoro {
             static constexpr auto Max() noexcept { return LeastMaxValue; };
 
         private:
-
-            [[nodiscard]] auto TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
+            [[nodiscard]] auto _TryAcquire(awaitable_type* awaiter, auto parentCoro) noexcept
             {
                 // needs to held the lock here
                 // because somebody may called release...
@@ -132,6 +130,14 @@ namespace tinycoro {
                 _waiters.push(awaiter);
            
                 return false;
+            }
+
+            [[nodiscard]] bool _Cancel(awaitable_type* awaiter) noexcept
+            { 
+                std::scoped_lock lock{_mtx};
+
+                // try to remove the awaiter from the list.
+                return _waiters.erase(awaiter);
             }
 
             std::atomic<size_t>    _counter;
@@ -154,11 +160,15 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _semaphore.TryAcquire(); }
 
-            [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore.TryAcquire(this, parentCoro); }
+            [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore._TryAcquire(this, parentCoro); }
 
-            [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuard{_semaphore}; }
+            [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuardRelaxed{_semaphore}; }
 
-            bool Notify() const noexcept { return _event.Notify(); }
+            bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
+
+            bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
+
+            [[nodiscard]] bool Cancel() noexcept { _semaphore._Cancel(this); }
 
             void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 
@@ -169,9 +179,11 @@ namespace tinycoro {
 
     } // namespace detail
 
+    // counting semaphore
     template <auto LeastMaxValue>
     using Semaphore = detail::Semaphore<LeastMaxValue, detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
 
+    // binary semaphore
     using BinarySemaphore = detail::Semaphore<1, detail::SemaphoreAwaiter, detail::LinkedPtrQueue>;
 
 } // namespace tinycoro

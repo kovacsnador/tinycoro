@@ -348,7 +348,7 @@ TEST_P(LatchTest, LatchTest_timeout)
     std::atomic<decltype(count)> cc = count;
 
     auto consumer = [&]()->tinycoro::Task<> {
-        co_await tinycoro::TimeoutAwait{clock, latch.Wait(), 10ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, latch.Wait(), 10ms};
         cc--;
     };
 
@@ -376,7 +376,7 @@ TEST_P(LatchTest, LatchTest_timeout_race)
     std::atomic<decltype(count)> cc = count;
 
     auto consumer = [&]()->tinycoro::Task<void, LatchTest::Allocator> {
-        co_await tinycoro::TimeoutAwait{clock, latch.ArriveAndWait(), 10ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, latch.ArriveAndWait(), 10ms};
         cc--;
     };
 

@@ -242,7 +242,7 @@ struct SingleEventTimeoutTest : testing::TestWithParam<size_t>
 
 INSTANTIATE_TEST_SUITE_P(SingleEventTimeoutTest, SingleEventTimeoutTest, testing::Values(1, 10, 100, 1000, 10000, 20000));
 
-// THIS TEST CAN HANG!!!
+// THIS TEST CAN HANG!!! (fixed)
 TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
 {
 
@@ -288,7 +288,7 @@ TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race)
     EXPECT_EQ(doneCount, count);
 }
 
-// THIS TEST CAN HANG!!!
+// THIS TEST CAN HANG!!! (fixed)
 TEST_P(SingleEventTimeoutTest, SingleEventFunctionalTest_timeout_race_auto_event)
 {
 
