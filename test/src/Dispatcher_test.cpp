@@ -3,6 +3,7 @@
 #include <ranges>
 #include <future>
 #include <chrono>
+#include <latch>
 
 #include "tinycoro/Dispatcher.hpp"
 #include "tinycoro/AtomicQueue.hpp"
@@ -41,7 +42,7 @@ namespace test {
 TEST(DispatcherTest, DispatcherTest_try_push_pop)
 {
     tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue};
+    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -61,96 +62,255 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
     EXPECT_TRUE(dispatcher.empty());
 }
 
-TEST(DispatcherTest, DispatcherTest_wait_for_pop)
+TEST(DispatcherTest, DispatcherTest_small_cache)
 {
-    tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue};
+    tinycoro::detail::AtomicQueue<int32_t, 4> queue;
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+
+    decltype(dispatcher)::state_type push_state{};
+    decltype(dispatcher)::state_type pop_state{};
+
+    EXPECT_TRUE(dispatcher.empty());
+    EXPECT_FALSE(dispatcher.full());
+
+    int32_t val;
+    EXPECT_FALSE(dispatcher.try_pop(val));
+
+    dispatcher.wait_for_push(push_state++);
+    EXPECT_TRUE(dispatcher.try_push(0));
+
+    dispatcher.wait_for_push(push_state++);
+    EXPECT_TRUE(dispatcher.try_push(1));
+    
+    dispatcher.wait_for_push(push_state++);
+    EXPECT_TRUE(dispatcher.try_push(2));
+
+    dispatcher.wait_for_push(push_state++);
+    EXPECT_TRUE(dispatcher.try_push(3));
+
+    EXPECT_TRUE(dispatcher.full());
+
+    EXPECT_FALSE(dispatcher.try_push(4));
+
+    dispatcher.wait_for_pop(pop_state++);
+    EXPECT_TRUE(dispatcher.try_pop(val));
+    EXPECT_EQ(val, 0);
+
+    EXPECT_TRUE(dispatcher.try_push(4));
+
+    EXPECT_FALSE(dispatcher.empty());
+    EXPECT_TRUE(dispatcher.full());
+
+    dispatcher.wait_for_pop(pop_state++);
+    EXPECT_TRUE(dispatcher.try_pop(val));
+    EXPECT_EQ(val, 1);
+
+    dispatcher.wait_for_pop(pop_state++);
+    EXPECT_TRUE(dispatcher.try_pop(val));
+    EXPECT_EQ(val, 2);
+
+    dispatcher.wait_for_pop(pop_state++);
+    EXPECT_TRUE(dispatcher.try_pop(val));
+    EXPECT_EQ(val, 3);
+
+    dispatcher.wait_for_pop(pop_state++);
+    EXPECT_TRUE(dispatcher.try_pop(val));
+    EXPECT_EQ(val, 4);
+
+    dispatcher.wait_for_push(push_state++);
+    EXPECT_TRUE(dispatcher.empty());
+}
+
+struct DispatcherTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(DispatcherTest, DispatcherTest, testing::Values(10, 100, 1000, 10000, 100000, 1000000));
+
+TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
+{
+    const auto count = GetParam();
+
+    tinycoro::detail::AtomicQueue<size_t, 1024> queue;
+    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     auto fut = std::async(std::launch::async, [&] {
-
-        size_t state{};
-
-        for (auto it : std::views::iota(0, 100))
+        decltype(dispatcher)::state_type state{};
+        for (size_t i = 0; i < count;)
         {
             // wait until we can pop
             dispatcher.wait_for_pop(state++);
 
-            int32_t val;
-            EXPECT_TRUE(dispatcher.try_pop(val));
-            EXPECT_EQ(val, it);
+            size_t val;
+            if (dispatcher.try_pop(val))
+            {
+                EXPECT_EQ(val, i++);
+            }
         }
-
-        SUCCEED();
     });
 
-    for (auto it : std::views::iota(0, 100))
+    for (size_t i = 0; i < count;)
     {
-        std::this_thread::sleep_for(10ms);
-        EXPECT_TRUE(dispatcher.try_push(it));
+        auto succeed = dispatcher.try_push(i);
+
+        if (i < queue.capacity())
+        {
+            EXPECT_TRUE(succeed);
+        };
+
+        if (succeed)
+            i++;
     }
 
     // wait for the future
-    fut.get();
+}
+
+TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
+{
+    const auto count = GetParam();
+
+    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+
+    auto asyncFunc = [&] {
+        decltype(dispatcher)::state_type state{0};
+        for (size_t i = 0; i < count; i++)
+        {
+            // wait until we can pop
+            dispatcher.wait_for_pop(state++);
+
+            EXPECT_FALSE(dispatcher.empty());
+
+            int32_t val;
+            EXPECT_TRUE(dispatcher.try_pop(val));
+
+            EXPECT_EQ(val, i);
+        }
+    };
+
+    auto fut = std::async(std::launch::async, asyncFunc);
+
+    decltype(dispatcher)::state_type state{0};
+    for (int32_t i = 0; i < count; i++)
+    {
+        dispatcher.wait_for_push(state++);
+
+        EXPECT_FALSE(dispatcher.full());
+
+        EXPECT_TRUE(dispatcher.try_push(i));
+    }
+
+    // wait for the future
 }
 
 // TODO check and fix this!!!!
-TEST(DispatcherTest, DispatcherTest_wait_for_push)
+TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
 {
-    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue};
+    const auto count = GetParam();
 
-    auto pushState = dispatcher.push_state(std::memory_order::acquire);
-    auto popState = dispatcher.pop_state(std::memory_order::acquire);
+    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     // this need to move
-    //dispatcher.wait_for_push(0);
+    dispatcher.wait_for_push(0);
 
     // make the queue full
     EXPECT_TRUE(dispatcher.try_push(0));
     EXPECT_TRUE(dispatcher.try_push(1));
 
     // this need to move
-    //dispatcher.wait_for_pop(0);
+    dispatcher.wait_for_pop(0);
 
     auto asyncFunc = [&] {
-        for (size_t i = 0; i < 100;)
+        decltype(dispatcher)::state_type state{0};
+        for (size_t i = 0; i < count; i++)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(pushState++);
-
-            //pushState = dispatcher.push_state(std::memory_order::acquire);
+            dispatcher.wait_for_pop(state++);
 
             EXPECT_FALSE(dispatcher.empty());
 
             int32_t val;
-            auto succeed = dispatcher.try_pop(val);
-            if(succeed)
-                i++;
+            EXPECT_TRUE(dispatcher.try_pop(val));
 
-            EXPECT_TRUE(succeed);
+            EXPECT_EQ(val, i);
         }
-
-        SUCCEED();
     };
 
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    for (int32_t i = 2; i < 100;)
-    {
-        dispatcher.wait_for_push(popState++);
+    decltype(dispatcher)::state_type state{2};
 
-        //popState = dispatcher.pop_state(std::memory_order::acquire);
+    for (int32_t i = 2; i < count; i++)
+    {
+        dispatcher.wait_for_push(state++);
 
         EXPECT_FALSE(dispatcher.full());
 
-        auto succeed = dispatcher.try_push(i);
-        if(succeed)
-            i++;
-
-        EXPECT_TRUE(succeed);
+        EXPECT_TRUE(dispatcher.try_push(i));
     }
 
     // wait for the future
-    fut.get();
+}
+
+TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
+{
+    const auto count = GetParam();
+
+    std::latch       latch{4};
+    std::stop_source ss;
+
+    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
+    tinycoro::detail::Dispatcher              dispatcher{queue, ss.get_token()};
+
+    {
+        auto consumer = [&] {
+            decltype(dispatcher)::state_type state{};
+            for (size_t i = 0; i < count;)
+            {
+                // wait until we can pop
+                dispatcher.wait_for_pop(state++);
+
+                int32_t val;
+                auto    succeed = dispatcher.try_pop(val);
+                if (succeed)
+                {
+                    i++;
+                }
+            }
+        };
+
+        auto consumer1 = std::async(std::launch::async, consumer);
+        auto consumer2 = std::async(std::launch::async, consumer);
+        auto consumer3 = std::async(std::launch::async, consumer);
+        auto consumer4 = std::async(std::launch::async, consumer);
+
+        auto producer = [&] {
+            decltype(dispatcher)::state_type state{};
+            for (size_t i = 0; i < count;)
+            {
+                dispatcher.wait_for_push(state++);
+
+                if (dispatcher.try_push(42))
+                {
+                    i++;
+                }
+            }
+
+            // we need to notify the pop waiters,
+            // because they can stack in a wait state.
+            latch.arrive_and_wait();
+            ss.request_stop();
+            dispatcher.notify_pop_waiters();
+        };
+
+        auto producer1 = std::async(std::launch::async, producer);
+        auto producer2 = std::async(std::launch::async, producer);
+        auto producer3 = std::async(std::launch::async, producer);
+        auto producer4 = std::async(std::launch::async, producer);
+    }
+
+    EXPECT_TRUE(dispatcher.empty());
+    EXPECT_TRUE(queue.empty());
 }

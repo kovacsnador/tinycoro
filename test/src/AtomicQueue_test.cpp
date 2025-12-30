@@ -269,14 +269,14 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     const auto count = GetParam();
 
     tinycoro::Scheduler                      scheduler{8};
+
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher dispatcher{queue};
+    tinycoro::detail::Dispatcher             dispatcher{queue, {}};
 
     std::atomic<size_t> totalCount{};
 
     auto producer = [&]() -> tinycoro::Task<void> {
-        
-        size_t state{};
+        decltype(dispatcher)::state_type state{};
         for (size_t i = 0; i <= count; ++i)
         {
             while (dispatcher.try_push(i) == false)
@@ -289,7 +289,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        size_t state{};
+        decltype(dispatcher)::state_type state{};
         for (;;)
         {
             size_t val;

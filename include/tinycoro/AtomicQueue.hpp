@@ -17,7 +17,7 @@ namespace tinycoro { namespace detail {
 
     // A multi-producer, multi-consumer (MPMC) lock-free queue.
     //
-    // Internally, this queue uses a fixed-size ring buffer of size `SIZE`,
+    // Internally, this queue uses a fixed-size ring buffer of size `Capacity`,
     // which **must be a power of two**. Indexing is done via masking for efficiency.
     //
     // The queue supports concurrent `try_push` and `try_pop` operations
@@ -29,7 +29,7 @@ namespace tinycoro { namespace detail {
     //   that represent global push and pop positions.
     // - Each buffer slot (`Element`) has its own `sequence` counter that
     //   encodes the state of that slot across wraparounds.
-    // - The combination of `(position / SIZE)` (the “turn”) and the
+    // - The combination of `(position / Capacity)` (the “turn”) and the
     //   per-element sequence number ensures correct coordination between
     //   producers and consumers, even when indices wrap around the ring.
     //
@@ -55,13 +55,13 @@ namespace tinycoro { namespace detail {
     // Properties:
     // - Multiple producers and multiple consumers
     // - Lock-free (subject to atomic guarantees)
-    // - Bounded capacity (`SIZE`)
+    // - Bounded capacity (`Capacity`)
     // - Non-blocking API (`try_push`, `try_pop`)
     //
     // This queue is well suited for high-throughput, low-latency systems
     // where bounded capacity and platform atomic guarantees are acceptable.
-    template <typename T, uint64_t SIZE>
-        requires detail::IsPowerOf2<SIZE>::value
+    template <typename T, uint64_t Capacity>
+        requires detail::IsPowerOf2<Capacity>::value
     class AtomicQueue
     {
     public:
@@ -70,7 +70,7 @@ namespace tinycoro { namespace detail {
         using value_type = T;
         using sequence_t = uint64_t;
 
-        AtomicQueue() = default; 
+        AtomicQueue() = default;
 
         // disable copy and move
         AtomicQueue(AtomicQueue&&) = delete;
@@ -79,6 +79,7 @@ namespace tinycoro { namespace detail {
         template <typename U>
         bool try_push(U&& value) noexcept
         {
+            int32_t retry{3};
             auto pos = _head.load(std::memory_order_acquire);
             for (;;)
             {
@@ -103,9 +104,9 @@ namespace tinycoro { namespace detail {
                     const auto prevHead = pos;
 
                     pos = _head.load(std::memory_order_acquire);
-                    if (pos == prevHead)
+                    if (pos == prevHead && --retry <= 0)
                     {
-                        // queue is full
+                        // queue is probably full, or we simply lost the race...
                         return false;
                     }
                 }
@@ -118,6 +119,7 @@ namespace tinycoro { namespace detail {
         // try to pop the next value from the queue
         bool try_pop(value_type& data) noexcept
         {
+            int32_t retry{3};
             auto pos = _tail.load(std::memory_order_acquire);
             for (;;)
             {
@@ -137,9 +139,11 @@ namespace tinycoro { namespace detail {
                 else
                 {
                     auto const prevTail = pos;
-                    pos                 = _tail.load(std::memory_order_acquire);
-                    if (pos == prevTail)
+
+                    pos = _tail.load(std::memory_order_acquire);
+                    if (pos == prevTail && --retry <= 0)
                     {
+                        // queue is probably empty, or we lost the race...
                         return false;
                     }
                 }
@@ -149,13 +153,21 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
-        [[nodiscard]] bool empty() const noexcept { return _head.load(std::memory_order_relaxed) == _tail.load(std::memory_order_relaxed); }
+        [[nodiscard]] bool empty() const noexcept
+        { 
+            return _head.load(std::memory_order::relaxed) == _tail.load(std::memory_order::relaxed);
+        }
 
-        [[nodiscard]] bool full() const noexcept { return _head.load(std::memory_order_relaxed) - SIZE == _tail.load(std::memory_order_relaxed); }
+        [[nodiscard]] bool full() const noexcept
+        {
+            return _head.load(std::memory_order::relaxed) - Capacity == _tail.load(std::memory_order::relaxed);
+        }
+
+        [[nodiscard]] static constexpr auto capacity() noexcept { return Capacity; }
 
     private:
-        constexpr size_t idx(size_t i) const noexcept { return i % SIZE; }
-        constexpr size_t turn(size_t i) const noexcept { return i / SIZE; }
+        constexpr size_t idx(size_t i) const noexcept { return i % Capacity; }
+        constexpr size_t turn(size_t i) const noexcept { return i / Capacity; }
 
         struct Element
         {
@@ -164,10 +176,10 @@ namespace tinycoro { namespace detail {
         };
 
         // the buffer mask. Should be for example 0xFFFFF
-        static constexpr sequence_t BUFFER_MASK{SIZE - 1};
+        static constexpr sequence_t BUFFER_MASK{Capacity - 1};
 
         // the array of the ringbuffer
-        std::array<Element, SIZE> _buffer;
+        std::array<Element, Capacity> _buffer;
 
         // the last push position of an element
         alignas(CACHELINE_SIZE) std::atomic<sequence_t> _head{};

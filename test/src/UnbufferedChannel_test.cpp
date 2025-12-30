@@ -1093,7 +1093,7 @@ TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_p
     auto producer = [&]() -> tinycoro::TaskNIC<> {
         for(size_t i = 0; i < count; ++i)
         {
-            co_await tinycoro::TimeoutAwait{clock, channel.PushWait(42), 1ms};
+            std::ignore = co_await tinycoro::TimeoutAwait{clock, channel.PushWait(42), 1ms};
             pushDone++;
         }
     };
@@ -1102,7 +1102,7 @@ TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_p
         for(size_t i = 0; i < count; ++i)
         {
             int32_t val;
-            co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
+            std::ignore = co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
             popDone++;
         }
     };
@@ -1124,7 +1124,7 @@ TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_l
     auto listener = [&]() -> tinycoro::TaskNIC<> {
         for(size_t i = 0; i < count; ++i)
         {
-            co_await tinycoro::TimeoutAwait{clock, channel.WaitForListeners(1), 1ms};
+            std::ignore = co_await tinycoro::TimeoutAwait{clock, channel.WaitForListeners(1), 1ms};
             listenerDone++;
         }
 
@@ -1136,7 +1136,7 @@ TEST_P(UnbufferedChannelTimeoutTest, UnbufferedChannelTimeoutTest_timeout_race_l
         {
             std::this_thread::sleep_for(40ms);
             int32_t val;
-            co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
+            std::ignore = co_await tinycoro::TimeoutAwait{clock, channel.PopWait(val), 1ms};
         }
     };
 

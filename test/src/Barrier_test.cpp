@@ -723,7 +723,7 @@ TEST_P(BarrierTest, BarrierTest_timeout)
     std::atomic<decltype(count)> cc = count;
 
     auto consumer = [&]()->tinycoro::Task<> {
-        co_await tinycoro::TimeoutAwait{clock, barrier.Wait(), 10ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, barrier.Wait(), 10ms};
         cc--;
     };
 
@@ -751,7 +751,7 @@ TEST_P(BarrierTest, BarrierTest_timeout_race)
     std::atomic<decltype(count)> cc = count;
 
     auto consumer = [&]()->tinycoro::Task<> {
-        co_await tinycoro::TimeoutAwait{clock, barrier.ArriveAndWait(), 10ms};
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, barrier.ArriveAndWait(), 10ms};
         cc--;
     };
 
