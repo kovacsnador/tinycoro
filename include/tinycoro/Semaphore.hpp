@@ -168,7 +168,7 @@ namespace tinycoro {
 
             bool NotifyToDestroy() const noexcept { return _event.Notify(ENotifyPolicy::DESTROY); }
 
-            [[nodiscard]] bool Cancel() noexcept { _semaphore._Cancel(this); }
+            [[nodiscard]] bool Cancel() noexcept { return _semaphore._Cancel(this); }
 
             void PutOnPause(auto parentCoro) noexcept { _event.Set(context::PauseTask(parentCoro)); }
 

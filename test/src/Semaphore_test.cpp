@@ -7,11 +7,7 @@
 
 #include "mock/CoroutineHandleMock.h"
 
-#include <tinycoro/Semaphore.hpp>
-#include <tinycoro/Promise.hpp>
-#include <tinycoro/Scheduler.hpp>
-#include <tinycoro/Task.hpp>
-#include <tinycoro/Wait.hpp>
+#include <tinycoro/tinycoro_all.h>
 
 template <typename T>
 struct SemaphoreMock
@@ -203,9 +199,11 @@ TYPED_TEST(SemaphoreTest, SemaphoreTest_multi_release)
         // auto guard = co_await semaphore;
         // guard.release();    // no auto release
         // or
-        tinycoro::ReleaseImmediately{co_await semaphore};
+        tinycoro::IgnoreGuard(co_await semaphore);
 
         counter.fetch_add(1, std::memory_order::relaxed);
+
+        // semaphore is not released here...
     };
 
     std::vector<tinycoro::Task<>> tasks;
@@ -496,4 +494,167 @@ TEST_P(SemaphoreStressTest, SemaphoreStressTest_blocking_try_acquire)
     tinycoro::AllOf(scheduler, task(), task(), task(), task(), task(), task(), task(), task());
 
     EXPECT_EQ(count, size * taskCount);
+}
+
+struct SemaphoreTimeoutTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest, testing::Values(1, 10, 100, 1000, 10000));
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_timeout_all)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::BinarySemaphore sema{0};
+
+    std::atomic<size_t> timeoutCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> { 
+        auto guard = co_await tinycoro::TimeoutAwait{clock, sema.Wait(), 20ms};
+        if (guard.has_value() == false)
+            timeoutCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(timeoutCount, count);
+}
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_timeout_race)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::Semaphore<1> sema;
+
+    size_t succeessCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> {
+        auto guard = co_await tinycoro::TimeoutAwait{clock, sema.Wait(), 10ms};
+        if (guard.has_value())
+            succeessCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    // intended to check woth sanitizers...
+    EXPECT_TRUE(succeessCount > 0);
+}
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_cancel_all_after)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::BinarySemaphore sema{0};
+
+    std::atomic<size_t> cancelCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> {
+        auto guard = co_await tinycoro::Cancellable{sema.Wait()};
+        cancelCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count + 1);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tasks.emplace_back([]() -> tinycoro::TaskNIC<> { co_return; }());
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cancelCount, 0);
+}
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_cancel_all_before)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::BinarySemaphore sema{0};
+
+    std::atomic<size_t> cancelCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> {
+        auto guard = co_await tinycoro::Cancellable{sema.Wait()};
+        cancelCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count + 1);
+
+    tasks.emplace_back([]() -> tinycoro::TaskNIC<> { co_return; }());
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cancelCount, 0);
+}
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_cancel_all_race)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::Semaphore<1> sema;
+
+    size_t cancelCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> {
+        auto guard = co_await tinycoro::Cancellable{sema.Wait()};
+        cancelCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    // intended to check with sanitizers...
+    EXPECT_TRUE(cancelCount > 0);
 }
