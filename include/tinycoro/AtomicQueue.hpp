@@ -79,6 +79,7 @@ namespace tinycoro { namespace detail {
         template <typename U>
         bool try_push(U&& value) noexcept
         {
+            int32_t retry{3};
             auto pos = _head.load(std::memory_order_acquire);
             for (;;)
             {
@@ -103,9 +104,9 @@ namespace tinycoro { namespace detail {
                     const auto prevHead = pos;
 
                     pos = _head.load(std::memory_order_acquire);
-                    if (pos == prevHead)
+                    if (pos == prevHead && --retry <= 0)
                     {
-                        // queue is full
+                        // queue is probably full, or we simply lost the race...
                         return false;
                     }
                 }
@@ -118,6 +119,7 @@ namespace tinycoro { namespace detail {
         // try to pop the next value from the queue
         bool try_pop(value_type& data) noexcept
         {
+            int32_t retry{3};
             auto pos = _tail.load(std::memory_order_acquire);
             for (;;)
             {
@@ -137,9 +139,11 @@ namespace tinycoro { namespace detail {
                 else
                 {
                     auto const prevTail = pos;
-                    pos                 = _tail.load(std::memory_order_acquire);
-                    if (pos == prevTail)
+
+                    pos = _tail.load(std::memory_order_acquire);
+                    if (pos == prevTail && --retry <= 0)
                     {
+                        // queue is probably empty, or we lost the race...
                         return false;
                     }
                 }

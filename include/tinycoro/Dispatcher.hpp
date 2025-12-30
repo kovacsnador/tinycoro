@@ -54,7 +54,6 @@ namespace tinycoro { namespace detail {
         {
             if (_stopToken.stop_requested() == false) 
                 _pushEvent.wait(prev, std::memory_order::acquire);
-            
         }
 
         void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
