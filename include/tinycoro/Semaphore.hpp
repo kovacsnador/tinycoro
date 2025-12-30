@@ -162,7 +162,10 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept { return !_semaphore._TryAcquire(this, parentCoro); }
 
-            [[nodiscard]] constexpr auto await_resume() noexcept { return ReleaseGuardRelaxed{_semaphore}; }
+            [[nodiscard]] constexpr auto await_resume() noexcept
+            {
+                return detail::ReleaseGuardRelaxedImpl<ReleaseGuard, std::remove_cvref_t<decltype(_semaphore)>>{_semaphore};
+            }
 
             bool Notify() const noexcept { return _event.Notify(ENotifyPolicy::RESUME); }
 
