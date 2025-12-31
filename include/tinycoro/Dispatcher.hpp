@@ -44,25 +44,31 @@ namespace tinycoro { namespace detail {
         {
         }
 
-        void wait_for_push(state_type prev) const noexcept
+        void wait_for_push() const noexcept
         {  
-            if (_stopToken.stop_requested() == false)
-                _popEvent.wait(prev, std::memory_order::acquire);
+            auto state = _popEvent.load(std::memory_order::relaxed);
+            if (full() && _stopToken.stop_requested() == false)
+                _popEvent.wait(state, std::memory_order::acquire);
         }
 
-        void wait_for_pop(state_type prev) const noexcept
+        void wait_for_pop() const noexcept
         {
-            if (_stopToken.stop_requested() == false) 
-                _pushEvent.wait(prev, std::memory_order::acquire);
+            auto state = _pushEvent.load(std::memory_order::relaxed);
+            if (empty() && _stopToken.stop_requested() == false) 
+                _pushEvent.wait(state, std::memory_order::acquire);
         }
 
-        void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
-        void notify_pop_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
+        // TODO: remove this if it's working.
+        //void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
+        //void notify_pop_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
 
         void notify_all() noexcept
         {
-            notify_pop_waiters();
-            notify_push_waiters();
+            local::Notify(_pushEvent, std::atomic_notify_all);
+            local::Notify(_popEvent, std::atomic_notify_all);
+
+            //notify_pop_waiters();
+            //notify_push_waiters();
         }
 
         template <typename T>
@@ -92,8 +98,15 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
-        [[nodiscard]] auto full() const noexcept { return _queue.full(); }
-        [[nodiscard]] auto empty() const noexcept { return _queue.empty(); }
+        [[nodiscard]] auto full() const noexcept { return _pushEvent.load(std::memory_order::relaxed) == _popEvent.load(std::memory_order::relaxed); }
+        
+        [[nodiscard]] auto empty() const noexcept
+        {
+            auto push = _pushEvent.load(std::memory_order::relaxed) + QueueT::capacity();
+            auto pop  = _popEvent.load(std::memory_order::relaxed);
+
+            return push == pop;
+        }
 
     private:
         alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent{};
