@@ -47,14 +47,14 @@ namespace tinycoro { namespace detail {
         void wait_for_push() const noexcept
         {  
             auto state = _popEvent.load(std::memory_order::relaxed);
-            if (full() && _stopToken.stop_requested() == false)
+            if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
                 _popEvent.wait(state, std::memory_order::acquire);
         }
 
         void wait_for_pop() const noexcept
         {
             auto state = _pushEvent.load(std::memory_order::relaxed);
-            if (empty() && _stopToken.stop_requested() == false) 
+            if (state + _queue.capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false) 
                 _pushEvent.wait(state, std::memory_order::acquire);
         }
 
