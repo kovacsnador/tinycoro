@@ -108,8 +108,11 @@ namespace tinycoro { namespace detail {
                 {
                     assert(_cachedTasks.empty());
 
+                    // Get the pop state before we check _notifiedCachedTasks.
+                    // This is important becasue it could happen, that a task is
+                    // landing in the _notifiedCachedTasks in the mean time
+                    // and we don't want to miss the notification "dispatcher.notify_all()"
                     auto popState = _dispatcher.pop_state();
- 
                     if (_notifiedCachedTasks.empty())
                     {
                         // all the caches are empty, we can

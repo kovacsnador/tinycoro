@@ -45,12 +45,18 @@ namespace tinycoro { namespace detail {
         }
 
         [[nodiscard]] state_type pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
+        [[nodiscard]] state_type push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
+
+        void wait_for_push(state_type state) const noexcept
+        {
+            if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
+                _popEvent.wait(state);
+        }
 
         void wait_for_push() const noexcept
         {  
-            auto state = _popEvent.load(std::memory_order::acquire);
-            if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
-                _popEvent.wait(state);
+            auto state = _popEvent.load(std::memory_order::relaxed);
+            wait_for_push(state);
         }
 
         void wait_for_pop(state_type state) const noexcept
@@ -65,17 +71,10 @@ namespace tinycoro { namespace detail {
             wait_for_pop(state);
         }
 
-        // TODO: remove this if it's working.
-        //void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
-        //void notify_pop_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
-
         void notify_all() noexcept
         {
             local::Notify(_pushEvent, std::atomic_notify_all);
             local::Notify(_popEvent, std::atomic_notify_all);
-
-            //notify_pop_waiters();
-            //notify_push_waiters();
         }
 
         template <typename T>
