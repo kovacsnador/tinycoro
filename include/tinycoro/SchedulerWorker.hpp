@@ -108,15 +108,17 @@ namespace tinycoro { namespace detail {
                 {
                     assert(_cachedTasks.empty());
 
-                    if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
+                    auto popState = _dispatcher.pop_state();
+ 
+                    if (_notifiedCachedTasks.empty())
                     {
-                        // the all the caches are empty, we can
+                        // all the caches are empty, we can
                         // wait safely for new tasks...
                         //
                         // now if some tasks need resumption
                         // they will directly be pushed into the dispatcher queue.
                         // (not in the local cache)
-                        _dispatcher.wait_for_pop();
+                        _dispatcher.wait_for_pop(popState);
                     }
                 }
                 else
@@ -190,7 +192,6 @@ namespace tinycoro { namespace detail {
                             if (_notifiedCachedTasks.try_push(task.release()))
                             {
                                 // wake up waiters, in case we are waiting for pop
-                                // dispatcherPtr->notify_pop_waiters();
                                 dispatcherPtr->notify_all();
                             }
                             else

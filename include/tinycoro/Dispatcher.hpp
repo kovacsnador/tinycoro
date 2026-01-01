@@ -44,18 +44,25 @@ namespace tinycoro { namespace detail {
         {
         }
 
+        [[nodiscard]] state_type pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
+
         void wait_for_push() const noexcept
         {  
-            auto state = _popEvent.load(std::memory_order::relaxed);
+            auto state = _popEvent.load(std::memory_order::acquire);
             if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
-                _popEvent.wait(state, std::memory_order::acquire);
+                _popEvent.wait(state);
+        }
+
+        void wait_for_pop(state_type state) const noexcept
+        {
+            if (state + _queue.capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false)
+                _pushEvent.wait(state);
         }
 
         void wait_for_pop() const noexcept
         {
-            auto state = _pushEvent.load(std::memory_order::relaxed);
-            if (state + _queue.capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false) 
-                _pushEvent.wait(state, std::memory_order::acquire);
+            auto state = _pushEvent.load(std::memory_order::acquire);
+            wait_for_pop(state);
         }
 
         // TODO: remove this if it's working.

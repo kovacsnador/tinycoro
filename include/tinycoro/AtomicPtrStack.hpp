@@ -12,6 +12,7 @@
 #include "Common.hpp"
 #include "Diagnostics.hpp"
 #include "LinkedUtils.hpp"
+#include "CachelineAlign.hpp"
 
 namespace tinycoro { namespace detail {
 
@@ -71,7 +72,7 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] constexpr bool empty() const noexcept
         {
             auto top = _top.load(std::memory_order_acquire);
-            return (top == nullptr || top == this);
+            return (top == nullptr);
         }
 
         [[nodiscard]] constexpr bool closed() const noexcept { return _top.load(std::memory_order_acquire) == this; }
@@ -124,7 +125,7 @@ namespace tinycoro { namespace detail {
         // nullptr -> stack is empty
         // this -> stack is closed
         // other -> stack has some content
-        std::atomic<void*> _top{nullptr};
+        alignas(CACHELINE_SIZE) std::atomic<void*> _top{nullptr};
     };
 
 }} // namespace tinycoro::detail
