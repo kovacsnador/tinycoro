@@ -131,6 +131,7 @@ namespace tinycoro {
 
                     while (_stopSource.stop_requested() == false)
                     {
+                        auto pushState = _dispatcher.push_state(std::memory_order::relaxed);
                         if (_dispatcher.try_push(std::move(task)))
                         {
                             // the task is pushed
@@ -140,7 +141,7 @@ namespace tinycoro {
                         else
                         {
                             // wait until we have space in the queue
-                            _dispatcher.wait_for_push();
+                            _dispatcher.wait_for_push(pushState);
                         }
                     }
                 }

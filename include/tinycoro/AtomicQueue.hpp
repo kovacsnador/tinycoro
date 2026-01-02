@@ -87,7 +87,7 @@ namespace tinycoro { namespace detail {
                 auto  currentSequence = turn(pos);
                 if (currentSequence == elem.sequence.load(std::memory_order_acquire))
                 {
-                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_head.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // found the right place
                         // pushing the value into the queue
@@ -105,10 +105,18 @@ namespace tinycoro { namespace detail {
                     const auto prevHead = pos;
 
                     pos = _head.load(std::memory_order_relaxed);
-                    if (pos == prevHead && --retry <= 0)
+                    if (pos == prevHead)
                     {
-                        // queue is probably full, or we simply lost the race...
-                        return false;
+                        if (--retry < 0)
+                        {
+                            // queue is probably full, or we simply lost the race...
+                            return false;
+                        }
+                        
+                        // Simple retry logic.
+                        // Could be made more sophisticated.
+                        std::this_thread::yield();
+                        
                     }
                 }
             }
@@ -128,7 +136,7 @@ namespace tinycoro { namespace detail {
                 auto  currentSequence = turn(pos);
                 if (currentSequence + 1 == elem.sequence.load(std::memory_order_acquire))
                 {
-                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_tail.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // we got exclusive access to the element
                         data = std::move(elem.value);
@@ -140,13 +148,21 @@ namespace tinycoro { namespace detail {
                 }
                 else
                 {
-                    auto const prevTail = pos;
+                    const auto prevTail = pos;
 
                     pos = _tail.load(std::memory_order_relaxed);
-                    if (pos == prevTail && --retry <= 0)
+                    if (pos == prevTail)
                     {
-                        // queue is probably empty, or we lost the race...
-                        return false;
+                        if (--retry < 0)
+                        {
+                            // queue is probably empty, or we lost the race...
+                            return false;
+                        }
+
+                        // Simple retry logic.
+                        // Could be made more sophisticated.
+                        std::this_thread::yield();
+                        
                     }
                 }
             }

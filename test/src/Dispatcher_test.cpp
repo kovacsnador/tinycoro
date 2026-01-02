@@ -3,7 +3,6 @@
 #include <ranges>
 #include <future>
 #include <chrono>
-#include <latch>
 
 #include "tinycoro/Dispatcher.hpp"
 #include "tinycoro/AtomicQueue.hpp"
@@ -251,11 +250,8 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
 {
     const auto count = GetParam();
 
-    /* std::latch  latch{4};
-    std::stop_source ss;*/
-
     tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {} /* ss.get_token()*/};
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     {
         auto consumer = [&] {
@@ -288,12 +284,6 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
                     i++;
                 }
             }
-
-            // we need to notify the pop waiters,
-            // because they can stack in a wait state.
-            /* latch.arrive_and_wait();
-            ss.request_stop();
-            dispatcher.notify_all();*/
         };
 
         auto producer1 = std::async(std::launch::async, producer);
