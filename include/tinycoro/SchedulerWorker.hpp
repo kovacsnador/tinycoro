@@ -99,7 +99,6 @@ namespace tinycoro { namespace detail {
     private:
         void Run(std::stop_token stopToken) noexcept
         {
-            typename DispatcherT::state_type state{};
             while (stopToken.stop_requested() == false)
             {
                 // we can try to upload the cached tasks
@@ -109,15 +108,20 @@ namespace tinycoro { namespace detail {
                 {
                     assert(_cachedTasks.empty());
 
-                    if (_cachedTasks.empty() && _notifiedCachedTasks.empty())
+                    // Get the pop state before we check _notifiedCachedTasks.
+                    // This is important becasue it could happen, that a task is
+                    // landing in the _notifiedCachedTasks in the mean time
+                    // and we don't want to miss the notification "dispatcher.notify_all()"
+                    auto popState = _dispatcher.pop_state();
+                    if (_notifiedCachedTasks.empty())
                     {
-                        // the all the caches are empty, we can
+                        // all the caches are empty, we can
                         // wait safely for new tasks...
                         //
                         // now if some tasks need resumption
                         // they will directly be pushed into the dispatcher queue.
                         // (not in the local cache)
-                        _dispatcher.wait_for_pop(state++);
+                        _dispatcher.wait_for_pop(popState);
                     }
                 }
                 else
@@ -191,7 +195,7 @@ namespace tinycoro { namespace detail {
                             if (_notifiedCachedTasks.try_push(task.release()))
                             {
                                 // wake up waiters, in case we are waiting for pop
-                                dispatcherPtr->notify_pop_waiters();
+                                dispatcherPtr->notify_all();
                             }
                             else
                             {

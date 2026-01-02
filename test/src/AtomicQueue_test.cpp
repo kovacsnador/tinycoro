@@ -2,6 +2,7 @@
 
 #include <ranges>
 #include <limits>
+#include <future>
 
 #include <tinycoro/tinycoro_all.h>
 
@@ -124,6 +125,46 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_single_threaded)
         EXPECT_TRUE(queue.try_pop(val));
         EXPECT_EQ(val, i);
     }
+}
+
+TEST(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_push_pop_success)
+{
+    tinycoro::detail::AtomicQueue<size_t, (1 << 15)> queue;
+
+    {
+        auto producer = [&] {
+            for (size_t i = 0; i < 4000; ++i)
+                EXPECT_TRUE(queue.try_push(i));
+        };
+
+        auto producer1 = std::async(std::launch::async, producer);
+        auto producer2 = std::async(std::launch::async, producer);
+        auto producer3 = std::async(std::launch::async, producer);
+        auto producer4 = std::async(std::launch::async, producer);
+        auto producer5 = std::async(std::launch::async, producer);
+        auto producer6 = std::async(std::launch::async, producer);
+        auto producer7 = std::async(std::launch::async, producer);
+        auto producer8 = std::async(std::launch::async, producer);
+    }
+
+    {
+        auto consumer = [&] { 
+            size_t val{};
+            for (size_t i = 0; i < 4000; ++i)
+                EXPECT_TRUE(queue.try_pop(val));
+        };
+
+        auto consumer1 = std::async(std::launch::async, consumer);
+        auto consumer2 = std::async(std::launch::async, consumer);
+        auto consumer3 = std::async(std::launch::async, consumer);
+        auto consumer4 = std::async(std::launch::async, consumer);
+        auto consumer5 = std::async(std::launch::async, consumer);
+        auto consumer6 = std::async(std::launch::async, consumer);
+        auto consumer7 = std::async(std::launch::async, consumer);
+        auto consumer8 = std::async(std::launch::async, consumer);
+    }
+
+    EXPECT_TRUE(queue.empty());
 }
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_multi_threaded_pop)
@@ -276,12 +317,11 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     std::atomic<size_t> totalCount{};
 
     auto producer = [&]() -> tinycoro::Task<void> {
-        decltype(dispatcher)::state_type state{};
         for (size_t i = 0; i <= count; ++i)
         {
             while (dispatcher.try_push(i) == false)
             {
-                dispatcher.wait_for_push(state++);
+                dispatcher.wait_for_push();
             }
             totalCount++;
         }
@@ -289,13 +329,12 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     };
 
     auto consumer = [&]() -> tinycoro::Task<void> {
-        decltype(dispatcher)::state_type state{};
         for (;;)
         {
             size_t val;
             if (dispatcher.try_pop(val) == false)
             {
-                dispatcher.wait_for_pop(state++);
+                dispatcher.wait_for_pop();
             }
             else
             {

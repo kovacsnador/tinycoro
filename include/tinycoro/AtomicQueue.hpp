@@ -80,20 +80,21 @@ namespace tinycoro { namespace detail {
         bool try_push(U&& value) noexcept
         {
             int32_t retry{3};
-            auto pos = _head.load(std::memory_order_acquire);
+            auto pos = _head.load(std::memory_order_relaxed);
             for (;;)
             {
-                auto& elem = _buffer[pos & BUFFER_MASK];
-                if (turn(pos) * 2 == elem.sequence.load(std::memory_order_acquire))
+                auto& elem = _buffer[idx(pos)];
+                auto  currentSequence = turn(pos);
+                if (currentSequence == elem.sequence.load(std::memory_order_acquire))
                 {
-                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_head.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // found the right place
                         // pushing the value into the queue
                         elem.value = std::forward<U>(value);
 
                         // store the new position as the next sequence
-                        elem.sequence.store(turn(pos) * 2 + 1, std::memory_order_release);
+                        elem.sequence.store(currentSequence + 1, std::memory_order_release);
 
                         // success
                         return true;
@@ -103,11 +104,19 @@ namespace tinycoro { namespace detail {
                 {
                     const auto prevHead = pos;
 
-                    pos = _head.load(std::memory_order_acquire);
-                    if (pos == prevHead && --retry <= 0)
+                    pos = _head.load(std::memory_order_relaxed);
+                    if (pos == prevHead)
                     {
-                        // queue is probably full, or we simply lost the race...
-                        return false;
+                        if (--retry < 0)
+                        {
+                            // queue is probably full, or we simply lost the race...
+                            return false;
+                        }
+                        
+                        // Simple retry logic.
+                        // Could be made more sophisticated.
+                        std::this_thread::yield();
+                        
                     }
                 }
             }
@@ -120,31 +129,40 @@ namespace tinycoro { namespace detail {
         bool try_pop(value_type& data) noexcept
         {
             int32_t retry{3};
-            auto pos = _tail.load(std::memory_order_acquire);
+            auto    pos = _tail.load(std::memory_order_relaxed);
             for (;;)
             {
-                auto& elem = _buffer[pos & BUFFER_MASK];
-                if (turn(pos) * 2 + 1 == elem.sequence.load(std::memory_order_acquire))
+                auto& elem = _buffer[idx(pos)];
+                auto  currentSequence = turn(pos);
+                if (currentSequence + 1 == elem.sequence.load(std::memory_order_acquire))
                 {
-                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_tail.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
                     {
                         // we got exclusive access to the element
                         data = std::move(elem.value);
 
-                        elem.sequence.store(turn(pos) * 2 + 2, std::memory_order_release);
+                        elem.sequence.store(currentSequence + 2, std::memory_order_release);
 
                         return true;
                     }
                 }
                 else
                 {
-                    auto const prevTail = pos;
+                    const auto prevTail = pos;
 
-                    pos = _tail.load(std::memory_order_acquire);
-                    if (pos == prevTail && --retry <= 0)
+                    pos = _tail.load(std::memory_order_relaxed);
+                    if (pos == prevTail)
                     {
-                        // queue is probably empty, or we lost the race...
-                        return false;
+                        if (--retry < 0)
+                        {
+                            // queue is probably empty, or we lost the race...
+                            return false;
+                        }
+
+                        // Simple retry logic.
+                        // Could be made more sophisticated.
+                        std::this_thread::yield();
+                        
                     }
                 }
             }
@@ -166,8 +184,8 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] static constexpr auto capacity() noexcept { return Capacity; }
 
     private:
-        constexpr size_t idx(size_t i) const noexcept { return i % Capacity; }
-        constexpr size_t turn(size_t i) const noexcept { return i / Capacity; }
+        constexpr size_t idx(size_t i) const noexcept { return i & BUFFER_MASK; }
+        constexpr size_t turn(size_t i) const noexcept { return (i / Capacity) * 2; }
 
         struct Element
         {

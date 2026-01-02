@@ -3,7 +3,6 @@
 #include <ranges>
 #include <future>
 #include <chrono>
-#include <latch>
 
 #include "tinycoro/Dispatcher.hpp"
 #include "tinycoro/AtomicQueue.hpp"
@@ -67,32 +66,29 @@ TEST(DispatcherTest, DispatcherTest_small_cache)
     tinycoro::detail::AtomicQueue<int32_t, 4> queue;
     tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
-    decltype(dispatcher)::state_type push_state{};
-    decltype(dispatcher)::state_type pop_state{};
-
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
 
     int32_t val;
     EXPECT_FALSE(dispatcher.try_pop(val));
 
-    dispatcher.wait_for_push(push_state++);
+    dispatcher.wait_for_push();
     EXPECT_TRUE(dispatcher.try_push(0));
 
-    dispatcher.wait_for_push(push_state++);
+    dispatcher.wait_for_push();
     EXPECT_TRUE(dispatcher.try_push(1));
     
-    dispatcher.wait_for_push(push_state++);
+    dispatcher.wait_for_push();
     EXPECT_TRUE(dispatcher.try_push(2));
 
-    dispatcher.wait_for_push(push_state++);
+    dispatcher.wait_for_push();
     EXPECT_TRUE(dispatcher.try_push(3));
 
     EXPECT_TRUE(dispatcher.full());
 
     EXPECT_FALSE(dispatcher.try_push(4));
 
-    dispatcher.wait_for_pop(pop_state++);
+    dispatcher.wait_for_pop();
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 0);
 
@@ -101,23 +97,23 @@ TEST(DispatcherTest, DispatcherTest_small_cache)
     EXPECT_FALSE(dispatcher.empty());
     EXPECT_TRUE(dispatcher.full());
 
-    dispatcher.wait_for_pop(pop_state++);
+    dispatcher.wait_for_pop();
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 1);
 
-    dispatcher.wait_for_pop(pop_state++);
+    dispatcher.wait_for_pop();
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 2);
 
-    dispatcher.wait_for_pop(pop_state++);
+    dispatcher.wait_for_pop();
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 3);
 
-    dispatcher.wait_for_pop(pop_state++);
+    dispatcher.wait_for_pop();
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 4);
 
-    dispatcher.wait_for_push(push_state++);
+    dispatcher.wait_for_push();
     EXPECT_TRUE(dispatcher.empty());
 }
 
@@ -125,7 +121,9 @@ struct DispatcherTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(DispatcherTest, DispatcherTest, testing::Values(10, 100, 1000, 10000, 100000, 1000000));
+INSTANTIATE_TEST_SUITE_P(DispatcherTest,
+                         DispatcherTest,
+                         testing::Values(10, 100, 1000, 10000, 100000, 1000000));
 
 TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
 {
@@ -135,11 +133,10 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
     tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     auto fut = std::async(std::launch::async, [&] {
-        decltype(dispatcher)::state_type state{};
         for (size_t i = 0; i < count;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(state++);
+            dispatcher.wait_for_pop();
 
             size_t val;
             if (dispatcher.try_pop(val))
@@ -173,11 +170,10 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
     tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     auto asyncFunc = [&] {
-        decltype(dispatcher)::state_type state{0};
         for (size_t i = 0; i < count; i++)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(state++);
+            dispatcher.wait_for_pop();
 
             EXPECT_FALSE(dispatcher.empty());
 
@@ -190,10 +186,9 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    decltype(dispatcher)::state_type state{0};
     for (int32_t i = 0; i < count; i++)
     {
-        dispatcher.wait_for_push(state++);
+        dispatcher.wait_for_push();
 
         EXPECT_FALSE(dispatcher.full());
 
@@ -212,21 +207,20 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
     tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     // this need to move
-    dispatcher.wait_for_push(0);
+    dispatcher.wait_for_push();
 
     // make the queue full
     EXPECT_TRUE(dispatcher.try_push(0));
     EXPECT_TRUE(dispatcher.try_push(1));
 
     // this need to move
-    dispatcher.wait_for_pop(0);
+    dispatcher.wait_for_pop();
 
     auto asyncFunc = [&] {
-        decltype(dispatcher)::state_type state{0};
         for (size_t i = 0; i < count; i++)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop(state++);
+            dispatcher.wait_for_pop();
 
             EXPECT_FALSE(dispatcher.empty());
 
@@ -240,11 +234,9 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    decltype(dispatcher)::state_type state{2};
-
     for (int32_t i = 2; i < count; i++)
     {
-        dispatcher.wait_for_push(state++);
+        dispatcher.wait_for_push();
 
         EXPECT_FALSE(dispatcher.full());
 
@@ -258,19 +250,15 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
 {
     const auto count = GetParam();
 
-    std::latch       latch{4};
-    std::stop_source ss;
-
     tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, ss.get_token()};
+    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     {
         auto consumer = [&] {
-            decltype(dispatcher)::state_type state{};
             for (size_t i = 0; i < count;)
             {
                 // wait until we can pop
-                dispatcher.wait_for_pop(state++);
+                dispatcher.wait_for_pop();
 
                 int32_t val;
                 auto    succeed = dispatcher.try_pop(val);
@@ -287,22 +275,15 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
         auto consumer4 = std::async(std::launch::async, consumer);
 
         auto producer = [&] {
-            decltype(dispatcher)::state_type state{};
             for (size_t i = 0; i < count;)
             {
-                dispatcher.wait_for_push(state++);
+                dispatcher.wait_for_push();
 
                 if (dispatcher.try_push(42))
                 {
                     i++;
                 }
             }
-
-            // we need to notify the pop waiters,
-            // because they can stack in a wait state.
-            latch.arrive_and_wait();
-            ss.request_stop();
-            dispatcher.notify_pop_waiters();
         };
 
         auto producer1 = std::async(std::launch::async, producer);

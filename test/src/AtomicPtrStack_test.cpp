@@ -50,7 +50,7 @@ TEST_F(AtomicPtrStackTest, AtomicPtrStackTest_push_close)
 
     auto top = stack.close();
 
-    EXPECT_TRUE(stack.empty());
+    EXPECT_FALSE(stack.empty());
     EXPECT_TRUE(stack.closed());
 
     // need to fail

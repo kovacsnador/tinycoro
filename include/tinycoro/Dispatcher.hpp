@@ -44,25 +44,37 @@ namespace tinycoro { namespace detail {
         {
         }
 
-        void wait_for_push(state_type prev) const noexcept
-        {  
-            if (_stopToken.stop_requested() == false)
-                _popEvent.wait(prev, std::memory_order::acquire);
-        }
+        [[nodiscard]] state_type pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _pushEvent.load(order); }
+        [[nodiscard]] state_type push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _popEvent.load(order); }
 
-        void wait_for_pop(state_type prev) const noexcept
+        void wait_for_push(state_type state) const noexcept
         {
-            if (_stopToken.stop_requested() == false) 
-                _pushEvent.wait(prev, std::memory_order::acquire);
+            if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
+                _popEvent.wait(state);
         }
 
-        void notify_push_waiters() noexcept { local::Notify(_popEvent, std::atomic_notify_all); }
-        void notify_pop_waiters() noexcept { local::Notify(_pushEvent, std::atomic_notify_all); }
+        void wait_for_push() const noexcept
+        {  
+            auto state = _popEvent.load(std::memory_order::relaxed);
+            wait_for_push(state);
+        }
+
+        void wait_for_pop(state_type state) const noexcept
+        {
+            if (state + _queue.capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false)
+                _pushEvent.wait(state);
+        }
+
+        void wait_for_pop() const noexcept
+        {
+            auto state = _pushEvent.load(std::memory_order::acquire);
+            wait_for_pop(state);
+        }
 
         void notify_all() noexcept
         {
-            notify_pop_waiters();
-            notify_push_waiters();
+            local::Notify(_pushEvent, std::atomic_notify_all);
+            local::Notify(_popEvent, std::atomic_notify_all);
         }
 
         template <typename T>
@@ -92,8 +104,15 @@ namespace tinycoro { namespace detail {
             return false;
         }
 
-        [[nodiscard]] auto full() const noexcept { return _queue.full(); }
-        [[nodiscard]] auto empty() const noexcept { return _queue.empty(); }
+        [[nodiscard]] auto full() const noexcept { return _pushEvent.load(std::memory_order::relaxed) == _popEvent.load(std::memory_order::relaxed); }
+        
+        [[nodiscard]] auto empty() const noexcept
+        {
+            auto push = _pushEvent.load(std::memory_order::relaxed) + QueueT::capacity();
+            auto pop  = _popEvent.load(std::memory_order::relaxed);
+
+            return push == pop;
+        }
 
     private:
         alignas(CACHELINE_SIZE) std::atomic<state_type> _pushEvent{};
