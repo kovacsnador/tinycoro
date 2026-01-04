@@ -155,12 +155,12 @@ namespace tinycoro { namespace detail {
                 if (_stopToken.stop_requested() == false)
                 {
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
-                    while (expected == EPauseState::IDLE)
+                    if (expected == EPauseState::IDLE)
                     {
                         // If the notify callback invoked very quickly
                         // we have here a little time window to tell to
                         // the scheduler, that the task is ready for resumption
-                        if (promisePtr->pauseState.compare_exchange_weak(
+                        if (promisePtr->pauseState.compare_exchange_strong(
                                 expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
                         {
                             // The task is notified

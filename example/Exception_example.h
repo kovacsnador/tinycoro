@@ -17,11 +17,9 @@ void Example_exception(auto& scheduler)
         co_return;
     };
 
-    auto future = scheduler.Enqueue(task());
-
     try
     {
-        future.get();
+        tinycoro::AllOf(scheduler, task());
     }
     catch (const std::exception& e)
     {

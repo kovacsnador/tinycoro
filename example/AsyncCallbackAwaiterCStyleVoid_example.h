@@ -30,9 +30,7 @@ void Example_asyncCallbackAwaiter_CStyleVoid(auto& scheduler)
         co_await task2();
     };
 
-    auto future = scheduler.Enqueue(task1());
-
-    future.get();
+    tinycoro::AllOf(scheduler, task1());
 
     SyncOut() << "co_return => void" << '\n';
 }
