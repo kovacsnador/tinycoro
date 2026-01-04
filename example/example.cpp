@@ -101,7 +101,7 @@ int main()
         auto val = tinycoro::AllOf(scheduler, Example_AllOfAwait(scheduler));
         SyncOut() << *val << '\n';
 
-        scheduler.Enqueue(Example_AnyOfCoAwait(scheduler)).get();
+        tinycoro::AllOf(scheduler, Example_AnyOfCoAwait(scheduler));
 
         Example_Semaphore(scheduler);
 
