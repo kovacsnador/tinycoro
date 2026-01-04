@@ -281,7 +281,7 @@ struct SchedulerTestMock
     template<typename T>
     struct MockPromiseT{};
 
-    template<template<typename> class PromiseT = MockPromiseT>
+    template<tinycoro::EOwnPolicy ownPolicy = tinycoro::EOwnPolicy::OWNER, template<typename> class PromiseT = MockPromiseT>
     auto Enqueue(auto...)
     {
         return EnqueueMethod();

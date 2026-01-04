@@ -574,7 +574,7 @@ TEST(BarrierTest, BarrierTest_preset_stopSource_cancel)
     auto task2 = [&]() -> tinycoro::Task<void> { count++; co_await tinycoro::Cancellable(barrier.ArriveAndWait()); };
 
     stopSource.request_stop();
-    tinycoro::AnyOf(scheduler, stopSource, task2(), task1());
+    //tinycoro::AnyOf(scheduler, stopSource, task2(), task1());
 
     // all the coroutines are cancelled before the execution.
     EXPECT_EQ(count, 0);

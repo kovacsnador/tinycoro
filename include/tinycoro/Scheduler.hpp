@@ -73,7 +73,8 @@ namespace tinycoro {
             auto GetStopToken() const noexcept { return _stopSource.get_token(); }
             auto GetStopSource() const noexcept { return _stopSource; }
 
-            template <template <typename> class FutureStateT = std::promise,
+            template <EOwnPolicy ownPolicy                   = EOwnPolicy::OWNER,
+                      template <typename> class FutureStateT = std::promise,
                       typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
                       concepts::IsSchedulable... CoroTasksT>
                 requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
@@ -81,15 +82,16 @@ namespace tinycoro {
             {
                 if constexpr (sizeof...(CoroTasksT) == 1)
                 {
-                    return EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks)...);
+                    return EnqueueImpl<ownPolicy, FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks)...);
                 }
                 else
                 {
-                    return std::tuple{EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks))...};
+                    return std::tuple{EnqueueImpl<ownPolicy, FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks))...};
                 }
             }
 
-            template <template <typename> class FutureStateT = std::promise,
+            template <EOwnPolicy ownPolicy                   = EOwnPolicy::OWNER,
+                      template <typename> class FutureStateT = std::promise,
                       typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
                       concepts::Iterable ContainerT>
                 requires concepts::FutureState<FutureStateT<void>> && (!std::is_reference_v<ContainerT>)
@@ -107,14 +109,14 @@ namespace tinycoro {
                 for (auto&& task : tasks)
                 {
                     // register tasks and collect all the futures
-                    futures.emplace_back(EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::move(task)));
+                    futures.emplace_back(EnqueueImpl<ownPolicy, FutureStateT, onTaskFinishWrapperT>(std::move(task)));
                 }
 
                 return futures;
             }
 
         private:
-            template <template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsSchedulable CoroTaskT>
+            template <EOwnPolicy ownPolicy, template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsSchedulable CoroTaskT>
                 requires (!std::is_reference_v<CoroTaskT>) && concepts::FutureState<FutureStateT<void>>
             [[nodiscard]] auto EnqueueImpl(CoroTaskT&& coro)
             {
@@ -127,7 +129,7 @@ namespace tinycoro {
                 {
                     // not allow to enqueue tasks with uninitialized std::coroutine_handler
                     // or if the a stop is requested
-                    auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+                    auto task = MakeSchedulableTask<ownPolicy, OnFinishCbT>(std::move(coro), std::move(futureState));
 
                     while (_stopSource.stop_requested() == false)
                     {

@@ -40,11 +40,20 @@ namespace tinycoro { namespace detail {
             if (promise)
             {
                 _hdl = std::coroutine_handle<PromiseT>::from_promise(*promise);
+
+                // At this point the pauseHandler should have been initialized
+                // through the MakeSchedulableTask() function.
+                auto& pauseHandler = _hdl.promise().pauseHandler;
+                assert(pauseHandler);
+
+                // sets the observer flag
+                _observer = pauseHandler->IsObserver();
             }
         }
 
         SchedulableTaskT(SchedulableTaskT&& other) noexcept
         : _hdl{std::exchange(other._hdl, nullptr)}
+        , _observer{std::exchange(other._observer, false)}
         {
         }
 
@@ -65,9 +74,16 @@ namespace tinycoro { namespace detail {
             }
             catch (...)
             {
-                // Calling directly the Finish() function,
-                // if we have an exception.
+                // Call the Finish() function directly if an exception occurs.
+                //
+                // In this case, we do not need to store the exception pointer
+                // in the promise and wait for the destructor, which would
+                // normally invoke Finish().
+                //
+                // The Finish() function sets the FutureState
+                // (e.g. std::promise.set_value(...)).
                 _hdl.promise().Finish(std::current_exception());
+                return ETaskResumeState::DONE;
             }
 
             // return the corouitne state.
@@ -118,15 +134,35 @@ namespace tinycoro { namespace detail {
 
         [[nodiscard]] auto& PauseState() noexcept { return _hdl.promise().pauseState; }
 
-        void swap(SchedulableTaskT& other) noexcept { std::swap(other._hdl, _hdl); }
+        [[nodiscard]] constexpr bool IsObserver() const noexcept { return _observer; }
+
+        void swap(SchedulableTaskT& other) noexcept
+        {
+            std::swap(other._hdl, _hdl);
+            std::swap(other._observer, _observer);
+        }
 
     private:
         void Destroy() noexcept
         {
-            if (_hdl)
+            auto hdl = std::exchange(_hdl, nullptr);
+
+            if (hdl)
             {
-                _hdl.destroy();
-                _hdl = nullptr;
+                if (hdl.promise().HasException() == false)
+                {
+                    // if we are only an observer
+                    // we are responsible only to call the
+                    // finish function.
+                    hdl.promise().Finish({});
+                }
+
+                if (_observer == false)
+                {
+                    // in case we own the coroutine_handler
+                    // we need to trigger destroy
+                    hdl.destroy();
+                }
             }
         }
 
@@ -135,6 +171,12 @@ namespace tinycoro { namespace detail {
         [[no_unique_address]] CoroResumerT _coroResumer{};
 
         std::coroutine_handle<PromiseT> _hdl{nullptr};
+
+        // Flag indicating whether this task is an observer task.
+        //
+        // An observer task does not own the coroutine handler and is therefore
+        // not responsible for its lifecycle.
+        bool _observer{false};
     };
 
     // this is the common task type
@@ -215,7 +257,7 @@ namespace tinycoro { namespace detail {
     //
     // Intented to save and connect the future state
     // (e.g std::promise<>) object with the corouitne itself.
-    template <typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
+    template <EOwnPolicy ownPolicy, typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
         requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
     auto MakeSchedulableTask(CoroT&& coro, FutureStateT&& futureState) noexcept
     {
@@ -227,22 +269,33 @@ namespace tinycoro { namespace detail {
             futureState.set_value(std::nullopt);
 
             // create the schedulable task
-            return MakeSchedulableTaskImpl<OnFinishCallbackT>(std::move(coro), detail::DetachedPromise{});
+            //
+            // as Own policy we can only use here the OWNER
+            return MakeSchedulableTaskImpl<EOwnPolicy::OWNER, OnFinishCallbackT>(std::move(coro), detail::DetachedPromise{});
         }
         else
         {
             // create the schedulable task
-            return MakeSchedulableTaskImpl<OnFinishCallbackT>(std::move(coro), std::move(futureState));
+            return MakeSchedulableTaskImpl<ownPolicy, OnFinishCallbackT>(std::move(coro), std::move(futureState));
         }
     }
 
-    template <typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
+    template<EOwnPolicy ownPolicy, concepts::IsSchedulable CoroT>
+    auto GetOriginalHandle(CoroT& coro) noexcept 
+    {
+        if constexpr (ownPolicy == EOwnPolicy::OWNER)
+            return coro.Release();
+        else // OBSERVER mode
+            return coro.Handle();
+    }
+
+    template <EOwnPolicy ownPolicy, typename OnFinishCallbackT, concepts::IsSchedulable CoroT, concepts::FutureState FutureStateT>
         requires (!std::is_reference_v<CoroT>) && std::derived_from<typename CoroT::promise_type, detail::SchedulableTask::Promise_t>
     auto MakeSchedulableTaskImpl(CoroT&& coro, FutureStateT&& futureState) noexcept
     {
         // create std::corouitne_handle with
         // the common promise type
-        auto  originalHandle = coro.Release();
+        auto  originalHandle = GetOriginalHandle<ownPolicy>(coro);
         auto& promise        = originalHandle.promise();
 
         using promise_t     = std::remove_cvref_t<CoroT>::promise_type;
@@ -256,7 +309,7 @@ namespace tinycoro { namespace detail {
         //
         // This is the right place to set it because this coroutine will act as a root
         // in the coroutine chain.
-        promise.MakePauseHandler(nullptr, CoroT::initial_cancellable_policy_t::value);
+        promise.MakePauseHandler(nullptr, CoroT::initial_cancellable_policy_t::value, ownPolicy);
 
         // create the universal schedulable task
         return detail::SchedulableTask{std::addressof(promise)};

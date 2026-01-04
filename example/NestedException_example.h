@@ -25,11 +25,9 @@ void Example_nestedException(auto& scheduler)
         co_return val;
     };
 
-    auto future = scheduler.Enqueue(task());
-
     try
     {
-        auto val = future.get();
+        auto val = tinycoro::AllOf(scheduler, task());
         SyncOut() << "co_return => " << val.value() << '\n';
     }
     catch (const std::exception& e)

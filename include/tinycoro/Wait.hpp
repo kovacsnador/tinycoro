@@ -194,7 +194,7 @@ namespace tinycoro {
         requires (sizeof...(Args) > 0) && concepts::IsScheduler<SchedulerT, Args...>
     [[nodiscard]] auto AllOf(SchedulerT& scheduler, Args&&... args)
     {
-        auto future = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...);
+        auto future = scheduler.template Enqueue<tinycoro::EOwnPolicy::OBSERVER, tinycoro::unsafe::Promise>(std::forward<Args>(args)...);
         return GetAll(future);
     }
 
@@ -204,7 +204,7 @@ namespace tinycoro {
     {
         (tasks.SetStopSource(source), ...);
 
-        auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroTasksT>(tasks)...);
+        auto futures = scheduler.template Enqueue<tinycoro::EOwnPolicy::OBSERVER, tinycoro::unsafe::Promise>(std::forward<CoroTasksT>(tasks)...);
         return GetAll(futures);
     }
 
@@ -213,7 +213,7 @@ namespace tinycoro {
     {
         std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
 
-        auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroContainerT>(tasks));
+        auto futures = scheduler.template Enqueue<tinycoro::EOwnPolicy::OBSERVER, tinycoro::unsafe::Promise>(std::forward<CoroContainerT>(tasks));
         return GetAll(futures);
     }
 

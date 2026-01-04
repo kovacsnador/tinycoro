@@ -87,6 +87,8 @@ namespace tinycoro
                 // if there is one connected
                 _onFinish(this, _futureStateBuffer.RawData(), std::move(exception));
             }
+
+            this->RequestStop();
         }
 
         // Set the exception flag to true.

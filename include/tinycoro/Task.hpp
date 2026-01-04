@@ -116,6 +116,8 @@ namespace tinycoro {
             // Release the coroutine_handle object
             [[nodiscard]] constexpr auto Release() noexcept { return std::exchange(_hdl, nullptr); }
 
+            [[nodiscard]] constexpr auto Handle() noexcept { return _hdl; }
+
             constexpr void swap(CoroTask& other) noexcept { std::swap(other._hdl, _hdl); }
 
         private:

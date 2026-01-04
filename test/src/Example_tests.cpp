@@ -86,7 +86,7 @@ TEST(ExampleTestFutureState, Example_moveOnlyValue_FutureState)
 
     auto task = []() -> tinycoro::Task<OnlyMoveable> { co_return 42; };
 
-    auto future = scheduler.Enqueue<tinycoro::unsafe::Promise>(task());
+    auto future = scheduler.Enqueue<tinycoro::EOwnPolicy::OWNER, tinycoro::unsafe::Promise>(task());
     auto val    = future.get();
 
     EXPECT_EQ(val.value().i, 42);

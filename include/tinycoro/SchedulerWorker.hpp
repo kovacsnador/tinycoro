@@ -154,6 +154,8 @@ namespace tinycoro { namespace detail {
 
                 if (_stopToken.stop_requested() == false)
                 {
+                    // In case we are an owner task
+                    // we care about this pause optimalization.
                     auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
                     while (expected == EPauseState::IDLE)
                     {
@@ -171,11 +173,13 @@ namespace tinycoro { namespace detail {
 
                     assert(expected == EPauseState::PAUSED);
 
-                    // If we reach this point
-                    // that means that the task is already in paused state
-                    // So we need to resume it manually
-                    _pausedTasks.erase(promisePtr);
-
+                    if (promisePtr->IsObserver() == false)
+                    {
+                        // If we reach this point
+                        // that means that the task is already in paused state
+                        // So we need to resume it manually
+                        _pausedTasks.erase(promisePtr);
+                    }
 
                     // push back task to the queue for resumption
                     Task_t task{promisePtr};
@@ -253,39 +257,48 @@ namespace tinycoro { namespace detail {
                     return;
                 }
                 case PAUSED: {
-                    auto expected = task->PauseState().load(std::memory_order_acquire);
-                    assert(expected != EPauseState::PAUSED);
 
-                    if (expected == EPauseState::IDLE)
-                    {
-                        auto promisePtr = task.release();
+                        auto expected = task->PauseState().load(std::memory_order::relaxed);
+                        assert(expected != EPauseState::PAUSED);
 
-                        // push back into the pause state
-                        _pausedTasks.insert(promisePtr);
-
-                        if (promisePtr->pauseState.compare_exchange_strong(
-                                expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
+                        if (expected == EPauseState::IDLE)
                         {
-                            // the task is in the paused task list
-                            // we can return
-                            return;
+                            auto promisePtr = task.release();
+
+                            auto owner = !promisePtr->IsObserver();
+
+                            if (owner)
+                            {
+                                // push back into the pause state
+                                _pausedTasks.insert(promisePtr);
+                            }
+
+                            if (promisePtr->pauseState.compare_exchange_strong(
+                                    expected, EPauseState::PAUSED, std::memory_order::release, std::memory_order::relaxed))
+                            {
+                                // the task is in the paused task list
+                                // we can return
+                                return;
+                            }
+
+                            assert(expected == EPauseState::NOTIFIED);
+
+                            if (owner)
+                            {
+                                // in the meantime the task is notified for resumption
+                                // so we need to remove it from the paused task queue
+                                // and resume the task
+                                _pausedTasks.erase(promisePtr);
+                            }
+
+                            // reassign the pointer
+                            // and continue with this task
+                            task.reset(promisePtr);
                         }
 
-                        assert(expected == EPauseState::NOTIFIED);
-
-                        // in the meantime the task is notified for resumption
-                        // so we need to remove it from the paused task queue
-                        // and resume the task
-                        _pausedTasks.erase(promisePtr);
-
-                        // reassign the pointer
-                        // and continue with this task
-                        task.reset(promisePtr);
-                    }
-
-                    // we can continue with the current task
-                    // it is already notified for resumption
-                    break;
+                        // we can continue with the current task
+                        // it is already notified for resumption
+                        break;
                 }
                 case STOPPED:
                     [[fallthrough]];

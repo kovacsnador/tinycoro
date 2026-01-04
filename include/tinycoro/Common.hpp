@@ -84,6 +84,12 @@ namespace tinycoro {
         }
     }
 
+    enum class EOwnPolicy : uint8_t
+    {
+        OWNER,
+        OBSERVER
+    };
+
     enum class ENotifyPolicy
     {
         RESUME, // Notify for resumption

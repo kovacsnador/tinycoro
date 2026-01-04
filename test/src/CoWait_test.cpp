@@ -14,7 +14,8 @@ concept AllSame = (std::same_as<T, Ts> && ...);
 
 struct SchedulerMock
 {
-    template <template <typename> class FutureStateT = std::promise,
+    template <tinycoro::EOwnPolicy ownPolicy = tinycoro::EOwnPolicy::OWNER,
+              template <typename> class FutureStateT = std::promise,
               typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
               tinycoro::concepts::NonIterable CoroTaskT>
     auto Enqueue([[maybe_unused]] CoroTaskT&& t)
@@ -34,7 +35,8 @@ struct SchedulerMock
         return promise.get_future();
     }
 
-    template <template <typename> class FutureStateT = std::promise,
+    template <tinycoro::EOwnPolicy ownPolicy         = tinycoro::EOwnPolicy::OWNER,
+              template <typename> class FutureStateT = std::promise,
               typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
               tinycoro::concepts::Iterable ContainerT>
     auto Enqueue(ContainerT&& c)
@@ -65,7 +67,8 @@ struct SchedulerMock
         return futures;
     }
 
-    template <template <typename> class FutureStateT = std::promise,
+    template <tinycoro::EOwnPolicy ownPolicy         = tinycoro::EOwnPolicy::OWNER,
+              template <typename> class FutureStateT = std::promise,
               typename FinishCallbackT               = tinycoro::detail::OnTaskFinishCallbackWrapper,
               tinycoro::concepts::NonIterable... Args>
         requires (sizeof...(Args) > 1)

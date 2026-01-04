@@ -41,7 +41,7 @@ namespace tinycoro { namespace detail {
 
         PromiseBase() = default;
 
-        ~PromiseBase()
+        /* ~PromiseBase()
         {
             if (parent == nullptr)
             {
@@ -53,7 +53,7 @@ namespace tinycoro { namespace detail {
                 // is a root coroutine
                 stopSource.request_stop();
             }
-        }
+        }*/
 
         // Disallow copy and move
         PromiseBase(PromiseBase&&) = delete;
@@ -124,11 +124,31 @@ namespace tinycoro { namespace detail {
             return _currentAwaitable;
         }
 
+        [[nodiscard]] constexpr bool IsObserver() const noexcept { return pauseHandler->IsObserver(); }
+
+        [[nodiscard]] constexpr bool HasException() const noexcept { return pauseHandler->HasException(); }
+
         [[nodiscard]] constexpr std::suspend_always initial_suspend() const noexcept { return {}; }
 
         [[nodiscard]] constexpr FinalAwaiterT final_suspend() const noexcept { return {}; }
 
         constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
+
+        bool RequestStop() noexcept
+        {
+            if (parent == nullptr)
+            {
+                // The parent coroutine is nullptr,
+                // that means this is a root
+                // coroutine promise.
+                //
+                // Only trigger stop, if this
+                // is a root coroutine
+                stopSource.request_stop();
+                return true;
+            }
+            return false;
+        }
 
     private:
         // Saving the current awaitable.
