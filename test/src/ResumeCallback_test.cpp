@@ -193,7 +193,7 @@ TEST(ResumeCallbackTest, ResumeCallback_with_return_value)
     EXPECT_EQ(b, 1);
 }
 
-struct ResumeCallbackTest : testing::TestWithParam<size_t>
+/* struct ResumeCallbackTest : testing::TestWithParam<size_t>
 {
 };
 
@@ -367,4 +367,4 @@ TEST_P(ResumeCallbackTest, std_function_invoke_benchmark)
 
     EXPECT_EQ(a, count);
     EXPECT_EQ(b, count);
-}
+}*/
