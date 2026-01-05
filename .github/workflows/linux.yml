@@ -96,9 +96,9 @@ jobs:
       run: cmake --build .
 
     - name: Run Unit Tests
-      timeout-minutes: 20
+      timeout-minutes: 60
       working-directory: ${{runner.workspace}}/build
-      run: ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1 --gtest_brief=1
+      run: ./test/tinycoro_tests --gtest_repeat=30 --gtest_break_on_failure=1 --gtest_brief=1
 
     - name: Run Examples
       working-directory: ${{runner.workspace}}/build
