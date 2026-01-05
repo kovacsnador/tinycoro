@@ -124,12 +124,20 @@ namespace tinycoro {
             {
                 std::latch latch{1};
 
+                // Create a custom resume callback for the event.
+                ResumeCallback_t cb{
+                    [](auto payload, auto, auto)
+                    {
+                        auto latch = static_cast<std::latch*>(payload);
+                        latch->count_down();
+                    },
+                    std::addressof(latch)
+                };
+
                 // prepare a special event for notification
                 detail::ResumeSignalEvent event;
 
-                event.Set([&latch](auto) {
-                    latch.count_down();
-                });
+                event.Set(cb);
 
                 // create a custom push awaiter.
                 // The channel is here unnecessary (first parameter), because non of the

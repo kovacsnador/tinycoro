@@ -86,7 +86,7 @@ TEST(SingleEventTest, SingleEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl         = tinycoro::test::MakeCoroutineHdl([&pauseCalled](auto) { pauseCalled = true; });
+    auto hdl         = tinycoro::test::MakeCoroutineHdl(tinycoro::test::ResumeCallbackTracer(pauseCalled));
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
     EXPECT_FALSE(pauseCalled);

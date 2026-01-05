@@ -166,7 +166,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
 {
     const auto count = GetParam();
 
-    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
+    tinycoro::detail::AtomicQueue<size_t, 2> queue;
     tinycoro::detail::Dispatcher              dispatcher{queue, {}};
 
     auto asyncFunc = [&] {
@@ -177,7 +177,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
 
             EXPECT_FALSE(dispatcher.empty());
 
-            int32_t val;
+            size_t val;
             EXPECT_TRUE(dispatcher.try_pop(val));
 
             EXPECT_EQ(val, i);
@@ -186,7 +186,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
 
     auto fut = std::async(std::launch::async, asyncFunc);
 
-    for (int32_t i = 0; i < count; i++)
+    for (size_t i = 0; i < count; i++)
     {
         dispatcher.wait_for_push();
 

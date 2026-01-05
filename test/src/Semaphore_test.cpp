@@ -28,7 +28,7 @@ struct SemaphoreAwaiterTest : public testing::Test
 
     void SetUp() override
     {
-        hdl.promise().pauseHandler.emplace([](auto) { /* resumer callback */ });
+        hdl.promise().pauseHandler.emplace(tinycoro::ResumeCallback_t{});
     }
 
     SemaphoreMock<value_type> mock;
@@ -103,7 +103,7 @@ struct SemaphoreTest : testing::Test
 
     void SetUp() override
     {
-        hdl.promise().pauseHandler.emplace([](auto) { /* resumer callback */ });
+        hdl.promise().pauseHandler.emplace(tinycoro::ResumeCallback_t{});
     }
 
     corohandle_type hdl;

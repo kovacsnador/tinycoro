@@ -33,8 +33,21 @@ namespace tinycoro { namespace test {
         std::shared_ptr<PromiseT> _promise;
     };
 
+    template<std::same_as<bool> T>
+    auto ResumeCallbackTracer(T& flag) noexcept
+    {
+        return tinycoro::ResumeCallback_t{[](auto flag, auto, auto) { *static_cast<bool*>(flag) = true; }, std::addressof(flag)};
+    }
+
+    template<typename T>
+        //requires (!std::same_as<T, bool>) && (std::integral<T> || std::unsigned_integral<T>) 
+    auto ResumeCallbackTracer(T& count) noexcept
+    {
+        return tinycoro::ResumeCallback_t{[](auto count, auto, auto) { auto val = static_cast<T*>(count); *val = (*val) + 1; }, std::addressof(count)};
+    }
+
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
-    auto MakeCoroutineHdl(std::regular_invocable<tinycoro::ENotifyPolicy> auto pauseResumerCallback)
+    auto MakeCoroutineHdl(auto pauseResumerCallback)
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
         hdl.promise().pauseHandler.emplace(pauseResumerCallback, InitialCancellablePolicyT::value);
@@ -45,7 +58,7 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace([]([[maybe_unused]] auto policy){}, InitialCancellablePolicyT::value);
+        hdl.promise().pauseHandler.emplace(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}}, InitialCancellablePolicyT::value);
         return hdl;
     }
 

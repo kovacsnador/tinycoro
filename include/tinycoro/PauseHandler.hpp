@@ -18,13 +18,6 @@
 
 namespace tinycoro {
 
-    namespace concepts {
-
-        template <typename T>
-        concept IsResumeCallbackType = std::regular_invocable<T, ENotifyPolicy>;
-
-    } // namespace concepts
-
     class PauseHandler : public detail::IntrusiveObject<PauseHandler>
     {
         static constexpr uint8_t c_pauseMask{0x01};

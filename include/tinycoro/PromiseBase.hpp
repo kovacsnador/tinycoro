@@ -13,7 +13,6 @@
 
 #include "Common.hpp"
 #include "IntrusivePtr.hpp"
-#include "UnsafeFunction.hpp"
 #include "LinkedUtils.hpp"
 
 #include "SimpleStorage.hpp"

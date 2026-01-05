@@ -69,8 +69,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend)
     EXPECT_FALSE(awaiter.await_ready());
 
     bool pauseCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]([[maybe_unused]] auto policy) { pauseCalled = true; });
-
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>(tinycoro::test::ResumeCallbackTracer(pauseCalled));
 
     EXPECT_TRUE(awaiter.await_suspend(hdl));
 
@@ -95,7 +94,7 @@ TEST(AutoEventTest, AutoEventTest_await_suspend_preset)
     event.Set();
 
     bool pauseCalled = false;
-    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>([&pauseCalled]([[maybe_unused]] auto policy) { pauseCalled = true; });
+    auto hdl = tinycoro::test::MakeCoroutineHdl<int32_t>(tinycoro::test::ResumeCallbackTracer(pauseCalled));
 
     EXPECT_FALSE(awaiter.await_suspend(hdl));
 

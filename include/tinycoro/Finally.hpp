@@ -46,6 +46,16 @@ namespace tinycoro {
         {
             if (_own)
             {
+                if constexpr (std::convertible_to<value_type, bool>)
+                {
+                    if (_func == false)
+                    {
+                        // e.g. we have a std::function
+                        // which is empty, we just simply return. 
+                        return;
+                    }
+                }
+
                 _func();
             }
         }
