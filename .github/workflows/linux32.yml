@@ -37,18 +37,15 @@ jobs:
         with:
           submodules: true
 
-      - name: Set up Homebrew
-        uses: Homebrew/actions/setup-homebrew@master
-
-      - name: Install 32-bit system dependencies
+      - name: Install toolchain (32-bit)
         run: |
-          sudo dpkg --add-architecture i386
-          sudo apt-get update
-          sudo apt-get install -y \
-            libc6-dev-i386 \
-            gcc-multilib \
-            g++-multilib \
-            libstdc++-12-dev:i386
+        sudo dpkg --add-architecture i386
+        sudo apt-get update
+        sudo apt-get install -y \
+          gcc-11 g++-11 \
+          gcc-11-multilib g++-11-multilib \
+          libc6-dev-i386 \
+          ninja-build
 
       - name: Create Build Environment
         run: |
@@ -60,7 +57,7 @@ jobs:
         run: |
           cmake -GNinja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_CXX_COMPILER=${{ matrix.cxx }} \
+            -DCMAKE_CXX_COMPILER=g++-11 \
             -DCMAKE_CXX_FLAGS="-m32" \
             $GITHUB_WORKSPACE
 
