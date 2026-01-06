@@ -12,7 +12,7 @@ jobs:
 
     strategy:
       matrix:
-        compiler: [11, 12, 13, 14, 15]  # GCC versions
+        compiler: [11, 12, 13]  # GCC versions
         build_type: [Debug, Release]
 
     steps:
