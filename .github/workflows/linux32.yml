@@ -12,52 +12,36 @@ jobs:
 
     strategy:
       matrix:
-        compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15]
+        compiler: [11, 12, 13, 14, 15]  # GCC versions
         build_type: [Debug, Release]
 
-        include:
-          - compiler: GCC-11
-            cxx: g++-11
-            install: brew install gcc@11 ninja
-          - compiler: GCC-12
-            cxx: g++-12
-            install: brew install gcc@12 ninja
-          - compiler: GCC-13
-            cxx: g++-13
-            install: brew install gcc@13 ninja
-          - compiler: GCC-14
-            cxx: g++-14
-            install: brew install gcc@14 ninja
-          - compiler: GCC-15
-            cxx: g++-15
-            install: brew install gcc@15 ninja
-
     steps:
-      - uses: actions/checkout@master
+      - uses: actions/checkout@v3
         with:
           submodules: true
 
-      - name: Install toolchain (32-bit)
+      - name: Install 32-bit toolchain
         run: |
-        sudo dpkg --add-architecture i386
-        sudo apt-get update
-        sudo apt-get install -y \
-          gcc-11 g++-11 \
-          gcc-11-multilib g++-11-multilib \
-          libc6-dev-i386 \
-          ninja-build
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-${{ matrix.compiler }} \
+            g++-${{ matrix.compiler }} \
+            gcc-${{ matrix.compiler }}-multilib \
+            g++-${{ matrix.compiler }}-multilib \
+            libc6-dev-i386 \
+            ninja-build \
+            cmake
 
       - name: Create Build Environment
-        run: |
-          ${{ matrix.install }}
-          cmake -E make_directory ${{ runner.workspace }}/build
+        run: cmake -E make_directory ${{ runner.workspace }}/build
 
       - name: Configure (32-bit)
         working-directory: ${{ runner.workspace }}/build
         run: |
           cmake -GNinja \
             -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
-            -DCMAKE_CXX_COMPILER=g++-11 \
+            -DCMAKE_CXX_COMPILER=g++-${{ matrix.compiler }} \
             -DCMAKE_CXX_FLAGS="-m32" \
             $GITHUB_WORKSPACE
 
@@ -78,5 +62,5 @@ jobs:
         working-directory: ${{ runner.workspace }}/build
         run: |
           ./example/echo_server_example/tinycoro_echo_server &
-          python $GITHUB_WORKSPACE/example/echo_server_example/echo_server_stress_test.py 1000 true &
+          python3 $GITHUB_WORKSPACE/example/echo_server_example/echo_server_stress_test.py 1000 true &
           wait
