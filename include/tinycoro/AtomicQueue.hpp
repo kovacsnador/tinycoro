@@ -60,15 +60,15 @@ namespace tinycoro { namespace detail {
     //
     // This queue is well suited for high-throughput, low-latency systems
     // where bounded capacity and platform atomic guarantees are acceptable.
-    template <typename T, uint64_t Capacity>
-        requires detail::IsPowerOf2<Capacity>::value
+    template <typename T, size_t Capacity, std::unsigned_integral SequenceT = uint64_t>
+        requires detail::IsPowerOf2<Capacity>::value && (std::numeric_limits<SequenceT>::max() >= Capacity - 1)
     class AtomicQueue
     {
     public:
         static_assert(std::is_default_constructible_v<T>, "AtomicQueue::T needs to be default constructible");
 
         using value_type = T;
-        using sequence_t = uint64_t;
+        using sequence_t = SequenceT;
 
         AtomicQueue() = default;
 
@@ -80,7 +80,7 @@ namespace tinycoro { namespace detail {
         bool try_push(U&& value) noexcept
         {
             int32_t retry{3};
-            auto pos = _head.load(std::memory_order_relaxed);
+            auto pos = _head.load(std::memory_order::relaxed);
             for (;;)
             {
                 auto& elem = _buffer[idx(pos)];
@@ -94,7 +94,7 @@ namespace tinycoro { namespace detail {
                         elem.value = std::forward<U>(value);
 
                         // store the new position as the next sequence
-                        elem.sequence.store(currentSequence + 1, std::memory_order_release);
+                        elem.sequence.store(currentSequence + 1, std::memory_order::release);
 
                         // success
                         return true;
@@ -104,7 +104,7 @@ namespace tinycoro { namespace detail {
                 {
                     const auto prevHead = pos;
 
-                    pos = _head.load(std::memory_order_relaxed);
+                    pos = _head.load(std::memory_order::relaxed);
                     if (pos == prevHead)
                     {
                         if (--retry < 0)
@@ -129,7 +129,7 @@ namespace tinycoro { namespace detail {
         bool try_pop(value_type& data) noexcept
         {
             int32_t retry{3};
-            auto    pos = _tail.load(std::memory_order_relaxed);
+            auto    pos = _tail.load(std::memory_order::relaxed);
             for (;;)
             {
                 auto& elem = _buffer[idx(pos)];
@@ -141,7 +141,7 @@ namespace tinycoro { namespace detail {
                         // we got exclusive access to the element
                         data = std::move(elem.value);
 
-                        elem.sequence.store(currentSequence + 2, std::memory_order_release);
+                        elem.sequence.store(currentSequence + 2, std::memory_order::release);
 
                         return true;
                     }
@@ -150,7 +150,7 @@ namespace tinycoro { namespace detail {
                 {
                     const auto prevTail = pos;
 
-                    pos = _tail.load(std::memory_order_relaxed);
+                    pos = _tail.load(std::memory_order::relaxed);
                     if (pos == prevTail)
                     {
                         if (--retry < 0)
@@ -184,13 +184,13 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] static constexpr auto capacity() noexcept { return Capacity; }
 
     private:
-        constexpr size_t idx(size_t i) const noexcept { return i & BUFFER_MASK; }
-        constexpr size_t turn(size_t i) const noexcept { return (i / Capacity) * 2; }
+        constexpr auto idx(auto i) const noexcept { return static_cast<size_t>(i & BUFFER_MASK); }
+        constexpr auto turn(auto i) const noexcept {return (i / Capacity) * 2; }
 
         struct Element
         {
-            std::atomic<sequence_t> sequence{};
-            value_type              value{};
+            std::atomic<SequenceT> sequence{};
+            value_type             value{};
         };
 
         // the buffer mask. Should be for example 0xFFFFF

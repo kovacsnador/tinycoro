@@ -106,7 +106,9 @@ struct AtomicQueueFunctionalTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest, testing::Values(1, 10, 100, 1000, 2000));
+INSTANTIATE_TEST_SUITE_P(AtomicQueueFunctionalTest,
+                         AtomicQueueFunctionalTest,
+                         testing::Values(1, 10, 100, 1000, 2000));
 
 TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_single_threaded)
 {
@@ -359,3 +361,108 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
 
     EXPECT_EQ(totalCount, 0);
 }
+
+TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_wait_for_push_mpmc)
+{
+    const auto count = GetParam();
+
+    tinycoro::detail::AtomicQueue<int32_t, 2> queue;
+
+    {
+        auto consumer = [&] {
+            for (size_t i = 0; i < count;)
+            {
+                int32_t val;
+                auto    succeed = queue.try_pop(val);
+                if (succeed)
+                {
+                    i++;
+                }
+            }
+        };
+
+        auto consumer1 = std::async(std::launch::async, consumer);
+        auto consumer2 = std::async(std::launch::async, consumer);
+        auto consumer3 = std::async(std::launch::async, consumer);
+        auto consumer4 = std::async(std::launch::async, consumer);
+
+        auto producer = [&] {
+            for (size_t i = 0; i < count;)
+            {
+                if (queue.try_push(42))
+                {
+                    i++;
+                }
+            }
+        };
+
+        auto producer1 = std::async(std::launch::async, producer);
+        auto producer2 = std::async(std::launch::async, producer);
+        auto producer3 = std::async(std::launch::async, producer);
+        auto producer4 = std::async(std::launch::async, producer);
+    }
+
+    EXPECT_TRUE(queue.empty());
+}
+
+// Currently disabled, the overflow is not solved in AtomicQueue.
+/* TEST(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_overflow_test_1)
+{
+    tinycoro::detail::AtomicQueue<size_t, 256, uint8_t> queue;
+
+
+    for (size_t j = 0; j < 100; ++j)
+    {
+        for (size_t i = 0; i < 256; ++i)
+        {
+            auto success = queue.try_push(i);
+            EXPECT_TRUE(success);
+        }
+
+        for (size_t i = 0; i < 256; ++i)
+        {
+            size_t val;
+            auto success = queue.try_pop(val);
+            EXPECT_TRUE(success);
+            EXPECT_EQ(i, val);
+        }
+    }
+}
+
+TEST(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_overflow_test_2)
+{
+    tinycoro::detail::AtomicQueue<size_t, 256, uint8_t> queue;
+
+    for (size_t i = 0; i < 128; ++i)
+    {
+        auto success = queue.try_push(i);
+        EXPECT_TRUE(success);
+    }
+
+    for (size_t i = 0; i < 28; ++i)
+    {
+        size_t val;
+        auto   success = queue.try_pop(val);
+        EXPECT_TRUE(success);
+        EXPECT_EQ(i, val);
+    }
+    // we have here 100 element
+    // but the head is at 128
+
+    // make it full with overload
+    for (size_t i = 128; i < 284; ++i)
+    {
+        auto success = queue.try_push(i);
+        EXPECT_TRUE(success);
+    }
+
+    EXPECT_FALSE(queue.try_push(257));
+
+    for (size_t i = 28; i < 284; ++i)
+    {
+        size_t val;
+        auto   success = queue.try_pop(val);
+        EXPECT_TRUE(success);
+        EXPECT_EQ(i, val);
+    }
+}*/

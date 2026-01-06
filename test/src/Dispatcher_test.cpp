@@ -123,13 +123,44 @@ struct DispatcherTest : testing::TestWithParam<size_t>
 
 INSTANTIATE_TEST_SUITE_P(DispatcherTest,
                          DispatcherTest,
-                         testing::Values(10, 100, 1000, 10000, 100000, 1000000));
+    testing::Values(10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         10,
+                                         100,
+                                         1000,
+                                         10000,
+                                         100000,
+                                         1000000));
 
 TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
 {
     const auto count = GetParam();
 
-    tinycoro::detail::AtomicQueue<size_t, 1024> queue;
+    tinycoro::detail::AtomicQueue<size_t, 1024, size_t> queue;
     tinycoro::detail::Dispatcher                dispatcher{queue, {}};
 
     auto fut = std::async(std::launch::async, [&] {

@@ -29,7 +29,7 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename TaskT, uint64_t CACHE_SIZE>
+        template <typename TaskT, size_t CACHE_SIZE>
         class CoroThreadPool
         {
         public:
@@ -187,7 +187,7 @@ namespace tinycoro {
             std::list<Worker_t> _workerThreads;
         };
 
-        static constexpr uint64_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
+        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
 
     } // namespace detail
 
