@@ -17,7 +17,7 @@ namespace tinycoro { namespace detail {
         // Find the last continuation
         // and set up the loop at the end
         // if necessary.
-        template<typename PromiseBaseT>
+        template <typename PromiseBaseT>
         [[nodiscard]] static inline auto FindContinuation(PromiseBaseT* promisePtr) noexcept
         {
             assert(promisePtr);
@@ -26,7 +26,7 @@ namespace tinycoro { namespace detail {
             // in the chain, which we need to resume.
             while (promisePtr->child != nullptr)
             {
-                //moving forward...
+                // moving forward...
                 promisePtr = promisePtr->child;
             }
 
@@ -65,7 +65,13 @@ namespace tinycoro { namespace detail {
             // find the continuation
             auto promiseToResume = FindContinuation<promise_base_t>(std::addressof(promise));
 
-            // resume the coroutine
+            // Resume the coroutine.
+            //
+            // Note:
+            // Ensure that promise_base_t has the same alignment
+            // as the derived promise class.
+            // Currently, we use alignas(std::max_align_t) for the base class
+            // because mismatched alignment caused issues on 32-bit builds.
             auto handle = std::coroutine_handle<promise_base_t>::from_promise(*promiseToResume);
             handle.resume();
         }
@@ -76,15 +82,17 @@ namespace tinycoro { namespace detail {
             {
                 auto& promise = handle.promise();
 
-                if constexpr (requires { {promise.HasException()} -> std::same_as<bool>; })
+                if constexpr (requires {
+                                  { promise.HasException() } -> std::same_as<bool>;
+                              })
                 {
-                    if(promise.HasException())
+                    if (promise.HasException())
                     {
                         // if there was an unhandled
                         // exception, the task is done
                         return ETaskResumeState::DONE;
                     }
-                } 
+                }
 
                 const auto& pauseHandler = promise.pauseHandler;
                 const auto& stopSource   = promise.stopSource;

@@ -3,7 +3,7 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-/* struct MockAllocatorTracer
+struct MockAllocatorTracer
 {
     MOCK_METHOD(void*, allocate_bytes, (size_t));
     MOCK_METHOD(void, deallocate_bytes, (void*, size_t), (noexcept));
@@ -332,4 +332,4 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_sync_await_throw_noexcept)
     auto func = [&] { std::ignore = tinycoro::AllOf(scheduler, task(0), task(1), task(2)); };
 
     EXPECT_THROW(func(), std::bad_alloc);
-}*/
+}

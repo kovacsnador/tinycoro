@@ -34,8 +34,12 @@ namespace tinycoro { namespace detail {
     // to std::coroutine_handle<SchedulablePromise>.
     // It is used inside the scheduler logic.
     template <concepts::IsAwaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT>
-    struct PromiseBase
+    struct alignas(std::max_align_t) PromiseBase
     {
+        // alignas(std::max_align_t) ensures that on 32-bit systems, 
+        // PromiseBase has the same alignment as the derived PromiseT
+        // for all platforms.
+
         using PromiseBase_t = PromiseBase;
 
         PromiseBase() = default;
