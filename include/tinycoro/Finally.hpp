@@ -24,7 +24,7 @@ namespace tinycoro {
     class [[nodiscard]] FinalAction
     {
     public:
-        using value_type = T;
+        using value_type = std::remove_cvref_t<T>;
 
         explicit FinalAction(const value_type& func)
         : _func{func}
@@ -46,6 +46,16 @@ namespace tinycoro {
         {
             if (_own)
             {
+                if constexpr (requires { _func == nullptr; })
+                {
+                    if (_func == nullptr)
+                    {
+                        // e.g. we have a std::function
+                        // which is empty, we just simply return. 
+                        return;
+                    }
+                }
+
                 _func();
             }
         }
@@ -56,9 +66,10 @@ namespace tinycoro {
     };
 
     template <std::invocable T>
-    auto Finally(T&& func)
+    [[nodiscard]] auto Finally(T&& func) noexcept
     {
-        return FinalAction<std::decay_t<T>>(std::forward<std::decay_t<T>>(func));
+        using func_t = std::remove_cvref_t<T>;
+        return FinalAction<func_t>{std::forward<T>(func)};
     }
 
 } // namespace tinycoro

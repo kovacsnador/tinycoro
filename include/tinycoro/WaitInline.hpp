@@ -34,15 +34,25 @@ namespace tinycoro {
 
     namespace detail {
 
-        template <typename TaskT, typename EventT, typename StopTokenT>
-        void SetPauseResumerCallback(TaskT& task, EventT& event, StopTokenT stopToken)
+        struct Payload
         {
-            auto pauseResumerCallback = [&task, &event, stopToken] ([[maybe_unused]] ENotifyPolicy policy) {
-                auto pauseHandler = task.GetPauseHandler();
+            helper::AutoResetEvent* event;
+            std::stop_token*        stopToken;
+        };
+
+        template <typename TaskT, typename PayloadT>
+        void SetPauseResumerCallback(TaskT& task, PayloadT* payload)
+        {
+            auto callback = [] (void* taskPtr, void* payload, [[maybe_unused]] ENotifyPolicy policy) {
+
+                auto task = static_cast<TaskT*>(taskPtr);
+                auto [event, stopToken] = *static_cast<PayloadT*>(payload);
+
+                auto pauseHandler = task->GetPauseHandler();
 
                 // checking if the task is cancelled
-                auto isTaskCancelled = [&stopToken, &pauseHandler]() {
-                    if(stopToken.stop_requested())
+                auto isTaskCancelled = [stopToken, &pauseHandler]() {
+                    if(stopToken->stop_requested())
                     {
                         return pauseHandler->IsCancellable();
                     }
@@ -59,11 +69,11 @@ namespace tinycoro {
 
                 // sets the event, that means theres is a task
                 // which is ready for resumption.
-                event.Set();
+                event->Set();
             };
 
             // setup the resumer callback
-            task.SetPauseHandler(pauseResumerCallback);
+            task.SetPauseHandler(ResumeCallback_t{callback, std::addressof(task), payload});
         }
 
         // check if the task is finished
@@ -150,6 +160,8 @@ namespace tinycoro {
 
                 auto stopToken = _stopSource.get_token();
 
+                detail::Payload payload{std::addressof(event), std::addressof(stopToken)};
+
                 std::stop_callback stopCallback{stopToken, [&event] {
                                                     // trigger the event
                                                     // if stop was requested
@@ -164,7 +176,7 @@ namespace tinycoro {
                 }
 
                 // set pause handler for all tasks
-                std::apply([&stopToken, &event](auto&&... tasks) { (SetPauseResumerCallback(tasks, event, stopToken), ...); }, _tasks);
+                std::apply([&payload](auto&&... tasks) { (SetPauseResumerCallback(tasks, std::addressof(payload)), ...); }, _tasks);
 
                 for (;;)
                 {
@@ -316,6 +328,8 @@ namespace tinycoro {
 
             auto stopToken = stopSource.get_token();
 
+            detail::Payload payload{std::addressof(event), std::addressof(stopToken)};
+
             std::stop_callback stopCallback{stopToken, [&event] {
                                                 // trigger the event
                                                 // if stop was requested
@@ -334,7 +348,7 @@ namespace tinycoro {
 
             for (auto& it : container)
             {
-                detail::SetPauseResumerCallback(it, event, stopToken);
+                detail::SetPauseResumerCallback(it, std::addressof(payload));
             }
 
             std::vector<ETaskResumeState> resultStates;

@@ -248,9 +248,15 @@ namespace tinycoro {
                 // flag for event complition
                 std::latch latch{1};
 
+                // Create a custom resume callback for the event.
+                ResumeCallback_t cb{[](auto payload, auto, auto) { 
+                    auto latch = static_cast<std::latch*>(payload);
+                    latch->count_down();
+                }, std::addressof(latch)};
+
                 // create custom event for the push_awaiter
                 ResumeSignalEvent event;
-                event.Set([&latch](auto) { latch.count_down(); });
+                event.Set(cb);
 
                 // create custom push_awaiter for inline waiting
                 // The channel is here unnecessary (first parameter), because non of the

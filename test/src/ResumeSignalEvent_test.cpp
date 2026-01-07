@@ -4,6 +4,8 @@
 #include <vector>
 #include <ranges>
 
+#include "mock/CoroutineHandleMock.h"
+
 #include <tinycoro/ResumeSignalEvent.hpp>
 
 TEST(ResumeSignalEventTest, ResumeSignalEventTest_basic)
@@ -12,9 +14,7 @@ TEST(ResumeSignalEventTest, ResumeSignalEventTest_basic)
 
     uint32_t flag{};
 
-    tinycoro::ResumeCallback_t cb = [&]([[maybe_unused]] auto policy) { flag++; };
-
-    event.Set(cb);
+    event.Set(tinycoro::test::ResumeCallbackTracer(flag));
 
     EXPECT_EQ(flag, 0);
 
@@ -48,7 +48,7 @@ TEST_P(ResumeSignalEventTest, ResumeSignalEventTest_multithreaded)
         uint32_t flag{};
         uint32_t notifyCount{};
 
-        event.Set([&]([[maybe_unused]] auto policy) { flag++; });
+        event.Set(tinycoro::test::ResumeCallbackTracer(flag));
 
         auto work = [&] {
             for (size_t i = 0; i < count; ++i)

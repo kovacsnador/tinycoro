@@ -1,0 +1,68 @@
+name: linux-32bit
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        compiler: [11, 12, 13]  # GCC versions
+        build_type: [Debug, Release]
+
+    steps:
+      - uses: actions/checkout@v3
+        with:
+          submodules: true
+
+      - name: Install 32-bit toolchain
+        run: |
+          sudo dpkg --add-architecture i386
+          sudo apt-get update
+          sudo apt-get install -y \
+            gcc-${{ matrix.compiler }} \
+            g++-${{ matrix.compiler }} \
+            gcc-${{ matrix.compiler }}-multilib \
+            g++-${{ matrix.compiler }}-multilib \
+            libc6-dev-i386 \
+            ninja-build \
+            cmake
+
+      - name: Create Build Environment
+        run: cmake -E make_directory ${{ runner.workspace }}/build
+
+      - name: Configure (32-bit)
+        working-directory: ${{ runner.workspace }}/build
+        run: |
+          cmake -GNinja \
+            -DCMAKE_BUILD_TYPE=${{ matrix.build_type }} \
+            -DCMAKE_CXX_COMPILER=g++-${{ matrix.compiler }} \
+            -DCMAKE_C_FLAGS="-m32" \
+            -DCMAKE_CXX_FLAGS="-m32" \
+            -DCMAKE_EXE_LINKER_FLAGS="-m32" \
+            $GITHUB_WORKSPACE
+
+      - name: Build
+        working-directory: ${{ runner.workspace }}/build
+        run: cmake --build .
+
+      - name: Run Unit Tests
+        timeout-minutes: 20
+        working-directory: ${{ runner.workspace }}/build
+        run: ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
+
+      - name: Run Examples
+        working-directory: ${{ runner.workspace }}/build
+        run: ./tinycoro_example
+
+      - name: Run echo server and stress test
+        working-directory: ${{ runner.workspace }}/build
+        run: |
+          ./example/echo_server_example/tinycoro_echo_server &
+          python3 $GITHUB_WORKSPACE/example/echo_server_example/echo_server_stress_test.py 1000 true &
+          wait

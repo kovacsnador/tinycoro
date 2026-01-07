@@ -148,19 +148,27 @@ namespace tinycoro { namespace detail {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        ResumeCallback_t GeneratePauseResume(auto promisePtr) noexcept
+        template<typename PromiseT>
+        ResumeCallback_t GeneratePauseResume(PromiseT promisePtr) noexcept
         {
-            return [this, promisePtr](ENotifyPolicy policy) {
+            using self_t = decltype(this);
 
-                if (_stopToken.stop_requested() == false)
+            auto callback = [](void* selfPtr, void* promisePtr, ENotifyPolicy policy) {
+
+                // worker pointer
+                auto self = static_cast<self_t>(selfPtr);
+                // promise poiner
+                auto promise = static_cast<PromiseT>(promisePtr);
+
+                if (self->_stopToken.stop_requested() == false)
                 {
-                    auto expected = promisePtr->pauseState.load(std::memory_order_relaxed);
+                    auto expected = promise->pauseState.load(std::memory_order_relaxed);
                     if (expected == EPauseState::IDLE)
                     {
                         // If the notify callback invoked very quickly
                         // we have here a little time window to tell to
                         // the scheduler, that the task is ready for resumption
-                        if (promisePtr->pauseState.compare_exchange_strong(
+                        if (promise->pauseState.compare_exchange_strong(
                                 expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
                         {
                             // The task is notified
@@ -174,25 +182,29 @@ namespace tinycoro { namespace detail {
                     // If we reach this point
                     // that means that the task is already in paused state
                     // So we need to resume it manually
-                    _pausedTasks.erase(promisePtr);
+                    self->_pausedTasks.erase(promise);
 
 
                     // push back task to the queue for resumption
-                    Task_t task{promisePtr};
-                    if (_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
+                    Task_t task{promise};
+                    if (self->_stopToken.stop_requested() == false && policy != ENotifyPolicy::DESTROY)
                     {
                         // no stop was requested,
                         // and no immediate destroy policy.
 
-                        // save dispatcher pointer for later use.
-                        auto dispatcherPtr = std::addressof(_dispatcher);
+                        // Save the dispatcher pointer for later use.
+                        //
+                        // This is not strictly necessary because tinycoro::ResumeCallback_t
+                        // uses value semantics to pass its parameters (void* selfPtr and void* promisePtr).
+                        auto dispatcherPtr = std::addressof(self->_dispatcher);
 
                         // After a successful push, we must return immediately.
+                        // 
                         // The task may resume and destroy itself before this function continues,
                         // which could lead to a heap use-after-free.
                         if (dispatcherPtr->try_push(std::move(task)) == false)
                         {
-                            if (_notifiedCachedTasks.try_push(task.release()))
+                            if (self->_notifiedCachedTasks.try_push(task.release()))
                             {
                                 // wake up waiters, in case we are waiting for pop
                                 dispatcherPtr->notify_all();
@@ -201,12 +213,14 @@ namespace tinycoro { namespace detail {
                             {
                                 // The _notifiedCachedTasks stack is closed.
                                 // Reassign the raw pointer to the RAII wrapper for proper destruction.
-                                task.reset(promisePtr);
+                                task.reset(promise);
                             }
                         }
                     }
                 }
             };
+
+            return {callback, this, promisePtr};
         }
 
         inline void _InvokeTask(Task_t task) noexcept

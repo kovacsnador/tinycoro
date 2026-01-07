@@ -13,7 +13,6 @@
 
 #include "PauseHandler.hpp"
 #include "Wait.hpp"
-#include "UnsafeFunction.hpp"
 
 namespace tinycoro {
 

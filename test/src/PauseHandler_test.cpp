@@ -77,7 +77,7 @@ TEST(PauseHandlerTest, CancellableSuspentTest_value)
 
     bool called = false;
 
-    hdl.promise().pauseHandler.emplace([&called](auto){ called = true; });
+    hdl.promise().pauseHandler.emplace(tinycoro::test::ResumeCallbackTracer(called));
 
     auto pauseResumerCallback = tinycoro::context::PauseTask(hdl);
 
@@ -92,12 +92,10 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 {
     bool called = false;
 
-    auto func = [&called](tinycoro::ENotifyPolicy) { called = true; };
-
-    tinycoro::PauseHandler pauseHandler{func};
+    tinycoro::PauseHandler pauseHandler{tinycoro::test::ResumeCallbackTracer(called)};
 
     auto res = pauseHandler.Pause();
-    EXPECT_TRUE((std::assignable_from<decltype(res)&, decltype(func)>));
+    EXPECT_TRUE((std::assignable_from<decltype(res)&, tinycoro::ResumeCallback_t>));
 
     EXPECT_TRUE(pauseHandler.IsPaused());
 
@@ -112,7 +110,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_pause)
 
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 {
-    tinycoro::PauseHandler pauseHandler{[](auto){}};
+    tinycoro::PauseHandler pauseHandler{tinycoro::ResumeCallback_t{}};
     
     // initial cancellable as default
     EXPECT_TRUE(pauseHandler.IsCancellable());
@@ -126,7 +124,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable)
 
 TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
 {
-    tinycoro::PauseHandler pauseHandler{[](auto){}, tinycoro::noninitial_cancellable_t::value};
+    tinycoro::PauseHandler pauseHandler{tinycoro::ResumeCallback_t{}, tinycoro::noninitial_cancellable_t::value};
     
     // initial cancellable as default
     EXPECT_FALSE(pauseHandler.IsCancellable());
@@ -143,7 +141,7 @@ TEST(PauseHandlerTest, PauseHandlerTest_MakeCancellable_noninitial_cancellable)
 
 TEST(PauseHandlerTest, PauseHandlerTest_ExceptionThrowned)
 {
-    tinycoro::PauseHandler pauseHandler{[](auto){}, tinycoro::noninitial_cancellable_t::value};
+    tinycoro::PauseHandler pauseHandler{tinycoro::ResumeCallback_t{}, tinycoro::noninitial_cancellable_t::value};
     
     EXPECT_FALSE(pauseHandler.HasException());
     pauseHandler.Resume();
@@ -188,8 +186,10 @@ TEST(ContextTest, ContextTest_PauseTask)
 {
     Context_CoroutineHandlerMock hdl;
 
-    EXPECT_CALL(*hdl.p->pauseHandler, Pause).Times(1).WillOnce(testing::Return([](auto){}));   
+    EXPECT_CALL(*hdl.p->pauseHandler, Pause).Times(1).WillOnce(testing::Return(tinycoro::ResumeCallback_t{}));   
     auto res = tinycoro::context::PauseTask(hdl);
+
+    EXPECT_TRUE((std::same_as<decltype(res), tinycoro::ResumeCallback_t>));
 }
 
 TEST(ContextTest, ContextTest_UnpauseTask)
