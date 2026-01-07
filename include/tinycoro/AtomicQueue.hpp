@@ -65,19 +65,22 @@ namespace tinycoro { namespace detail {
     class AtomicQueue
     {
     public:
-        static_assert(std::is_default_constructible_v<T>, "AtomicQueue::T needs to be default constructible");
+        static_assert(std::is_default_constructible_v<T>, "AtomicQueue::T needs to be default constructable");
 
         using value_type = T;
         using sequence_t = SequenceT;
 
-        AtomicQueue() = default;
+        AtomicQueue()
+        : _buffer{new Element[Capacity]}
+        {
+        }
 
         // disable copy and move
         AtomicQueue(AtomicQueue&&) = delete;
 
         // try to push a new value into the queue
         template <typename U>
-        bool try_push(U&& value) noexcept
+        [[nodiscard]] bool try_push(U&& value) noexcept
         {
             int32_t retry{3};
             auto pos = _head.load(std::memory_order::relaxed);
@@ -85,15 +88,16 @@ namespace tinycoro { namespace detail {
             {
                 auto& elem = _buffer[idx(pos)];
                 auto  currentSequence = turn(pos);
-                if (currentSequence == elem.sequence.load(std::memory_order_acquire))
+                if (currentSequence == elem.sequence.load(std::memory_order::acquire))
                 {
-                    if (_head.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_head.compare_exchange_strong(pos, pos + 1, std::memory_order::relaxed, std::memory_order::relaxed))
                     {
                         // found the right place
                         // pushing the value into the queue
                         elem.value = std::forward<U>(value);
 
                         // store the new position as the next sequence
+                        // and publish value to consumers
                         elem.sequence.store(currentSequence + 1, std::memory_order::release);
 
                         // success
@@ -126,7 +130,7 @@ namespace tinycoro { namespace detail {
         }
 
         // try to pop the next value from the queue
-        bool try_pop(value_type& data) noexcept
+        [[nodiscard]] bool try_pop(value_type& data) noexcept
         {
             int32_t retry{3};
             auto    pos = _tail.load(std::memory_order::relaxed);
@@ -134,13 +138,15 @@ namespace tinycoro { namespace detail {
             {
                 auto& elem = _buffer[idx(pos)];
                 auto  currentSequence = turn(pos);
-                if (currentSequence + 1 == elem.sequence.load(std::memory_order_acquire))
+                if (currentSequence + 1 == elem.sequence.load(std::memory_order::acquire))
                 {
-                    if (_tail.compare_exchange_weak(pos, pos + 1, std::memory_order::release, std::memory_order::relaxed))
+                    if (_tail.compare_exchange_strong(pos, pos + 1, std::memory_order::relaxed, std::memory_order::relaxed))
                     {
                         // we got exclusive access to the element
                         data = std::move(elem.value);
 
+                        // store the new position as the next sequence
+                        // and publish that the element is removed
                         elem.sequence.store(currentSequence + 2, std::memory_order::release);
 
                         return true;
@@ -196,8 +202,8 @@ namespace tinycoro { namespace detail {
         // the buffer mask. Should be for example 0xFFFFF
         static constexpr sequence_t BUFFER_MASK{Capacity - 1};
 
-        // the array of the ringbuffer
-        std::array<Element, Capacity> _buffer;
+        // The underlying element buffer
+        std::unique_ptr<Element[]> _buffer;
 
         // the last push position of an element
         alignas(CACHELINE_SIZE) std::atomic<sequence_t> _head{};
