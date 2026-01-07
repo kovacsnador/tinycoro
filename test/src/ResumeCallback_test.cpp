@@ -193,6 +193,7 @@ TEST(ResumeCallbackTest, ResumeCallback_with_return_value)
     EXPECT_EQ(b, 1);
 }
 
+// Benchmark test to compare ResumeCallback with std::function.
 /* struct ResumeCallbackTest : testing::TestWithParam<size_t>
 {
 };

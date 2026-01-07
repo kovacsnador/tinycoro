@@ -12,8 +12,12 @@
 
 namespace tinycoro { namespace detail {
 
+    // This class was previously implemented as a simple std::function<>, but
+    // for performance reasons it has been specialized for this specific use case.
+    // 
     // Stores a callable together with two bound parameters and allows
-    //        invoking it later with additional arguments.
+    // invoking it later with additional arguments.
+    // 
     //
     // ResumeCallback owns a function object (`FuncT`) and two pre-bound arguments
     // (`FirstParamT`, `SecondParamT`). When invoked via `operator()`, the stored

@@ -121,40 +121,7 @@ struct DispatcherTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(DispatcherTest,
-                         DispatcherTest,
-    testing::Values(10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         10,
-                                         100,
-                                         1000,
-                                         10000,
-                                         100000,
-                                         1000000));
+INSTANTIATE_TEST_SUITE_P(DispatcherTest, DispatcherTest, testing::Values(10, 100, 1000, 10000, 100000, 1000000));
 
 TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
 {

@@ -96,10 +96,11 @@ namespace tinycoro {
     {
     };
 
-    // The pause handler callback signature
-    // used mainly by the scheduler
-    //using ResumeCallback_t = std::function<void(ENotifyPolicy)>;
-    using ResumeCallback_t = detail::ResumeCallback<void(*)(void*, void*, ENotifyPolicy), void*, void*>; //std::function<void(ENotifyPolicy)>;
+    // The resume callback which resumes
+    // a paused coroutine.
+    // 
+    // Used mainly by the awaitables.
+    using ResumeCallback_t = detail::ResumeCallback<void(*)(void*, void*, ENotifyPolicy), void*, void*>;
 
     enum class ETaskResumeState : uint8_t
     {
@@ -113,7 +114,6 @@ namespace tinycoro {
     {
         IDLE,
         PAUSED,
-
         NOTIFIED,
     };
 

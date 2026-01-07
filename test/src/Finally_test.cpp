@@ -39,3 +39,14 @@ TEST(FinallyTest, FinallyTest_FunctionTest)
     EXPECT_EQ(res, 42);
     EXPECT_EQ(count, 1);
 }
+
+TEST(FinallyTest, FinallyTest_empty_std_function)
+{
+    {
+        // This function is not callable,
+        // we should not call this function.
+        auto action = tinycoro::Finally(std::function<void()>{});
+    }
+
+    SUCCEED();
+}
