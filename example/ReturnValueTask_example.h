@@ -5,17 +5,16 @@
 
 #include "Common.h"
 
-void Example_returnValueTask(auto& scheduler)
+tinycoro::Task<int32_t> ReturnValueCoro()
+{
+    co_return 42;
+}
+
+void Example_returnValueTask()
 {
     SyncOut() << "\n\nExample_returnValueTask:\n";
 
-    auto task = []() -> tinycoro::Task<int32_t> {
-        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
-
-        co_return 42;
-    };
-
-    auto val = tinycoro::AllOf(scheduler, task());
+    auto val = tinycoro::AllOf(ReturnValueCoro());
 
     SyncOut() << "co_return => " << *val << '\n';
 }

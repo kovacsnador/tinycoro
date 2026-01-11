@@ -23,8 +23,8 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 * [Motivation](#motivation)
 * [Usage](#usage)
 * [Examples](#examples)
-    - [Scheduler](#scheduler)
     - [Task](#task)
+    - [Scheduler](#scheduler)
     - [SyncFunctions](#syncfunctions)
     - [AllOf](#allof)
     - [AnyOf](#anyof)
@@ -264,47 +264,21 @@ Simply copy the `include` folder into your C++20 (or greater) project. If necess
 ## Examples
 The following examples demonstrate various use cases of the `tinycoro` library:
 
-### `Scheduler`
-The `tinycoro::Scheduler` is responsible for managing and executing coroutines across multiple threads.
-When creating a scheduler, you can specify the number of worker threads it should use.
-The constructor accepts the number of threads, allowing you to utilize hardware concurrency efficiently.
-
-```cpp
-#include <tinycoro/tinycoro_all.h>
-
-// create a scheduler with explicit worker thread count
-tinycoro::Scheduler scheduler{4}; // 4 worker threads
-
-// Or just use the default constructor which is equivalent to:
-// tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
-tinycoro::Scheduler scheduler; 
-```
-
 ### `Task`
 
-This example demonstrates how to create a basic coroutine task that returns `void` and schedule it using the `tinycoro::Scheduler`.  
-The scheduler takes **complete ownership** of the coroutine and manages its lifecycle.
-
-While you can manually enqueue tasks in `tinycoro::Scheduler`, it is **recommended to use helper functions** like `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)`.
-These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified, fast and safe way.
-
-The `AllOf(...)` function supports both **individual tasks** and **containers of tasks**. It returns `std::optional<>`, `std::tuple<std::optional<T>...>` or `std::vector<std::optional<T>>` depending on the return type and cancellation state.
+This example demonstrates how to create a simple coroutine task that returns `void`.
+It uses the helper function `tinycoro::AllOf()` to execute the coroutine.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-void Example_voidTask()
+tinycoro::Task<void> SimpleVoidCoro()
 {
-    // Create a scheduler
-    tinycoro::Scheduler scheduler;
-
-    auto task = []() -> tinycoro::Task<void> {
     co_return;
-    };
-
-    // Recommended way to run the task
-    tinycoro::AllOf(scheduler, task());
 }
+
+// invoke the coroutine.
+tinycoro::AllOf(SimpleVoidCoro());
 ```
 
 > 💡 For simplicity, if you want to return `void`, you can also just write `tinycoro::Task<>`.  
@@ -316,30 +290,34 @@ void Example_voidTask()
 The yielded values are retrieved one by one using `co_await`, and the final value is returned as the result of the last `co_await`.
 
 ```cpp
-auto generator = [](int32_t max) -> tinycoro::Task<int32_t> {
+tinycoro::Task<int32_t> Producer(int32_t max)
+{
     for (auto it : std::views::iota(0, max))
     {
         co_yield it;    // yield a value
     }
     co_return max;  // return the max value
-};
+}
 
-auto consumer = [gen = generator](int32_t max) -> tinycoro::Task<void> {
+tinycoro::Task<void> Consumer(int32_t max)
+{
+    // create the corouitne task
+    auto producer = Producer(max);
+    
     int32_t v{};
-    auto task = gen(max);
     for (auto it : std::views::iota(0, max))
     {
-        v = co_await task; // result from co_yield
+        v = co_await producer; // result from co_yield
         assert(v == it);
     }
-    v = co_await task; // Final result from co_return
+    v = co_await producer; // Final result from co_return
     assert(v == max);
-};
+}
 
-tinycoro::AllOf(consumer(42));
+tinycoro::AllOf(Consumer(42));
 ```
 
-- co_yield is useful for creating generators and streaming values over time from a coroutine, while still allowing for a final result with co_return.
+- co_yield is useful for creating generators like tasks and streaming values over time from a coroutine, while still allowing for a final result with co_return.
 
 ### Yielding and Returning Different Types
 
@@ -353,6 +331,86 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
     co_return true;  // returns a bool
 }
 ```
+### `Scheduler`
+The `tinycoro::Scheduler` is responsible for managing and executing coroutines across multiple worker threads.
+It owns a thread pool internally and dispatches schedulable coroutine tasks to these workers in a thread-safe manner.
+
+When creating a scheduler, you can specify how many worker threads it should use. By default, it uses
+*std::thread::hardware_concurrency()* to efficiently utilize the available CPU cores.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+// create a scheduler with explicit worker thread count
+tinycoro::Scheduler scheduler{4}; // 4 worker threads
+
+// Or just use the default constructor which is equivalent to:
+// tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+tinycoro::Scheduler scheduler; 
+```
+#### Key characteristics
+
+- Thread pool–based execution
+The scheduler internally manages a pool of worker threads (std::jthread), which continuously
+pull and execute coroutine tasks from a shared lock-free queue.
+
+- RAII lifetime management
+The scheduler follows strict RAII semantics:
+
+- Destroying the scheduler automatically requests cancellation for all worker threads.
+
+- All worker threads are guaranteed to stop and join before the scheduler is fully destroyed.
+
+- This ensures safe shutdown without dangling references or background execution.
+
+#### Cooperative cancellation support
+- The scheduler owns a std::stop_source, and all worker threads operate with the corresponding
+std::stop_token.
+Once a stop is requested:
+
+- No new tasks will be accepted.
+
+- Existing workers are notified and exit gracefully.
+
+- Tasks that could not be scheduled will complete their associated futures with std::nullopt.
+
+- If a task cannot be scheduled (e.g. due to shutdown), the returned future is completed immediately.
+
+#### Lock-free dispatching
+- Tasks are stored in a bounded, lock-free queue with a configurable cache size.
+If the queue is temporarily full, enqueueing threads will wait efficiently until space becomes available.
+
+Customizable scheduler variant
+For advanced use cases, you can customize the internal queue cache size:
+```cpp
+// Custom scheduler with a queue size of 2048 tasks. 
+using MyScheduler = tinycoro::CustomScheduler<2048>;
+```
+### Running task(s) on the `tinycoro::Scheduler`
+
+This example demonstrates how to run a task on a `tinycoro::Scheduler`.  
+The scheduler takes **complete ownership** of the coroutine and manages its lifecycle.
+
+While you can manually enqueue tasks in `tinycoro::Scheduler`, it is **recommended to use helper functions** like `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)`.
+These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified, fast and safe way.
+
+The `AllOf(...)` function supports both **individual tasks** and **containers of tasks**. It returns `std::optional<>`, `std::tuple<std::optional<T>...>` or `std::vector<std::optional<T>>` depending on the return type and cancellation state.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+tinycoro::Scheduler scheduler;
+
+tinycoro::Task<int32_t> Coro()
+{
+    co_return 42;
+}
+
+// Passing the scheduler as the first parameter
+// in the helper function.
+std::optional<int32_t> val_42 = tinycoro::AllOf(scheduler, Coro());
+```
+
 ---
 ### `SyncFunctions`
 #### Overview:

@@ -22,6 +22,7 @@ void Example_moveOnlyValue(auto& scheduler)
         int32_t i;
     };
 
+    // coroutine task (can be a lambda func also)
     auto task = []() -> tinycoro::Task<OnlyMoveable> {
         SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
 

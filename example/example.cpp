@@ -1,5 +1,3 @@
-#include "AggregateValue_example.h"
-
 #include "AnyOf_example.h"
 #include "AnyOfDynamic_example.h"
 #include "AnyOfDynamicVoid_example.h"
@@ -40,17 +38,17 @@
 
 #include "BufferedChannel_example.h"
 
+#include "CoYieldForTask_example.h"
+
 int main()
 {
     tinycoro::Scheduler scheduler;
     {
-        Example_voidTask(scheduler);
+        Example_voidTask();
 
-        Example_returnValueTask(scheduler);
+        Example_returnValueTask();
 
         Example_moveOnlyValue(scheduler);
-
-        Example_aggregateValue(scheduler);
 
         Example_exception(scheduler);
 
@@ -106,6 +104,8 @@ int main()
         Example_Semaphore(scheduler);
 
         Example_bufferedChannel(scheduler);
+
+        Example_coyieldForTask();
     }
 
     return 0;

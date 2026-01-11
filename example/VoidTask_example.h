@@ -5,18 +5,16 @@
 
 #include "Common.h"
 
-void Example_voidTask(auto& scheduler)
+tinycoro::Task<void> SimpleVoidCoro()
+{
+    co_return;
+}
+
+void Example_voidTask()
 {
     SyncOut() << "\n\nExample_voidTask:\n";
 
-    auto task = []() -> tinycoro::Task<void> {
-        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
-        co_return;
-    };
-
-    tinycoro::AllOf(scheduler, task());
-
-    SyncOut() << "co_return => void" << '\n';
+    tinycoro::AllOf(SimpleVoidCoro());
 }
 
 #endif //!__TINY_CORO_EXAMPLE_VOID_TASK_H__
