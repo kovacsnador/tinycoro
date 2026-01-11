@@ -3,59 +3,63 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-#include "Common.h"
+#include <string>
+#include <future>
+
+namespace third_party
+{
+    void async_read(std::function<void(std::string)> cb)
+    {
+        auto future = std::async(std::launch::async, [cb] { cb("data"); });
+        future.get();
+    }
+}
 
 // Your custom awaiter
 struct CustomAwaiter
 {
     constexpr bool await_ready() const noexcept { return false; }
 
-    void await_suspend(auto hdl) noexcept
+    constexpr void await_suspend(auto hdl) noexcept
     {
-        // save resume task callback
+        // We need to get the resume callback and
+        // save it for later use.
         _resumeTask = tinycoro::context::PauseTask(hdl);
 
-        auto cb = [](void* userData, [[maybe_unused]] int i) {
-
-            SyncOut() << "  Callback called... " << i << " Thread id: " << std::this_thread::get_id() << '\n';
-
-            auto self = static_cast<decltype(this)>(userData);
-
-            // do some work
-            std::this_thread::sleep_for(100ms);
-            self->_userData++;
+        auto cb = [this](std::string data) {
+            // save the user data
+            _userData = data;
 
             // resume the coroutine (you need to make them exception safe)
-            self->_resumeTask(tinycoro::ENotifyPolicy::RESUME);
+            _resumeTask(tinycoro::ENotifyPolicy::RESUME);
         };
 
-        AsyncCallbackAPIvoid(cb, this);
+        // Async third party api call
+        third_party::async_read(cb);
     }
 
     constexpr auto await_resume() const noexcept { return _userData; }
 
-    int32_t _userData{41};
+private:
+    // Custom user data (optional). Can be returned with await_resume()
+    std::string _userData{};
 
+    // Resume callback: signals the coroutine to resume.
     tinycoro::ResumeCallback_t _resumeTask;
 };
 
-void Example_CustomAwaiter(auto& scheduler)
+tinycoro::Task<std::string> MyCoroutine()
 {
-    SyncOut() << "\n\nExample_CustomAwaiter:\n";
+    auto val = co_await CustomAwaiter{};
 
-    auto asyncTask = []() -> tinycoro::Task<int32_t> {
-        SyncOut() << "  Coro starting..." << "  Thread id : " << std::this_thread::get_id() << '\n';
-        // do some work before
+    // do some work after
+    co_return val;
+}
 
-        auto val = co_await CustomAwaiter{};
-
-        // do some work after
-        co_return val;
-    };
-
-    auto val = tinycoro::AllOf(scheduler, asyncTask());
-
-    SyncOut() << "co_return => " << *val << '\n'; 
+void Example_CustomAwaiter(tinycoro::Scheduler& scheduler)
+{
+    auto val = tinycoro::AllOf(MyCoroutine());
+    assert(*val == "data");
 }
 
 #endif //!__TINY_CORO_EXAMPLE_CUSTOM_AWAITER_H__
