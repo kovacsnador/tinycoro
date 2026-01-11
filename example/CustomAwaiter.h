@@ -38,7 +38,7 @@ struct CustomAwaiter
         third_party::async_read(cb);
     }
 
-    constexpr auto await_resume() const noexcept { return _userData; }
+    auto await_resume() const noexcept { return _userData; }
 
 private:
     // Custom user data (optional). Can be returned with await_resume()
@@ -56,7 +56,7 @@ tinycoro::Task<std::string> MyCoroutine()
     co_return val;
 }
 
-void Example_CustomAwaiter(tinycoro::Scheduler& scheduler)
+void Example_CustomAwaiter()
 {
     auto val = tinycoro::AllOf(MyCoroutine());
     assert(*val == "data");

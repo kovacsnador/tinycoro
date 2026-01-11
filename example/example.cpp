@@ -96,7 +96,7 @@ int main()
 
         Example_AnyOfException(scheduler);
 
-        Example_CustomAwaiter(scheduler);
+        Example_CustomAwaiter();
 
         auto val = tinycoro::AllOf(scheduler, Example_AllOfAwait(scheduler));
         SyncOut() << *val << '\n';

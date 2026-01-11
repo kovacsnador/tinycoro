@@ -299,7 +299,7 @@ void Example_voidTask()
     tinycoro::Scheduler scheduler;
 
     auto task = []() -> tinycoro::Task<void> {
-        co_return;
+    co_return;
     };
 
     // Recommended way to run the task
@@ -1131,7 +1131,7 @@ tinycoro::Task<std::string> MyCoroutine()
     co_return val;
 }
 
-void Example_CustomAwaiter(tinycoro::Scheduler& scheduler)
+void Example_CustomAwaiter()
 {
     auto val = tinycoro::AllOf(MyCoroutine());
     assert(*val == "data");
