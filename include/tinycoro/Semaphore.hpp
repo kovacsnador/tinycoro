@@ -9,7 +9,6 @@
 #include <mutex>
 #include <coroutine>
 
-#include "PauseHandler.hpp"
 #include "ResumeSignalEvent.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "ReleaseGuard.hpp"

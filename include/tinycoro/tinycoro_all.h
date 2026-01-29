@@ -33,5 +33,6 @@
 #include "SoftClock.hpp"
 #include "Cancellable.hpp"
 #include "TimeoutAwait.hpp"
+#include "TaskGroup.hpp"
 
 #endif // TINY_CORO_TINY_CORO_ALL_H

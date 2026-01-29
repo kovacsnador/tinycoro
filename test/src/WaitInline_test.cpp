@@ -5,15 +5,15 @@
 
 #include <tinycoro/tinycoro_all.h>
 
-struct WaitInline_PauseHandlerMock
+struct WaitInline_SharedStateMock
 {
-    WaitInline_PauseHandlerMock() = default;
-    WaitInline_PauseHandlerMock(tinycoro::ResumeCallback_t c)
+    WaitInline_SharedStateMock() = default;
+    WaitInline_SharedStateMock(tinycoro::ResumeCallback_t c)
     : cb{c}
     {
     }
 
-    MOCK_METHOD(void, Resume, ());
+    MOCK_METHOD(void, ClearFlags, ());
     MOCK_METHOD(bool, IsCancellable, (), (const));
 
     tinycoro::ResumeCallback_t cb;
@@ -25,32 +25,32 @@ struct PromiseMock
     using value_type = T;
 };
 
-template<typename ReturnT, typename PauseHandlerT>
+template<typename ReturnT, typename SharedStateT>
 struct WaitInline_TaskMock
 {
     using value_type = ReturnT;
 
     MOCK_METHOD(ReturnT, await_resume, ());
-    MOCK_METHOD(std::shared_ptr<PauseHandlerT>, GetPauseHandler, ());
-    MOCK_METHOD(std::shared_ptr<PauseHandlerT>, SetPauseHandler, (tinycoro::ResumeCallback_t));
+    MOCK_METHOD(std::shared_ptr<SharedStateT>, SetResumeCallback, (tinycoro::ResumeCallback_t));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
     MOCK_METHOD(void, Resume, ());
-    MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
+    MOCK_METHOD(tinycoro::detail::ETaskResumeState, ResumeState, ());
     MOCK_METHOD(bool, IsPaused, (), (const, noexcept));
     MOCK_METHOD(bool, IsCancelled, (), (const, noexcept));
     MOCK_METHOD(bool, IsDone, (), (const, noexcept));
+    MOCK_METHOD(SharedStateT*, SharedState, (), (noexcept));
 
-    std::shared_ptr<PauseHandlerT> pauseHandlerMock;
+    std::shared_ptr<SharedStateT> sharedStateMock;
 };
 
-template<typename ReturnT, typename PauseHandlerT>
+template<typename ReturnT, typename SharedStateT>
 struct WaitInline_TaskMockWrapper
 {
     using value_type = ReturnT;
     using promise_type = PromiseMock<ReturnT>;
 
     WaitInline_TaskMockWrapper()
-    : mock{std::make_shared<WaitInline_TaskMock<ReturnT, PauseHandlerT>>()}
+    : mock{std::make_shared<WaitInline_TaskMock<ReturnT, SharedStateT>>()}
     {
         ON_CALL(*mock, IsDone).WillByDefault(::testing::Return(true));
     }
@@ -60,15 +60,9 @@ struct WaitInline_TaskMockWrapper
         return mock->await_resume();
     }
 
-    std::shared_ptr<PauseHandlerT> GetPauseHandler()
+    std::shared_ptr<SharedStateT> SetResumeCallback(tinycoro::ResumeCallback_t cb)
     {
-        return mock->GetPauseHandler();
-
-    }
-
-    std::shared_ptr<PauseHandlerT> SetPauseHandler(tinycoro::ResumeCallback_t cb)
-    {
-        return mock->SetPauseHandler(cb);
+        return mock->SetResumeCallback(cb);
     }
 
     void SetStopSource(auto stopSource)
@@ -76,12 +70,17 @@ struct WaitInline_TaskMockWrapper
         mock->SetStopSource(stopSource);
     }
 
+    auto SharedState()
+    {
+        return mock->SharedState();
+    }
+
     void Resume()
     {
         mock->Resume();
     }
 
-    tinycoro::ETaskResumeState ResumeState()
+    tinycoro::detail::ETaskResumeState ResumeState()
     {
         return mock->ResumeState();
     }
@@ -101,25 +100,25 @@ struct WaitInline_TaskMockWrapper
         return mock->IsDone();
     }
 
-    std::shared_ptr<WaitInline_TaskMock<ReturnT, PauseHandlerT>> mock;
+    std::shared_ptr<WaitInline_TaskMock<ReturnT, SharedStateT>> mock;
 };
 
 
 TEST(WaitInlineTest, WaitInlineTest_void)
 {
-    WaitInline_TaskMockWrapper<void, WaitInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<void, WaitInline_SharedStateMock> mock;
 
-    EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(*mock.mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
-            return mock.mock->pauseHandlerMock;
+            mock.mock->sharedStateMock = std::make_shared<WaitInline_SharedStateMock>(callback);
+            return mock.mock->sharedStateMock;
         }
     ));
 
     EXPECT_CALL(*mock.mock, Resume()).Times(1);
     EXPECT_CALL(*mock.mock, IsPaused()).Times(1);
     EXPECT_CALL(*mock.mock, IsDone()).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
-    EXPECT_CALL(*mock.mock, ResumeState()).WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+    EXPECT_CALL(*mock.mock, ResumeState()).WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
 
  
     tinycoro::AllOf(mock);
@@ -127,12 +126,12 @@ TEST(WaitInlineTest, WaitInlineTest_void)
 
 TEST(WaitInlineTest, WaitInlineTest_int32)
 {
-    WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<int32_t, WaitInline_SharedStateMock> mock;
 
-    EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(*mock.mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
-            return mock.mock->pauseHandlerMock;
+            mock.mock->sharedStateMock = std::make_shared<WaitInline_SharedStateMock>(callback);
+            return mock.mock->sharedStateMock;
         }
     ));
 
@@ -144,7 +143,7 @@ TEST(WaitInlineTest, WaitInlineTest_int32)
         .WillOnce(testing::Return(true));
     
     EXPECT_CALL(*mock.mock, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
     
     EXPECT_CALL(*mock.mock, await_resume())
         .Times(1)
@@ -156,21 +155,21 @@ TEST(WaitInlineTest, WaitInlineTest_int32)
 
 TEST(WaitInlineTest, WaitInlineTest_pause)
 {
-    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock;
+    WaitInline_TaskMock<int32_t, WaitInline_SharedStateMock> mock;
 
-    EXPECT_CALL(mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
+            mock.sharedStateMock = std::make_shared<WaitInline_SharedStateMock>(callback);
 
-            EXPECT_CALL(*mock.pauseHandlerMock, Resume()).Times(1);
+            EXPECT_CALL(*mock.sharedStateMock, ClearFlags()).Times(1);
 
-            return mock.pauseHandlerMock;
+            return mock.sharedStateMock;
         }
     ));
 
-    EXPECT_CALL(mock, GetPauseHandler()).WillOnce(testing::Invoke(
+    EXPECT_CALL(mock, SharedState()).WillOnce(testing::Invoke(
         [&mock] () {
-            return mock.pauseHandlerMock;
+            return mock.sharedStateMock.get();
         }
     ));
 
@@ -186,12 +185,12 @@ TEST(WaitInlineTest, WaitInlineTest_pause)
         .WillOnce(testing::Return(true));
 
     EXPECT_CALL(mock, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::PAUSED))
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::PAUSED))
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
 
     EXPECT_CALL(mock, await_resume()).Times(1).WillOnce(testing::Return(42));
 
-    auto resumer = [&]()->tinycoro::Task<void> { mock.pauseHandlerMock->cb(tinycoro::ENotifyPolicy::RESUME); co_return;};
+    auto resumer = [&]()->tinycoro::Task<void> { mock.sharedStateMock->cb(tinycoro::ENotifyPolicy::RESUME); co_return;};
 
     auto [val, voidValue] = tinycoro::AllOf(mock, resumer());
     EXPECT_EQ(42, val);
@@ -199,12 +198,12 @@ TEST(WaitInlineTest, WaitInlineTest_pause)
 
 TEST(WaitInlineTest, WaitInlineTest_cancelled)
 {
-    WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock> mock;
+    WaitInline_TaskMockWrapper<int32_t, WaitInline_SharedStateMock> mock;
 
-    EXPECT_CALL(*mock.mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(*mock.mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock] (auto callback) {
-            mock.mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>(callback);
-            return mock.mock->pauseHandlerMock;
+            mock.mock->sharedStateMock = std::make_shared<WaitInline_SharedStateMock>(callback);
+            return mock.mock->sharedStateMock;
         }
     ));
 
@@ -216,7 +215,7 @@ TEST(WaitInlineTest, WaitInlineTest_cancelled)
         .WillOnce(testing::Return(false));
     
     EXPECT_CALL(*mock.mock, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::STOPPED));
 
     EXPECT_CALL(*mock.mock, await_resume()).Times(0);
  
@@ -227,9 +226,9 @@ TEST(WaitInlineTest, WaitInlineTest_cancelled)
 
 TEST(WaitInlineTest, WaitInlineTest_multiTasks)
 {
-    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock1;
+    WaitInline_TaskMock<int32_t, WaitInline_SharedStateMock> mock1;
 
-    mock1.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
+    mock1.sharedStateMock = std::make_shared<WaitInline_SharedStateMock>();
 
     EXPECT_CALL(mock1, IsDone)
         .WillOnce(testing::Return(false))
@@ -239,21 +238,21 @@ TEST(WaitInlineTest, WaitInlineTest_multiTasks)
     EXPECT_CALL(mock1, IsPaused)
         .WillRepeatedly(testing::Return(false));
 
-    EXPECT_CALL(mock1, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(mock1, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock1] (auto) {
-            return mock1.pauseHandlerMock;
+            return mock1.sharedStateMock;
         }
     ));
 
     EXPECT_CALL(mock1, Resume()).Times(1);
     EXPECT_CALL(mock1, ResumeState())
-        .WillRepeatedly(testing::Return(tinycoro::ETaskResumeState::DONE));
+        .WillRepeatedly(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
 
     EXPECT_CALL(mock1, await_resume()).Times(1).WillOnce(testing::Return(42));
 
-    WaitInline_TaskMock<int32_t, WaitInline_PauseHandlerMock> mock2;
+    WaitInline_TaskMock<int32_t, WaitInline_SharedStateMock> mock2;
 
-    mock2.pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
+    mock2.sharedStateMock = std::make_shared<WaitInline_SharedStateMock>();
 
     EXPECT_CALL(mock2, IsDone)
         .WillOnce(testing::Return(false))
@@ -263,16 +262,16 @@ TEST(WaitInlineTest, WaitInlineTest_multiTasks)
     EXPECT_CALL(mock2, IsPaused)
         .WillRepeatedly(testing::Return(false));
 
-    EXPECT_CALL(mock2, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+    EXPECT_CALL(mock2, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&mock2] (auto) {
-            return mock2.pauseHandlerMock;
+            return mock2.sharedStateMock;
         }
     ));
 
     EXPECT_CALL(mock2, Resume()).Times(1);
     EXPECT_CALL(mock2, ResumeState())
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::SUSPENDED))
-        .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::SUSPENDED))
+        .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::STOPPED));
 
     EXPECT_CALL(mock2, await_resume()).Times(1).WillOnce(testing::Return(43));
 
@@ -283,17 +282,17 @@ TEST(WaitInlineTest, WaitInlineTest_multiTasks)
 
 TEST(WaitInlineTest, WaitInlineTest_dynamicTasks)
 {
-    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock>> tasks;
+    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_SharedStateMock>> tasks;
 
     for(size_t i=0; i < 10; ++i)
     {
         tasks.emplace_back();
 
-        tasks[i].mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
+        tasks[i].mock->sharedStateMock = std::make_shared<WaitInline_SharedStateMock>();
 
-        EXPECT_CALL(*tasks[i].mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+        EXPECT_CALL(*tasks[i].mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&tasks, index = i] (auto) {
-            return tasks[index].mock->pauseHandlerMock;
+            return tasks[index].mock->sharedStateMock;
         }
         ));
 
@@ -305,7 +304,7 @@ TEST(WaitInlineTest, WaitInlineTest_dynamicTasks)
             .WillOnce(testing::Return(true));
         
         EXPECT_CALL(*tasks[i].mock, ResumeState())
-            .WillOnce(testing::Return(tinycoro::ETaskResumeState::DONE));
+            .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
 
         EXPECT_CALL(*tasks[i].mock, await_resume()).Times(1).WillOnce(testing::Return(42));
     }
@@ -318,17 +317,17 @@ TEST(WaitInlineTest, WaitInlineTest_dynamicTasks)
 
 TEST(WaitInlineTest, WaitInlineTest_dynamicTasks_cancelled)
 {
-    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_PauseHandlerMock>> tasks;
+    std::vector<WaitInline_TaskMockWrapper<int32_t, WaitInline_SharedStateMock>> tasks;
 
     for(size_t i=0; i < 10; ++i)
     {
         tasks.emplace_back();
 
-        tasks[i].mock->pauseHandlerMock = std::make_shared<WaitInline_PauseHandlerMock>();
+        tasks[i].mock->sharedStateMock = std::make_shared<WaitInline_SharedStateMock>();
 
-        EXPECT_CALL(*tasks[i].mock, SetPauseHandler(testing::_)).WillOnce(testing::Invoke(
+        EXPECT_CALL(*tasks[i].mock, SetResumeCallback(testing::_)).WillOnce(testing::Invoke(
         [&tasks, index = i] (auto) {
-            return tasks[index].mock->pauseHandlerMock;
+            return tasks[index].mock->sharedStateMock;
         }
         ));
 
@@ -340,7 +339,7 @@ TEST(WaitInlineTest, WaitInlineTest_dynamicTasks_cancelled)
             .WillOnce(testing::Return(false));
         
         EXPECT_CALL(*tasks[i].mock, ResumeState())
-            .WillOnce(testing::Return(tinycoro::ETaskResumeState::STOPPED));
+            .WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::STOPPED));
 
         EXPECT_CALL(*tasks[i].mock, await_resume()).Times(0);
     }

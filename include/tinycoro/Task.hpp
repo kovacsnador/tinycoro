@@ -15,7 +15,6 @@
 
 #include "Common.hpp"
 #include "Exception.hpp"
-#include "PauseHandler.hpp"
 #include "Promise.hpp"
 #include "TaskAwaiter.hpp"
 #include "TaskResumer.hpp"
@@ -55,11 +54,18 @@ namespace tinycoro {
 
             using initial_cancellable_policy_t = InitialCancellablePolicyT;
 
+            // default constructor
+            constexpr CoroTask() = default;
+
             template <typename... Args>
-                requires std::constructible_from<coro_hdl_type, Args...>
+                requires std::constructible_from<coro_hdl_type, Args...> &&  (sizeof...(Args) > 0)
             CoroTask(Args&&... args)
             : _hdl{std::forward<Args>(args)...}
             {
+                assert(_hdl);
+                
+                // Create the shared state only once
+                _hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
             }
 
             CoroTask(CoroTask&& other) noexcept
@@ -80,26 +86,22 @@ namespace tinycoro {
 
             [[nodiscard]] auto ResumeState() noexcept { return _coroResumer.ResumeState(_hdl); }
 
-            [[nodiscard]] bool IsPaused() const noexcept { return _hdl.promise().pauseHandler->IsPaused(); }
+            [[nodiscard]] bool IsPaused() const noexcept { return SharedState()->IsPaused(); }
 
             [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-            void SetPauseHandler(concepts::IsResumeCallbackType auto pauseResume) noexcept
+            void SetResumeCallback(concepts::IsResumeCallbackType auto pauseResume) noexcept
             {
-                auto& pauseHandler = _hdl.promise().pauseHandler;
-                if (pauseHandler)
-                {
-                    // pause handler is already initialized
-                    pauseHandler->ResetCallback(std::move(pauseResume));
-                }
-                else
-                {
-                    // pause handler need to be initialized
-                    _hdl.promise().MakePauseHandler(std::move(pauseResume), InitialCancellablePolicyT::value);
-                }
+                auto sharedStatePtr = SharedState();
+
+                assert(sharedStatePtr);
+
+                // pause handler is already initialized
+                sharedStatePtr->ResetCallback(std::move(pauseResume));
             }
 
-            [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
+            [[nodiscard]] auto* SharedState() noexcept { return _hdl.promise().SharedState(); }
+            [[nodiscard]] auto* SharedState() const noexcept { return _hdl.promise().SharedState(); }
 
             template <typename T>
                 requires std::constructible_from<StopSourceT, T>
@@ -108,8 +110,7 @@ namespace tinycoro {
                 _hdl.promise().SetStopSource(std::forward<T>(arg));
             }
 
-            // template <std::regular_invocable T>
-            void SetCurrentAwaitable(void* awaitable) noexcept { _hdl.promise().SetCurrentAwaitable(awaitable); }
+            void SetCustomData(void* awaitable) noexcept { _hdl.promise().SetCustomData(awaitable); }
 
             [[nodiscard]] detail::address_t Address() const noexcept { return _hdl.address(); }
 

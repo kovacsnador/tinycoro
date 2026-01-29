@@ -8,8 +8,6 @@
 
 #include <coroutine>
 
-#include "PauseHandler.hpp"
-
 namespace tinycoro {
 
     struct CancellableSuspend

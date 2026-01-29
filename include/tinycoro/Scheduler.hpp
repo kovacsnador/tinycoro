@@ -18,7 +18,6 @@
 #include <memory_resource>
 
 #include "Common.hpp"
-#include "PauseHandler.hpp"
 #include "LinkedPtrList.hpp"
 #include "AtomicQueue.hpp"
 #include "SchedulerWorker.hpp"
@@ -79,6 +78,8 @@ namespace tinycoro {
                 requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
             [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
             {
+                static_assert((!std::is_reference_v<CoroTasksT> && ...), "Task must be passed as an rvalue (do not use a reference).");
+
                 if constexpr (sizeof...(CoroTasksT) == 1)
                 {
                     return EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks)...);
@@ -95,6 +96,8 @@ namespace tinycoro {
                 requires concepts::FutureState<FutureStateT<void>> && (!std::is_reference_v<ContainerT>)
             [[nodiscard]] auto Enqueue(ContainerT&& tasks)
             {
+                static_assert(!std::is_reference_v<ContainerT>, "Task container must be passed as an rvalue (do not use a reference).");
+
                 // get the result value
                 using desiredValue_t = typename std::decay_t<ContainerT>::value_type::value_type;
 

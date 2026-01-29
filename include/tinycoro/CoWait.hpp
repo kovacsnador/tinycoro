@@ -11,7 +11,6 @@
 #include <utility>
 #include <iostream>
 
-#include "PauseHandler.hpp"
 #include "Wait.hpp"
 
 namespace tinycoro {
@@ -38,7 +37,7 @@ namespace tinycoro {
 
                     // Notify the current awaitable if all the coroutines are completed.
                     auto  p = static_cast<PromiseT*>(promise);
-                    auto* a = static_cast<AwaitableT>(p->CurrentAwaitable());
+                    auto* a = static_cast<AwaitableT>(p->CustomData());
                     a->DestroyNotify();
                 };
             }
@@ -101,7 +100,7 @@ namespace tinycoro {
                 // start all coroutines
                 this->_futures = std::apply(
                     [this]<typename... Ts>(Ts&&... ts) {
-                        (ts.SetCurrentAwaitable(this), ...);
+                        (ts.SetCustomData(this), ...);
                         return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
                             std::forward<Ts>(ts)...);
                     },
@@ -131,7 +130,7 @@ namespace tinycoro {
                 // setting the destroy notifier callback
                 for (auto& it : _container)
                 {
-                    it.SetCurrentAwaitable(this);
+                    it.SetCustomData(this);
                 }
 
                 // start all coroutines
@@ -166,7 +165,7 @@ namespace tinycoro {
                 // start all coroutines
                 this->_futures = std::apply(
                     [this]<typename... Ts>(Ts&&... ts) {
-                        ((ts.SetCurrentAwaitable(this), ts.SetStopSource(_stopSource)), ...);
+                        ((ts.SetCustomData(this), ts.SetStopSource(_stopSource)), ...);
                         return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
                             std::forward<Ts>(ts)...);
                     },
@@ -198,7 +197,7 @@ namespace tinycoro {
                 // setting the destroy notifier callback
                 for (auto& it : _container)
                 {
-                    it.SetCurrentAwaitable(this);
+                    it.SetCustomData(this);
                     it.SetStopSource(_stopSource);
                 }
 

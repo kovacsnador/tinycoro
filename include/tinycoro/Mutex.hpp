@@ -8,7 +8,6 @@
 
 #include <atomic>
 
-#include "PauseHandler.hpp"
 #include "ReleaseGuard.hpp"
 #include "LinkedUtils.hpp"
 

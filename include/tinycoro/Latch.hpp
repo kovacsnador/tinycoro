@@ -9,7 +9,6 @@
 #include <mutex>
 
 #include "LinkedPtrStack.hpp"
-#include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "AwaiterHelper.hpp"
 
@@ -109,7 +108,7 @@ namespace tinycoro {
 
             [[nodiscard]] constexpr bool await_ready() const noexcept { return _latch.IsReady(); }
 
-            constexpr auto await_suspend(auto parentCoro)
+            [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
             {
                 PutOnPause(parentCoro);
                 if (_latch.Add(this) == false)

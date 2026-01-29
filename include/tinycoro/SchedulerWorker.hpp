@@ -26,7 +26,7 @@ namespace tinycoro { namespace detail {
         // underlying list with a mutex. Only the operations required by the
         // scheduler are exposed: iterating (begin), inserting at front and
         // erasing an element by pointer.
-        template<typename T>
+        template <typename T>
         struct ThreadSafeList
         {
             auto begin() const noexcept { return _list.begin(); }
@@ -40,7 +40,7 @@ namespace tinycoro { namespace detail {
             bool erase(T* elem) noexcept
             {
                 std::scoped_lock lock{_mtx};
-                
+
                 auto erased = _list.erase(elem);
                 assert(erased);
 
@@ -55,7 +55,7 @@ namespace tinycoro { namespace detail {
             detail::LinkedPtrList<T> _list;
         };
 
-    } // namespace helper
+    } // namespace local
 
     template <typename DispatcherT>
     class SchedulerWorker
@@ -148,13 +148,12 @@ namespace tinycoro { namespace detail {
 
         // Generates the pause resume callback
         // It relays on a task pointer address
-        template<typename PromiseT>
+        template <typename PromiseT>
         ResumeCallback_t GeneratePauseResume(PromiseT promisePtr) noexcept
         {
             using self_t = decltype(this);
 
             auto callback = [](void* selfPtr, void* promisePtr, ENotifyPolicy policy) {
-
                 // worker pointer
                 auto self = static_cast<self_t>(selfPtr);
                 // promise poiner
@@ -162,14 +161,18 @@ namespace tinycoro { namespace detail {
 
                 if (self->_stopToken.stop_requested() == false)
                 {
-                    auto expected = promise->pauseState.load(std::memory_order_relaxed);
-                    if (expected == EPauseState::IDLE)
+                    auto SharedStatePtr = promise->SharedState();
+                    auto expected       = SharedStatePtr->Load(std::memory_order::acquire);
+
+                    if ((expected & UTypeCast(EPauseState::IDLE)) == 0)
                     {
+                        // decltype is necessary becasue of integer promotion
+                        decltype(expected) desired = expected | UTypeCast(EPauseState::NOTIFIED);
+                        
                         // If the notify callback invoked very quickly
                         // we have here a little time window to tell to
                         // the scheduler, that the task is ready for resumption
-                        if (promise->pauseState.compare_exchange_strong(
-                                expected, EPauseState::NOTIFIED, std::memory_order_release, std::memory_order_relaxed))
+                        if (SharedStatePtr->CompareExchange(expected, desired, std::memory_order::release, std::memory_order::relaxed))
                         {
                             // The task is notified
                             // in time, so we are done.
@@ -177,13 +180,13 @@ namespace tinycoro { namespace detail {
                         }
                     }
 
-                    assert(expected == EPauseState::PAUSED);
+                    assert(expected & UTypeCast(EPauseState::PAUSED));
+                    assert((expected & UTypeCast(EPauseState::NOTIFIED)) == 0);
 
                     // If we reach this point
                     // that means that the task is already in paused state
                     // So we need to resume it manually
                     self->_pausedTasks.erase(promise);
-
 
                     // push back task to the queue for resumption
                     Task_t task{promise};
@@ -199,7 +202,7 @@ namespace tinycoro { namespace detail {
                         auto dispatcherPtr = std::addressof(self->_dispatcher);
 
                         // After a successful push, we must return immediately.
-                        // 
+                        //
                         // The task may resume and destroy itself before this function continues,
                         // which could lead to a heap use-after-free.
                         if (dispatcherPtr->try_push(std::move(task)) == false)
@@ -227,7 +230,7 @@ namespace tinycoro { namespace detail {
         {
             // sets the corrent pause resume callback
             // before any resumption
-            task->SetPauseHandler(GeneratePauseResume(task.get()));
+            task->SetResumeCallback(GeneratePauseResume(task.get()));
 
             using enum ETaskResumeState;
             while (_stopToken.stop_requested() == false)
@@ -267,25 +270,31 @@ namespace tinycoro { namespace detail {
                     return;
                 }
                 case PAUSED: {
-                    auto expected = task->PauseState().load(std::memory_order_acquire);
-                    assert(expected != EPauseState::PAUSED);
+                    auto sharedStatePtr = task->SharedState();
+                    auto expected       = sharedStatePtr->Load(std::memory_order::relaxed);
 
-                    if (expected == EPauseState::IDLE)
+                    // state cannot be in paused
+                    assert((expected & UTypeCast(EPauseState::PAUSED)) == 0);
+
+                    if ((expected & UTypeCast(EPauseState::IDLE)) == 0)
                     {
                         auto promisePtr = task.release();
 
                         // push back into the pause state
                         _pausedTasks.insert(promisePtr);
 
-                        if (promisePtr->pauseState.compare_exchange_strong(
-                                expected, EPauseState::PAUSED, std::memory_order_release, std::memory_order_relaxed))
+                        // decltype is necessary becasue of integer promotion
+                        decltype(expected) desired = expected | UTypeCast(EPauseState::PAUSED);
+                        if (sharedStatePtr->CompareExchange(expected, desired, std::memory_order::release, std::memory_order::relaxed))
                         {
                             // the task is in the paused task list
                             // we can return
                             return;
                         }
 
-                        assert(expected == EPauseState::NOTIFIED);
+                        // This failed once, how????????
+                        assert(expected & UTypeCast(EPauseState::NOTIFIED));
+                        assert((expected & UTypeCast(EPauseState::PAUSED)) == 0);
 
                         // in the meantime the task is notified for resumption
                         // so we need to remove it from the paused task queue

@@ -25,13 +25,13 @@ namespace tinycoro { namespace detail {
             newNode->owner = this;
 #endif
 
-            if(_first)
+            if (_first)
                 _first->prev = newNode;
             else
                 _last = newNode;
 
             newNode->next = std::exchange(_first, newNode);
-            _first->prev = nullptr;
+            _first->prev  = nullptr;
 
             ++_size;
         }
@@ -40,19 +40,19 @@ namespace tinycoro { namespace detail {
         {
             assert(node);
 
-            if((node->next == nullptr && node != _last) || _first == nullptr)
-                return false;   // not in the list
+            if ((node->next == nullptr && node != _last) || _first == nullptr)
+                return false; // not in the list
 
 #ifdef TINYCORO_DIAGNOSTICS
             TINYCORO_ASSERT(node && node->owner == this);
 #endif
 
-            if(node->next)
+            if (node->next)
                 node->next->prev = node->prev;
             else
                 _last = node->prev;
 
-            if(node->prev)
+            if (node->prev)
                 node->prev->next = node->next;
             else
                 _first = node->next;
@@ -73,11 +73,18 @@ namespace tinycoro { namespace detail {
         [[nodiscard]] bool        empty() const noexcept { return !_first; }
         [[nodiscard]] auto        size() const noexcept { return _size; }
 
+        [[nodiscard]] auto steal() noexcept
+        {
+            _last = nullptr;
+            _size = 0;
+            return std::exchange(_first, nullptr);
+        }
+
     private:
         value_type* _first{nullptr};
         value_type* _last{nullptr};
 
-        size_t      _size{};
+        size_t _size{};
     };
 
 }} // namespace tinycoro::detail

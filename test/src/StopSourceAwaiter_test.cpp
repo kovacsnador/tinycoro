@@ -13,6 +13,8 @@ struct PromiseMock
     {
         return stopSource;
     }
+
+    void CreateSharedState(bool) { }
 };
 
 TEST(StopSourceAwaiterTest, StopSourceAwaiterTest)
@@ -41,6 +43,8 @@ struct PromiseMockNoState
         stopSource = {};
         return stopSource;
     }
+
+    void CreateSharedState(bool) { }
 };
 
 TEST(StopSourceAwaiterTest, StopSourceAwaiterTest_nostate)

@@ -8,7 +8,6 @@
 #include <concepts>
 
 #include <tinycoro/Promise.hpp>
-#include <tinycoro/PauseHandler.hpp>
 
 namespace tinycoro { namespace test {
 
@@ -50,7 +49,10 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl(auto pauseResumerCallback)
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace(pauseResumerCallback, InitialCancellablePolicyT::value);
+
+        hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
+        hdl.promise().SharedState()->ResetCallback(pauseResumerCallback);
+        
         return hdl;
     }
 
@@ -58,7 +60,10 @@ namespace tinycoro { namespace test {
     auto MakeCoroutineHdl()
     {
         tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}}, InitialCancellablePolicyT::value);
+
+        hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
+        hdl.promise().SharedState()->ResetCallback(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}});
+
         return hdl;
     }
 

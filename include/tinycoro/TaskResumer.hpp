@@ -36,28 +36,19 @@ namespace tinycoro { namespace detail {
         template <typename PromiseT>
         static inline void Resume(PromiseT& promise)
         {
-            auto&       pauseHandler = promise.pauseHandler;
-            const auto& stopSource   = promise.stopSource;
+            auto        sharedStatePtr = promise.SharedState();
+            const auto& stopSource     = promise.stopSource;
 
-            if constexpr (requires { promise.pauseState; })
+            // reset the pause state by every resume.
+            sharedStatePtr->ClearPauseStateBits();
+
+            if (sharedStatePtr->IsCancellable() && stopSource.stop_requested())
             {
-                // pauseState is not supported by
-                // InlinePromise
-                //
-                // reset the pause state by every resume.
-                promise.pauseState.store(EPauseState::IDLE, std::memory_order_relaxed);
+                return; // need to cancel the corouitne
             }
 
-            if (pauseHandler)
-            {
-                if (stopSource.stop_requested() && pauseHandler->IsCancellable())
-                {
-                    return; // need to cancel the corouitne
-                }
-
-                // Resets the pause flag if necessary so the task is running.
-                pauseHandler->Resume();
-            }
+            // Resets all the flags.
+            sharedStatePtr->ClearFlags();
 
             // check for continuation type
             using promise_base_t = std::remove_pointer_t<decltype(promise.child)>;
@@ -94,19 +85,16 @@ namespace tinycoro { namespace detail {
                     }
                 }
 
-                const auto& pauseHandler = promise.pauseHandler;
-                const auto& stopSource   = promise.stopSource;
+                const auto  sharedStatePtr = promise.SharedState();
+                const auto& stopSource     = promise.stopSource;
 
-                if (pauseHandler)
+                if (sharedStatePtr->IsCancellable() && stopSource.stop_requested())
                 {
-                    if (stopSource.stop_requested() && pauseHandler->IsCancellable())
-                    {
-                        return ETaskResumeState::STOPPED;
-                    }
-                    else if (pauseHandler->IsPaused())
-                    {
-                        return ETaskResumeState::PAUSED;
-                    }
+                    return ETaskResumeState::STOPPED;
+                }
+                else if (sharedStatePtr->IsPaused())
+                {
+                    return ETaskResumeState::PAUSED;
                 }
                 return ETaskResumeState::SUSPENDED;
             }

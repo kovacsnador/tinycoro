@@ -6,11 +6,11 @@
 
 #include "mock/CoroutineHandleMock.h"
 
-struct PauseHdlMock
+struct SharedStateMock
 {
     static inline size_t count{0};
 
-    PauseHdlMock()
+    SharedStateMock()
     : val{count++}
     {
     }
@@ -40,7 +40,7 @@ struct HandleMock
     {
         value = hdl.promise().value;
         stopSource = hdl.promise().stopSource;
-        pauseHandler = hdl.promise().pauseHandler;
+        sharedState = hdl.promise().sharedState;
     }
 
     template<typename T>
@@ -48,13 +48,13 @@ struct HandleMock
     {
         value = hdl.promise().value;
         stopSource = hdl.promise().stopSource;
-        pauseHandler = hdl.promise().pauseHandler;
+        sharedState = hdl.promise().sharedState;
     }
 
     ValueT value;
 
     StopSourceMock stopSource;
-    PauseHdlMock pauseHandler;
+    SharedStateMock sharedState;
 };
 
 template<>
@@ -66,18 +66,18 @@ struct HandleMock<void>
     HandleMock(tinycoro::test::CoroutineHandleMock<T> hdl)
     {
         stopSource = hdl.promise().stopSource;
-        pauseHandler = hdl.promise().pauseHandler;
+        sharedState = hdl.promise().sharedState;
     }
 
     template<typename T>
     void operator=(tinycoro::test::CoroutineHandleMock<T> hdl)
     {
         stopSource = hdl.promise().stopSource;
-        pauseHandler = hdl.promise().pauseHandler;
+        sharedState = hdl.promise().sharedState;
     }
 
     StopSourceMock stopSource;
-    PauseHdlMock pauseHandler;
+    SharedStateMock sharedState;
 };
 
 template<typename ValueT>
@@ -86,12 +86,18 @@ struct PromiseMock
     PromiseMock<ValueT>* child;
     PromiseMock<ValueT>* parent;
     StopSourceMock stopSource;
-    PauseHdlMock pauseHandler;
+    SharedStateMock sharedState;
 
     auto& StopSource() noexcept
     {
         return stopSource;
     }
+
+    void AssignSharedState(auto) {}
+
+    void CreateSharedState(bool) { }
+
+    auto SharedState() { return std::addressof(sharedState); }
 
     ValueT&& value() { return std::move(_value); }
 
@@ -104,12 +110,18 @@ struct PromiseMock<void>
     PromiseMock<void>* child;
     PromiseMock<void>* parent;
     StopSourceMock stopSource;
-    PauseHdlMock pauseHandler;
+    SharedStateMock sharedState;
 
     auto& StopSource() noexcept
     {
         return stopSource;
     }
+
+    void CreateSharedState(bool) { }
+
+    void AssignSharedState(auto) {}
+
+    auto SharedState() { return std::addressof(sharedState); }
 };
 
 template<typename ValueT, template<typename, typename> class AwaiterT>
@@ -162,7 +174,7 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_int)
 
     EXPECT_EQ(parent._hdl.promise().child->value(), 42);
 
-    EXPECT_EQ(task._hdl.promise().parent->pauseHandler.val, parent._hdl.promise().pauseHandler.val);
+    EXPECT_EQ(task._hdl.promise().parent->sharedState.val, parent._hdl.promise().sharedState.val);
     EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
 }
 
@@ -174,6 +186,6 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_void)
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(task._hdl.promise().parent->pauseHandler.val, parent._hdl.promise().pauseHandler.val);
+    EXPECT_EQ(task._hdl.promise().parent->sharedState.val, parent._hdl.promise().sharedState.val);
     EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
 }

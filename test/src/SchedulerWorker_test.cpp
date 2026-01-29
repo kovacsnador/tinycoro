@@ -36,24 +36,26 @@ struct AtomicQueueMock
 
 struct SchedubableMock
 {
-    MOCK_METHOD(tinycoro::ETaskResumeState, Resume, ());
+    MOCK_METHOD(tinycoro::detail::ETaskResumeState, Resume, ());
 
-    MOCK_METHOD(std::atomic<tinycoro::EPauseState>&, PauseState, ());
+    MOCK_METHOD(std::atomic<tinycoro::detail::EPauseState>&, PauseState, ());
 
-    MOCK_METHOD(void, SetPauseHandler, (tinycoro::ResumeCallback_t));
+    MOCK_METHOD(void, SetResumeCallback, (tinycoro::ResumeCallback_t));
+
+    MOCK_METHOD(tinycoro::detail::SharedState*, SharedState, ());
 };
 
 struct Schedubable : tinycoro::detail::DoubleLinkable<Schedubable>
 {
-    tinycoro::ETaskResumeState Resume() { return mock.Resume(); };
+    auto Resume() { return mock.Resume(); };
 
-    void SetPauseHandler(tinycoro::ResumeCallback_t cb) { mock.SetPauseHandler(cb); };
+    void SetResumeCallback(tinycoro::ResumeCallback_t cb) { mock.SetResumeCallback(cb); };
 
-    auto& PauseState() { return mock.PauseState(); }
+    auto SharedState() { return mock.SharedState(); }
 
     SchedubableMock mock;
 
-    std::atomic<tinycoro::EPauseState> pauseState{tinycoro::EPauseState::IDLE};
+    tinycoro::detail::SharedState sharedState{false};
 };
 
 TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
@@ -65,9 +67,9 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
 
     EXPECT_CALL(task->mock, Resume).WillOnce([&] {
         latch.count_down();
-        return tinycoro::ETaskResumeState::DONE;
+        return tinycoro::detail::ETaskResumeState::DONE;
     });
-    EXPECT_CALL(task->mock, SetPauseHandler);
+    EXPECT_CALL(task->mock, SetResumeCallback);
 
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
     tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
@@ -100,13 +102,13 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_CALL(task->mock, Resume)
             .WillOnce([&] {
                 latch.count_down();
-                return tinycoro::ETaskResumeState::SUSPENDED;
+                return tinycoro::detail::ETaskResumeState::SUSPENDED;
             })
             .WillOnce([&] {
                 latch.count_down();
-                return tinycoro::ETaskResumeState::DONE;
+                return tinycoro::detail::ETaskResumeState::DONE;
             });
-        EXPECT_CALL(task->mock, SetPauseHandler).Times(2);
+        EXPECT_CALL(task->mock, SetResumeCallback).Times(2);
 
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
         tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};

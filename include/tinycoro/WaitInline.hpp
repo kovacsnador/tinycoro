@@ -14,7 +14,6 @@
 #include <stop_token>
 
 #include "Common.hpp"
-#include "PauseHandler.hpp"
 
 namespace tinycoro {
     namespace concepts {
@@ -22,10 +21,9 @@ namespace tinycoro {
         template <typename T>
         concept LocalRunable = requires (T t) {
             { t.await_resume() };
-            { t.GetPauseHandler() };
-            { t.SetPauseHandler(ResumeCallback_t{}) };
+            { t.SetResumeCallback(ResumeCallback_t{}) };
             { t.Resume() } -> std::same_as<void>;
-            { t.ResumeState() } -> std::same_as<ETaskResumeState>;
+            { t.ResumeState() } -> std::same_as<detail::ETaskResumeState>;
         };
 
         template <typename ValueT, typename... TaskT>
@@ -48,13 +46,13 @@ namespace tinycoro {
                 auto task = static_cast<TaskT*>(taskPtr);
                 auto [event, stopToken] = *static_cast<PayloadT*>(payload);
 
-                auto pauseHandler = task->GetPauseHandler();
+                auto sharedStatePtr = task->SharedState();
 
                 // checking if the task is cancelled
-                auto isTaskCancelled = [stopToken, &pauseHandler]() {
+                auto isTaskCancelled = [stopToken, sharedStatePtr]() {
                     if(stopToken->stop_requested())
                     {
-                        return pauseHandler->IsCancellable();
+                        return sharedStatePtr->IsCancellable();
                     }
                     return false;
                 };
@@ -63,8 +61,8 @@ namespace tinycoro {
                 {
                     // it the task is not cancelled,
                     // reset the pause handler flags with explicitly
-                    // calling resume on pauseHandler
-                    pauseHandler->Resume();
+                    // calling resume on shared state
+                    sharedStatePtr->ClearFlags();
                 }
 
                 // sets the event, that means theres is a task
@@ -73,7 +71,7 @@ namespace tinycoro {
             };
 
             // setup the resumer callback
-            task.SetPauseHandler(ResumeCallback_t{callback, std::addressof(task), payload});
+            task.SetResumeCallback(ResumeCallback_t{callback, std::addressof(task), payload});
         }
 
         // check if the task is finished

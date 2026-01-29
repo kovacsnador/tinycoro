@@ -11,7 +11,6 @@
 
 #include "AllocatorAdapter.hpp"
 #include "PromiseSchedulable.hpp"
-#include "PauseHandler.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -197,13 +196,12 @@ namespace tinycoro {
         // It is used inside the scheduler logic.
         template <concepts::IsAwaiter    FinalAwaiterT,
                   PromiseReturnerConcept ReturnerT,
-                  typename PauseHandlerT,
                   typename StopSourceT,
                   template <typename> class AllocatorT>
             requires concepts::IsAllocatorAdapter<AllocatorT>
-        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>,
+        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, StopSourceT>,
                           public ReturnerT,
-                          public AllocatorT<PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
+                          public AllocatorT<PromiseT<FinalAwaiterT, ReturnerT, StopSourceT, AllocatorT>>
         {
             [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<PromiseT>::from_promise(*this); }
 
@@ -236,31 +234,27 @@ namespace tinycoro {
         // Only inherits from the promise base object.
         template <concepts::IsAwaiter    FinalAwaiterT,
                   PromiseReturnerConcept ReturnerT,
-                  typename PauseHandlerT,
                   typename StopSourceT,
                   template <typename> class AllocatorT>
             requires concepts::IsAllocatorAdapter<AllocatorT>
-        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>,
+        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, StopSourceT>,
                                 public ReturnerT,
-                                public AllocatorT<InlinePromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
+                                public AllocatorT<InlinePromiseT<FinalAwaiterT, ReturnerT, StopSourceT, AllocatorT>>
         {
             [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<InlinePromiseT>::from_promise(*this); }
         };
 
         template <typename ReturnValueT,
                   template <typename> class AllocatorT = DefaultAllocator,
-                  typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
         using Promise = detail::
-            PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT, AllocatorT>;
+            PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, StopSourceT, AllocatorT>;
 
         template <typename ReturnValueT,
                   template <typename> class AllocatorT = DefaultAllocator,
-                  typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
         using InlinePromise = detail::InlinePromiseT<detail::FinalAwaiter,
                                                      detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>,
-                                                     PauseHandlerT,
                                                      StopSourceT,
                                                      AllocatorT>;
     } // namespace detail
