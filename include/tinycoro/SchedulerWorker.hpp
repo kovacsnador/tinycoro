@@ -164,8 +164,11 @@ namespace tinycoro { namespace detail {
                     auto SharedStatePtr = promise->SharedState();
                     auto expected       = SharedStatePtr->Load(std::memory_order::acquire);
 
-                    if ((expected & UTypeCast(EPauseState::IDLE)) == 0)
+                    while ((expected & UTypeCast(EPauseState::PAUSED)) == 0)
                     {
+                        // we try to set the NOTIFIED flag until the PAUSED
+                        // is not set.
+
                         // decltype is necessary becasue of integer promotion
                         decltype(expected) desired = expected | UTypeCast(EPauseState::NOTIFIED);
                         
@@ -276,20 +279,31 @@ namespace tinycoro { namespace detail {
                     // state cannot be in paused
                     assert((expected & UTypeCast(EPauseState::PAUSED)) == 0);
 
-                    if ((expected & UTypeCast(EPauseState::IDLE)) == 0)
+                    if ((expected & UTypeCast(EPauseState::NOTIFIED)) == 0)
                     {
+                        // no bit are set
+                        assert((expected & UTypeCast(EPauseState::IDLE)) == 0);
+
+                        // task is not notified yet,
+                        // so we try to pause it.
                         auto promisePtr = task.release();
 
                         // push back into the pause state
                         _pausedTasks.insert(promisePtr);
 
-                        // decltype is necessary becasue of integer promotion
-                        decltype(expected) desired = expected | UTypeCast(EPauseState::PAUSED);
-                        if (sharedStatePtr->CompareExchange(expected, desired, std::memory_order::release, std::memory_order::relaxed))
+                        while((expected & UTypeCast(EPauseState::NOTIFIED)) == 0)
                         {
-                            // the task is in the paused task list
-                            // we can return
-                            return;
+                            // we try to set the PAUSED flag until the NOTIFIED
+                            // is not set.
+
+                            // decltype is necessary becasue of integer promotion
+                            decltype(expected) desired = expected | UTypeCast(EPauseState::PAUSED);
+                            if (sharedStatePtr->CompareExchange(expected, desired, std::memory_order::release, std::memory_order::relaxed))
+                            {
+                                // the task is in the paused task list
+                                // we can return
+                                return;
+                            }
                         }
 
                         // This failed once, how????????

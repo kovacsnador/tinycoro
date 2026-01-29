@@ -91,15 +91,13 @@ namespace tinycoro {
             [[nodiscard]] auto Load(std::memory_order order) const noexcept { return _state.load(order); }
 
             template <typename T>
-            [[nodiscard]] bool CompareExchange(T&                expected,
-                                                         T                 desired,
-                                                         std::memory_order orderSucceed,
-                                                         std::memory_order orderFailed) noexcept
+            [[nodiscard]] bool CompareExchange(T& expected, T desired, std::memory_order orderSucceed, std::memory_order orderFailed) noexcept
             {
                 return _state.compare_exchange_strong(expected, desired, orderSucceed, orderFailed);
             }
 
-            auto ClearPauseStateBits(std::memory_order order = std::memory_order::relaxed) noexcept {
+            auto ClearPauseStateBits(std::memory_order order = std::memory_order::relaxed) noexcept
+            {
                 // clear the first bits which are responsible for the pause state in scheduler.
                 return _state.fetch_and(~detail::UTypeCast(detail::EPauseState::IDLE), order);
             };
@@ -124,7 +122,7 @@ namespace tinycoro {
         // Pauses the task associated with the given coroutine handle.
         //
         // The pause request is forwarded to the task's shared state.
-        // 
+        //
         // Returns a ResumeCallback_t which is responsible for the task resumption.
         [[nodiscard]] ResumeCallback_t PauseTask(auto hdl) noexcept
         {
