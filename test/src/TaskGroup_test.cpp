@@ -144,29 +144,6 @@ TEST(TaskGroupTest, TaskGroupTest_multiple_task_return)
     EXPECT_TRUE(set.empty());
 }
 
-/*TEST(TaskGroupTest, TaskGroupTest_multiple_task_return_next)
-{
-    tinycoro::TaskGroup<int32_t> taskGroup;
-
-    tinycoro::Scheduler scheduler;
-    taskGroup.Spawn(scheduler, IntTask(1));
-    taskGroup.Spawn(scheduler, IntTask(2));
-    taskGroup.Spawn(scheduler, IntTask(3));
-    taskGroup.Spawn(scheduler, IntTask(4));
-
-    auto val = taskGroup.Next();
-    EXPECT_EQ(*val, 1);
-
-    val = taskGroup.Next();
-    EXPECT_EQ(*val, 2);
-
-    val = taskGroup.Next();
-    EXPECT_EQ(*val, 3);
-
-    val = taskGroup.Next();
-    EXPECT_EQ(*val, 4);
-}*/
-
 TEST(TaskGroupTest, TaskGroupTest_next_await)
 {
     tinycoro::TaskGroup<int32_t> taskGroup;
@@ -336,4 +313,76 @@ TEST(TaskGroupTest, TaskGroupTest_spawn_after_close_fails)
     };
 
     EXPECT_FALSE(group.Spawn(scheduler, task()));
+}
+
+struct TaskGroupStressTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(TaskGroupStressTest, TaskGroupStressTest, testing::Values(1, 10, 100, 1000, 10000));
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::TaskGroup<int> group;
+
+    std::atomic<uint32_t> c{}; 
+
+    auto task = []() -> tinycoro::Task<int32_t> {
+        co_return 42;
+    };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for(size_t i=0; i < count; ++i)
+            group.Spawn(scheduler, task());
+
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while(auto res = co_await group.Next())
+        {
+            EXPECT_EQ(*res, 42);
+            c.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::AllOf(producer(), consumer());
+
+    EXPECT_EQ(c, count);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler{2};
+    tinycoro::TaskGroup<int> group;
+
+    std::atomic<uint32_t> c{}; 
+
+    auto task = []() -> tinycoro::Task<int32_t> {
+        co_return 42;
+    };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for(size_t i=0; i < count; ++i)
+            group.Spawn(scheduler, task());
+
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while(auto res = co_await group.Next())
+        {
+            EXPECT_EQ(*res, 42);
+            c.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::AllOf(scheduler, producer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+
+    EXPECT_EQ(c, count);
 }

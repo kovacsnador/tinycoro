@@ -193,6 +193,7 @@ namespace tinycoro {
             using futureTypeGetter_t = detail::FutureTypeGetter<ReturnT, FutureStateT>;
 
             using future_t       = futureTypeGetter_t::future_t;
+            using futureState_t  = futureTypeGetter_t::futureState_t;
             using futureReturn_t = futureTypeGetter_t::futureReturn_t;
             using block_t        = TaskGroupBlock<future_t>;
 
@@ -226,6 +227,8 @@ namespace tinycoro {
             // tasks to finish and suppresses exceptions.
             ~TaskGroup()
             {
+                Close();
+
                 // After Join(), no tasks are running and no further Finish-callbacks can occur.
                 auto joinAll = [this]() -> InlineTask<> { co_await Join(); };
                 tinycoro::AllOf(joinAll());
@@ -274,24 +277,29 @@ namespace tinycoro {
                 task.SharedState()->MarkStopTokenUser();
                 task.SetStopSource(_stopSource);
 
-                using finishCallback_t = TaskFinishCallback<block_t>;
+                futureState_t futureState{};
 
-                std::scoped_lock lock{_mtx};
+                std::unique_lock lock{_mtx};
 
                 if (_closed == false)
                 {
-                    auto blockPtr = block.release();
+                    // group is open.
+                    block->future = futureState.get_future();
 
                     // take ownership over the block the _runningTaskblocks
-                    _runningTaskblocks.push_front(blockPtr);
+                    _runningTaskblocks.push_front(block.release());
+
+                    lock.unlock();
 
                     // here we can check if the taskgroup is closed,
-                    blockPtr->future = scheduler.template Enqueue<FutureStateT, finishCallback_t>(std::move(task));
+                    scheduler.template Enqueue<TaskFinishCallback<block_t>>(std::move(futureState), std::move(task));
+
+                    // task is attached to the group
+                    return true;
                 }
 
-                // adding task was successful if
-                // the state is not closed.
-                return !_closed;
+                // failed to add a task to the group
+                return false;
             }
 
             // Cancels all running tasks in the group.
@@ -420,8 +428,13 @@ namespace tinycoro {
 
                 [[maybe_unused]] auto erased = _runningTaskblocks.erase(block.get());
 
-                assert(erased);
+                // NOTE:
+                // At this point, it can be that
+                // the future is not valid yet.
+                // Because the task finishes before the future can
+                // be asssigned in Spawn() function.
                 assert(block->future.valid());
+                assert(erased);
 
                 // in case the task is cancelled, we don't touch the next awaiters list
                 auto awaiter = isCancelled ? nullptr : _nextAwaiters.pop();
