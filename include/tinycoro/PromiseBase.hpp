@@ -151,7 +151,9 @@ namespace tinycoro { namespace detail {
             assert(SharedState() == nullptr);
             assert(parent == nullptr);
 
-            _sharedState.emplace<detail::SharedState>(initialCancellable);
+            _sharedState.emplace<1>(initialCancellable);
+
+            //_sharedState = detail::SharedState{initialCancellable};
         }  
 
     private:
