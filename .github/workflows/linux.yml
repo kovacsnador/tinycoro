@@ -95,10 +95,20 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: cmake --build .
 
-    - name: Run Unit Tests
+    - name: Run Unit Tests (with gdb on crash)
       timeout-minutes: 20
       working-directory: ${{runner.workspace}}/build
-      run: ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
+      run: |
+        set +e
+        ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
+        EXIT_CODE=$?
+
+        if [ $EXIT_CODE -ne 0 ]; then
+          echo "❌ Tests crashed, running gdb backtrace..."
+          gdb -batch -ex "run" -ex "bt full" --args ./test/tinycoro_tests \
+            --gtest_repeat=1 --gtest_break_on_failure=1
+          exit $EXIT_CODE
+        fi
 
     - name: Run Examples
       working-directory: ${{runner.workspace}}/build
