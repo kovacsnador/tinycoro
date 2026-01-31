@@ -147,7 +147,7 @@ namespace tinycoro { namespace detail {
         constexpr void CreateSharedState(bool initialCancellable = tinycoro::default_initial_cancellable_policy::value) noexcept
         {
             // make sure this is called only once
-            assert(std::get<0>(_sharedState) == nullptr);
+            assert(SharedState() == nullptr);
 
             _sharedState.emplace<detail::SharedState>(initialCancellable);
         }  

@@ -53,6 +53,9 @@ namespace tinycoro { namespace detail {
         requires local::ValidatePtrVariant_v<std::remove_cvref_t<VariantT>>
     auto PtrVisit(VariantT& variant)
     {
+        assert(variant.index() != std::variant_npos);
+        assert(variant.valueless_by_exception() == false);
+
         // Base value type of the variant (T), independent of pointer or cv-qualification.
         using value_t = std::remove_pointer_t<std::variant_alternative_t<0, VariantT>>;
 

@@ -38,6 +38,9 @@ namespace tinycoro {
                 if (cancellable)
                     MakeCancellable();
             }
+            
+            // disable move and copy
+            SharedState(SharedState&&) = delete;
 
             void ClearFlags() noexcept
             {
