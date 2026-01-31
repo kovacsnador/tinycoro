@@ -80,9 +80,6 @@ jobs:
       with:
         python-version: "3.10"
 
-    - name: Install gdb
-      run: brew install gdb
-
     - name: Create Build Environment
       run: |
         ${{matrix.install}}
@@ -98,20 +95,10 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: cmake --build .
 
-    - name: Run Unit Tests (with gdb on crash)
+    - name: Run Unit Tests
       timeout-minutes: 20
       working-directory: ${{runner.workspace}}/build
-      run: |
-        set +e
-        ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
-        EXIT_CODE=$?
-
-        if [ $EXIT_CODE -ne 0 ]; then
-          echo "❌ Tests crashed, running gdb backtrace..."
-          gdb -batch -ex "run" -ex "bt full" --args ./test/tinycoro_tests \
-            --gtest_repeat=1 --gtest_break_on_failure=1
-          exit $EXIT_CODE
-        fi
+      run: ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1 --gtest_brief=1
 
     - name: Run Examples
       working-directory: ${{runner.workspace}}/build
