@@ -58,14 +58,18 @@ namespace tinycoro {
             constexpr CoroTask() = default;
 
             template <typename... Args>
-                requires std::constructible_from<coro_hdl_type, Args...> &&  (sizeof...(Args) > 0)
+                requires std::constructible_from<coro_hdl_type, Args...> && (sizeof...(Args) > 0)
             CoroTask(Args&&... args)
             : _hdl{std::forward<Args>(args)...}
             {
                 assert(_hdl);
-                
-                // Create the shared state only once
-                _hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
+
+                // Warning!
+                //
+                // Do not call promise() here.
+                // On some compilers (especially Clang 17 and above), this is dangerous.
+                // In Release mode, the optimizer may remove parts of the code,
+                // which can lead to crashes.
             }
 
             CoroTask(CoroTask&& other) noexcept
@@ -151,12 +155,13 @@ namespace tinycoro {
     template <typename ReturnT                                               = void,
               template <typename> class AllocatorT                           = DefaultAllocator,
               concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
-    using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, AllocatorT>, AwaiterValue>;
+    using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, InitialCancellablePolicyT, AllocatorT>, AwaiterValue>;
 
     template <typename ReturnT                                               = void,
               template <typename> class AllocatorT                           = DefaultAllocator,
               concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
-    using InlineTask = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, AllocatorT>, AwaiterValue>;
+    using InlineTask
+        = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, InitialCancellablePolicyT, AllocatorT>, AwaiterValue>;
 
     // Convenience aliases for tasks with a non-initial cancellable policy.
     // (TaskNIC/InlineTaskNIC)

@@ -47,8 +47,6 @@ TEST(SharedStateTest, CancellableSuspentTest_value)
 {
     tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<int32_t>> hdl;
 
-    hdl.promise().CreateSharedState(tinycoro::default_initial_cancellable_policy::value);
-
     bool called = false;
 
     hdl.promise().SharedState()->ResetCallback(tinycoro::test::ResumeCallbackTracer(called));

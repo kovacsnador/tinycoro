@@ -78,8 +78,6 @@ struct PromiseMock
         stopSource = source;
     }
 
-    void CreateSharedState(bool) {}
-
     auto SharedState() { return std::addressof(sharedState); }
 
     std::stop_source stopSource{};

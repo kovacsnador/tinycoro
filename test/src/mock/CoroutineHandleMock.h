@@ -48,9 +48,8 @@ namespace tinycoro { namespace test {
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl(auto pauseResumerCallback)
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T, InitialCancellablePolicyT>> hdl;
 
-        hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
         hdl.promise().SharedState()->ResetCallback(pauseResumerCallback);
         
         return hdl;
@@ -59,9 +58,8 @@ namespace tinycoro { namespace test {
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl()
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T, InitialCancellablePolicyT>> hdl;
 
-        hdl.promise().CreateSharedState(InitialCancellablePolicyT::value);
         hdl.promise().SharedState()->ResetCallback(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}});
 
         return hdl;

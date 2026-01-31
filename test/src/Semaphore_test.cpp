@@ -28,7 +28,6 @@ struct SemaphoreAwaiterTest : public testing::Test
 
     void SetUp() override
     {
-        hdl.promise().CreateSharedState();
         hdl.promise().SharedState()->ResetCallback(tinycoro::ResumeCallback_t{});
     }
 
@@ -104,7 +103,6 @@ struct SemaphoreTest : testing::Test
 
     void SetUp() override
     {
-        hdl.promise().CreateSharedState();
         hdl.promise().SharedState()->ResetCallback(tinycoro::ResumeCallback_t{});
     }
 

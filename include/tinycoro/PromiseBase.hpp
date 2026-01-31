@@ -145,16 +145,15 @@ namespace tinycoro { namespace detail {
             _sharedState = sharedStatePtr;
         }
 
+protected:
         constexpr void CreateSharedState(bool initialCancellable = tinycoro::default_initial_cancellable_policy::value) noexcept
         {
             // make sure this is called only once
             assert(SharedState() == nullptr);
             assert(parent == nullptr);
 
-            _sharedState.emplace<1>(initialCancellable);
-
-            //_sharedState = detail::SharedState{initialCancellable};
-        }  
+            _sharedState.emplace<detail::SharedState>(initialCancellable);
+        }
 
     private:
         // Saving the current awaitable.

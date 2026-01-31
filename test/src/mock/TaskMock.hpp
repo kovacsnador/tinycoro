@@ -28,8 +28,6 @@ namespace tinycoro { namespace test {
     struct PromiseMock
     {
         using value_type = T;
-
-        void CreateSharedState(bool) { }
     };
 
     template <typename T, typename CancellableT = tinycoro::initial_cancellable_t>

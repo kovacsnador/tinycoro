@@ -95,8 +95,6 @@ struct PromiseMock
 
     void AssignSharedState(auto) {}
 
-    void CreateSharedState(bool) { }
-
     auto SharedState() { return std::addressof(sharedState); }
 
     ValueT&& value() { return std::move(_value); }
@@ -116,8 +114,6 @@ struct PromiseMock<void>
     {
         return stopSource;
     }
-
-    void CreateSharedState(bool) { }
 
     void AssignSharedState(auto) {}
 

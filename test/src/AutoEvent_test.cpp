@@ -418,7 +418,7 @@ TEST_P(AutoEventTest, AutoEventFunctionalTest_concurrentSetAndWait)
 
 TEST(AutoEventTest, AutoEventFunctionalTest_setBeforeAwait)
 {
-    tinycoro::Scheduler scheduler{8};
+    tinycoro::Scheduler scheduler;
     tinycoro::AutoEvent event;
     bool                waited = false;
 

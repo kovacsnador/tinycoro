@@ -73,9 +73,7 @@ namespace tinycoro { namespace detail {
             {
                 auto& promise = handle.promise();
 
-                if constexpr (requires {
-                                  { promise.HasException() } -> std::same_as<bool>;
-                              })
+                if constexpr (requires { { promise.HasException() } -> std::same_as<bool>; })
                 {
                     if (promise.HasException())
                     {
