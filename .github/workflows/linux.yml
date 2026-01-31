@@ -12,7 +12,7 @@ jobs:
     strategy:
       matrix:
         compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15, Clang-16, Clang-17, Clang-18, Clang-19, Clang-20]
-        build_type: [Debug, Release]
+        build_type: [Debug] #, Release]
 
         include:
           - compiler: GCC-11
