@@ -140,6 +140,7 @@ namespace tinycoro { namespace detail {
         constexpr void AssignSharedState(auto sharedStatePtr) noexcept
         {
             assert(sharedStatePtr);
+            assert(parent != nullptr);
 
             _sharedState = sharedStatePtr;
         }
@@ -148,6 +149,7 @@ namespace tinycoro { namespace detail {
         {
             // make sure this is called only once
             assert(SharedState() == nullptr);
+            assert(parent == nullptr);
 
             _sharedState.emplace<detail::SharedState>(initialCancellable);
         }  

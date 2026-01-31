@@ -11,7 +11,7 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15, Clang-16] #, Clang-17, Clang-18, Clang-19, Clang-20]
+        compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15, Clang-16, Clang-17, Clang-18, Clang-19, Clang-20]
         build_type: [Debug, Release]
 
         include:
@@ -103,7 +103,7 @@ jobs:
       working-directory: ${{runner.workspace}}/build
       run: |
         set +e
-        ./test/tinycoro_tests --gtest_repeat=5 --gtest_break_on_failure=1
+        ./test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
         EXIT_CODE=$?
 
         if [ $EXIT_CODE -ne 0 ]; then

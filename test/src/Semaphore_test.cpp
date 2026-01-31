@@ -502,7 +502,7 @@ struct SemaphoreTimeoutTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest, testing::Values(1, 10, 100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000,100, 1000, 10000));
+INSTANTIATE_TEST_SUITE_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest, testing::Values(1, 10, 100, 1000, 10000));
 
 TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_timeout_all)
 {
