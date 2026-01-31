@@ -81,7 +81,7 @@ jobs:
         python-version: "3.10"
 
     - name: Install gdb
-      run: apt-get update && apt-get install -y gdb
+      run: brew install gdb
 
     - name: Create Build Environment
       run: |
