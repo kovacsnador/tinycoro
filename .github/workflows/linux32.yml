@@ -11,6 +11,7 @@ jobs:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false   # prevents cancelling other matrix jobs
       matrix:
         compiler: [11, 12, 13]  # GCC versions
         build_type: [Debug, Release]

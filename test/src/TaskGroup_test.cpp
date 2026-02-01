@@ -4,7 +4,7 @@
 
 #include "tinycoro/tinycoro_all.h"
 
-tinycoro::Task<> VoidTask()
+/*tinycoro::Task<> VoidTask()
 {
     co_return;
 }
@@ -382,7 +382,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer)
     EXPECT_EQ(c, count);
 }
 
-/*TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
 {
     const auto count = GetParam();
 

@@ -10,6 +10,7 @@ jobs:
   build:
     runs-on: windows-2022
     strategy:
+      fail-fast: false   # prevents cancelling other matrix jobs
       matrix:
         platform: [x86, x64]
         build_type: [Debug, Release]
