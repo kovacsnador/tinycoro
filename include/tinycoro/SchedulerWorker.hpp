@@ -175,7 +175,7 @@ namespace tinycoro { namespace detail {
                         // If the notify callback invoked very quickly
                         // we have here a little time window to tell to
                         // the scheduler, that the task is ready for resumption
-                        if (SharedStatePtr->CompareExchange(expected, desired, std::memory_order::release, std::memory_order::relaxed))
+                        if (SharedStatePtr->CompareExchange(expected, desired, std::memory_order::relaxed, std::memory_order::relaxed))
                         {
                             // The task is notified
                             // in time, so we are done.

@@ -314,6 +314,18 @@ TEST(TaskGroupTest, TaskGroupTest_spawn_after_close_fails)
     EXPECT_FALSE(group.Spawn(scheduler, task()));
 }
 
+TEST(TaskGroupTest, TaskGroupTest_stop_source)
+{
+    std::stop_source ss;
+    tinycoro::TaskGroup<int> group{ss};
+
+    auto ss2 = group.StopSource();
+
+    group.CancelAll();
+
+    EXPECT_TRUE(ss2.stop_requested());
+}
+
 struct TaskGroupStressTest : testing::TestWithParam<size_t>
 {
 };
@@ -326,7 +338,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t schedulerSize = 1 << 15;
+    constexpr size_t                         schedulerSize = 1 << 15;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -361,7 +373,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t schedulerSize = 1 << 15;
+    constexpr size_t                         schedulerSize = 1 << 15;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -396,7 +408,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t schedulerSize = 1 << 19;
+    constexpr size_t                         schedulerSize = 1 << 19;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -439,4 +451,197 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
                     consumer());
 
     EXPECT_EQ(spawned, executed);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_next)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 19;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::TaskGroup<int> group;
+    tinycoro::ManualEvent    event;
+
+    std::atomic<uint32_t> spawned{};
+    std::atomic<uint32_t> executed{};
+
+    auto task = []() -> tinycoro::Task<int32_t> { co_return 42; };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            if (group.Spawn(scheduler, task()))
+                spawned.fetch_add(1, std::memory_order::relaxed);
+        }
+
+        co_await group.Join();
+
+        event.Set();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        for (;;)
+        {
+            if (auto res = group.TryNext())
+            {
+                EXPECT_EQ(*res, 42);
+                executed.fetch_add(1, std::memory_order::relaxed);
+            }
+            else
+            {
+                if (event.IsSet())
+                    co_return;
+            }
+        }
+    };
+
+    tinycoro::AllOf(scheduler, producer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
+
+    EXPECT_EQ(spawned, executed);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer_cancel_all)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 15;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::SoftClock clock;
+
+    tinycoro::TaskGroup<int> group;
+
+    std::atomic<uint32_t> c{};
+
+    auto task = [&clock]() -> tinycoro::TaskNIC<int32_t> {
+        co_await tinycoro::SleepForCancellable(clock, 10s);
+        co_return 42;
+    };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+            group.Spawn(scheduler, task());
+
+        group.CancelAll();
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while (auto res = co_await group.Next())
+        {
+            // we should not land here...
+            c.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::AllOf(scheduler, producer(), consumer());
+
+    EXPECT_EQ(c, 0);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_cancel_some)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 19;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::SoftClock clock;
+
+    tinycoro::TaskGroup<int> group;
+
+    std::atomic<uint32_t> spawned{};
+    std::atomic<uint32_t> executed{};
+
+    auto task = [&clock]() -> tinycoro::TaskNIC<int32_t> {
+        co_await tinycoro::SleepForCancellable(clock, 5ms);
+        co_return 42;
+    };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            group.Spawn(scheduler, task());
+
+            // cancel in the middle somewhere
+            if(i == count / 2)
+                group.CancelAll();
+
+            spawned.fetch_add(1, std::memory_order::relaxed);
+        }
+
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while (auto res = co_await group.Next())
+        {
+            EXPECT_EQ(*res, 42);
+            executed.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::AllOf(scheduler, producer(), producer(), producer(), producer(), consumer(), consumer(), consumer(), consumer());
+
+    // some need to be cancelled
+    EXPECT_TRUE(executed <= spawned);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_cancel_some_stop_source)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 19;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::SoftClock clock;
+
+    std::stop_source ss;
+
+    tinycoro::TaskGroup<int> group{ss};
+
+    std::atomic<uint32_t> spawned{};
+    std::atomic<uint32_t> executed{};
+
+    auto task = [&clock]() -> tinycoro::TaskNIC<int32_t> {
+        co_await tinycoro::SleepForCancellable(clock, 5ms);
+        co_return 42;
+    };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+        {
+            group.Spawn(scheduler, task());
+
+            // cancel in the middle somewhere
+            if(i == count / 2)
+                ss.request_stop();
+
+            spawned.fetch_add(1, std::memory_order::relaxed);
+        }
+
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while (auto res = co_await group.Next())
+        {
+            EXPECT_EQ(*res, 42);
+            executed.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::AllOf(scheduler, producer(), producer(), producer(), producer(), consumer(), consumer(), consumer(), consumer());
+
+    // some need to be cancelled
+    EXPECT_TRUE(executed <= spawned);
 }
