@@ -453,17 +453,17 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
     EXPECT_EQ(spawned, executed);
 }
 
-TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_next)
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_pro_multi_co_try_next)
 {
     const auto count = GetParam();
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t                         schedulerSize = 1 << 15;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
-    std::atomic_flag flag;
+    tinycoro::ManualEvent event;
 
     std::atomic<uint32_t> spawned{};
     std::atomic<uint32_t> executed{};
@@ -473,13 +473,13 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
     auto producer = [&]() -> tinycoro::Task<> {
         for (size_t i = 0; i < count; ++i)
         {
-            if (group.Spawn(scheduler, task()))
-                spawned.fetch_add(1, std::memory_order::relaxed);
+            EXPECT_TRUE(group.Spawn(scheduler, task()));
+            spawned.fetch_add(1, std::memory_order::relaxed);
         }
 
         co_await group.Join();
 
-        flag.test_and_set();
+        event.Set();
     };
 
     auto consumer = [&]() -> tinycoro::Task<> {
@@ -492,7 +492,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
             }
             else
             {
-                if (flag.test())
+                if(event.IsSet())
                     co_return;
             }
         }
