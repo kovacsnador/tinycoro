@@ -4,7 +4,7 @@
 
 #include "tinycoro/tinycoro_all.h"
 
-/*tinycoro::Task<> VoidTask()
+tinycoro::Task<> VoidTask()
 {
     co_return;
 }
@@ -427,4 +427,4 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
                     consumer());
 
     EXPECT_EQ(spawned, executed);
-}*/
+}
