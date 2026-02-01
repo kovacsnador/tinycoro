@@ -463,7 +463,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
-    tinycoro::ManualEvent    event;
+    std::atomic_flag flag;
 
     std::atomic<uint32_t> spawned{};
     std::atomic<uint32_t> executed{};
@@ -479,7 +479,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
 
         co_await group.Join();
 
-        event.Set();
+        flag.test_and_set();
     };
 
     auto consumer = [&]() -> tinycoro::Task<> {
@@ -492,7 +492,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
             }
             else
             {
-                if (event.IsSet())
+                if (flag.test())
                     co_return;
             }
         }

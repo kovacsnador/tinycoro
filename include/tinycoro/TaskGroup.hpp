@@ -303,7 +303,11 @@ namespace tinycoro {
 
                     lock.unlock();
 
-                    // here we can check if the taskgroup is closed,
+                    // here we can check if the taskgroup is closed
+                    //
+                    // in case we were not able to schedule the task,
+                    // the FinishCallback will be anyway triggered, trough
+                    // the task promise destructor.
                     return scheduler.template Enqueue<TaskFinishCallback<block_t>>(std::move(futureState), std::move(task));
                 }
 
@@ -529,7 +533,10 @@ namespace tinycoro {
                 assert(_runningTaskblocks.empty());
                 assert(_joinAwaiters.empty());
 
-                // woke up zombie NextAwaiters
+                // Woke up zombie NextAwaiters
+                //
+                // Those next awaiter will never get tasks assigned
+                // because the group is closed.
                 if (_awaitReadyBlocks.empty() && _nextAwaiters.size())
                 {
                     auto awaiters = _nextAwaiters.steal();
