@@ -324,7 +324,11 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer)
 {
     const auto count = GetParam();
 
-    tinycoro::Scheduler      scheduler;
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 15;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
     tinycoro::TaskGroup<int> group;
 
     std::atomic<uint32_t> c{};
@@ -355,7 +359,11 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer)
 {
     const auto count = GetParam();
 
-    tinycoro::Scheduler      scheduler;
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 15;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
     tinycoro::TaskGroup<int> group;
 
     std::atomic<uint32_t> c{};
@@ -386,7 +394,11 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
 {
     const auto count = GetParam();
 
-    tinycoro::Scheduler      scheduler;
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 15;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
     tinycoro::TaskGroup<int> group;
 
     std::atomic<uint32_t> spawned{};

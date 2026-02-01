@@ -62,12 +62,15 @@ namespace tinycoro {
                     // because this function is responsible to
                     // free up the memory, and this needs to happen
                     // before we set the future, becasue we wait for the future in the destructor.
-                    [[maybe_unused]] std::unique_ptr<UserDataT> uPtr = a->OnFinish(taskCancelled);
+                    std::unique_ptr<UserDataT> uPtr = a->OnFinish(taskCancelled);
 
                     // if the task is cancelled
                     // we need to get back the unique_ptr.
                     if (taskCancelled)
                         assert(uPtr);
+
+                    // Explicitly free up the block
+                    uPtr.reset();
 
                     if (taskCancelled == false)
                     {
@@ -89,7 +92,7 @@ namespace tinycoro {
             // disable move and copy
             NextAwaiter(NextAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept { return _taskGroup._IsReady(this); }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return false; }
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
             {
@@ -160,7 +163,7 @@ namespace tinycoro {
             // disable move and copy
             JoinAwaiter(JoinAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept { return _taskGroup._IsReady(this); }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return false; }
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
             {
@@ -178,7 +181,7 @@ namespace tinycoro {
             }
 
             // only the first join awaiter gets the results
-            constexpr void await_resume() const noexcept { }
+            constexpr void await_resume() noexcept { _taskGroup._Resume(this); }
 
             void Notify() noexcept { _event.Notify(ENotifyPolicy::RESUME); }
 
@@ -186,6 +189,14 @@ namespace tinycoro {
             EventT      _event;
             TaskGroupT& _taskGroup;
         };
+
+        namespace safe {
+            template <template <typename> class ContainerT, typename T>
+            [[nodiscard]] auto Pop(ContainerT<T>& container) noexcept -> std::unique_ptr<T>
+            {
+                return std::unique_ptr<T>{container.pop()};
+            }
+        } // namespace safe
 
         template <typename ReturnT, template <typename> class FutureStateT>
         class TaskGroup
@@ -227,8 +238,6 @@ namespace tinycoro {
             // tasks to finish and suppresses exceptions.
             ~TaskGroup()
             {
-                Close();
-
                 // After Join(), no tasks are running and no further Finish-callbacks can occur.
                 auto joinAll = [this]() -> InlineTask<> { co_await Join(); };
                 tinycoro::AllOf(joinAll());
@@ -237,16 +246,19 @@ namespace tinycoro {
 
                 assert(_closed);
                 assert(_runningTaskblocks.empty());
+                assert(_nextAwaiters.empty());
+                assert(_joinAwaiters.empty());
 
                 // clean up all the unused _readyFutureBlocks
-                auto awaiter = _awaitReadyBlocks.steal();
+                auto blocks = _awaitReadyBlocks.steal();
                 lock.unlock();
 
                 // iterate over the remaining ready block
                 // and destroy them.
-                while (std::unique_ptr<block_t> block{awaiter})
+                while (blocks)
                 {
-                    awaiter = block->next;
+                    std::unique_ptr<block_t> block{blocks};
+                    blocks = block->next;
                 }
             }
 
@@ -292,10 +304,7 @@ namespace tinycoro {
                     lock.unlock();
 
                     // here we can check if the taskgroup is closed,
-                    scheduler.template Enqueue<TaskFinishCallback<block_t>>(std::move(futureState), std::move(task));
-
-                    // task is attached to the group
-                    return true;
+                    return scheduler.template Enqueue<TaskFinishCallback<block_t>>(std::move(futureState), std::move(task));
                 }
 
                 // failed to add a task to the group
@@ -312,7 +321,11 @@ namespace tinycoro {
             // Thread-safe.
             void CancelAll() noexcept
             {
-                Close();
+                {
+                    std::scoped_lock lock{_mtx};
+                    _closed = true;
+                }
+
                 assert(_stopSource.stop_possible());
 
                 _stopSource.request_stop();
@@ -323,22 +336,11 @@ namespace tinycoro {
             // After closing, no new tasks can be spawned. Already running tasks continue
             // executing until completion or cancellation.
             //
-            // Any awaiters waiting on Next() will be notified if no further results
-            // can become available.
-            //
             // Thread-safe.
             void Close() noexcept
             {
-                std::unique_lock lock{_mtx};
-
+                std::scoped_lock lock{_mtx};
                 _closed = true;
-
-                // we need to notify the currently waiting
-                // next awaiters.
-                auto nextAwaiters = _nextAwaiters.steal();
-                lock.unlock();
-
-                _NotifyAll(nextAwaiters);
             }
 
             // Returns an awaiter that yields the next completed task result.
@@ -369,7 +371,7 @@ namespace tinycoro {
             {
                 std::unique_lock lock{_mtx};
 
-                if (std::unique_ptr<block_t> block{_awaitReadyBlocks.pop()})
+                if (auto block = safe::Pop(_awaitReadyBlocks))
                 {
                     lock.unlock();
 
@@ -418,7 +420,7 @@ namespace tinycoro {
 
             [[nodiscard]] bool _IsDone() const noexcept { return (_closed && _awaitReadyBlocks.empty() && _runningTaskblocks.empty()); }
 
-            [[nodiscard]] std::unique_ptr<block_t> _OnTaskFinish(block_t* readyBlock, bool isCancelled) noexcept
+            [[nodiscard]] auto _OnTaskFinish(block_t* readyBlock, bool isCancelled) noexcept -> std::unique_ptr<block_t>
             {
                 assert(readyBlock);
 
@@ -428,11 +430,6 @@ namespace tinycoro {
 
                 [[maybe_unused]] auto erased = _runningTaskblocks.erase(block.get());
 
-                // NOTE:
-                // At this point, it can be that
-                // the future is not valid yet.
-                // Because the task finishes before the future can
-                // be asssigned in Spawn() function.
                 assert(block->future.valid());
                 assert(erased);
 
@@ -440,7 +437,6 @@ namespace tinycoro {
                 auto awaiter = isCancelled ? nullptr : _nextAwaiters.pop();
 
                 joinAwaiter_t* joinAwaiters{nullptr};
-                nextAwaiter_t* nextAwaiters{nullptr};
 
                 // check if we are done
                 if (_closed && _runningTaskblocks.empty())
@@ -450,7 +446,6 @@ namespace tinycoro {
                     //
                     // So we notify here all the join awaiters.
                     joinAwaiters = _joinAwaiters.steal();
-                    nextAwaiters = _nextAwaiters.steal();
                 }
 
                 if (awaiter)
@@ -475,8 +470,8 @@ namespace tinycoro {
 
                 assert(lock.owns_lock() == false);
 
-                // in case we need somebody to notify.
-                _NotifyAll(nextAwaiters);
+                // notify join awaiters, in case we have some
+                // which is waiting.
                 _NotifyAll(joinAwaiters);
 
                 // pass the block back to the caller
@@ -488,44 +483,16 @@ namespace tinycoro {
                 return block;
             }
 
-            // for NextAwaiter
-            [[nodiscard]] bool _IsReady(nextAwaiter_t* awaiter) noexcept
-            {
-                std::scoped_lock lock{_mtx};
-
-                // if the group is closed
-                // and there are no running or unconsumed tasks
-                // we are done.
-                if (_IsDone())
-                {
-                    return true;
-                }
-
-                if (std::unique_ptr<block_t> block{_awaitReadyBlocks.pop()})
-                {
-                    // await is ready
-                    awaiter->Set(std::move(block->future));
-                    return true;
-                }
-
-                // await is not ready, probably
-                // pass forward to await_suspend
-                return false;
-            }
-
             [[nodiscard]] auto _Suspend(nextAwaiter_t* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
                 if (_IsDone())
                 {
-                    // if the group is closed
-                    // and there are no running or unconsumed tasks
-                    // we are done.
                     return false;
                 }
 
-                if (std::unique_ptr<block_t> block{_awaitReadyBlocks.pop()})
+                if (auto block = safe::Pop(_awaitReadyBlocks))
                 {
                     awaiter->Set(std::move(block->future));
                     return false;
@@ -535,24 +502,11 @@ namespace tinycoro {
                 return true;
             }
 
-            // for JoinAwaiter
-            [[nodiscard]] auto _IsReady([[maybe_unused]] joinAwaiter_t* awaiter) noexcept
-            {
-                std::scoped_lock lock{_mtx};
-
-                _closed = true;
-
-                // if the task group is closed,
-                // and we have no running futures
-                // everything is done.
-                return _runningTaskblocks.empty();
-            }
-
             [[nodiscard]] auto _Suspend(joinAwaiter_t* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
 
-                assert(_closed);
+                _closed = true;
 
                 if (_runningTaskblocks.empty())
                 {
@@ -565,6 +519,24 @@ namespace tinycoro {
 
                 _joinAwaiters.push(awaiter);
                 return true;
+            }
+
+            void _Resume([[maybe_unused]] const joinAwaiter_t* awaiter) noexcept
+            {
+                std::unique_lock lock{_mtx};
+
+                assert(_closed);
+                assert(_runningTaskblocks.empty());
+                assert(_joinAwaiters.empty());
+
+                // woke up zombie NextAwaiters
+                if (_awaitReadyBlocks.empty() && _nextAwaiters.size())
+                {
+                    auto awaiters = _nextAwaiters.steal();
+                    lock.unlock();
+
+                    _NotifyAll(awaiters);
+                }
             }
 
             std::mutex _mtx;
