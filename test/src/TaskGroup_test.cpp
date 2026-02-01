@@ -453,13 +453,13 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
     EXPECT_EQ(spawned, executed);
 }
 
-TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_pro_multi_co_try_next)
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_next)
 {
     const auto count = GetParam();
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 15;
+    constexpr size_t                         schedulerSize = 1 << 19;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -495,6 +495,8 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_pro_multi_co_try_next)
                 if(event.IsSet())
                     co_return;
             }
+
+            co_await std::suspend_always{};
         }
     };
 

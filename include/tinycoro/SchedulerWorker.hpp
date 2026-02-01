@@ -306,7 +306,6 @@ namespace tinycoro { namespace detail {
                             }
                         }
 
-                        // This failed once, how????????
                         assert(expected & UTypeCast(EPauseState::NOTIFIED));
                         assert((expected & UTypeCast(EPauseState::PAUSED)) == 0);
 

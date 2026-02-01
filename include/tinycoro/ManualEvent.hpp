@@ -37,7 +37,7 @@ namespace tinycoro {
 
             void Set() noexcept
             {
-                auto oldValue = _state.exchange(this);
+                auto oldValue = _state.exchange(this, std::memory_order_relaxed);
                 if (oldValue != this && oldValue)
                 {
                     // handle awaiters
@@ -46,12 +46,12 @@ namespace tinycoro {
                 }
             }
 
-            [[nodiscard]] bool IsSet() const noexcept { return _state.load() == this; }
+            [[nodiscard]] bool IsSet() const noexcept { return _state.load(std::memory_order_relaxed) == this; }
 
             bool Reset() noexcept
             {
                 typename decltype(_state)::value_type expected = this;
-                return _state.compare_exchange_strong(expected, nullptr, std::memory_order_release, std::memory_order_relaxed);
+                return _state.compare_exchange_strong(expected, nullptr, std::memory_order_relaxed, std::memory_order_relaxed);
             }
 
             [[nodiscard]] auto operator co_await() noexcept { return Wait(); };
@@ -61,11 +61,11 @@ namespace tinycoro {
         private:
             [[nodiscard]] bool Add(awaiter_type* awaiter)
             {
-                auto oldValue = _state.load(std::memory_order::acquire);
+                auto oldValue = _state.load(std::memory_order::relaxed);
                 if (oldValue != this)
                 {
                     awaiter->next = static_cast<awaiter_type*>(oldValue);
-                    while (_state.compare_exchange_strong(oldValue, awaiter, std::memory_order_release, std::memory_order_relaxed) == false)
+                    while (_state.compare_exchange_strong(oldValue, awaiter, std::memory_order_relaxed, std::memory_order_relaxed) == false)
                     {
                         if (oldValue == this)
                         {
