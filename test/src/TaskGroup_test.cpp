@@ -396,7 +396,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t schedulerSize = 1 << 15;
+    constexpr size_t schedulerSize = 1 << 19;
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
