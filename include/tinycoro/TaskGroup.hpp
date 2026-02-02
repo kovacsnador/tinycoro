@@ -27,6 +27,8 @@
 namespace tinycoro {
     namespace detail {
 
+        // Internal block representing a running task in the TaskGroup.
+        // Owns the task's future and participates in intrusive lists.
         template <typename FutureT>
         struct TaskGroupBlock : detail::DoubleLinkable<TaskGroupBlock<FutureT>>
         {
@@ -49,33 +51,35 @@ namespace tinycoro {
             template <typename PromiseT, typename FutureStateT>
             [[nodiscard]] static constexpr auto Get() noexcept
             {
-                return [](void* promise, void* futureState, std::exception_ptr ex) {
-                    auto p = static_cast<PromiseT*>(promise);
-                    auto a = static_cast<UserDataT*>(p->CustomData());
+                return [](void* promisePtr, void* futureState, std::exception_ptr ex) {
+                    auto promise = static_cast<PromiseT*>(promisePtr);
+                    auto userData = static_cast<UserDataT*>(promise->CustomData());
 
                     // checking if the task got cancelled.
                     // if the task is cancelled we will ignore them
-                    auto handle        = std::coroutine_handle<PromiseT>::from_promise(*p);
+                    auto handle        = std::coroutine_handle<PromiseT>::from_promise(*promise);
                     bool taskCancelled = (!handle.done() && !ex);
 
-                    // we need to call OnFinish first,
+                    // We need to call TaskGroup OnFinish first,
                     // because this function is responsible to
                     // free up the memory, and this needs to happen
                     // before we set the future, becasue we wait for the future in the destructor.
-                    std::unique_ptr<UserDataT> uPtr = a->OnFinish(taskCancelled);
+                    std::unique_ptr<UserDataT> userDataPtr = userData->OnFinish(taskCancelled);
 
                     // if the task is cancelled
                     // we need to get back the unique_ptr.
                     if (taskCancelled)
-                        assert(uPtr);
+                        assert(userDataPtr);
 
-                    // Explicitly free up the block
-                    uPtr.reset();
+                    // IMPORTANT: (userDataPtr contains user data)
+                    // After OnFinish(), ownership of block is transferred back to TaskGroup.
+                    // Do not access `a` beyond this point.
+                    userDataPtr.reset();
 
                     if (taskCancelled == false)
                     {
                         // Call the default task finish handler to set the future.
-                        detail::OnTaskFinish<PromiseT, FutureStateT>(promise, futureState, std::move(ex));
+                        detail::OnTaskFinish<PromiseT, FutureStateT>(promisePtr, futureState, std::move(ex));
                     }
                 };
             }
@@ -253,7 +257,7 @@ namespace tinycoro {
                 auto blocks = _awaitReadyBlocks.steal();
                 lock.unlock();
 
-                // iterate over the remaining ready block
+                // iterate over the remaining zombie awaitReadyBlocks
                 // and destroy them.
                 while (blocks)
                 {
@@ -371,7 +375,7 @@ namespace tinycoro {
             // Thread-safe.
             //
             // Returns std::optional containing the next task result if available, otherwise empty.
-            [[nodiscard]] auto TryNext() noexcept
+            [[nodiscard]] auto TryNext()
             {
                 std::unique_lock lock{_mtx};
 

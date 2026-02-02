@@ -30,6 +30,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
     - [AnyOf](#anyof)
     - [InlineTask](#inlinetask)
     - [Cancellation](#cancellation)
+    - [TaskGroup](#taskgroup)
     - [MakeBound](#makebound)
     - [Detach](#detach)
     - [Task with return value](#returnvaluetask)
@@ -714,6 +715,186 @@ It gives you fine-grained control over cancellation at any suspension point.
 
 > ℹ️ You can also **read cancellation behavior directly from the code**:  
 > Every cancellable suspension point is explicitly wrapped with `tinycoro::Cancellable{...}` — making it easy to see where cancellation may occur.
+
+### `TaskGroup`
+
+`TaskGroup<T>` is a structured concurrency primitive for managing multiple coroutines as a single unit.  
+It provides task spawning, result collection, cooperative cancellation, and synchronization with well-defined lifetime semantics.
+
+### Basic Example
+
+```cpp
+tinycoro::Task<int> Task() { co_return 42; }
+
+
+tinycoro::TaskGroup<int> group;
+
+// spawn task(s)
+group.Spawn(scheduler, Task());
+...
+
+// get the results
+while (auto result = co_await group.Next()) {
+    std::print("{}", *result);
+}
+
+co_await group.Join();
+```
+### Spawning Tasks
+
+    template <typename SchedulerT, typename TaskT>
+    bool Spawn(SchedulerT& scheduler, TaskT&& task);
+
+Schedules a task on the given scheduler and transfers task ownership to the underlying `Scheduler`.
+
+- The task’s `value_type` must match the `TaskGroup`’s `value_type`.
+- Returns `false` if the group is closed or the task cannot be added to the scheduler.
+- The `TaskGroup` propagates its stop token to all spawned tasks.
+
+---
+
+### Retrieving Results
+
+#### Next()
+```cpp
+    std::optional<T> res = co_await group.Next();
+```
+
+Suspends until the next task finishes or the group becomes closed and empty.
+
+Returns `std::optional<T>`:
+
+- Contains a value if a task completed successfully.
+- `std::nullopt` if no further results exist.
+
+Multiple concurrent `Next()` awaiters are supported.
+
+---
+
+#### TryNext()
+
+```cpp
+    std::optional<T> res = group.TryNext();
+```
+
+TryNext() is Non-blocking variant of Next():
+
+- Returns the next available result immediately if present.
+- Returns `std::nullopt` if no completed task is available.
+
+---
+
+### Waiting for Completion
+
+#### Join()
+
+```cpp
+    co_await group.Join();
+```
+
+Suspends until all tasks in the group have finished.
+Not waits awaiters to be finished.
+
+Properties:
+
+- Implicitly closes the `TaskGroup`.
+- Multiple `Join()` awaiters are allowed.
+- All `Join()` awaiter observes the completion state directly.
+
+---
+
+#### Blocking Join Helper
+
+```cpp
+    tinycoro::Join(group);
+```
+
+Blocks the current thread until all tasks finish.
+
+---
+
+### Cancellation
+
+#### CancelAll()
+
+```cpp
+    group.CancelAll();
+```
+
+- Closes the `TaskGroup`.
+- Requests cancellation via its internal stop source.
+- Tasks observing the stop token may terminate early.
+- No new tasks can be spawned afterward.
+
+---
+
+### Closing the Group
+
+#### Close()
+```cpp
+    group.Close();
+```
+
+- Prevents further task spawning.
+- Already running tasks continue until completion or cancellation.
+
+---
+
+### Stop Token Propagation
+
+Each `TaskGroup` owns a `std::stop_source`:
+
+```cpp
+    // initialize with stop source from outside.
+    std::stop_source stopSource;
+    tinycoro::TaskGroup<int> group{stopSource};
+
+    // get the stop source
+    std::stop_source source = group.StopSource();
+```
+
+- The stop token is propagated to all spawned tasks.
+- An external stop source can be injected via the constructor.
+
+---
+
+### Lifetime Semantics
+
+- Destroying a `TaskGroup` waits for all tasks to complete.
+
+<b>The `TaskGroup` guarantees that no task outlives the group object.<b>
+
+---
+
+### Thread Safety
+
+The following operations are thread-safe:
+
+- `Spawn`
+- `Next`
+- `TryNext`
+- `Join`
+- `Close`
+- `CancelAll`
+
+<b>Multiple producers and consumers are supported.<b>
+
+---
+
+### Semantics Summary
+
+| Operation    | Effect |
+|------------|--------|
+| `Spawn`     | Adds and schedules a task |
+| `Next`      | Awaits the next completed task result |
+| `TryNext`   | Retrieves the next result without suspension |
+| `Join`      | Closes the group and waits for all tasks |
+| `Close`     | Closes the group which prevents new tasks from being spawned |
+| `CancelAll` | Requests cancellation of all tasks |
+| Destructor  | Implicitly waits for all tasks |
+
+---
+
 
 
 ### `MakeBound`

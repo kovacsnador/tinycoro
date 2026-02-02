@@ -120,6 +120,31 @@ TEST(TaskGroupTest, TaskGroupTest_one_task_return)
     EXPECT_EQ(val, 42);
 }
 
+TEST(TaskGroupTest, TaskGroupTest_task_exception)
+{
+    tinycoro::TaskGroup<int32_t> taskGroup;
+
+    auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+        throw true;
+        co_return v;
+    };
+
+    tinycoro::Scheduler scheduler;
+    taskGroup.Spawn(scheduler, task(42));   // should throw
+    taskGroup.Spawn(scheduler, task(41));   // should throw
+
+    tinycoro::Join(taskGroup);
+
+    auto receiver = [&taskGroup]() -> tinycoro::Task<int32_t>
+    {
+        auto res = co_await taskGroup.Next();
+        co_return *res;
+    };
+
+    EXPECT_THROW((std::ignore = tinycoro::AllOf(receiver())), bool);
+    EXPECT_THROW((std::ignore = taskGroup.TryNext()), bool);
+}
+
 TEST(TaskGroupTest, TaskGroupTest_multiple_task_return)
 {
     tinycoro::TaskGroup<int32_t> taskGroup;
@@ -646,4 +671,50 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
 
     // some need to be cancelled
     EXPECT_TRUE(executed <= spawned);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_scheduler_destroy)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 15;
+    
+    auto scheduler = std::make_unique<tinycoro::CustomScheduler<schedulerSize>>();
+    tinycoro::Scheduler schedulerMain;
+
+    tinycoro::TaskGroup<int> group;
+
+    auto task = []() -> tinycoro::Task<int32_t> { co_return 42; };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+
+        bool open{true};
+
+        for (size_t i = 0; i < count; ++i)
+        {
+            EXPECT_EQ(group.Spawn(*scheduler, task()), open);
+            if(count == i /2)
+            {
+                // request stop at the middle somewhere
+                scheduler->GetStopSource().request_stop();
+                open = false;
+            }
+        }
+
+        // delete scheduler
+        scheduler.reset();
+
+        co_await group.Join();
+    };
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while (auto res = co_await group.Next())
+        {
+            EXPECT_EQ(*res, 42);
+        }
+    };
+
+    tinycoro::AllOf(schedulerMain, producer(), consumer(), consumer(), consumer(), consumer(), consumer(), consumer());
 }
