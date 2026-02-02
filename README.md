@@ -734,7 +734,7 @@ group.Spawn(scheduler, Task());
 ...
 
 // get the results
-while (auto result = co_await group.Next()) {
+while (std::optional<int> result = co_await group.Next()) {
     std::print("{}", *result);
 }
 
