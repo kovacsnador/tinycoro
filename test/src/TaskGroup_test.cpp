@@ -621,6 +621,79 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
     EXPECT_TRUE(executed <= spawned);
 }
 
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 19;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::SoftClock clock;
+
+    tinycoro::TaskGroup<> group;
+
+    std::atomic<uint32_t> executed{};
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        while (auto res = co_await tinycoro::Cancellable{group.Next()})
+        {
+            executed.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    for(size_t i = 0; i < count; ++i)
+    {
+        group.Spawn(scheduler, consumer());
+    }
+
+    auto cancel = [&]()->tinycoro::Task<> { group.CancelAll(); co_return; };
+
+    tinycoro::AllOf(scheduler, cancel());
+
+    // some need to be cancelled
+    EXPECT_EQ(executed, 0);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all_join)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t                         schedulerSize = 1 << 19;
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::SoftClock clock;
+
+    tinycoro::TaskGroup<> group;
+    tinycoro::ManualEvent event;
+
+    std::atomic<uint32_t> executed{};
+
+    auto consumer = [&]() -> tinycoro::Task<> {
+        // self join,
+        // should not happen
+        co_await tinycoro::Cancellable{group.Join()};
+
+        // should not be executed
+        executed.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    for(size_t i = 0; i < count; ++i)
+    {
+        group.Spawn(scheduler, consumer());
+    }
+
+    auto cancel = [&]()->tinycoro::Task<> { group.CancelAll(); co_return; };
+
+    tinycoro::AllOf(scheduler, cancel());
+
+    // some need to be cancelled
+    EXPECT_EQ(executed, 0);
+}
+
 TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_cancel_some_stop_source)
 {
     const auto count = GetParam();

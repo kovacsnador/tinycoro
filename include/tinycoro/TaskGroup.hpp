@@ -52,7 +52,7 @@ namespace tinycoro {
             [[nodiscard]] static constexpr auto Get() noexcept
             {
                 return [](void* promisePtr, void* futureState, std::exception_ptr ex) {
-                    auto promise = static_cast<PromiseT*>(promisePtr);
+                    auto promise  = static_cast<PromiseT*>(promisePtr);
                     auto userData = static_cast<UserDataT*>(promise->CustomData());
 
                     // checking if the task got cancelled.
@@ -147,6 +147,10 @@ namespace tinycoro {
 
             void Notify() noexcept { _event.Notify(ENotifyPolicy::RESUME); }
 
+            void NotifyToDestroy() noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+
+            [[nodiscard]] bool Cancel() noexcept { return _taskGroup._Cancel(this); }
+
             void Set(FutureT&& future) noexcept { _future = std::move(future); }
 
         private:
@@ -188,6 +192,10 @@ namespace tinycoro {
             constexpr void await_resume() noexcept { _taskGroup._Resume(this); }
 
             void Notify() noexcept { _event.Notify(ENotifyPolicy::RESUME); }
+
+            void NotifyToDestroy() noexcept { _event.Notify(ENotifyPolicy::DESTROY); }
+
+            [[nodiscard]] bool Cancel() noexcept { return _taskGroup._Cancel(this); }
 
         private:
             EventT      _event;
@@ -510,6 +518,12 @@ namespace tinycoro {
                 return true;
             }
 
+            [[nodiscard]] bool _Cancel(nextAwaiter_t* awaiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _nextAwaiters.erase(awaiter);
+            }
+
             [[nodiscard]] auto _Suspend(joinAwaiter_t* awaiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
@@ -548,6 +562,12 @@ namespace tinycoro {
 
                     _NotifyAll(awaiters);
                 }
+            }
+
+            [[nodiscard]] bool _Cancel(joinAwaiter_t* awaiter) noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _joinAwaiters.erase(awaiter);
             }
 
             std::mutex _mtx;
