@@ -346,9 +346,10 @@ TEST(TaskGroupTest, TaskGroupTest_stop_source)
 
     auto ss2 = group.StopSource();
 
-    group.CancelAll();
+    ss.request_stop();
 
     EXPECT_TRUE(ss2.stop_requested());
+    EXPECT_TRUE(ss.stop_requested());
 }
 
 struct TaskGroupStressTest : testing::TestWithParam<size_t>

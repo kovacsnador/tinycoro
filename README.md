@@ -757,15 +757,20 @@ Schedules a task on the given scheduler and transfers task ownership to the unde
 
 #### Next()
 ```cpp
+    // Get the next task result.
     std::optional<T> res = co_await group.Next();
+
+    // you can make it cancellable too
+    std::optional<T> res = co_await tinycoro::Cancellable{group.Next()};
 ```
 
-Suspends until the next task finishes or the group becomes closed and empty.
+Suspends until the next task finishes or the group becomes closed and empty. Cancellable.
 
 Returns `std::optional<T>`:
 
 - Contains a value if a task completed successfully.
 - `std::nullopt` if no further results exist.
+- Explicitly cancellable.
 
 Multiple concurrent `Next()` awaiters are supported.
 
@@ -789,7 +794,11 @@ TryNext() is Non-blocking variant of Next():
 #### Join()
 
 ```cpp
+    // Join the group
     co_await group.Join();
+
+    // you can make it cancellable
+    co_await tinycoro::Cancellable{group.Join()};
 ```
 
 Suspends until all tasks in the group have finished.
@@ -800,6 +809,7 @@ Properties:
 - Implicitly closes the `TaskGroup`.
 - Multiple `Join()` awaiters are allowed.
 - All `Join()` awaiter observes the completion state directly.
+- Explicitly cancellable.
 
 ---
 
@@ -846,11 +856,13 @@ Each `TaskGroup` owns a `std::stop_source`:
 
 ```cpp
     // initialize with stop source from outside.
-    std::stop_source stopSource;
-    tinycoro::TaskGroup<int> group{stopSource};
+    std::stop_source stopSource1;
+    tinycoro::TaskGroup<int> group{stopSource1};
+
+    ...
 
     // get the stop source
-    std::stop_source source = group.StopSource();
+    std::stop_source stopSource2 = group.StopSource();
 ```
 
 - The stop token is propagated to all spawned tasks.
