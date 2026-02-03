@@ -55,15 +55,18 @@ namespace tinycoro {
                     auto promise  = static_cast<PromiseT*>(promisePtr);
                     auto userData = static_cast<UserDataT*>(promise->CustomData());
 
+                    // Call the default task finish handler to set the future.
+                    detail::OnTaskFinish<PromiseT, FutureStateT>(promisePtr, futureState, std::move(ex));
+
                     // checking if the task got cancelled.
                     // if the task is cancelled we will ignore them
                     auto handle        = std::coroutine_handle<PromiseT>::from_promise(*promise);
                     bool taskCancelled = (!handle.done() && !ex);
 
-                    // We need to call TaskGroup OnFinish first,
-                    // because this function is responsible to
-                    // free up the memory, and this needs to happen
-                    // before we set the future, becasue we wait for the future in the destructor.
+                    // Future need to be valid here
+                    // Nobody could wait on it yet.
+                    assert(userData->future.valid());
+
                     std::unique_ptr<UserDataT> userDataPtr = userData->OnFinish(taskCancelled);
 
                     // if the task is cancelled
@@ -75,12 +78,6 @@ namespace tinycoro {
                     // After OnFinish(), ownership of block is transferred back to TaskGroup.
                     // Do not access `a` beyond this point.
                     userDataPtr.reset();
-
-                    if (taskCancelled == false)
-                    {
-                        // Call the default task finish handler to set the future.
-                        detail::OnTaskFinish<PromiseT, FutureStateT>(promisePtr, futureState, std::move(ex));
-                    }
                 };
             }
         };
