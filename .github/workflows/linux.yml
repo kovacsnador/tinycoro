@@ -4,7 +4,15 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
   pull_request:
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
 
 jobs:
   build:
