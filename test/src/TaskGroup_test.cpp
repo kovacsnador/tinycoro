@@ -130,13 +130,12 @@ TEST(TaskGroupTest, TaskGroupTest_task_exception)
     };
 
     tinycoro::Scheduler scheduler;
-    taskGroup.Spawn(scheduler, task(42));   // should throw
-    taskGroup.Spawn(scheduler, task(41));   // should throw
+    taskGroup.Spawn(scheduler, task(42)); // should throw
+    taskGroup.Spawn(scheduler, task(41)); // should throw
 
     tinycoro::Join(taskGroup);
 
-    auto receiver = [&taskGroup]() -> tinycoro::Task<int32_t>
-    {
+    auto receiver = [&taskGroup]() -> tinycoro::Task<int32_t> {
         auto res = co_await taskGroup.Next();
         co_return *res;
     };
@@ -341,7 +340,7 @@ TEST(TaskGroupTest, TaskGroupTest_spawn_after_close_fails)
 
 TEST(TaskGroupTest, TaskGroupTest_stop_source)
 {
-    std::stop_source ss;
+    std::stop_source         ss;
     tinycoro::TaskGroup<int> group{ss};
 
     auto ss2 = group.StopSource();
@@ -364,7 +363,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 15;
+    constexpr size_t schedulerSize = 1 << 15;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -399,7 +400,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 15;
+    constexpr size_t schedulerSize = 1 << 15;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -434,7 +437,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
@@ -485,11 +490,13 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::TaskGroup<int> group;
-    tinycoro::ManualEvent event;
+    tinycoro::ManualEvent    event;
 
     std::atomic<uint32_t> spawned{};
     std::atomic<uint32_t> executed{};
@@ -518,7 +525,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_multi_consumer_try_
             }
             else
             {
-                if(event.IsSet())
+                if (event.IsSet())
                     co_return;
             }
 
@@ -537,7 +544,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_one_producer_one_consumer_cancel
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 15;
+    constexpr size_t schedulerSize = 1 << 15;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::SoftClock clock;
@@ -578,7 +587,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::SoftClock clock;
@@ -599,7 +610,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
             group.Spawn(scheduler, task());
 
             // cancel in the middle somewhere
-            if(i == count / 2)
+            if (i == count / 2)
                 group.CancelAll();
 
             spawned.fetch_add(1, std::memory_order::relaxed);
@@ -628,7 +639,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::SoftClock clock;
@@ -644,12 +657,15 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all)
         }
     };
 
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         group.Spawn(scheduler, consumer());
     }
 
-    auto cancel = [&]()->tinycoro::Task<> { group.CancelAll(); co_return; };
+    auto cancel = [&]() -> tinycoro::Task<> {
+        group.CancelAll();
+        co_return;
+    };
 
     tinycoro::AllOf(scheduler, cancel());
 
@@ -663,7 +679,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all_join)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 19;
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count);
+
     tinycoro::CustomScheduler<schedulerSize> scheduler;
 
     tinycoro::SoftClock clock;
@@ -682,17 +700,54 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all_join)
         executed.fetch_add(1, std::memory_order::relaxed);
     };
 
-    for(size_t i = 0; i < count; ++i)
+    for (size_t i = 0; i < count; ++i)
     {
         group.Spawn(scheduler, consumer());
     }
 
-    auto cancel = [&]()->tinycoro::Task<> { group.CancelAll(); co_return; };
+    auto cancel = [&]() -> tinycoro::Task<> {
+        group.CancelAll();
+        co_return;
+    };
 
     tinycoro::AllOf(scheduler, cancel());
 
     // some need to be cancelled
     EXPECT_EQ(executed, 0);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_join_await_all_timeout)
+{
+    const auto       count                 = GetParam();
+    constexpr size_t c_schedulerBufferSize = 1 << 16;
+
+    ASSERT_TRUE(c_schedulerBufferSize > count);
+
+    tinycoro::CustomScheduler<c_schedulerBufferSize> scheduler;
+    tinycoro::SoftClock                              clock;
+
+    auto task = [&]() -> tinycoro::Task<> {
+        std::atomic<size_t> c{};
+
+        auto counter = [&](auto time) -> tinycoro::Task<size_t> {
+            co_await tinycoro::SleepFor(clock, time);
+            co_return c.fetch_add(1, std::memory_order::relaxed);
+        };
+
+        tinycoro::TaskGroup<size_t> taskGroup;
+
+        for (size_t i = 0; i < GetParam(); ++i)
+        {
+            EXPECT_TRUE(taskGroup.Spawn(scheduler, counter(20ms)));
+        }
+
+        // wait for all the task.
+        co_await taskGroup.Join();
+
+        EXPECT_TRUE(count >= c);
+    };
+
+    tinycoro::AllOf(task());
 }
 
 TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_cancel_some_stop_source)
@@ -724,7 +779,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
             group.Spawn(scheduler, task());
 
             // cancel in the middle somewhere
-            if(i == count / 2)
+            if (i == count / 2)
                 ss.request_stop();
 
             spawned.fetch_add(1, std::memory_order::relaxed);
@@ -753,9 +808,9 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_scheduler_destroy)
 
     // make sure this is big enough
     // our scheduler enqueue() is not awaitable here
-    constexpr size_t                         schedulerSize = 1 << 15;
-    
-    auto scheduler = std::make_unique<tinycoro::CustomScheduler<schedulerSize>>();
+    constexpr size_t schedulerSize = 1 << 15;
+
+    auto                scheduler = std::make_unique<tinycoro::CustomScheduler<schedulerSize>>();
     tinycoro::Scheduler schedulerMain;
 
     tinycoro::TaskGroup<int> group;
@@ -763,13 +818,12 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_scheduler_destroy)
     auto task = []() -> tinycoro::Task<int32_t> { co_return 42; };
 
     auto producer = [&]() -> tinycoro::Task<> {
-
         bool open{true};
 
         for (size_t i = 0; i < count; ++i)
         {
             EXPECT_EQ(group.Spawn(*scheduler, task()), open);
-            if(count == i /2)
+            if (count == i / 2)
             {
                 // request stop at the middle somewhere
                 scheduler->GetStopSource().request_stop();
