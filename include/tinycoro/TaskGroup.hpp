@@ -29,19 +29,20 @@ namespace tinycoro {
 
         // Internal block representing a running task in the TaskGroup.
         // Owns the task's future and participates in intrusive lists.
-        template <typename FutureT>
-        struct TaskGroupBlock : detail::DoubleLinkable<TaskGroupBlock<FutureT>>
+        template <typename TaskGroupT, typename FutureT>
+        struct TaskGroupBlock : detail::DoubleLinkable<TaskGroupBlock<TaskGroupT, FutureT>>
         {
-            using callback_t = std::function<std::unique_ptr<TaskGroupBlock>(TaskGroupBlock*, bool)>;
-
-            std::unique_ptr<TaskGroupBlock> OnFinish(bool isCancelled) noexcept
+            TaskGroupBlock(TaskGroupT& group)
+            : taskGroup{group}
             {
-                assert(notifyTaskGroup);
-
-                return notifyTaskGroup(this, isCancelled);
             }
 
-            callback_t notifyTaskGroup{};
+            void OnFinish(std::unique_ptr<TaskGroupBlock>& selfPtr, bool isCancelled) noexcept
+            {
+                taskGroup._OnTaskFinish(selfPtr, isCancelled);
+            }
+
+            TaskGroupT& taskGroup;
             FutureT    future{};
         };
 
@@ -55,6 +56,9 @@ namespace tinycoro {
                     auto promise  = static_cast<PromiseT*>(promisePtr);
                     auto userData = static_cast<UserDataT*>(promise->CustomData());
 
+                    // take ownership over the user data.
+                    std::unique_ptr<UserDataT> userDataPtr{userData};
+
                     // Call the default task finish handler to set the future.
                     detail::OnTaskFinish<PromiseT, FutureStateT>(promisePtr, futureState, std::move(ex));
 
@@ -67,17 +71,13 @@ namespace tinycoro {
                     // Nobody could wait on it yet.
                     assert(userData->future.valid());
 
-                    std::unique_ptr<UserDataT> userDataPtr = userData->OnFinish(taskCancelled);
+                    // NOTE: OnFinish can steal the userDataPtr unique_ptr.
+                    userData->OnFinish(userDataPtr, taskCancelled);
 
                     // if the task is cancelled
                     // we need to get back the unique_ptr.
                     if (taskCancelled)
                         assert(userDataPtr);
-
-                    // IMPORTANT: (userDataPtr contains user data)
-                    // After OnFinish(), ownership of block is transferred back to TaskGroup.
-                    // Do not access `a` beyond this point.
-                    userDataPtr.reset();
                 };
             }
         };
@@ -215,13 +215,15 @@ namespace tinycoro {
             using future_t       = futureTypeGetter_t::future_t;
             using futureState_t  = futureTypeGetter_t::futureState_t;
             using futureReturn_t = futureTypeGetter_t::futureReturn_t;
-            using block_t        = TaskGroupBlock<future_t>;
+            using block_t        = TaskGroupBlock<TaskGroup, future_t>;
 
             friend struct NextAwaiter<TaskGroup, future_t, futureReturn_t, detail::ResumeSignalEvent>;
             using nextAwaiter_t = NextAwaiter<TaskGroup, future_t, futureReturn_t, detail::ResumeSignalEvent>;
 
             friend struct JoinAwaiter<TaskGroup, future_t, detail::ResumeSignalEvent>;
             using joinAwaiter_t = JoinAwaiter<TaskGroup, future_t, detail::ResumeSignalEvent>;
+
+            friend struct TaskGroupBlock<TaskGroup, future_t>;
 
             using stopCallback_t = std::optional<std::stop_callback<std::function<void()>>>;
 
@@ -287,9 +289,7 @@ namespace tinycoro {
                 static_assert(std::same_as<typename TaskT::value_type, value_type>,
                               "Return value mismatch! Task type is incompatible with TaskGroup.");
 
-                auto block = std::make_unique<block_t>();
-
-                block->notifyTaskGroup = [this](auto blockPtr, bool isCancelled) { return _OnTaskFinish(blockPtr, isCancelled); };
+                auto block = std::make_unique<block_t>(*this);
 
                 // prepare the tasks as they are only
                 // stop token users, but they self cannot trigger
@@ -433,12 +433,8 @@ namespace tinycoro {
 
             [[nodiscard]] bool _IsDone() const noexcept { return (_closed && _awaitReadyBlocks.empty() && _runningTaskblocks.empty()); }
 
-            [[nodiscard]] auto _OnTaskFinish(block_t* readyBlock, bool isCancelled) noexcept -> std::unique_ptr<block_t>
+            void _OnTaskFinish(std::unique_ptr<block_t>& block, bool isCancelled) noexcept
             {
-                assert(readyBlock);
-
-                std::unique_ptr<block_t> block{readyBlock};
-
                 std::unique_lock lock{_mtx};
 
                 [[maybe_unused]] auto erased = _runningTaskblocks.erase(block.get());
@@ -475,6 +471,8 @@ namespace tinycoro {
                         // in case the task is NOT cancelled and
                         // no awaiter waiting for the task
                         // save that for the future
+                        //
+                        // NOTE: Steal the unique_ptr block.
                         _awaitReadyBlocks.push(block.release());
                     }
 
@@ -486,14 +484,6 @@ namespace tinycoro {
                 // notify join awaiters, in case we have some
                 // which is waiting.
                 _NotifyAll(joinAwaiters);
-
-                // pass the block back to the caller
-                // and he can decide if he want to keep them
-                // or destroy it.
-                //
-                // We simply delay the destruction and pass the ownership
-                // back the the caller.
-                return block;
             }
 
             [[nodiscard]] auto _Suspend(nextAwaiter_t* awaiter) noexcept
