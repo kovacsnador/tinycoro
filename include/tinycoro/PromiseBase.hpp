@@ -114,11 +114,11 @@ namespace tinycoro { namespace detail {
         }
 
         // Get the stored custom data and clears it.
-        [[nodiscard]] constexpr auto CustomData() noexcept
+        [[nodiscard]] constexpr auto CustomData() const noexcept
         {
             assert(parent == nullptr);  // need to be a root corouitne
 
-            return std::exchange(_customData, nullptr);
+            return _customData;
         }
 
         [[nodiscard]] constexpr std::suspend_always initial_suspend() const noexcept { return {}; }
