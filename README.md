@@ -774,6 +774,11 @@ Returns `std::optional<T>`:
 
 Multiple concurrent `Next()` awaiters are supported.
 
+⚠️Calling Next() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
+This pattern can easily lead to deadlocks, because the task may end up waiting for results that cannot be produced while it is suspended.
+
+<b>Make sure that tasks inside a TaskGroup do not co_await group.Next() on the same group.</b>
+
 ---
 
 #### TryNext()
@@ -810,6 +815,11 @@ Properties:
 - Multiple `Join()` awaiters are allowed.
 - All `Join()` awaiter observes the completion state directly.
 - Explicitly cancellable.
+
+⚠️Calling Join() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
+This can easily lead to deadlocks, because the task waits for the group to finish while it is still part of the group.
+
+<b>Make sure that tasks inside a TaskGroup do not co_await group.Join() on the same group.</b>
 
 ---
 
