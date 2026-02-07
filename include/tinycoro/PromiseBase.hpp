@@ -12,8 +12,9 @@
 #include <new>
 
 #include "Common.hpp"
-#include "IntrusivePtr.hpp"
 #include "LinkedUtils.hpp"
+#include "SharedState.hpp"
+#include "PtrVisitor.hpp"
 
 #include "SimpleStorage.hpp"
 
@@ -33,7 +34,7 @@ namespace tinycoro { namespace detail {
     // So with this base class we can convert any derived promise
     // to std::coroutine_handle<SchedulablePromise>.
     // It is used inside the scheduler logic.
-    template <concepts::IsAwaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT>
+    template <concepts::IsAwaiter FinalAwaiterT, typename StopSourceT>
     struct alignas(std::max_align_t) PromiseBase
     {
         // alignas(std::max_align_t) ensures that on 32-bit systems, 
@@ -46,14 +47,19 @@ namespace tinycoro { namespace detail {
 
         ~PromiseBase()
         {
-            if (parent == nullptr)
+            auto stopTokenUser = SharedState() ? SharedState()->IsStopTokenUser() : false;
+
+            if (parent == nullptr && stopTokenUser == false)
             {
                 // The parent coroutine is nullptr,
                 // that means this is a root
                 // coroutine promise.
                 //
                 // Only trigger stop, if this
-                // is a root coroutine
+                // is a root coroutine.
+                //
+                // If we have no rights (we are stopToken user)
+                // we not trigger it.
                 stopSource.request_stop();
             }
         }
@@ -71,20 +77,6 @@ namespace tinycoro { namespace detail {
         // the stop source here, the initialization
         // will be delayed, until we actually need this object
         StopSourceT stopSource{std::nostopstate};
-
-        // This is the shared pause handler.
-        // It's shared between parent and child promises.
-        //
-        // Todo: consider to rename it to sharedState or so...
-        detail::IntrusivePtr<PauseHandlerT> pauseHandler;
-
-        // Creates the pause handler shared object
-        template <typename... Args>
-        auto MakePauseHandler(Args&&... args)
-        {
-            pauseHandler.emplace(std::forward<Args>(args)...);
-            return pauseHandler.get();
-        }
 
         // Sets a stop state.
         template <typename T>
@@ -107,24 +99,26 @@ namespace tinycoro { namespace detail {
             return stopSource;
         }
 
-        // Set the current awaitable.
+        // Sets custom user data for the promise. This pointer is reserved
+        // for storing arbitrary data associated with the coroutine.
         //
-        // It is used in the "AllOfAwait" and "AnyOfAwait" context (with scheduler),
-        // to store the awaitable pointer for later resumption.
-        void SetCurrentAwaitable(void* awaitable) noexcept
+        // For example:
+        //  - the current awaitable pointer for CoWait constructs, or
+        //  - any data required for resumption in a TaskGroup.
+        void SetCustomData(void* data) noexcept
         {   
             assert(parent == nullptr);  // need to be a root corouitne
-            assert(_currentAwaitable == nullptr); //  must not be set
+            assert(_customData == nullptr); //  must not be set
 
-            _currentAwaitable = awaitable;
+            _customData = data;
         }
 
-        // Get the stored custom data
-        [[nodiscard]] constexpr auto CurrentAwaitable() const noexcept
+        // Get the stored custom data and clears it.
+        [[nodiscard]] constexpr auto CustomData() const noexcept
         {
             assert(parent == nullptr);  // need to be a root corouitne
 
-            return _currentAwaitable;
+            return _customData;
         }
 
         [[nodiscard]] constexpr std::suspend_always initial_suspend() const noexcept { return {}; }
@@ -133,12 +127,47 @@ namespace tinycoro { namespace detail {
 
         constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 
+        constexpr auto SharedState() noexcept
+        {
+            return detail::PtrVisit(_sharedState);
+        }
+
+        constexpr auto SharedState() const noexcept
+        {
+            return detail::PtrVisit(_sharedState);
+        }
+
+        constexpr void AssignSharedState(auto sharedStatePtr) noexcept
+        {
+            assert(sharedStatePtr);
+            assert(parent != nullptr);
+
+            _sharedState = sharedStatePtr;
+        }
+
+protected:
+        constexpr void CreateSharedState(bool initialCancellable = tinycoro::default_initial_cancellable_policy::value) noexcept
+        {
+            // make sure this is called only once
+            assert(SharedState() == nullptr);
+            assert(parent == nullptr);
+
+            _sharedState.emplace<detail::SharedState>(initialCancellable);
+        }
+
     private:
         // Saving the current awaitable.
         //
         // It is used in the "AllOfAwait" and "AnyOfAwait" context (with scheduler),
         // to be able to resume the awaitable.
-        void* _currentAwaitable{nullptr};
+        void* _customData{nullptr};
+
+        // Contains shared state information across
+        // different coroutines. (e.g. parent -> child)
+        //
+        // Parent owns the shared state and passes forward
+        // to his child coroutines.
+        detail::SharedState_t _sharedState{nullptr};
     };
 
 }} // namespace tinycoro::detail

@@ -13,5 +13,5 @@ TEST(CancellableSuspentTest, CancellableSuspentTest)
     
     suspend.await_suspend(hdl);
 
-    EXPECT_TRUE(hdl.promise().pauseHandler->IsCancellable());
+    EXPECT_TRUE(hdl.promise().SharedState()->IsCancellable());
 }

@@ -13,7 +13,7 @@
 #include <type_traits>
 #include <cassert>
 
-#include "PauseHandler.hpp"
+#include "SharedState.hpp"
 #include "ResumeSignalEvent.hpp"
 #include "Finally.hpp"
 

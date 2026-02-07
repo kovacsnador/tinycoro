@@ -3,7 +3,6 @@
 
 #include <gmock/gmock.h>
 
-#include <tinycoro/PauseHandler.hpp>
 #include <tinycoro/Common.hpp>
 
 #include "CoroutineHandleMock.h"
@@ -14,11 +13,11 @@ namespace tinycoro { namespace test {
     struct TaskMockImpl
     {
         MOCK_METHOD(void, Resume, ());
-        MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
+        MOCK_METHOD(tinycoro::detail::ETaskResumeState, ResumeState, ());
         MOCK_METHOD(T, await_resume, ());
         MOCK_METHOD(bool, IsPaused, (), (const noexcept));
         MOCK_METHOD(bool, IsDone, (), (const noexcept));
-        MOCK_METHOD(void, SetPauseHandler, (tinycoro::ResumeCallback_t));
+        MOCK_METHOD(void, SetResumeCallback, (tinycoro::ResumeCallback_t));
         MOCK_METHOD(void*, Address, (), (const noexcept));
         MOCK_METHOD(CoroutineHandleMock<tinycoro::detail::Promise<void>>, Release, (), (noexcept));
 
@@ -46,15 +45,15 @@ namespace tinycoro { namespace test {
 
         void Resume() { mock->Resume(); }
 
-        tinycoro::ETaskResumeState ResumeState() { return mock->ResumeState(); }
+        auto ResumeState() { return mock->ResumeState(); }
 
         T await_resume() { return mock->await_resume(); }
 
         bool IsDone() { return mock->IsDone(); }
 
-        void SetPauseHandler(tinycoro::ResumeCallback_t func)
+        void SetResumeCallback(tinycoro::ResumeCallback_t func)
         {
-            mock->SetPauseHandler(func);
+            mock->SetResumeCallback(func);
             mock->pauseCallback = func;
         }
 

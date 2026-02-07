@@ -73,7 +73,7 @@ struct FinalAwaiterMock
 
 TEST(PromiseTest, PromiseTest_FinalAwaiter)
 {
-    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source, tinycoro::DefaultAllocator> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::initial_cancellable_t, std::stop_source, tinycoro::DefaultAllocator> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });
 
@@ -89,7 +89,7 @@ TEST(PromiseTest, PromiseTest_FinalAwaiter)
 
 TEST(PromiseTest, PromiseTest_YieldValue)
 {
-    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::PauseHandler, std::stop_source, tinycoro::DefaultAllocator> promise;
+    tinycoro::detail::PromiseT<FinalAwaiterMock, tinycoro::detail::PromiseReturnValue<int32_t, FinalAwaiterMock>, tinycoro::initial_cancellable_t, std::stop_source, tinycoro::DefaultAllocator> promise;
     EXPECT_TRUE(requires { promise.return_value(42); });
     EXPECT_TRUE(requires { promise.yield_value(42); });
     EXPECT_TRUE(requires { typename decltype(promise)::value_type; });

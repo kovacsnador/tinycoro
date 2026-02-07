@@ -8,7 +8,6 @@
 
 #include <optional>
 
-#include "PauseHandler.hpp"
 #include "Finally.hpp"
 #include "Common.hpp"
 

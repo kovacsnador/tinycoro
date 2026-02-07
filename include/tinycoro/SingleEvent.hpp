@@ -12,7 +12,6 @@
 #include <mutex>
 #include <coroutine>
 
-#include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "Common.hpp"
 

@@ -23,7 +23,7 @@ namespace tinycoro {
             parentPromise.child  = std::addressof(promise);
             promise.parent       = std::addressof(parentPromise);
             promise.stopSource   = parentPromise.StopSource();
-            promise.pauseHandler = parentPromise.pauseHandler;
+            promise.AssignSharedState(parentPromise.SharedState());
             
             return hdl;
         }

@@ -17,7 +17,7 @@ TEST(BoundTaskTest, BoundTaskTest_make)
 
 struct TaskWrapperMockImpl
 {
-    struct PauseHandlerMock
+    struct SharedStateMock
     {
     };
 
@@ -27,11 +27,10 @@ struct TaskWrapperMockImpl
 
     MOCK_METHOD(void, Resume, ());
     MOCK_METHOD(bool, IsDone, ());
-    MOCK_METHOD(tinycoro::ETaskResumeState, ResumeState, ());
-    MOCK_METHOD(PauseHandlerMock, SetPauseHandler, (std::function<void()>));
-    MOCK_METHOD(PauseHandlerMock, GetPauseHandler, (), (noexcept));
+    MOCK_METHOD(tinycoro::detail::ETaskResumeState, ResumeState, ());
+    MOCK_METHOD(SharedStateMock, SetResumeCallback, (std::function<void()>));
     MOCK_METHOD(void, SetStopSource, (std::stop_source));
-    MOCK_METHOD(void, SetCurrentAwaitable, (void*));
+    MOCK_METHOD(void, SetCustomData, (void*));
     MOCK_METHOD(void*, Address, (), (const noexcept));
     MOCK_METHOD(void*, Release, (), (noexcept));
 };
@@ -60,9 +59,7 @@ struct TaskWrapperMock
 
     [[nodiscard]] auto ResumeState() { return impl->ResumeState(); }
 
-    auto SetPauseHandler(auto pauseResume) { return impl->SetPauseHandler(std::move(pauseResume)); }
-
-    auto GetPauseHandler() noexcept { return impl->GetPauseHandler(); }
+    auto SetResumeCallback(auto pauseResume) { return impl->SetResumeCallback(std::move(pauseResume)); }
 
     template <typename U>
     void SetStopSource(U&& arg)
@@ -71,9 +68,9 @@ struct TaskWrapperMock
     }
 
     template <typename U>
-    void SetCurrentAwaitable(U&& cb)
+    void SetCustomData(U&& cb)
     {
-        impl->SetCurrentAwaitable(std::forward<U>(cb));
+        impl->SetCustomData(std::forward<U>(cb));
     }
 
     [[nodiscard]] auto Address() const noexcept { return impl->Address(); }

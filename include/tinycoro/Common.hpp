@@ -76,6 +76,46 @@ namespace tinycoro {
         // an std::coroutine_handler::address
         using address_t = void*;
 
+        template<typename... Types>
+        struct IsTupleT : std::false_type
+        {
+        };
+
+        template<typename... Types>
+        struct IsTupleT<std::tuple<Types...>> : std::true_type
+        {
+        };
+
+        template<typename... Types>
+        struct IsTupleT<const std::tuple<Types...>> : std::true_type
+        {
+        };
+
+        enum class ETaskResumeState : uint8_t
+        {
+            SUSPENDED,
+            PAUSED,
+            STOPPED,
+            DONE
+        };
+
+        // This need to match with the masks
+        // in SharedState class.
+        enum class EPauseState : uint8_t
+        {
+            NOTIFIED = 1, // 0000 0001
+            PAUSED   = 2, // 0000 0010
+            IDLE     = 3 // 0000 0011
+        };
+
+        template <typename T>
+            requires std::is_enum_v<T>
+        constexpr auto UTypeCast(T state) noexcept
+        {
+            using uType = std::underlying_type_t<T>;
+            return static_cast<uType>(state);
+        }
+
     } // namespace detail
 
     namespace helper
@@ -102,21 +142,6 @@ namespace tinycoro {
     // Used mainly by the awaitables.
     using ResumeCallback_t = detail::ResumeCallback<void(*)(void*, void*, ENotifyPolicy), void*, void*>;
 
-    enum class ETaskResumeState : uint8_t
-    {
-        SUSPENDED,
-        PAUSED,
-        STOPPED,
-        DONE
-    };
-
-    enum class EPauseState : uint8_t
-    {
-        IDLE,
-        PAUSED,
-        NOTIFIED,
-    };
-
     namespace concepts {
 
         template <typename T>
@@ -139,8 +164,8 @@ namespace tinycoro {
             { c.IsDone() } -> std::same_as<bool>;
             { c.await_resume() };
             { c.Release() };
-            { c.ResumeState() } -> std::same_as<ETaskResumeState>;
-            { c.SetPauseHandler(ResumeCallback_t{}) };
+            { c.ResumeState() } -> std::same_as<detail::ETaskResumeState>;
+            { c.SetResumeCallback(ResumeCallback_t{}) };
             typename T::value_type;
         };
 
@@ -193,11 +218,6 @@ namespace tinycoro {
         concept IsResumeCallbackType = std::regular_invocable<T, ENotifyPolicy>;
 
         template <typename T>
-        concept PauseHandler = std::constructible_from<T, ResumeCallback_t> && requires (T t) {
-            { t.IsPaused() } -> std::same_as<bool>;
-        };
-
-        template <typename T>
 		concept FutureState = ( requires(T f) { { f.set_value() }; } 
                                 || requires(T f) { { f.set_value(f.get_future().get().value()) }; }) 
                             && requires(T f) { f.set_exception(std::exception_ptr{}); };
@@ -232,6 +252,9 @@ namespace tinycoro {
 
         template<typename T>
         concept NothrowMoveAssignable = std::is_nothrow_move_assignable_v<T>;
+
+        template<typename... Args>
+        concept IsTuple = detail::IsTupleT<Args...>::value;
 
     } // namespace concepts
 
@@ -268,6 +291,23 @@ namespace tinycoro {
         struct IsPowerOf2
         {
             static constexpr bool value = helper::PowerOf2(Number);
+        };
+
+        template <typename ReturnT, template <typename> class FutureStateT>
+        struct FutureTypeGetter
+        {
+            // futureReturn_t is packed in a std::optinal
+            using futureReturn_t = typename detail::FutureReturnT<ReturnT>::value_type;
+
+            // this is the future state type
+            //
+            // e.g. std::promise<std::optinal<int32_t>>
+            using futureState_t = FutureStateT<futureReturn_t>;
+
+            // and this is the corresponding future type
+            //
+            // e.g. std::future<std::optinal<int32_t>>
+            using future_t = decltype(std::declval<futureState_t>().get_future());
         };
 
         namespace helper {

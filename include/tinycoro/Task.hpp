@@ -15,7 +15,6 @@
 
 #include "Common.hpp"
 #include "Exception.hpp"
-#include "PauseHandler.hpp"
 #include "Promise.hpp"
 #include "TaskAwaiter.hpp"
 #include "TaskResumer.hpp"
@@ -55,11 +54,22 @@ namespace tinycoro {
 
             using initial_cancellable_policy_t = InitialCancellablePolicyT;
 
+            // default constructor
+            constexpr CoroTask() = default;
+
             template <typename... Args>
-                requires std::constructible_from<coro_hdl_type, Args...>
+                requires std::constructible_from<coro_hdl_type, Args...> && (sizeof...(Args) > 0)
             CoroTask(Args&&... args)
             : _hdl{std::forward<Args>(args)...}
             {
+                assert(_hdl);
+
+                // Warning!
+                //
+                // Do not call promise() here.
+                // On some compilers (especially Clang 17 and above), this is dangerous.
+                // In Release mode, the optimizer may remove parts of the code,
+                // which can lead to crashes.
             }
 
             CoroTask(CoroTask&& other) noexcept
@@ -80,26 +90,22 @@ namespace tinycoro {
 
             [[nodiscard]] auto ResumeState() noexcept { return _coroResumer.ResumeState(_hdl); }
 
-            [[nodiscard]] bool IsPaused() const noexcept { return _hdl.promise().pauseHandler->IsPaused(); }
+            [[nodiscard]] bool IsPaused() const noexcept { return SharedState()->IsPaused(); }
 
             [[nodiscard]] bool IsDone() const noexcept { return _hdl.done(); }
 
-            void SetPauseHandler(concepts::IsResumeCallbackType auto pauseResume) noexcept
+            void SetResumeCallback(concepts::IsResumeCallbackType auto pauseResume) noexcept
             {
-                auto& pauseHandler = _hdl.promise().pauseHandler;
-                if (pauseHandler)
-                {
-                    // pause handler is already initialized
-                    pauseHandler->ResetCallback(std::move(pauseResume));
-                }
-                else
-                {
-                    // pause handler need to be initialized
-                    _hdl.promise().MakePauseHandler(std::move(pauseResume), InitialCancellablePolicyT::value);
-                }
+                auto sharedStatePtr = SharedState();
+
+                assert(sharedStatePtr);
+
+                // pause handler is already initialized
+                sharedStatePtr->ResetCallback(std::move(pauseResume));
             }
 
-            [[nodiscard]] auto* GetPauseHandler() noexcept { return _hdl.promise().pauseHandler.get(); }
+            [[nodiscard]] auto* SharedState() noexcept { return _hdl.promise().SharedState(); }
+            [[nodiscard]] auto* SharedState() const noexcept { return _hdl.promise().SharedState(); }
 
             template <typename T>
                 requires std::constructible_from<StopSourceT, T>
@@ -108,8 +114,7 @@ namespace tinycoro {
                 _hdl.promise().SetStopSource(std::forward<T>(arg));
             }
 
-            // template <std::regular_invocable T>
-            void SetCurrentAwaitable(void* awaitable) noexcept { _hdl.promise().SetCurrentAwaitable(awaitable); }
+            void SetCustomData(void* awaitable) noexcept { _hdl.promise().SetCustomData(awaitable); }
 
             [[nodiscard]] detail::address_t Address() const noexcept { return _hdl.address(); }
 
@@ -150,12 +155,13 @@ namespace tinycoro {
     template <typename ReturnT                                               = void,
               template <typename> class AllocatorT                           = DefaultAllocator,
               concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
-    using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, AllocatorT>, AwaiterValue>;
+    using Task = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::Promise<ReturnT, InitialCancellablePolicyT, AllocatorT>, AwaiterValue>;
 
     template <typename ReturnT                                               = void,
               template <typename> class AllocatorT                           = DefaultAllocator,
               concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
-    using InlineTask = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, AllocatorT>, AwaiterValue>;
+    using InlineTask
+        = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, InitialCancellablePolicyT, AllocatorT>, AwaiterValue>;
 
     // Convenience aliases for tasks with a non-initial cancellable policy.
     // (TaskNIC/InlineTaskNIC)

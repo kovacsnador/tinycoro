@@ -8,7 +8,6 @@
 #include <concepts>
 
 #include <tinycoro/Promise.hpp>
-#include <tinycoro/PauseHandler.hpp>
 
 namespace tinycoro { namespace test {
 
@@ -49,16 +48,20 @@ namespace tinycoro { namespace test {
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl(auto pauseResumerCallback)
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace(pauseResumerCallback, InitialCancellablePolicyT::value);
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T, InitialCancellablePolicyT>> hdl;
+
+        hdl.promise().SharedState()->ResetCallback(pauseResumerCallback);
+        
         return hdl;
     }
 
     template<typename T = void, typename InitialCancellablePolicyT = tinycoro::noninitial_cancellable_t>
     auto MakeCoroutineHdl()
     {
-        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T>> hdl;
-        hdl.promise().pauseHandler.emplace(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}}, InitialCancellablePolicyT::value);
+        tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<T, InitialCancellablePolicyT>> hdl;
+
+        hdl.promise().SharedState()->ResetCallback(tinycoro::ResumeCallback_t{[](auto, auto, auto) {}});
+
         return hdl;
     }
 

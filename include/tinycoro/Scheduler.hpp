@@ -18,7 +18,6 @@
 #include <memory_resource>
 
 #include "Common.hpp"
-#include "PauseHandler.hpp"
 #include "LinkedPtrList.hpp"
 #include "AtomicQueue.hpp"
 #include "SchedulerWorker.hpp"
@@ -36,7 +35,7 @@ namespace tinycoro {
             CoroThreadPool(size_t workerThreadCount = std::thread::hardware_concurrency())
             : _stopSource{}
             , _dispatcher{_sharedTasks, _stopSource.get_token()}
-            , _stopCallback { _stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
+            , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
             {
                 _AddWorkers(workerThreadCount);
             }
@@ -79,13 +78,29 @@ namespace tinycoro {
                 requires concepts::FutureState<FutureStateT<void>> && (sizeof...(CoroTasksT) > 0)
             [[nodiscard]] auto Enqueue(CoroTasksT&&... tasks)
             {
+                static_assert((!std::is_reference_v<CoroTasksT> && ...), "Task must be passed as an rvalue (do not use a reference).");
+
+                auto enqueue = [this]<typename T>(T&& task) {
+                    // get the result value
+                    using desiredValue_t = typename std::remove_cvref_t<T>::value_type;
+
+                    // calculate the future object which will be returned.
+                    using futureState_t = detail::FutureTypeGetter<desiredValue_t, FutureStateT>::futureState_t;
+
+                    futureState_t futureState;
+                    auto          future = futureState.get_future();
+
+                    this->_EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
+                    return future;
+                };
+
                 if constexpr (sizeof...(CoroTasksT) == 1)
                 {
-                    return EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks)...);
+                    return enqueue(std::forward<CoroTasksT>(tasks)...);
                 }
                 else
                 {
-                    return std::tuple{EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::forward<CoroTasksT>(tasks))...};
+                    return std::tuple{enqueue(std::forward<CoroTasksT>(tasks))...};
                 }
             }
 
@@ -95,11 +110,14 @@ namespace tinycoro {
                 requires concepts::FutureState<FutureStateT<void>> && (!std::is_reference_v<ContainerT>)
             [[nodiscard]] auto Enqueue(ContainerT&& tasks)
             {
+                static_assert(!std::is_reference_v<ContainerT>, "Task container must be passed as an rvalue (do not use a reference).");
+
                 // get the result value
                 using desiredValue_t = typename std::decay_t<ContainerT>::value_type::value_type;
 
                 // calculate the future object which will be returned.
-                using future_t = detail::FutureTypeGetter<desiredValue_t, FutureStateT>::future_t;
+                using futureState_t = detail::FutureTypeGetter<desiredValue_t, FutureStateT>::futureState_t;
+                using future_t      = detail::FutureTypeGetter<desiredValue_t, FutureStateT>::future_t;
 
                 std::vector<future_t> futures;
                 futures.reserve(std::size(tasks));
@@ -107,22 +125,29 @@ namespace tinycoro {
                 for (auto&& task : tasks)
                 {
                     // register tasks and collect all the futures
-                    futures.emplace_back(EnqueueImpl<FutureStateT, onTaskFinishWrapperT>(std::move(task)));
+                    futureState_t futureState{};
+                    futures.emplace_back(futureState.get_future());
+
+                    // Enqueue tasks in the scheduler.
+                    _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
                 }
 
                 return futures;
             }
 
-        private:
-            template <template <typename> class FutureStateT, typename OnFinishCbT, concepts::IsSchedulable CoroTaskT>
-                requires (!std::is_reference_v<CoroTaskT>) && concepts::FutureState<FutureStateT<void>>
-            [[nodiscard]] auto EnqueueImpl(CoroTaskT&& coro)
+            template <typename onTaskFinishWrapperT = detail::OnTaskFinishCallbackWrapper,
+                      concepts::FutureState   FutureStateT,
+                      concepts::IsSchedulable CoroTasksT>
+            auto Enqueue(FutureStateT&& futureState, CoroTasksT&& task)
             {
-                using futureState_t = detail::FutureTypeGetter<typename CoroTaskT::value_type, FutureStateT>::futureState_t;
+                return _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
+            }
 
-                futureState_t futureState;
-                auto          future = futureState.get_future();
-
+        private:
+            template <typename OnFinishCbT, typename FutureStateT, concepts::IsSchedulable CoroTaskT>
+                requires (!std::is_reference_v<CoroTaskT>)
+            bool _EnqueueImpl(FutureStateT&& futureState, CoroTaskT&& coro)
+            {
                 if (_stopSource.stop_requested() == false && coro.Address())
                 {
                     // not allow to enqueue tasks with uninitialized std::coroutine_handler
@@ -136,7 +161,7 @@ namespace tinycoro {
                         {
                             // the task is pushed
                             // into the queue
-                            break;
+                            return true;
                         }
                         else
                         {
@@ -151,7 +176,7 @@ namespace tinycoro {
                     futureState.set_value(std::nullopt);
                 }
 
-                return future;
+                return false;
             }
 
             void _AddWorkers(size_t workerThreadCount)
@@ -164,8 +189,8 @@ namespace tinycoro {
                 }
             }
 
-            using queue_t = detail::AtomicQueue<TaskT, CACHE_SIZE>;
-            using dispatcher_t = detail::Dispatcher<queue_t>; 
+            using queue_t      = detail::AtomicQueue<TaskT, CACHE_SIZE>;
+            using dispatcher_t = detail::Dispatcher<queue_t>;
 
             // currently active/scheduled tasks
             queue_t _sharedTasks;
@@ -173,7 +198,7 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
 
-            //std::vector<queue_t> _queues;
+            // std::vector<queue_t> _queues;
             dispatcher_t _dispatcher;
 
             // the stop callback, which will be triggered

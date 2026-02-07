@@ -4,12 +4,21 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
   pull_request:
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
 
 jobs:
   build:
     runs-on: windows-2022
     strategy:
+      fail-fast: false   # prevents cancelling other matrix jobs
       matrix:
         platform: [x86, x64]
         build_type: [Debug, Release]
@@ -50,4 +59,4 @@ jobs:
     - name: Run Unit Tests
       timeout-minutes: 20
       working-directory: ${{runner.workspace}}/build
-      run: ./test/tinycoro_tests.exe --gtest_repeat=3 --gtest_break_on_failure=1 --gtest_brief=1
+      run: ./test/tinycoro_tests.exe --gtest_repeat=3 --gtest_break_on_failure=1

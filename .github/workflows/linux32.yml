@@ -4,13 +4,22 @@ on:
   push:
     branches:
       - main
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
   pull_request:
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
 
 jobs:
   build:
     runs-on: ubuntu-latest
 
     strategy:
+      fail-fast: false   # prevents cancelling other matrix jobs
       matrix:
         compiler: [11, 12, 13]  # GCC versions
         build_type: [Debug, Release]

@@ -3,8 +3,16 @@ name: asan_gcc_13
 on:
   push:
     branches: [ "main" ]
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
   pull_request:
     branches: [ "main" ]
+    paths-ignore:
+      - "README.md"
+      - "**/*.md"
+      - "LICENSE.txt"
 
 jobs:
   build:
@@ -40,7 +48,7 @@ jobs:
 
     - name: Run Unit Tests
       timeout-minutes: 20
-      run: ./build/test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1 --gtest_brief=1
+      run: ./build/test/tinycoro_tests --gtest_repeat=3 --gtest_break_on_failure=1
       working-directory: ${{ github.workspace }}
 
     - name: Run Examples

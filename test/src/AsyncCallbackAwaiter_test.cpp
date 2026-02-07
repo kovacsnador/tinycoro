@@ -2,6 +2,7 @@
 
 #include <tinycoro/AsyncCallbackAwaiter.hpp>
 #include <tinycoro/Promise.hpp>
+#include <tinycoro/SharedState.hpp>
 
 #include "mock/CoroutineHandleMock.h"
 
@@ -18,7 +19,8 @@ struct AsyncCallbackAwaiterTest : public testing::Test
     AsyncCallbackAwaiterTest()
     {
         tinycoro::ResumeCallback_t cb{tinycoro::test::ResumeCallbackTracer(pauseHandlerCalled)};
-        hdl.promise().pauseHandler.emplace(cb);
+        
+        hdl.promise().SharedState()->ResetCallback(cb);
     }
 
     bool pauseHandlerCalled{false};

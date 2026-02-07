@@ -11,7 +11,6 @@
 #include <latch>
 
 #include "ChannelOpStatus.hpp"
-#include "PauseHandler.hpp"
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrOrderedList.hpp"
 #include "LinkedUtils.hpp"

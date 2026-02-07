@@ -13,7 +13,6 @@
 #include <limits>
 #include <latch>
 
-#include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "ChannelOpStatus.hpp"
 #include "LinkedPtrQueue.hpp"

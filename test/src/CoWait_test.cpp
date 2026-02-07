@@ -101,8 +101,10 @@ struct SchedulerMock
 struct AllOfAwaiterTest : testing::Test
 {
 
+    using handler_t = decltype(tinycoro::test::MakeCoroutineHdl());
+
 protected:
-    tinycoro::test::CoroutineHandleMock<tinycoro::detail::Promise<void>> hdl = tinycoro::test::MakeCoroutineHdl();
+    handler_t hdl = tinycoro::test::MakeCoroutineHdl();
 
     SchedulerMock schedulerMock;
 };

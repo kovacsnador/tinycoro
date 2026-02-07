@@ -22,7 +22,7 @@ namespace tinycoro {
     namespace detail {
 
         template <typename ValueT>
-        struct SharedState
+        struct FutureSharedState
         {
             // Don't change the order here
             // it is important for get()
@@ -37,10 +37,10 @@ namespace tinycoro {
 
             using value_type = std::variant<std::exception_ptr, ValueT>;
 
-            SharedState() = default;
+            FutureSharedState() = default;
 
             // disallow copy and move
-            SharedState(SharedState&&) = delete;
+            FutureSharedState(FutureSharedState&&) = delete;
 
             auto get() -> ValueT
             {
@@ -129,7 +129,7 @@ namespace tinycoro {
         template <typename ValueT>
         class Promise
         {
-            using sharedState_t = detail::SharedState<ValueT>;
+            using FutureSharedState_t = detail::FutureSharedState<ValueT>;
             using future_t = Future<ValueT>;
 
         public:
@@ -153,13 +153,13 @@ namespace tinycoro {
 
             auto get_future()
             {
-                auto sharedState = std::make_unique<sharedState_t>();
+                auto sharedState = std::make_unique<FutureSharedState_t>();
                 _sharedState     = sharedState.get();
                 return future_t{std::move(sharedState)};
             }
 
         private:
-            sharedState_t* _sharedState{nullptr};
+            FutureSharedState_t* _sharedState{nullptr};
         };
 
         // This is a lightweight/fast but unsafe implementation of a Promise-Future idiom.
@@ -170,7 +170,7 @@ namespace tinycoro {
         {
             friend Promise<ValueT>;
 
-            using sharedState_t = detail::SharedState<ValueT>;
+            using FutureSharedState_t = detail::FutureSharedState<ValueT>;
 
         public:
             Future() = default;
@@ -184,13 +184,18 @@ namespace tinycoro {
                 return _sharedState->get();
             }
 
+            [[nodiscard]] constexpr bool valid() const noexcept
+            {
+                return _sharedState != nullptr;
+            } 
+
         private:
-            Future(std::unique_ptr<sharedState_t>&& sharedState)
+            Future(std::unique_ptr<FutureSharedState_t>&& sharedState)
             : _sharedState{std::move(sharedState)}
             {
             }
 
-            std::unique_ptr<sharedState_t> _sharedState{};
+            std::unique_ptr<FutureSharedState_t> _sharedState{};
         };
 
     } // namespace unsafe

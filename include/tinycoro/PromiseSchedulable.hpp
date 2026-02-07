@@ -26,8 +26,8 @@ namespace tinycoro
     static constexpr std::size_t PROMISE_BASE_BUFFER_SIZE = CUSTOM_PROMISE_BUFFER_SIZE;
 #endif
 
-    template <std::unsigned_integral auto BUFFER_SIZE, concepts::IsAwaiter FinalAwaiterT, concepts::PauseHandler PauseHandlerT, typename StopSourceT>
-    struct SchedulablePromise : PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>, detail::DoubleLinkable<SchedulablePromise<BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>>
+    template <std::unsigned_integral auto BUFFER_SIZE, concepts::IsAwaiter FinalAwaiterT, typename StopSourceT>
+    struct SchedulablePromise : PromiseBase<FinalAwaiterT, StopSourceT>, detail::DoubleLinkable<SchedulablePromise<BUFFER_SIZE, FinalAwaiterT, StopSourceT>>
     {
         static_assert(BUFFER_SIZE >= PROMISE_BASE_BUFFER_SIZE, "SchedulablePromise: Buffer size is too small to hold the promise object.");
 
@@ -39,9 +39,6 @@ namespace tinycoro
 
         // Disallow copy and move
         SchedulablePromise(SchedulablePromise&&) = delete;
-
-        // Pause state needed by the scheduler.
-        std::atomic<EPauseState> pauseState{EPauseState::IDLE};
 
         // Saves the promise inside the coroutine promise object
         // "PromiseT" must not be an L value reference.  
@@ -79,7 +76,7 @@ namespace tinycoro
                 {
                     // In case we have an exception, 
                     // set the "exception thrown flag"
-                    // to true in the promise pauseHandler.
+                    // to true in the promise shared state.
                     this->MarkException();
                 }
 
@@ -92,16 +89,15 @@ namespace tinycoro
         // Set the exception flag to true.
         void MarkException() noexcept
         {
-            assert(this->pauseHandler);
-            this->pauseHandler->MarkException();
+            this->SharedState()->MarkException();
         }
 
         // Check if there was already an exception.
         [[nodiscard]] bool HasException() const noexcept
         {
-            if(this->pauseHandler)
+            if(auto sharedState = this->SharedState())
             {
-                return this->pauseHandler->HasException();
+                return sharedState->HasException();
             }
             return false;
         }

@@ -11,7 +11,7 @@
 
 #include "AllocatorAdapter.hpp"
 #include "PromiseSchedulable.hpp"
-#include "PauseHandler.hpp"
+#include "Common.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -197,14 +197,23 @@ namespace tinycoro {
         // It is used inside the scheduler logic.
         template <concepts::IsAwaiter    FinalAwaiterT,
                   PromiseReturnerConcept ReturnerT,
-                  typename PauseHandlerT,
+                  typename InitialCancellablePolicyT,
                   typename StopSourceT,
                   template <typename> class AllocatorT>
             requires concepts::IsAllocatorAdapter<AllocatorT>
-        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, PauseHandlerT, StopSourceT>,
+        struct PromiseT : public SchedulablePromise<PROMISE_BASE_BUFFER_SIZE, FinalAwaiterT, StopSourceT>,
                           public ReturnerT,
-                          public AllocatorT<PromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
+                          public AllocatorT<PromiseT<FinalAwaiterT, ReturnerT, InitialCancellablePolicyT, StopSourceT, AllocatorT>>
         {
+            PromiseT()
+            {
+                // This CreateSharedState() call was previously in the Task constructor.
+                // That was dangerous.
+                // On some compilers (especially Clang 17 and above), this can break in Release mode:
+                // the optimizer may remove parts of the code, which can lead to crashes.
+                this->CreateSharedState(InitialCancellablePolicyT::value);
+            }
+
             [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<PromiseT>::from_promise(*this); }
 
             // Here we trigger the base class Finish function.
@@ -217,8 +226,9 @@ namespace tinycoro {
             // that we can not rely on the base class
             // destructor here, becasue in Finish() we
             // need the value from the derived promise object.
-            ~PromiseT() { 
-                if(this->HasException() == false)
+            ~PromiseT()
+            {
+                if (this->HasException() == false)
                 {
                     // If there was no exception yet,
                     // trigger the Finish callback.
@@ -236,31 +246,43 @@ namespace tinycoro {
         // Only inherits from the promise base object.
         template <concepts::IsAwaiter    FinalAwaiterT,
                   PromiseReturnerConcept ReturnerT,
-                  typename PauseHandlerT,
+                  typename InitialCancellablePolicyT,
                   typename StopSourceT,
                   template <typename> class AllocatorT>
             requires concepts::IsAllocatorAdapter<AllocatorT>
-        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, PauseHandlerT, StopSourceT>,
+        struct InlinePromiseT : public PromiseBase<FinalAwaiterT, StopSourceT>,
                                 public ReturnerT,
-                                public AllocatorT<InlinePromiseT<FinalAwaiterT, ReturnerT, PauseHandlerT, StopSourceT, AllocatorT>>
+                                public AllocatorT<InlinePromiseT<FinalAwaiterT, ReturnerT, InitialCancellablePolicyT, StopSourceT, AllocatorT>>
         {
+            InlinePromiseT()
+            {
+                // This CreateSharedState() call was previously in the Task constructor.
+                // That was dangerous.
+                // On some compilers (especially Clang 17 and above), this can break in Release mode:
+                // the optimizer may remove parts of the code, which can lead to crashes.
+                this->CreateSharedState(InitialCancellablePolicyT::value);
+            }
+
             [[nodiscard]] auto get_return_object() noexcept { return std::coroutine_handle<InlinePromiseT>::from_promise(*this); }
         };
 
         template <typename ReturnValueT,
+                  typename InitialCancellablePolicyT   = initial_cancellable_t,
                   template <typename> class AllocatorT = DefaultAllocator,
-                  typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
-        using Promise = detail::
-            PromiseT<detail::FinalAwaiter, detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>, PauseHandlerT, StopSourceT, AllocatorT>;
+        using Promise = detail::PromiseT<detail::FinalAwaiter,
+                                         detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>,
+                                         InitialCancellablePolicyT,
+                                         StopSourceT,
+                                         AllocatorT>;
 
         template <typename ReturnValueT,
+                  typename InitialCancellablePolicyT   = initial_cancellable_t,
                   template <typename> class AllocatorT = DefaultAllocator,
-                  typename PauseHandlerT               = PauseHandler,
                   typename StopSourceT                 = std::stop_source>
         using InlinePromise = detail::InlinePromiseT<detail::FinalAwaiter,
                                                      detail::PromiseReturnValue<ReturnValueT, detail::FinalAwaiter>,
-                                                     PauseHandlerT,
+                                                     InitialCancellablePolicyT,
                                                      StopSourceT,
                                                      AllocatorT>;
     } // namespace detail
@@ -269,6 +291,8 @@ namespace tinycoro {
         // This represents a common schedulable promise type
         // that can be used for all Promise<T> specializations, (as base class)
         // regardless of their return type.
+        //
+        // (dummy void type)
         using CommonSchedulablePromiseT = Promise<void>::PromiseBase_t;
     } // namespace detail
 

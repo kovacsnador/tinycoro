@@ -7,7 +7,6 @@
 #define TINY_CORO_BARRIER_HPP
 
 #include "LinkedPtrStack.hpp"
-#include "PauseHandler.hpp"
 #include "Exception.hpp"
 #include "Finally.hpp"
 #include "AwaiterHelper.hpp"

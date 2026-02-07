@@ -16,9 +16,9 @@ TEST(TaskTest, TaskTest_void)
 
     task.Resume();
 
-    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
+    EXPECT_EQ(task.ResumeState(), tinycoro::detail::ETaskResumeState::DONE);
     
-    task.SetPauseHandler(tinycoro::ResumeCallback_t{});
+    task.SetResumeCallback(tinycoro::ResumeCallback_t{});
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 }
@@ -37,9 +37,9 @@ TEST(TaskTest, TaskTest_int)
 
     task.Resume();
 
-    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::DONE);
+    EXPECT_EQ(task.ResumeState(), tinycoro::detail::ETaskResumeState::DONE);
 
-    task.SetPauseHandler(tinycoro::ResumeCallback_t{});
+    task.SetResumeCallback(tinycoro::ResumeCallback_t{});
 
     EXPECT_NO_THROW(task.SetStopSource(std::stop_source{}));
 }
@@ -73,31 +73,26 @@ struct PromiseMock
 
     auto get_return_object() { return std::coroutine_handle<PromiseMock>::from_promise(*this); }
 
-    template<typename... Args>
-    auto MakePauseHandler(Args&&... args)
-    {
-        pauseHandler = std::make_shared<PauseHandlerMock>(std::forward<Args>(args)...);
-        return pauseHandler.get();
-    }
-
     void SetStopSource(auto source)
     {
         stopSource = source;
     }
 
-    std::shared_ptr<PauseHandlerMock> pauseHandler;
+    auto SharedState() { return std::addressof(sharedState); }
+
     std::stop_source stopSource{};
+    tinycoro::detail::SharedState sharedState{false};
 };
 
 struct CoroResumerMock
 {
-    void Resume([[maybe_unused]] auto hdl)
+    void Resume([[maybe_unused]] auto& hdl)
     {
     }
 
-    auto ResumeState([[maybe_unused]] auto hdl)
+    auto ResumeState([[maybe_unused]] auto& hdl)
     {
-        return tinycoro::ETaskResumeState::PAUSED;
+        return tinycoro::detail::ETaskResumeState::PAUSED;
     }
 };
 
@@ -122,7 +117,7 @@ TEST(CoroTaskTest, CoroTaskTest)
 
     task.Resume();
 
-    EXPECT_EQ(task.ResumeState(), tinycoro::ETaskResumeState::PAUSED);
+    EXPECT_EQ(task.ResumeState(), tinycoro::detail::ETaskResumeState::PAUSED);
 
-    task.SetPauseHandler(tinycoro::ResumeCallback_t{});
+    task.SetResumeCallback(tinycoro::ResumeCallback_t{});
 }

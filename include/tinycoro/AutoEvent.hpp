@@ -9,7 +9,6 @@
 #include <atomic>
 #include <mutex>
 
-#include "PauseHandler.hpp"
 #include "LinkedPtrStack.hpp"
 #include "AwaiterHelper.hpp"
 #include "LinkedUtils.hpp"
