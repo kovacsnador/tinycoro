@@ -8,7 +8,7 @@
 ## Join the `TINYCORO` Community
 Join us to discuss Tinycoro, ask questions, and share ideas!
 
-[![Join our Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord&logoColor=white)](https://discord.gg/epJ867PE)
+[![Join our Discord](https://img.shields.io/badge/Discord-Join-blue?logo=discord&logoColor=white)](https://discord.gg/3ZspURfSgW)
 
 ## Description
 `tinycoro` is a lightweight, header-only coroutine library aimed at simplifying asynchronous programming in C++. It offers an efficient, straightforward solution for managing concurrent tasks, without the complexity of traditional threading or multiprocessing.
