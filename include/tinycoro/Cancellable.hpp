@@ -32,6 +32,13 @@ namespace tinycoro {
         {
         }
 
+        // accepts only r-value refs
+        explicit Cancellable(std::stop_token token, AwaiterT&& awaiter)
+        : _awaiter{awaiter}
+        , _stopToken{std::move(token)}
+        {
+        }
+
         // disable move and copy
         Cancellable(Cancellable&&) = delete;
 
@@ -49,12 +56,20 @@ namespace tinycoro {
             {
                 auto& stopSource = parentCoro.promise().StopSource();
                 assert(stopSource.stop_possible());
-                
+
+                // check if the member token is initialized
+                if (_stopToken.stop_possible() == false)
+                    _stopToken = stopSource.get_token();
+
                 // now we have a valid stop_source
                 // we also setup a stop_callback
-                _stopCallback.emplace(stopSource.get_token(), [this, parentCoro] {
+                _stopCallback.emplace(_stopToken, [this, parentCoro]() mutable {
                     if (_awaiter.Cancel())
                     {
+                        // make sure we cancel the embedded stop source also.
+                        // in case we got the token from outside.
+                        parentCoro.promise().StopSource().request_stop();
+
                         // if we could cancel the awaiter
                         // this is the first point that we actually
                         // are able to mark the awaiter suspend as cancellable
@@ -78,15 +93,25 @@ namespace tinycoro {
         {
             // destroy the stop callback
             // we resume the coroutine anyway
+            //
+            // Why is safe to call the destructor
+            // https://en.cppreference.com/w/cpp/thread/stop_callback/~stop_callback.html
             _stopCallback.reset();
 
             // delegate the call to the awaiter
             return _awaiter.await_resume();
         }
 
+        // expose cancellation interface
+        [[nodiscard]] bool Cancel() noexcept { return _awaiter.Cancel(); }
+        bool               NotifyToDestroy() noexcept { return _awaiter.NotifyToDestroy(); }
+        bool               Notify() noexcept { return _awaiter.Notify(); }
+
     private:
         AwaiterT& _awaiter;
         StorageT  _stopCallback;
+
+        std::stop_token _stopToken{};
     };
 
 } // namespace tinycoro
