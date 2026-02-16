@@ -397,3 +397,23 @@ TEST_P(ManualEventTimeoutTest, ManualEventFunctionalTest_all_timeout)
 
     EXPECT_EQ(doneCount, count);
 }
+
+TEST_P(ManualEventTimeoutTest, ManualEventFunctionalTest_timeout_with_cancellable)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+    tinycoro::ManualEvent event;
+
+    auto task = [&]() -> tinycoro::TaskNIC<> { co_await tinycoro::TimeoutAwait{clock, tinycoro::Cancellable{event.Wait()}, 20ms}; };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+    for (size_t i=0; i < count; ++i)
+        tasks.push_back(task());
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    EXPECT_FALSE(event.IsSet());
+}

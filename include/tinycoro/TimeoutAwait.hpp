@@ -80,7 +80,7 @@ namespace tinycoro {
             return suspend;
         }
 
-        [[nodiscard]] constexpr auto await_resume() noexcept
+        constexpr auto await_resume() noexcept
         {
             using return_t   = decltype(std::declval<AwaiterT>().await_resume());
             using optional_t = detail::TaskResult_t<return_t>;

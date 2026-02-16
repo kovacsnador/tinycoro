@@ -276,7 +276,10 @@ namespace tinycoro {
             {
                 // We can delegate the stop request
                 // directly to the jthread
-                return _thread.request_stop();
+                auto res = _thread.request_stop();
+                _cv.notify_all();
+                
+                return res;
             }
 
             [[nodiscard]] auto StopRequested() const noexcept { return _thread.get_stop_token().stop_requested(); }
