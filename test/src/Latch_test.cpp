@@ -391,3 +391,32 @@ TEST_P(LatchTest, LatchTest_timeout_race)
 
     EXPECT_EQ(cc, 0);
 }
+
+TEST_P(LatchTest, LatchTest_timeout_race_cancellable)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    auto count = GetParam();
+
+    tinycoro::Latch latch{std::max((count / (size_t)2), (size_t)1)};
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto consumer = [&]()->tinycoro::TaskNIC<void, LatchTest::Allocator> {
+        std::ignore = co_await tinycoro::TimeoutAwait{clock, tinycoro::Cancellable{latch.ArriveAndWait()}, 1ms};
+        cc--;
+    };
+
+    std::vector<decltype(consumer())> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    // at least one need succeed
+    EXPECT_TRUE(cc < count);
+}

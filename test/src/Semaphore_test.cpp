@@ -658,3 +658,34 @@ TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_cancel_all_race)
     // intended to check with sanitizers...
     EXPECT_TRUE(cancelCount > 0);
 }
+
+TEST_P(SemaphoreTimeoutTest, SemaphoreTimeoutTest_cancel_all_race_timeout)
+{
+    const auto count = GetParam();
+
+    tinycoro::Scheduler scheduler;
+    tinycoro::SoftClock clock;
+
+    // sema is locked
+    tinycoro::Semaphore<1> sema;
+
+    size_t cancelCount{};
+
+    auto func = [&]() -> tinycoro::TaskNIC<> {
+        auto guard = co_await tinycoro::TimeoutAwait{clock, tinycoro::Cancellable{sema.Wait()}, 1ms};
+        cancelCount++;
+    };
+
+    std::vector<tinycoro::TaskNIC<>> tasks;
+    tasks.reserve(count);
+
+    for (size_t i = 0; i < count; ++i)
+    {
+        tasks.emplace_back(func());
+    }
+
+    tinycoro::AnyOf(scheduler, std::move(tasks));
+
+    // intended to check with sanitizers...
+    EXPECT_TRUE(cancelCount > 0);
+}
