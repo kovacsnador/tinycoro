@@ -9,13 +9,13 @@
 #include <thread>
 #include <future>
 #include <functional>
-#include <list>
 #include <mutex>
 #include <concepts>
 #include <assert.h>
 #include <ranges>
 #include <cstddef>
 #include <memory_resource>
+#include <vector>
 
 #include "Common.hpp"
 #include "LinkedPtrList.hpp"
@@ -37,7 +37,21 @@ namespace tinycoro {
             , _dispatcher{_sharedTasks, _stopSource.get_token()}
             , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
             {
-                _AddWorkers(workerThreadCount);
+                assert(workerThreadCount >= 1);
+
+                _workers.reserve(workerThreadCount);
+                _workerThreads.reserve(workerThreadCount);
+
+                auto token = _stopSource.get_token();
+
+                for (size_t i = 0; i < workerThreadCount; ++i)
+                {
+                    // create workers
+                    auto& worker = _workers.emplace_back(std::make_unique<Worker_t>(_dispatcher, token));
+                    
+                    // start workers in workersThreads
+                    _workerThreads.emplace_back([w = worker.get()] (auto token) { w->Run(token); }, token);
+                }
             }
 
             ~CoroThreadPool()
@@ -179,16 +193,6 @@ namespace tinycoro {
                 return false;
             }
 
-            void _AddWorkers(size_t workerThreadCount)
-            {
-                assert(workerThreadCount >= 1);
-
-                for ([[maybe_unused]] auto it : std::views::iota(0u, workerThreadCount))
-                {
-                    _workerThreads.emplace_back(_dispatcher, _stopSource.get_token());
-                }
-            }
-
             using queue_t      = detail::AtomicQueue<TaskT, CACHE_SIZE>;
             using dispatcher_t = detail::Dispatcher<queue_t>;
 
@@ -198,7 +202,7 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource;
 
-            // std::vector<queue_t> _queues;
+            // Task dispatcher 
             dispatcher_t _dispatcher;
 
             // the stop callback, which will be triggered
@@ -208,8 +212,8 @@ namespace tinycoro {
             // Specialize the worker (thread) type
             using Worker_t = SchedulerWorker<decltype(_dispatcher)>;
 
-            // the worker threads which are running the tasks
-            std::list<Worker_t> _workerThreads;
+            std::vector<std::unique_ptr<Worker_t>> _workers;
+            std::vector<std::jthread> _workerThreads;
         };
 
         static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;

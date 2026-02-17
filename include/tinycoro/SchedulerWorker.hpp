@@ -6,7 +6,6 @@
 #ifndef TINY_CORO_SCHEDULER_WORKER_HPP
 #define TINY_CORO_SCHEDULER_WORKER_HPP
 
-#include <thread>
 #include <mutex>
 #include <cstddef>
 
@@ -66,7 +65,6 @@ namespace tinycoro { namespace detail {
         SchedulerWorker(DispatcherT& dispatcher, std::stop_token stopToken)
         : _dispatcher{dispatcher}
         , _stopToken{stopToken}
-        , _thread{[this](std::stop_token st) { Run(st); }, stopToken}
         {
         }
 
@@ -75,14 +73,6 @@ namespace tinycoro { namespace detail {
 
         ~SchedulerWorker()
         {
-            if (joinable())
-            {
-                // this is here just for
-                // safety reasons, join should be called
-                // from the owner scheduler.
-                join();
-            }
-
             // only in the destructor is cleaned up
             // the paused task container.
             //
@@ -92,11 +82,6 @@ namespace tinycoro { namespace detail {
             _Cleanup(_pausedTasks.begin());
         }
 
-        void join() { _thread.join(); }
-
-        [[nodiscard]] auto joinable() const noexcept { return _thread.joinable(); }
-
-    private:
         void Run(std::stop_token stopToken) noexcept
         {
             while (stopToken.stop_requested() == false)
@@ -146,6 +131,7 @@ namespace tinycoro { namespace detail {
             _Cleanup(_cachedTasks.begin());
         }
 
+    private:
         // Generates the pause resume callback
         // It relays on a task pointer address
         template <typename PromiseT>
@@ -406,9 +392,6 @@ namespace tinycoro { namespace detail {
 
         // The scheduler stop token
         std::stop_token _stopToken;
-
-        // The underlying worker thread
-        std::jthread _thread;
     };
 
 }} // namespace tinycoro::detail
