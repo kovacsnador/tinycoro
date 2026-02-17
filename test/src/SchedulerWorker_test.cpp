@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include <latch>
+#include <future>
 
 #include <tinycoro/tinycoro_all.h>
 
@@ -76,12 +77,16 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
 
     tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
 
+    auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
+
     EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
     latch.wait();
 
     ss.request_stop();
     dispatcher.notify_all();
+
+    fut.get();
 }
 
 struct SchedulerWorkerTest : testing::TestWithParam<size_t>
@@ -113,8 +118,9 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
         tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
 
-
         tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+
+        auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
         EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
@@ -122,5 +128,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
 
         ss.request_stop();
         dispatcher.notify_all();
+
+        fut.get();
     }
 }
