@@ -27,7 +27,7 @@ namespace tinycoro { namespace detail {
     class SimpleStorage
     { 
         using Storage_t    = std::byte[SIZE];
-        using Destructor_t = void (*)(SimpleStorage*);
+        using Destructor_t = void (*)(SimpleStorage*) noexcept;
 
     public:
         SimpleStorage() = default;
