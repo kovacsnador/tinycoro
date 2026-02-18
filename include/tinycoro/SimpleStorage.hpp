@@ -8,16 +8,24 @@
 
 #include <concepts>
 #include <cstddef>
+#include <memory>
+#include <new> /* launder */
 
 namespace tinycoro { namespace detail {
+
+    namespace local
+    {
+        template<typename T, size_t SIZE, size_t ALIGN>
+        concept FitInStore = (sizeof(T) <= SIZE) && (ALIGN >= alignof(T));
+    }
 
     // This is a simple storage object.
     //
     // It stores a simple object on his internal storage (stack).
     // It does not support copy or move operation.
-    template <std::unsigned_integral auto SIZE, typename AlignmentT = std::max_align_t>
+    template <size_t SIZE, size_t ALIGNMENT = alignof(std::max_align_t)>
     class SimpleStorage
-    {
+    { 
         using Storage_t    = std::byte[SIZE];
         using Destructor_t = void (*)(SimpleStorage*);
 
@@ -29,8 +37,7 @@ namespace tinycoro { namespace detail {
 
         ~SimpleStorage() { Destroy(); }
 
-        template <typename T, typename... Args>
-            requires (sizeof(T) <= SIZE) && (alignof(AlignmentT) >= alignof(T))
+        template <local::FitInStore<SIZE, ALIGNMENT> T, typename... Args>
         void Emplace(Args&&... args)
         {
             // destroy the previous object
@@ -39,21 +46,19 @@ namespace tinycoro { namespace detail {
 
             // The storage is not initialized yet
             // We initialize it
-            auto ptr = GetAs<T>();
-            std::construct_at(ptr, std::forward<Args>(args)...);
+            std::construct_at(reinterpret_cast<T*>(_buffer), std::forward<Args>(args)...);
 
             // Setting the corresponding destructor
-            _destructor = [](auto storage) {
-                auto ptr = storage->template GetAs<T>();
+            _destructor = [](auto storage) noexcept {
+                auto ptr = storage->template UnsafeGet<T>();
                 std::destroy_at(ptr);
             };
         }
 
         // Helper function to get
         // out the real object pointer
-        template <typename T>
-            requires (sizeof(T) <= SIZE)
-        [[nodiscard]] T* GetAs() noexcept
+        template <local::FitInStore<SIZE, ALIGNMENT> T>
+        [[nodiscard]] T* UnsafeGet() noexcept
         {
             return std::launder(reinterpret_cast<T*>(_buffer));
         }
@@ -81,7 +86,7 @@ namespace tinycoro { namespace detail {
     private:
         // the underlying buffer
         // which stores the real object
-        alignas(AlignmentT) Storage_t _buffer;
+        alignas(ALIGNMENT) Storage_t _buffer;
 
         // The dedicated destructor
         //

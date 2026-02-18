@@ -279,6 +279,12 @@ namespace tinycoro {
         };
 
         template <typename T>
+        struct FutureReturnT<std::optional<T>>
+        {
+            using value_type = std::optional<typename ReturnT<T>::value_type>;
+        };
+
+        template <typename T>
         struct TaskResultType
         {
             using value_type = std::optional<typename ReturnT<T>::value_type>;
@@ -308,6 +314,14 @@ namespace tinycoro {
             //
             // e.g. std::future<std::optinal<int32_t>>
             using future_t = decltype(std::declval<futureState_t>().get_future());
+        };
+
+        template<typename FutureStateT>
+        struct FutureTypeConverter;
+
+        template<template<typename> class FutureStateT, typename T>
+        struct FutureTypeConverter<FutureStateT<T>> :  FutureTypeGetter<T, FutureStateT>
+        {
         };
 
         namespace helper {
