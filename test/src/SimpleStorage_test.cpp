@@ -15,7 +15,7 @@ struct StorageObject
 
 TEST(SimpleStorageTest, SimpleStorageTest_empty)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     EXPECT_TRUE(storage.Empty());
     EXPECT_FALSE(storage);
@@ -23,11 +23,11 @@ TEST(SimpleStorageTest, SimpleStorageTest_empty)
 
 TEST(SimpleStorageTest, SimpleStorageTest_not_empty)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     storage.Emplace<StorageObject>("test");
 
-    auto* obj = storage.GetAs<StorageObject>();
+    auto* obj = storage.UnsafeGet<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
 
     EXPECT_FALSE(storage.Empty());
@@ -38,17 +38,17 @@ TEST(SimpleStorageTest, SimpleStorageTest_not_empty)
 
 TEST(SimpleStorageTest, SimpleStorageTest_2times_initialize)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     storage.Emplace<StorageObject>("test");
 
-    auto* obj = storage.GetAs<StorageObject>();
+    auto* obj = storage.UnsafeGet<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
 
     storage.Emplace<StorageObject>("test2");
 
     // get the new value
-    obj = storage.GetAs<StorageObject>();
+    obj = storage.UnsafeGet<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
 
     // still holds the first value
@@ -57,12 +57,12 @@ TEST(SimpleStorageTest, SimpleStorageTest_2times_initialize)
 
 TEST(SimpleStorageTest, SimpleStorageTest_reassign_explicit_destroy)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     auto test = [&](std::string str) {
         storage.Emplace<StorageObject>(str);
 
-        auto* obj = storage.GetAs<StorageObject>();
+        auto* obj = storage.UnsafeGet<StorageObject>();
         EXPECT_CALL(*obj, Destructor).Times(1);
 
         EXPECT_EQ(obj->data, str);
@@ -78,12 +78,12 @@ TEST(SimpleStorageTest, SimpleStorageTest_reassign_explicit_destroy)
 
 TEST(SimpleStorageTest, SimpleStorageTest_reassign)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     auto test = [&](std::string str) {
         storage.Emplace<StorageObject>(str);
 
-        auto* obj = storage.GetAs<StorageObject>();
+        auto* obj = storage.UnsafeGet<StorageObject>();
         EXPECT_CALL(*obj, Destructor).Times(1);
 
         EXPECT_EQ(obj->data, str);
@@ -96,11 +96,11 @@ TEST(SimpleStorageTest, SimpleStorageTest_reassign)
 
 TEST(SimpleStorageTest, SimpleStorageTest_raw_data_compare)
 {
-    tinycoro::detail::SimpleStorage<sizeof(StorageObject), StorageObject> storage;
+    tinycoro::detail::SimpleStorage<sizeof(StorageObject), alignof(StorageObject)> storage;
 
     storage.Emplace<StorageObject>("str");
 
-    auto* obj = storage.GetAs<StorageObject>();
+    auto* obj = storage.UnsafeGet<StorageObject>();
     EXPECT_CALL(*obj, Destructor).Times(1);
 
     EXPECT_EQ(obj->data, std::string{"str"});

@@ -9,6 +9,7 @@
 #include <stop_token>
 #include <cassert>
 #include <utility>
+#include <new> /* launder */
 
 #include "TaskResumer.hpp"
 #include "Promise.hpp"
@@ -144,7 +145,11 @@ namespace tinycoro { namespace detail {
     void OnTaskFinish(void* self, void* futureStatePtr, std::exception_ptr exception)
     {
         auto promise = static_cast<PromiseT*>(self);
-        auto future  = static_cast<FutureStateT*>(futureStatePtr);
+
+        // std::launder is not strictly necessary, but may some older compilers still need it.
+        //
+        // P3006 https://www.open-std.org/jtc1/sc22/wg21/docs/papers/2023/p3006r0.html
+        auto future  = std::launder(static_cast<FutureStateT*>(futureStatePtr));
 
         if (exception)
         {
