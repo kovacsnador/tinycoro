@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <set>
+#include <chrono>
 
 #include "tinycoro/tinycoro_all.h"
 
@@ -214,9 +215,44 @@ TEST(TaskGroupTest, TaskGroupTest_join_await)
         // wait for all the task.
         co_await taskGroup.Join();
 
+        EXPECT_TRUE(taskGroup.Closed());
+
         std::set set{0, 1, 2, 3};
 
         while (auto res = co_await taskGroup.Next())
+        {
+            EXPECT_TRUE(set.erase(*res));
+        }
+
+        EXPECT_TRUE(set.empty());
+    };
+
+    tinycoro::AllOf(task());
+}
+
+TEST(TaskGroupTest, TaskGroupTest_wait_await)
+{
+    tinycoro::Scheduler scheduler;
+
+    auto task = [&]() -> tinycoro::Task<> {
+        std::atomic<int32_t> count{};
+        auto                 counter = [&]() -> tinycoro::Task<int32_t> { co_return count.fetch_add(1); };
+
+        tinycoro::TaskGroup<int32_t> taskGroup;
+
+        taskGroup.Spawn(scheduler, counter());
+        taskGroup.Spawn(scheduler, counter());
+        taskGroup.Spawn(scheduler, counter());
+        taskGroup.Spawn(scheduler, counter());
+
+        // wait for all the task.
+        co_await taskGroup.Wait();
+
+        EXPECT_FALSE(taskGroup.Closed());
+
+        std::set set{0, 1, 2, 3};
+
+        while (auto res = taskGroup.TryNext())
         {
             EXPECT_TRUE(set.erase(*res));
         }
@@ -631,6 +667,151 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_producer_multi_consumer_ca
 
     // some need to be cancelled
     EXPECT_TRUE(executed <= spawned);
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_wait_test)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count * 8);
+
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::TaskGroup<int> group;
+
+    auto task = []() -> tinycoro::Task<int32_t> { co_return 42; };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+            group.Spawn(scheduler, task());
+
+        co_await group.Wait();
+
+        for(size_t i=0; i < count; ++i)
+            EXPECT_TRUE(*group.TryNext() == 42);
+    };
+
+    tinycoro::AllOf(scheduler,
+                    producer(),
+                    producer(),
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer());
+
+    // group is empty
+    EXPECT_FALSE(group.TryNext());
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_wait_timeout_check_test)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count * 8);
+
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    tinycoro::TaskGroup<size_t> group;
+
+    tinycoro::Latch latch(6);
+
+    std::atomic<size_t> c{};
+
+    // last task to be finished
+    auto waiter = [&]() -> tinycoro::Task<size_t> {
+        co_await latch;
+        co_return 42u;
+    };
+
+    auto task = [&](size_t v) -> tinycoro::Task<size_t> {
+        c.fetch_add(1, std::memory_order::relaxed);
+
+        // one producer is done
+        if(v + 1 == count)
+            latch.CountDown();
+
+        co_return v;
+    };
+
+    // spawn first task
+    group.Spawn(scheduler, waiter());
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for (size_t i = 0; i < count; ++i)
+            group.Spawn(scheduler, task(i));
+
+        co_return;
+    };
+
+    auto consumerWait = [&]() -> tinycoro::Task<> {
+        co_await group.Wait();
+
+        // only release all Wait() if all tasks are done
+        EXPECT_EQ(c.load(std::memory_order::relaxed), (count * 6));
+    };
+
+    tinycoro::AllOf(scheduler,
+                    producer(),
+                    producer(),
+                    producer(),
+                    producer(),
+                    producer(),
+                    producer(),
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait(), 
+                    consumerWait());
+}
+
+TEST_P(TaskGroupStressTest, TaskGroupStressTest_multi_wait_test)
+{
+    const auto count = GetParam();
+
+    // make sure this is big enough
+    // our scheduler enqueue() is not awaitable here
+    constexpr size_t schedulerSize = 1 << 19;
+    ASSERT_TRUE(schedulerSize > count * 8);
+
+    tinycoro::CustomScheduler<schedulerSize> scheduler;
+
+    auto task = [](size_t v) -> tinycoro::Task<size_t> { co_return v; };
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        
+        tinycoro::TaskGroup<size_t> group;
+        for (size_t i = 0; i < count; ++i)
+        {
+            group.Spawn(scheduler, task(i));
+
+            co_await group.Wait();
+            EXPECT_EQ(*group.TryNext(), i);
+        }
+
+        // group empty
+        EXPECT_FALSE(group.TryNext());
+    };
+
+    tinycoro::AllOf(scheduler,
+                    producer(),
+                    producer(),
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer(), 
+                    producer());
 }
 
 TEST_P(TaskGroupStressTest, TaskGroupStressTest_consumer_cancel_all)
