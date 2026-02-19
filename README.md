@@ -741,9 +741,10 @@ while (std::optional<int> result = co_await group.Next()) {
 co_await group.Join();
 ```
 ### Spawning Tasks
-
+```cpp
     template <typename SchedulerT, typename TaskT>
     bool Spawn(SchedulerT& scheduler, TaskT&& task);
+```
 
 Schedules a task on the given scheduler and transfers task ownership to the underlying `Scheduler`.
 
@@ -755,7 +756,7 @@ Schedules a task on the given scheduler and transfers task ownership to the unde
 
 ### Retrieving Results
 
-#### Next()
+### Next()
 ```cpp
     // Get the next task result.
     std::optional<T> res = co_await group.Next();
@@ -781,7 +782,7 @@ This pattern can easily lead to deadlocks, because the task may end up waiting f
 
 ---
 
-#### TryNext()
+### TryNext()
 
 ```cpp
     std::optional<T> res = group.TryNext();
@@ -796,7 +797,31 @@ TryNext() is Non-blocking variant of Next():
 
 ### Waiting for Completion
 
-#### Join()
+### Wait()
+
+```cpp
+    // wait the group
+    co_await group.Wait();
+
+    // you can make it cancellable
+    co_await tinycoro::Cancellable{group.Wait()};
+```
+
+Suspends until all tasks in the group have finished.
+
+Properties:
+
+- Implicitly closes the `TaskGroup`.
+- Multiple `Wait()` awaiters are allowed.
+- All `Wait()` awaiter observes the completion state directly.
+- Explicitly cancellable.
+
+⚠️Calling Wait() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
+This can easily lead to deadlocks, because the task waits for the group to finish while it is still part of the group.
+
+<b>Make sure that tasks inside a TaskGroup do not co_await group.Wait() on the same group.</b>
+
+### Join()
 
 ```cpp
     // Join the group
@@ -812,9 +837,12 @@ Not waits awaiters to be finished.
 Properties:
 
 - Implicitly closes the `TaskGroup`.
+- After Join() is called, no new tasks can be spawned into the group.
 - Multiple `Join()` awaiters are allowed.
 - All `Join()` awaiter observes the completion state directly.
 - Explicitly cancellable.
+
+Once Join() has been invoked, the group transitions to a closed state. Any subsequent attempt to spawn a task into the same TaskGroup fails and Spawn() returns false.
 
 ⚠️Calling Join() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
 This can easily lead to deadlocks, because the task waits for the group to finish while it is still part of the group.
@@ -835,7 +863,7 @@ Blocks the current thread until all tasks finish.
 
 ### Cancellation
 
-#### CancelAll()
+### CancelAll()
 
 ```cpp
     group.CancelAll();
@@ -850,7 +878,7 @@ Blocks the current thread until all tasks finish.
 
 ### Closing the Group
 
-#### Close()
+### Close()
 ```cpp
     group.Close();
 ```
@@ -892,27 +920,29 @@ Each `TaskGroup` owns a `std::stop_source`:
 
 The following operations are thread-safe:
 
-- `Spawn`
-- `Next`
-- `TryNext`
-- `Join`
-- `Close`
-- `CancelAll`
+- `Spawn()`
+- `Next()`
+- `TryNext()`
+- `Wait()`
+- `Join()`
+- `Close()`
+- `CancelAll()`
 
 <b>Multiple producers and consumers are supported.<b>
 
 ---
 
-### Semantics Summary
+### API Summary
 
 | Operation    | Effect |
 |------------|--------|
-| `Spawn`     | Adds and schedules a task |
-| `Next`      | Awaits the next completed task result |
-| `TryNext`   | Retrieves the next result without suspension |
-| `Join`      | Closes the group and waits for all tasks |
-| `Close`     | Closes the group which prevents new tasks from being spawned |
-| `CancelAll` | Requests cancellation of all tasks |
+| `Spawn()`     | Adds and schedules a task |
+| `Next()`      | Awaits the next completed task result |
+| `TryNext()`   | Retrieves the next result without suspension |
+| `Wait()`      | Waits for all tasks |
+| `Join()`      | Closes the group and waits for all tasks |
+| `Close()`     | Closes the group which prevents new tasks from being spawned |
+| `CancelAll()` | Requests cancellation of all tasks |
 | Destructor  | Implicitly waits for all tasks |
 
 ---

@@ -249,6 +249,8 @@ namespace tinycoro {
             // tasks to finish and suppresses exceptions.
             ~TaskGroup()
             {
+                Close();
+
                 // After Join(), no tasks are running and no further Finish-callbacks can occur.
                 auto joinAll = [this]() -> InlineTask<> { co_await Join(); };
                 tinycoro::AllOf(joinAll());
@@ -334,10 +336,7 @@ namespace tinycoro {
             // Thread-safe.
             void CancelAll() noexcept
             {
-                {
-                    std::scoped_lock lock{_mtx};
-                    _closed = true;
-                }
+                Close();
 
                 assert(_stopSource.stop_possible());
 
@@ -407,13 +406,22 @@ namespace tinycoro {
 
             // Returns an awaiter that completes when all tasks in the group have finished.
             //
-            // Calling Join() implicitly closes the TaskGroup, preventing further task spawning.
-            //
-            // Multiple Join() awaiters are allowed, but only the first one observes the
-            // completion state directly; others are simply resumed.
+            // Multiple Wait() awaiters are allowed.
             //
             // Thread-safe.
-            [[nodiscard]] auto Join() noexcept -> joinAwaiter_t { return joinAwaiter_t{*this}; }
+            [[nodiscard]] auto Wait() noexcept -> joinAwaiter_t { return joinAwaiter_t{*this}; }
+
+            // Returns an awaiter that completes when all tasks in the group have finished.
+            //
+            // Calling Join() implicitly closes the TaskGroup, preventing further task spawning.
+            //
+            // Multiple Join() awaiters are allowed.
+            //
+            // Thread-safe.
+            [[nodiscard]] auto Join() noexcept -> joinAwaiter_t { 
+                Close();
+                return Wait();
+            }
 
             // Returns the stop source associated with this TaskGroup.
             //
@@ -422,6 +430,8 @@ namespace tinycoro {
             //
             // Thread-safe.
             [[nodiscard]] auto StopSource() noexcept { return _stopSource; }
+
+            [[nodiscard]] constexpr bool Closed() const noexcept { return _closed; }
 
         private:
             template <typename T>
@@ -448,7 +458,7 @@ namespace tinycoro {
                 joinAwaiter_t* joinAwaiters{nullptr};
 
                 // check if we are done
-                if (_closed && _runningTaskblocks.empty())
+                if (_runningTaskblocks.empty())
                 {
                     // there are no tasks which needs to be waited
                     // and we are in the close state.
@@ -515,13 +525,9 @@ namespace tinycoro {
             {
                 std::scoped_lock lock{_mtx};
 
-                _closed = true;
-
                 if (_runningTaskblocks.empty())
                 {
-                    // if the task group is closed,
-                    // and we have no running futures
-                    // everything is done.
+                    // if we have no running futures
                     // No suspend necessary.
                     return false;
                 }
@@ -534,9 +540,11 @@ namespace tinycoro {
             {
                 std::unique_lock lock{_mtx};
 
-                assert(_closed);
-                assert(_runningTaskblocks.empty());
-                assert(_joinAwaiters.empty());
+                if(Closed())
+                {
+                    assert(_runningTaskblocks.empty());
+                    assert(_joinAwaiters.empty());
+                }
 
                 // Woke up zombie NextAwaiters
                 //
