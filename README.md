@@ -811,7 +811,6 @@ Suspends until all tasks in the group have finished.
 
 Properties:
 
-- Implicitly closes the `TaskGroup`.
 - Multiple `Wait()` awaiters are allowed.
 - All `Wait()` awaiter observes the completion state directly.
 - Explicitly cancellable.
@@ -832,7 +831,6 @@ This can easily lead to deadlocks, because the task waits for the group to finis
 ```
 
 Suspends until all tasks in the group have finished.
-Not waits awaiters to be finished.
 
 Properties:
 
@@ -856,8 +854,7 @@ This can easily lead to deadlocks, because the task waits for the group to finis
 ```cpp
     tinycoro::Join(group);
 ```
-
-Blocks the current thread until all tasks finish.
+Blocks the current thread until all tasks completes. Can be invoked from a <b>non</b> corouitne context.
 
 ---
 
@@ -890,21 +887,16 @@ Blocks the current thread until all tasks finish.
 
 ### Stop Token Propagation
 
-Each `TaskGroup` owns a `std::stop_source`:
-
-```cpp
-    // initialize with stop source from outside.
-    std::stop_source stopSource1;
-    tinycoro::TaskGroup<int> group{stopSource1};
-
-    ...
-
-    // get the stop source
-    std::stop_source stopSource2 = group.StopSource();
-```
+`TaskGroup` with external `std::stop_source`:
 
 - The stop token is propagated to all spawned tasks.
 - An external stop source can be injected via the constructor.
+
+```cpp
+    // initialize with stop source from outside.
+    std::stop_source stopSource;
+    tinycoro::TaskGroup<int> group{stopSource};
+```
 
 ---
 
