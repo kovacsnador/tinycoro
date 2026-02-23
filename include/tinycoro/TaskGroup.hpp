@@ -43,7 +43,7 @@ namespace tinycoro {
             }
 
             TaskGroupT& taskGroup;
-            FutureT    future{};
+            FutureT     future{};
         };
 
         template <typename UserDataT>
@@ -418,7 +418,8 @@ namespace tinycoro {
             // Multiple Join() awaiters are allowed.
             //
             // Thread-safe.
-            [[nodiscard]] auto Join() noexcept -> joinAwaiter_t { 
+            [[nodiscard]] auto Join() noexcept -> joinAwaiter_t
+            {
                 Close();
                 return Wait();
             }
@@ -430,8 +431,6 @@ namespace tinycoro {
             //
             // Thread-safe.
             [[nodiscard]] auto StopSource() noexcept { return _stopSource; }
-
-            [[nodiscard]] constexpr bool Closed() const noexcept { return _closed; }
 
         private:
             template <typename T>
@@ -540,7 +539,7 @@ namespace tinycoro {
             {
                 std::unique_lock lock{_mtx};
 
-                if(Closed())
+                if (_closed)
                 {
                     assert(_runningTaskblocks.empty());
                     assert(_joinAwaiters.empty());

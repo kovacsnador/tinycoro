@@ -51,7 +51,7 @@ namespace tinycoro { namespace detail {
             sharedStatePtr->ClearFlags();
 
             // check for continuation type
-            using promise_base_t = std::remove_pointer_t<decltype(promise.child)>;
+            using promise_base_t = PromiseT::PromiseBase_t;
 
             // find the continuation
             auto promiseToResume = FindContinuation<promise_base_t>(std::addressof(promise));
@@ -62,7 +62,7 @@ namespace tinycoro { namespace detail {
             // Ensure that promise_base_t has the same alignment
             // as the derived promise class.
             // Currently, we use alignas(std::max_align_t) for the base class
-            // because mismatched alignment caused issues on 32-bit builds.
+            // because mismatched alignment caused issues specially on 32-bit builds.
             auto handle = std::coroutine_handle<promise_base_t>::from_promise(*promiseToResume);
             handle.resume();
         }

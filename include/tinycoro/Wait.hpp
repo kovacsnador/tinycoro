@@ -101,7 +101,10 @@ namespace tinycoro {
             }
             catch (...)
             {
-                exception = std::current_exception();
+                if (!exception)
+                {
+                    exception = std::current_exception();
+                }
             }
         };
         std::apply([futureGet](auto&... future) { ((futureGet(future)), ...); }, futures);

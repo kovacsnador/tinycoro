@@ -215,8 +215,6 @@ TEST(TaskGroupTest, TaskGroupTest_join_await)
         // wait for all the task.
         co_await taskGroup.Join();
 
-        EXPECT_TRUE(taskGroup.Closed());
-
         std::set set{0, 1, 2, 3};
 
         while (auto res = co_await taskGroup.Next())
@@ -247,8 +245,6 @@ TEST(TaskGroupTest, TaskGroupTest_wait_await)
 
         // wait for all the task.
         co_await taskGroup.Wait();
-
-        EXPECT_FALSE(taskGroup.Closed());
 
         std::set set{0, 1, 2, 3};
 
