@@ -293,7 +293,7 @@ namespace tinycoro {
         // regardless of their return type.
         //
         // (dummy void type)
-        using CommonSchedulablePromiseT = Promise<void>::PromiseBase_t;
+        using CommonSchedulablePromiseT = Promise<void>::SchedulablePromise_t;
     } // namespace detail
 
 } // namespace tinycoro

@@ -106,9 +106,7 @@ namespace tinycoro {
             };
 
         private:
-            // TODO: prove that.
-            // Placing _state before _resumerCallback saves 8 bytes of padding
-            // on all three major compilers: MSVC, GCC, and Clang.
+            // atomic flag to store shared state
             std::atomic<uint8_t> _state{};
 
             // The resume callback, which is intented to

@@ -37,8 +37,8 @@ namespace tinycoro { namespace detail {
     template <concepts::IsAwaiter FinalAwaiterT, typename StopSourceT>
     struct alignas(std::max_align_t) PromiseBase
     {
-        // alignas(std::max_align_t) ensures that on 32-bit systems, 
-        // PromiseBase has the same alignment as the derived PromiseT
+        // alignas(std::max_align_t) ensures that PromiseBase has
+        // the same alignment as the derived PromiseT
         // for all platforms.
 
         using PromiseBase_t = PromiseBase;

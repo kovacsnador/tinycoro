@@ -33,7 +33,7 @@ namespace tinycoro
 
         using OnFinishCallback_t = void (*)(void*, void*, std::exception_ptr);
 
-        using PromiseBase_t = SchedulablePromise;
+        using SchedulablePromise_t = SchedulablePromise;
 
         SchedulablePromise() = default;
 
