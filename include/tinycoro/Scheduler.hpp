@@ -216,7 +216,7 @@ namespace tinycoro {
             std::vector<std::jthread> _workerThreads;
         };
 
-        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
+        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1 << 16;  // 65536
 
     } // namespace detail
 
