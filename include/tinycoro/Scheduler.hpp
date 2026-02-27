@@ -216,11 +216,19 @@ namespace tinycoro {
             std::vector<std::jthread> _workerThreads;
         };
 
-        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1024u;
+        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1 << 14;  // Default queue capacity: 16,384 tasks
 
     } // namespace detail
 
-    // Custom scheduler with custom cache size
+    // Scheduler queue capacity tuning guide (power of two):
+    // - 16,384 (1 << 14): good general-purpose library default.
+    //
+    // - 32,768 (1 << 15): better for sustained high fan-in workloads.
+    //
+    // - 65,536 (1 << 16) or above: for very bursty/high-throughput scenarios where
+    //   reducing producer backpressure is more important than memory footprint.
+    //
+    // Custom scheduler with explicit queue capacity.
     template <uint64_t CACHE_SIZE = detail::DEFAULT_SCHEDULER_CACHE_SIZE>
     using CustomScheduler = detail::CoroThreadPool<detail::SchedulableTask, CACHE_SIZE>;
 
