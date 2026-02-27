@@ -381,7 +381,7 @@ Once a stop is requested:
 - Tasks are stored in a bounded, lock-free queue with a configurable cache size.
 If the queue is temporarily full, enqueueing threads will wait efficiently until space becomes available.
 
-Customizable scheduler variant
+#### Customizable scheduler variant
 For advanced use cases, you can customize the internal queue cache size:
 ```cpp
 // Custom scheduler with a queue size of 2048 tasks. 
@@ -393,7 +393,7 @@ This example demonstrates how to run a task on a `tinycoro::Scheduler`.
 The scheduler takes **complete ownership** of the coroutine and manages its lifecycle.
 
 While you can manually enqueue tasks in `tinycoro::Scheduler`, it is **recommended to use helper functions** like `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)`.
-These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified, fast and safe way.
+These functions assign the coroutine to the scheduler, handle cancellation, and return results in a unified way.
 
 The `AllOf(...)` function supports both **individual tasks** and **containers of tasks**. It returns `std::optional<>`, `std::tuple<std::optional<T>...>` or `std::vector<std::optional<T>>` depending on the return type and cancellation state.
 
@@ -468,7 +468,7 @@ You can use it in two modes:
 
 > ⚠️ **Important**:
 > - `tinycoro::AllOf(scheduler, tasks...)` **requires** all tasks to be `tinycoro::Task`, because they will be executed on the provided scheduler.
-> - `tinycoro::AllOf(tasks...)` **runs without a scheduler** and supports both `tinycoro::Task` and > `tinycoro::InlineTask`.
+> - `tinycoro::AllOf(tasks...)` **runs without a scheduler** and supports both `tinycoro::Task` and `tinycoro::InlineTask`.
 > - `tinycoro::InlineTask` **cannot** be executed on a scheduler.
 
 ---
@@ -481,7 +481,7 @@ Runs all given `tinycoro::Task`s using the provided **scheduler**. Blocks until 
 tinycoro::AllOf(scheduler, task1, task2, ...); // each task is a tinycoro::Task
 ```
 
-- Executes tasks parallel via the scheduler.
+- Executes tasks in parallel via the scheduler.
 - **Requires** `tinycoro::Task`.
 - Returns when all tasks are complete.
 
