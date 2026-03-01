@@ -20,6 +20,7 @@
 #include "SchedulerWorker.hpp"
 #include "SchedulableTask.hpp"
 #include "Dispatcher.hpp"
+#include "Exception.hpp"
 
 namespace tinycoro {
 

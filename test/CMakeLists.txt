@@ -1,7 +1,5 @@
 project(tinycoro_tests) # name of your project
 
-enable_testing()
-
 if (MSVC)   
     if (CMAKE_BUILD_TYPE STREQUAL "Debug")
         set(CMAKE_CXX_FLAGS_DEBUG   "${CMAKE_CXX_FLAGS} /MTd") # for static libs debug
@@ -56,9 +54,4 @@ target_link_libraries(${PROJECT_NAME}
 
 gtest_discover_tests(${PROJECT_NAME}
     DISCOVERY_TIMEOUT 60
-)
-
-add_test(
-    NAME tinycoro_unit_tests
-    COMMAND ${PROJECT_NAME}
 )
