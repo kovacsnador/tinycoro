@@ -13,8 +13,13 @@ set(CMAKE_CXX_STANDARD_REQUIRED True)
 
 # Option to enable ASAN
 option(WithASAN "Build with AddressSanitizer" OFF)
+option(WithTSAN "Build with ThreadSanitizer" OFF)
 option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
 option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
+
+if (WithASAN AND WithTSAN)
+  message(FATAL_ERROR "WithASAN and WithTSAN cannot be enabled together")
+endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
   # using Clang
@@ -36,10 +41,16 @@ endif()
 
 if (WithASAN)
     message("Setting sanitizers...")
-    add_compile_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
-    add_link_options(-fsanitize=address, -fsanitize=undefined, -fsanitize=leak)
+    add_compile_options(-fsanitize=address -fsanitize=undefined -fsanitize=leak)
+    add_link_options(-fsanitize=address -fsanitize=undefined -fsanitize=leak)
 
     set(ENV{LSAN_OPTIONS} "verbosity=2:log_threads=1")
+endif()
+
+if (WithTSAN)
+  message("Setting ThreadSanitizer...")
+  add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g -O0)
+  add_link_options(-fsanitize=thread)
 endif()
 
 if (CMAKE_BUILD_TYPE STREQUAL "Debug")

@@ -53,5 +53,6 @@ target_link_libraries(${PROJECT_NAME}
                       PRIVATE gmock)
 
 gtest_discover_tests(${PROJECT_NAME}
+    DISCOVERY_MODE PRE_TEST
     DISCOVERY_TIMEOUT 60
 )
