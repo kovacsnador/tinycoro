@@ -1,5 +1,7 @@
 #include <gtest/gtest.h>
 
+#include <ranges>
+
 #include "mock/CoroutineHandleMock.h"
 
 #include <tinycoro/tinycoro_all.h>

@@ -3,6 +3,7 @@
 
 #include <concepts>
 #include <semaphore>
+#include <ranges>
 
 #include "mock/CoroutineHandleMock.h"
 

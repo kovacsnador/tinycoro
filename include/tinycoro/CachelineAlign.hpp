@@ -7,6 +7,7 @@
 #define TINY_CORO_CACHELINE_ALIGN_HPP
 
 #include <new> // std::hardware_destructive_interference_size
+#include <cstddef>
 
 namespace tinycoro { namespace detail {
 

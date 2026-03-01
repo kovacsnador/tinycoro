@@ -3,6 +3,8 @@
 
 #include <tinycoro/tinycoro_all.h>
 
+#include <ranges>
+
 #include "Common.h"
 
 void Example_generator()

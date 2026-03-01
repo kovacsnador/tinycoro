@@ -75,6 +75,12 @@ namespace tinycoro
         using BaseT = std::runtime_error;
         using BaseT::BaseT;
     };
+
+    struct SchedulerException : std::runtime_error
+    {
+        using BaseT = std::runtime_error;
+        using BaseT::BaseT;
+    };
     
 } // namespace tinycoro
 

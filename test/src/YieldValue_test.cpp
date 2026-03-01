@@ -1,4 +1,5 @@
 #include <gtest/gtest.h>
+#include <ranges>
 
 #include "tinycoro/tinycoro_all.h"
 

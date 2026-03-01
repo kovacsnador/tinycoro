@@ -4,6 +4,8 @@
 #include "mock/CoroutineHandleMock.h"
 #include "Allocator.hpp"
 
+#include <ranges>
+
 #include <tinycoro/tinycoro_all.h>
 
 TEST(LatchTest, LatchTest_countdown)
