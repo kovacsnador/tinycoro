@@ -7,6 +7,11 @@
 #include "mock/TaskMock.hpp"
 #include "mock/CoroutineHandleMock.h"
 
+TEST(ParallelSchedulerTest, constructor_throw)
+{
+    EXPECT_THROW(tinycoro::Scheduler{0}, tinycoro::SchedulerException);
+}
+
 struct SchedulerFunctionalTest : testing::TestWithParam<size_t>
 {
 };
