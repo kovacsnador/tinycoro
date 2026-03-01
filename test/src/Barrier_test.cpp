@@ -2,6 +2,7 @@
 #include <gmock/gmock.h>
 
 #include <algorithm>
+#include <ranges>
 
 #include <tinycoro/tinycoro_all.h>
 

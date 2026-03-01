@@ -1,6 +1,7 @@
 #include <gtest/gtest.h>
 
 #include <thread>
+#include <ranges>
 
 #include <tinycoro/tinycoro_all.h>
 

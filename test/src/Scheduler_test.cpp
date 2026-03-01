@@ -2,6 +2,8 @@
 
 #include <tinycoro/tinycoro_all.h>
 
+#include <ranges>
+
 #include "mock/TaskMock.hpp"
 #include "mock/CoroutineHandleMock.h"
 
@@ -92,6 +94,36 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_stop_source)
         scheduler.GetStopSource().request_stop();
 
         for(size_t i=0; i < count; ++i)
+        {
+            auto res = co_await tinycoro::AllOfAwait(scheduler, simpleTask());
+            EXPECT_FALSE(res.has_value());
+        }
+    };
+
+    // create detached tasks
+    for(size_t i = 0; i < count; ++i)
+        tinycoro::AllOf(scheduler, tinycoro::Detach{task()});
+
+    // this test is for the sanitizers
+}
+
+TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_external_token)
+{
+    auto count = GetParam();
+
+    std::stop_source ss;
+
+    tinycoro::Scheduler scheduler{ss.get_token()};
+
+    auto simpleTask = []() -> tinycoro::Task<int32_t>{
+        co_return 42;
+    };
+
+    auto task = [&]() -> tinycoro::Task<> {
+        // close the scheduler
+        ss.request_stop();
+
+        for(size_t i = 0; i < count; ++i)
         {
             auto res = co_await tinycoro::AllOfAwait(scheduler, simpleTask());
             EXPECT_FALSE(res.has_value());

@@ -71,7 +71,7 @@ namespace tinycoro { namespace detail {
         using sequence_t = SequenceT;
 
         AtomicQueue()
-        : _buffer{new Element[Capacity]}
+        : _buffer{std::make_unique<Element[]>(Capacity)}
         {
         }
 
