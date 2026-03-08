@@ -326,7 +326,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
         {
             while (dispatcher.try_push(i) == false)
             {
-                dispatcher.wait_for_push();
+                dispatcher.wait_for_push(dispatcher.push_state());
             }
             totalCount++;
         }
@@ -339,7 +339,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
             size_t val;
             if (dispatcher.try_pop(val) == false)
             {
-                dispatcher.wait_for_pop();
+                dispatcher.wait_for_pop(dispatcher.pop_state());
             }
             else
             {

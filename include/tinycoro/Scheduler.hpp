@@ -21,12 +21,15 @@
 #include "SchedulableTask.hpp"
 #include "Dispatcher.hpp"
 #include "Exception.hpp"
+#include "MPSCPtrQueue.hpp"
+#include "WorkGuard.hpp"
 
 namespace tinycoro {
 
     namespace detail {
 
         namespace local {
+
             /// Returns the default worker-thread count for the scheduler.
             ///
             /// `std::thread::hardware_concurrency()` may return `0` on some
@@ -39,9 +42,10 @@ namespace tinycoro {
             {
                 return std::max(std::thread::hardware_concurrency(), 1u);
             }
-        }
 
-        template<typename DispatcherT, template<typename> class WorkerT>
+        } // namespace local
+
+        template <typename DispatcherT, template <typename> class WorkerT>
         class WorkerGroup
         {
             // Specialize the worker (thread) type
@@ -51,7 +55,7 @@ namespace tinycoro {
             // Owns worker instances and their backing jthreads.
             WorkerGroup(size_t workersCount, DispatcherT& dispatcher, std::stop_token token)
             {
-                if(workersCount == 0)
+                if (workersCount == 0)
                     throw SchedulerException{"workers count cannot be 0"};
 
                 _workers.reserve(workersCount);
@@ -60,10 +64,10 @@ namespace tinycoro {
                 for (size_t i = 0; i < workersCount; ++i)
                 {
                     // create workers
-                    auto& worker = _workers.emplace_back(std::make_unique<Worker_t>(dispatcher, token));
-                    
+                    auto& worker = _workers.emplace_back(std::make_unique<Worker_t>(dispatcher));
+
                     // start workers in workersThreads
-                    _workerThreads.emplace_back([w = worker.get()] (auto token) { w->Run(token); }, token);
+                    _workerThreads.emplace_back([w = worker.get()](auto token) { w->Run(token); }, token);
                 }
             }
 
@@ -83,67 +87,16 @@ namespace tinycoro {
             }
 
             std::vector<std::unique_ptr<Worker_t>> _workers;
-            std::vector<std::jthread> _workerThreads;
+            std::vector<std::jthread>              _workerThreads;
         };
 
-        template <typename TaskT, size_t CACHE_SIZE>
-        class ParallelScheduler
+        template <typename EnqueueStrategyT>
+        struct TaskEnqueuer
         {
-        public:
-            /// Construct a scheduler with an internal stop source.
-            ///
-            /// The scheduler creates `workerThreadCount` worker threads and binds the
-            /// stop callback to its own internal stop token.
-            ///
-            /// \param workerThreadCount Number of worker threads to start.
-            ///        Must be greater than zero.
-            ParallelScheduler(size_t workerThreadCount = local::HardwareConcurrency())
-            : _dispatcher{_sharedTasks, _stopSource.get_token()}
-            , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
-            , _workersGroup{workerThreadCount, _dispatcher, _stopSource.get_token()}
+            TaskEnqueuer(EnqueueStrategyT* strategy)
+            : _strategy{strategy}
             {
             }
-
-            /// Construct a scheduler and bridge an external stop token.
-            ///
-            /// When `externalToken` is requested, this scheduler requests stop on its
-            /// internal stop source and wakes dispatcher waiters.
-            ///
-            /// \param externalToken External stop token that controls this scheduler.
-            /// \param workerThreadCount Number of worker threads to start.
-            ///        Must be greater than zero.
-            ParallelScheduler(std::stop_token externalToken, size_t workerThreadCount = local::HardwareConcurrency())
-            : _dispatcher{_sharedTasks, _stopSource.get_token()}
-            , _stopCallback{externalToken, [this] { _stopSource.request_stop(); _dispatcher.notify_all(); }}    // listens to the external token
-            , _workersGroup{workerThreadCount, _dispatcher, _stopSource.get_token()}
-            {
-            }
-
-            ~ParallelScheduler()
-            {
-                // requesting the stop for the worker threads.
-                // Note: we are using jthread
-                // so we don't need to explicitly join them.
-                _stopSource.request_stop();
-
-                // Explicitly join the jthread workers here to ensure proper destruction order.
-                // Although jthread automatically joins in its destructor, we must ensure
-                // that the jthread is the first member to be destroyed. This is because
-                // if the jthread destructor calls join (thread still running) after other members
-                // are destroyed, it could lead to dangling references or undefined behavior.
-                //
-                // By joining here, we guarantee that the jthread has stopped before
-                // any other members are destroyed, avoiding potential race conditions
-                // or access to invalid memory, if the code is extended in the future.
-                _workersGroup.Join();
-            }
-
-            // Disable copy and move
-            ParallelScheduler(const ParallelScheduler&) = delete;
-            ParallelScheduler(ParallelScheduler&&)      = delete;
-
-            auto GetStopToken() const noexcept { return _stopSource.get_token(); }
-            auto GetStopSource() const noexcept { return _stopSource; }
 
             template <template <typename> class FutureStateT = std::promise,
                       typename onTaskFinishWrapperT          = detail::OnTaskFinishCallbackWrapper,
@@ -163,7 +116,7 @@ namespace tinycoro {
                     futureState_t futureState;
                     auto          future = futureState.get_future();
 
-                    this->_EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
+                    _strategy->template _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
                     return future;
                 };
 
@@ -202,7 +155,7 @@ namespace tinycoro {
                     futures.emplace_back(futureState.get_future());
 
                     // Enqueue tasks in the scheduler.
-                    _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
+                    _strategy->template _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
                 }
 
                 return futures;
@@ -213,8 +166,79 @@ namespace tinycoro {
                       concepts::IsSchedulable CoroTasksT>
             auto Enqueue(FutureStateT&& futureState, CoroTasksT&& task)
             {
-                return _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
+                return _strategy->template _EnqueueImpl<onTaskFinishWrapperT>(std::move(futureState), std::move(task));
             }
+
+        private:
+            EnqueueStrategyT* _strategy{};
+        };
+
+        template <typename TaskT, size_t CACHE_SIZE>
+        class ParallelScheduler : public TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>
+        {
+            using enqueuer_t = TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>;
+            friend enqueuer_t;
+
+        public:
+            /// Construct a scheduler with an internal stop source.
+            ///
+            /// The scheduler creates `workerThreadCount` worker threads and binds the
+            /// stop callback to its own internal stop token.
+            ///
+            /// \param workerThreadCount Number of worker threads to start.
+            ///        Must be greater than zero.
+            ParallelScheduler(size_t workerThreadCount = local::HardwareConcurrency())
+            : enqueuer_t{this}
+            , _dispatcher{_sharedTasks, _stopSource.get_token()}
+            , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
+            , _workersGroup{workerThreadCount, _dispatcher, _stopSource.get_token()}
+            {
+            }
+
+            /// Construct a scheduler and bridge an external stop token.
+            ///
+            /// When `externalToken` is requested, this scheduler requests stop on its
+            /// internal stop source and wakes dispatcher waiters.
+            ///
+            /// \param externalToken External stop token that controls this scheduler.
+            /// \param workerThreadCount Number of worker threads to start.
+            ///        Must be greater than zero.
+            ParallelScheduler(std::stop_token externalToken, size_t workerThreadCount = local::HardwareConcurrency())
+            : enqueuer_t{this}
+            , _dispatcher{_sharedTasks, _stopSource.get_token()}
+            , _stopCallback{externalToken,
+                            [this] {
+                                _stopSource.request_stop();
+                                _dispatcher.notify_all();
+                            }} // listens to the external token
+            , _workersGroup{workerThreadCount, _dispatcher, _stopSource.get_token()}
+            {
+            }
+
+            ~ParallelScheduler()
+            {
+                // requesting the stop for the worker threads.
+                // Note: we are using jthread
+                // so we don't need to explicitly join them.
+                _stopSource.request_stop();
+
+                // Explicitly join the jthread workers here to ensure proper destruction order.
+                // Although jthread automatically joins in its destructor, we must ensure
+                // that the jthread is the first member to be destroyed. This is because
+                // if the jthread destructor calls join (thread still running) after other members
+                // are destroyed, it could lead to dangling references or undefined behavior.
+                //
+                // By joining here, we guarantee that the jthread has stopped before
+                // any other members are destroyed, avoiding potential race conditions
+                // or access to invalid memory, if the code is extended in the future.
+                _workersGroup.Join();
+            }
+
+            // Disable copy and move
+            ParallelScheduler(ParallelScheduler&&) = delete;
+
+            auto GetStopToken() const noexcept { return _stopSource.get_token(); }
+            auto GetStopSource() const noexcept { return _stopSource; }
 
         private:
             template <typename OnFinishCbT, typename FutureStateT, concepts::IsSchedulable CoroTaskT>
@@ -261,18 +285,110 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource{};
 
-            // Task dispatcher 
+            // Task dispatcher
             dispatcher_t _dispatcher;
 
             // the stop callback, which will be triggered
             // if a stop for _stopSource is requested.
             std::stop_callback<std::function<void()>> _stopCallback;
 
-            // contains the assigned workers for this scheduler 
+            // contains the assigned workers for this scheduler
             WorkerGroup<dispatcher_t, SchedulerWorker> _workersGroup;
         };
 
-        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1 << 14;  // Default queue capacity: 16,384 tasks
+        static constexpr size_t DEFAULT_SCHEDULER_CACHE_SIZE = 1 << 14; // Default queue capacity: 16,384 tasks
+
+        template <typename TaskT>
+        class ConcurrentScheduler : public TaskEnqueuer<ConcurrentScheduler<TaskT>>
+        {
+            friend WorkGuard MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
+
+            using task_enqueuer_t = TaskEnqueuer<ConcurrentScheduler<TaskT>>;
+            friend task_enqueuer_t;
+
+        public:
+            ConcurrentScheduler()
+            : task_enqueuer_t{this}
+            , _dispatcher{_queue, _stopSource.get_token()}
+            , _worker{_dispatcher}
+            {
+            }
+
+            // Disable copy and move
+            ConcurrentScheduler(ConcurrentScheduler&&) = delete;
+
+            // Runs the scheduler loop on the current thread.
+            //
+            // Drains all currently queued tasks, exits when no
+            // outstanding work remains.
+            //
+            // In case of a WorkGuard it stays in the loop
+            // and wait for new tasks.
+            void Run()
+            {
+                for (;;)
+                {
+                    auto state = _dispatcher.push_state();
+
+                    // run the next batch
+                    _worker.DrainQueuedTasks();
+
+                    // if no refcount break
+                    if (_refCount.load(std::memory_order::relaxed) == 0)
+                        break;
+
+                    _dispatcher.wait_for_push(state);
+                }
+            }
+
+        private:
+            template <typename OnFinishCbT, typename FutureStateT, concepts::IsSchedulable CoroTaskT>
+                requires (!std::is_reference_v<CoroTaskT>)
+            bool _EnqueueImpl(FutureStateT&& futureState, CoroTaskT&& coro)
+            {
+                if (_stopSource.stop_requested() == false && coro.Address())
+                {
+                    // not allow to enqueue tasks with uninitialized std::coroutine_handler
+                    // or if the a stop is requested
+                    auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+
+                    auto succeed = _dispatcher.try_push(std::move(task));
+
+                    // this shoould never fail.
+                    assert(succeed);
+                    return succeed;
+                }
+
+                // coroutine task is not scheduled.
+                futureState.set_value(std::nullopt);
+                return false;
+            }
+
+            void _Acquire() noexcept { _refCount.fetch_add(1, std::memory_order::relaxed); }
+
+            void _Release() noexcept
+            {
+                auto last = _refCount.fetch_sub(1, std::memory_order::relaxed);
+                assert(last > 0);
+
+                // if this was the last, wake up waiting
+                // in the Run() function.
+                if (last == 1)
+                    _dispatcher.notify_all();
+            }
+
+            // stop_source to support safe cancellation
+            std::stop_source _stopSource{};
+
+            std::atomic<int32_t> _refCount{};
+
+            using queue_t      = detail::MPSCPtrQueue<typename TaskT::element_type>;
+            using dispatcher_t = ConcurrentDispatcher<queue_t, TaskT>;
+
+            queue_t                       _queue;
+            dispatcher_t                  _dispatcher;
+            SchedulerWorker<dispatcher_t> _worker;
+        };
 
     } // namespace detail
 
@@ -288,7 +404,8 @@ namespace tinycoro {
     template <uint64_t CACHE_SIZE = detail::DEFAULT_SCHEDULER_CACHE_SIZE>
     using CustomScheduler = detail::ParallelScheduler<detail::SchedulableTask, CACHE_SIZE>;
 
-    using Scheduler = detail::ParallelScheduler<detail::SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;
+    using Scheduler       = detail::ParallelScheduler<detail::SchedulableTask, detail::DEFAULT_SCHEDULER_CACHE_SIZE>;
+    using InlineScheduler = detail::ConcurrentScheduler<detail::SchedulableTask>;
 
 } // namespace tinycoro
 
