@@ -4,7 +4,7 @@
 
 #include <future>
 
-TEST(ConcurrentSchedulerTest, ConcurrentSchedulerTest_constructor)
+TEST(InlineSchedulerTest, InlineSchedulerTest_constructor)
 {
     tinycoro::InlineScheduler scheduler;
 
@@ -26,7 +26,7 @@ TEST(ConcurrentSchedulerTest, ConcurrentSchedulerTest_constructor)
     EXPECT_EQ(*val, 42);
 }
 
-TEST(ConcurrentSchedulerTest, ConcurrentSchedulerTest_co_await)
+TEST(InlineSchedulerTest, InlineSchedulerTest_co_await)
 {
     tinycoro::InlineScheduler scheduler;
 
@@ -47,7 +47,7 @@ TEST(ConcurrentSchedulerTest, ConcurrentSchedulerTest_co_await)
     scheduler.Run();
 }
 
-TEST(ConcurrentSchedulerTest, ConcurrentSchedulerTest_work_guard)
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard)
 {
     tinycoro::InlineScheduler scheduler;
 
