@@ -160,24 +160,24 @@ namespace tinycoro {
     template <typename ReturnT                                               = void,
               template <typename> class AllocatorT                           = DefaultAllocator,
               concepts::IsInitialCancellablePolicy InitialCancellablePolicyT = default_initial_cancellable_policy>
-    using InlineTask
+    using SlimTask
         = detail::CoroTask<ReturnT, InitialCancellablePolicyT, detail::InlinePromise<ReturnT, InitialCancellablePolicyT, AllocatorT>, AwaiterValue>;
 
     // Convenience aliases for tasks with a non-initial cancellable policy.
-    // (TaskNIC/InlineTaskNIC)
+    // (TaskNIC/SlimTaskNIC)
     //
     // These are helper types meant to simplify usage when cancellation should not be
     // automatically propagated into the coroutine on creation (i.e., not initially cancellable).
     // This is typically useful for root coroutines or tasks that should explicitly manage
     // cancellation behavior.
     //
-    // Note: These aliases are just syntactic sugar over Task and InlineTask with
+    // Note: These aliases are just syntactic sugar over Task and SlimTask with
     // `noninitial_cancellable_t` passed as the cancellation policy.
     template <typename ReturnT = void, template <typename> class AllocatorT = DefaultAllocator>
     using TaskNIC = Task<ReturnT, AllocatorT, noninitial_cancellable_t>;
 
     template <typename ReturnT = void, template <typename> class AllocatorT = DefaultAllocator>
-    using InlineTaskNIC = InlineTask<ReturnT, AllocatorT, noninitial_cancellable_t>;
+    using SlimTaskNIC = SlimTask<ReturnT, AllocatorT, noninitial_cancellable_t>;
 
 } // namespace tinycoro
 
