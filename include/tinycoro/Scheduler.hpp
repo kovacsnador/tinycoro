@@ -301,7 +301,7 @@ namespace tinycoro {
         template <typename TaskT>
         class ConcurrentScheduler : public TaskEnqueuer<ConcurrentScheduler<TaskT>>
         {
-            friend WorkGuard MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
+            friend tinycoro::WorkGuard tinycoro::MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
 
             using task_enqueuer_t = TaskEnqueuer<ConcurrentScheduler<TaskT>>;
             friend task_enqueuer_t;
