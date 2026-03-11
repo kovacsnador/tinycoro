@@ -42,7 +42,7 @@ namespace tinycoro
             Unlock();
         }
 
-        constexpr void swap(WorkGuard& other) noexcept
+        void swap(WorkGuard& other) noexcept
         {
             std::swap(_release, other._release);
         }
