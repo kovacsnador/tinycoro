@@ -46,6 +46,12 @@ namespace tinycoro { namespace detail {
                 return erased;
             }
 
+            [[nodiscard]] bool empty() noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _list.empty();
+            }
+
         private:
             // mutext to protect the list
             std::mutex _mtx;
@@ -127,15 +133,15 @@ namespace tinycoro { namespace detail {
                     auto popState = _dispatcher.pop_state();
                     if (_notifiedCachedTasks.empty())
                     {
-                        if (stopToken.stop_requested())
+                        if (stopToken.stop_requested() && _pausedTasks.empty())
                         {
-                            assert(_notifiedCachedTasks.empty());
                             assert(_cachedTasks.empty());
 
                             // scheduler requested stop...
                             // Now we finished with all our thread bounded
                             // tasks, we are done here.
-                            break;
+                            if(_notifiedCachedTasks.empty())
+                                break;
                         }
 
                         // all the caches are empty, we can
