@@ -176,6 +176,8 @@ namespace tinycoro {
         template <typename TaskT, size_t CACHE_SIZE>
         class ParallelScheduler : public TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>
         {
+            friend tinycoro::WorkGuard tinycoro::MakeWorkGuard<ParallelScheduler>(ParallelScheduler&) noexcept;
+
             using enqueuer_t = TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>;
             friend enqueuer_t;
 
@@ -221,6 +223,8 @@ namespace tinycoro {
                 // Note: we are using jthread
                 // so we don't need to explicitly join them.
                 _stopSource.request_stop();
+
+                _WaitForGuard();
 
                 // Explicitly join the jthread workers here to ensure proper destruction order.
                 // Although jthread automatically joins in its destructor, we must ensure
@@ -276,8 +280,30 @@ namespace tinycoro {
                 return false;
             }
 
+            void _Acquire() noexcept { _workGuardCount.fetch_add(1, std::memory_order::relaxed); }
+
+            void _Release() noexcept
+            {
+                auto last = _workGuardCount.fetch_sub(1, std::memory_order::relaxed);
+                assert(last > 0);
+
+                _workGuardCount.notify_one();
+            }
+
+            void _WaitForGuard()
+            {
+                auto c = _workGuardCount.fetch_add(1, std::memory_order::relaxed);
+                while (c != 0)
+                {
+                    _workGuardCount.wait(c, std::memory_order::relaxed);
+                    c = _workGuardCount.fetch_add(1, std::memory_order::relaxed);
+                }
+            }
+
             using queue_t      = detail::AtomicQueue<TaskT, CACHE_SIZE>;
             using dispatcher_t = detail::Dispatcher<queue_t>;
+
+            std::atomic<int32_t> _workGuardCount{};
 
             // currently active/scheduled tasks
             queue_t _sharedTasks;
@@ -301,7 +327,7 @@ namespace tinycoro {
         template <typename TaskT>
         class ConcurrentScheduler : public TaskEnqueuer<ConcurrentScheduler<TaskT>>
         {
-            friend WorkGuard MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
+            friend tinycoro::WorkGuard tinycoro::MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
 
             using task_enqueuer_t = TaskEnqueuer<ConcurrentScheduler<TaskT>>;
             friend task_enqueuer_t;
@@ -334,7 +360,7 @@ namespace tinycoro {
                     _worker.DrainQueuedTasks();
 
                     // if no refcount break
-                    if (_refCount.load(std::memory_order::relaxed) == 0)
+                    if (_workGuardCount.load(std::memory_order::relaxed) == 0)
                         break;
 
                     _dispatcher.wait_for_push(state);
@@ -364,11 +390,11 @@ namespace tinycoro {
                 return false;
             }
 
-            void _Acquire() noexcept { _refCount.fetch_add(1, std::memory_order::relaxed); }
+            void _Acquire() noexcept { _workGuardCount.fetch_add(1, std::memory_order::relaxed); }
 
             void _Release() noexcept
             {
-                auto last = _refCount.fetch_sub(1, std::memory_order::relaxed);
+                auto last = _workGuardCount.fetch_sub(1, std::memory_order::relaxed);
                 assert(last > 0);
 
                 // if this was the last, wake up waiting
@@ -380,7 +406,7 @@ namespace tinycoro {
             // stop_source to support safe cancellation
             std::stop_source _stopSource{};
 
-            std::atomic<int32_t> _refCount{};
+            std::atomic<int32_t> _workGuardCount{};
 
             using queue_t      = detail::MPSCPtrQueue<typename TaskT::element_type>;
             using dispatcher_t = ConcurrentDispatcher<queue_t, TaskT>;

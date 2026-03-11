@@ -12,25 +12,23 @@
 using namespace std::chrono_literals;
 
 namespace {
-    struct IntNode
+    struct IntNode : tinycoro::detail::SingleLinkable<IntNode>
     {
         explicit IntNode(int v)
         : value(v)
         {
         }
 
-        IntNode* next{};
         int value{};
     };
 
-    struct TrackedNode
+    struct TrackedNode : tinycoro::detail::SingleLinkable<TrackedNode>
     {
         ~TrackedNode()
         {
             ++destroyed;
         }
 
-        TrackedNode* next{};
         static inline std::atomic<int> destroyed{0};
     };
 
