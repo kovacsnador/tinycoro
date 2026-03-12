@@ -249,34 +249,30 @@ namespace tinycoro {
                 requires (!std::is_reference_v<CoroTaskT>)
             bool _EnqueueImpl(FutureStateT&& futureState, CoroTaskT&& coro)
             {
-                if (_stopSource.stop_requested() == false && coro.Address())
-                {
-                    // not allow to enqueue tasks with uninitialized std::coroutine_handler
-                    // or if the a stop is requested
-                    auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+                if (coro.Address() == nullptr)
+                    throw SchedulerException{"Coroutine Task is not initialized"};
 
-                    while (_stopSource.stop_requested() == false)
+                // not allow to enqueue tasks with uninitialized std::coroutine_handler
+                // or if the a stop is requested
+                auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+
+                while (_stopSource.stop_requested() == false)
+                {
+                    auto pushState = _dispatcher.push_state(std::memory_order::relaxed);
+                    if (_dispatcher.try_push(std::move(task)))
                     {
-                        auto pushState = _dispatcher.push_state(std::memory_order::relaxed);
-                        if (_dispatcher.try_push(std::move(task)))
-                        {
-                            // the task is pushed
-                            // into the queue
-                            return true;
-                        }
-                        else
-                        {
-                            // wait until we have space in the queue
-                            _dispatcher.wait_for_push(pushState);
-                        }
+                        // the task is pushed
+                        // into the queue
+                        return true;
+                    }
+                    else
+                    {
+                        // wait until we have space in the queue
+                        _dispatcher.wait_for_push(pushState);
                     }
                 }
-                else
-                {
-                    // coroutine task is not scheduled.
-                    futureState.set_value(std::nullopt);
-                }
 
+                // coroutine task is not scheduled.
                 return false;
             }
 
@@ -372,21 +368,21 @@ namespace tinycoro {
                 requires (!std::is_reference_v<CoroTaskT>)
             bool _EnqueueImpl(FutureStateT&& futureState, CoroTaskT&& coro)
             {
-                if (_stopSource.stop_requested() == false && coro.Address())
+                if (coro.Address() == nullptr)
+                    throw SchedulerException{"Coroutine Task is not initialized"};
+
+                // not allow to enqueue tasks with uninitialized std::coroutine_handler
+                // or if the a stop is requested
+                auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+                if (_stopSource.stop_requested() == false)
                 {
-                    // not allow to enqueue tasks with uninitialized std::coroutine_handler
-                    // or if the a stop is requested
-                    auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
-
                     auto succeed = _dispatcher.try_push(std::move(task));
-
-                    // this shoould never fail.
+                    // this shoould never at that point fail.
                     assert(succeed);
                     return succeed;
                 }
 
                 // coroutine task is not scheduled.
-                futureState.set_value(std::nullopt);
                 return false;
             }
 

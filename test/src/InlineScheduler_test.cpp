@@ -87,20 +87,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_enqueue_container_with_invalid_tas
     tasks.emplace_back(); // default-constructed task has no coroutine handle
     tasks.emplace_back(task(3));
 
-    auto futures = scheduler.Enqueue(std::move(tasks));
-    scheduler.Run();
-
-    ASSERT_EQ(futures.size(), 3u);
-
-    auto val1 = futures[0].get();
-    auto val2 = futures[1].get();
-    auto val3 = futures[2].get();
-
-    ASSERT_TRUE(val1.has_value());
-    EXPECT_FALSE(val2.has_value());
-    ASSERT_TRUE(val3.has_value());
-    EXPECT_EQ(*val1, 1);
-    EXPECT_EQ(*val3, 3);
+    EXPECT_THROW([&]{ std::ignore = scheduler.Enqueue(std::move(tasks)); }(), tinycoro::SchedulerException);
 }
 
 TEST(InlineSchedulerTest, InlineSchedulerTest_exception_forwarded_to_future)
