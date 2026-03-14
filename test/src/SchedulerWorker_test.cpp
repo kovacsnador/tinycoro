@@ -75,7 +75,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
     tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
 
-    tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+    tinycoro::detail::SchedulerWorker worker{dispatcher};
 
     auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
@@ -118,7 +118,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
         tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
 
-        tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+        tinycoro::detail::SchedulerWorker worker{dispatcher};
 
         auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 

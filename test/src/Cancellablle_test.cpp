@@ -122,6 +122,22 @@ TEST(CancellableTest, CancellableTest_with_timeout)
     EXPECT_FALSE(event.IsSet());
 }
 
+TEST(CancellableTest, CancellableTest_with_timeout_task_group_and_inline_scheduler)
+{
+    tinycoro::TaskGroup<> group;
+    tinycoro::InlineScheduler scheduler;
+
+    tinycoro::SoftClock clock;
+    tinycoro::AutoEvent event;
+
+    auto task = [&]() -> tinycoro::Task<> { co_await tinycoro::TimeoutAwait{clock, tinycoro::Cancellable{event.Wait()}, 100ms}; };
+
+    group.Spawn(scheduler, task());
+    scheduler.Run();
+
+    EXPECT_FALSE(event.IsSet());
+}
+
 TEST(CancellableTest, CancellableTest_with_custom_token)
 {
     tinycoro::AutoEvent event;

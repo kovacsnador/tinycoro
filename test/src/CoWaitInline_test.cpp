@@ -7,7 +7,7 @@
 
 TEST(InlineAwaitTest, InlineAwaitTest_tasks_int_return)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
     auto awaitable = tinycoro::AllOfAwait(task(40), task(41), task(42));
 
@@ -22,7 +22,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_int_return)
 
 TEST(InlineAwaitTest, InlineAwaitTest_tasks_int_return_single_task)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
     auto awaitable = tinycoro::AllOfAwait(task(42));
 
@@ -37,7 +37,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_void_return)
 {
     size_t count{0};
 
-    auto task = [&]() -> tinycoro::InlineTask<> {
+    auto task = [&]() -> tinycoro::SlimTask<> {
         count++;
         co_return;
     };
@@ -53,9 +53,9 @@ TEST(InlineAwaitTest, InlineAwaitTest_tasks_void_return)
 
 TEST(InlineAwaitTest, InlineAwaitTest_container_int_return)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
-    std::vector<tinycoro::InlineTask<int32_t>> container;
+    std::vector<tinycoro::SlimTask<int32_t>> container;
     container.push_back(task(40));
     container.push_back(task(41));
     container.push_back(task(42));
@@ -75,12 +75,12 @@ TEST(InlineAwaitTest, InlineAwaitTest_container_void_return)
 {
     size_t count{0};
 
-    auto task = [&]() -> tinycoro::InlineTask<> {
+    auto task = [&]() -> tinycoro::SlimTask<> {
         count++;
         co_return;
     };
 
-    std::vector<tinycoro::InlineTask<>> container{};
+    std::vector<tinycoro::SlimTask<>> container{};
     container.push_back(task());
     container.push_back(task());
     container.push_back(task());
@@ -96,9 +96,9 @@ TEST(InlineAwaitTest, InlineAwaitTest_container_void_return)
 
 TEST(InlineAwaitTest, InlineAwaitTest_coawait)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<int32_t> {
         auto [r1, r2, r3] = co_await tinycoro::AllOfAwait(task(40), task(41), task(42));
         co_return *r1 + *r2 + *r3;
     };
@@ -110,12 +110,12 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait)
 
 TEST(InlineAwaitTest, InlineAwaitTest_coawait_exception)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> {
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> {
         throw std::runtime_error{"error"};
         co_return val;
     };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<int32_t> {
         auto [r1, r2, r3] = co_await tinycoro::AllOfAwait(task(40), task(41), task(42));
         co_return *r1 + *r2 + *r3;
     };
@@ -126,10 +126,10 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_exception)
 
 TEST(InlineAwaitTest, InlineAwaitTest_coawait_container)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
-        std::vector<tinycoro::InlineTask<int32_t>> vec;
+    auto wrapper = [&]() -> tinycoro::SlimTask<int32_t> {
+        std::vector<tinycoro::SlimTask<int32_t>> vec;
         vec.push_back(task(40));
         vec.push_back(task(41));
         vec.push_back(task(42));
@@ -147,13 +147,13 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_void)
 {
     size_t count{0};
 
-    auto task = [](size_t& c) -> tinycoro::InlineTask<> {
+    auto task = [](size_t& c) -> tinycoro::SlimTask<> {
         c++;
         co_return;
     };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
-        std::vector<tinycoro::InlineTask<>> vec;
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
+        std::vector<tinycoro::SlimTask<>> vec;
         vec.push_back(task(count));
         vec.push_back(task(count));
         vec.push_back(task(count));
@@ -169,13 +169,13 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_void)
 
 TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_exception)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> {
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> {
         throw std::runtime_error{"error"};
         co_return val;
     };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<int32_t> {
-        std::vector<tinycoro::InlineTask<int32_t>> vec;
+    auto wrapper = [&]() -> tinycoro::SlimTask<int32_t> {
+        std::vector<tinycoro::SlimTask<int32_t>> vec;
         vec.push_back(task(40));
         vec.push_back(task(41));
         vec.push_back(task(42));
@@ -190,7 +190,7 @@ TEST(InlineAwaitTest, InlineAwaitTest_coawait_container_exception)
 
 TEST(AnyOfAwaitTest, AnyOfAwaitTest)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
     auto awaiter = tinycoro::AnyOfAwait(task(42));
     EXPECT_TRUE(awaiter.await_ready());
@@ -203,7 +203,7 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest)
 TEST(AnyOfAwaitTest, AnyOfAwaitTest_stop_source)
 {
     std::stop_source ss;
-    auto             task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto             task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
     auto awaiter = tinycoro::AnyOfAwait(ss, task(40), task(41), task(42));
     EXPECT_TRUE(awaiter.await_ready());
@@ -218,9 +218,9 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_stop_source)
 TEST(AnyOfAwaitTest, AnyOfAwaitTest_stop_source_container)
 {
     std::stop_source ss;
-    auto             task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto             task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
-    std::vector<tinycoro::InlineTask<int32_t>> vec;
+    std::vector<tinycoro::SlimTask<int32_t>> vec;
     vec.push_back(task(40));
     vec.push_back(task(41));
     vec.push_back(task(42));
@@ -237,9 +237,9 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_stop_source_container)
 
 TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test)
 {
-    auto task = [](int32_t val) -> tinycoro::InlineTask<int32_t> { co_return val; };
+    auto task = [](int32_t val) -> tinycoro::SlimTask<int32_t> { co_return val; };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
         auto [r1, r2, r3] = co_await tinycoro::AnyOfAwait(task(40), task(41), task(42));
 
         EXPECT_EQ(r1, 40);
@@ -256,7 +256,7 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_stopSource)
 {
     std::stop_source stopSource{};
 
-    auto task = [&stopSource](int32_t val) -> tinycoro::InlineTask<int32_t> {
+    auto task = [&stopSource](int32_t val) -> tinycoro::SlimTask<int32_t> {
         auto ss = co_await tinycoro::this_coro::stop_source();
         ss.request_stop();
 
@@ -265,7 +265,7 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_stopSource)
         co_return val;
     };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
         auto [r1, r2, r3] = co_await tinycoro::AnyOfAwait(stopSource, task(40), task(41), task(42));
 
         EXPECT_EQ(r1, 40);
@@ -282,7 +282,7 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_stopSource_vector)
 {
     std::stop_source stopSource{};
 
-    auto task = [&stopSource](int32_t val) -> tinycoro::InlineTask<int32_t> {
+    auto task = [&stopSource](int32_t val) -> tinycoro::SlimTask<int32_t> {
         auto ss = co_await tinycoro::this_coro::stop_source();
         ss.request_stop();
 
@@ -291,12 +291,12 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_stopSource_vector)
         co_return val;
     };
 
-    std::vector<tinycoro::InlineTask<int32_t>> tasks;
+    std::vector<tinycoro::SlimTask<int32_t>> tasks;
     tasks.push_back(task(42));
     tasks.push_back(task(2));
     tasks.push_back(task(3));
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
         auto res = co_await tinycoro::AnyOfAwait(stopSource, tasks);
 
         EXPECT_EQ(res[0], 42);
@@ -311,14 +311,14 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_InlineNIC)
 {
     std::stop_source stopSource{};
 
-    auto task = [&stopSource](int32_t val) -> tinycoro::InlineTaskNIC<int32_t> {
+    auto task = [&stopSource](int32_t val) -> tinycoro::SlimTaskNIC<int32_t> {
         auto ss = co_await tinycoro::this_coro::stop_source();
         EXPECT_EQ(ss, stopSource);
 
         co_return val;
     };
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
         // those tasks are not initial cancellable.
         // So they will just simply return
         auto [r1, r2, r3] = co_await tinycoro::AnyOfAwait(stopSource, task(40), task(41), task(42));
@@ -335,19 +335,19 @@ TEST(AnyOfAwaitTest, AnyOfAwaitTest_functional_test_InlineNIC_vector)
 {
     std::stop_source stopSource{};
 
-    auto task = [&stopSource](int32_t val) -> tinycoro::InlineTaskNIC<int32_t> {
+    auto task = [&stopSource](int32_t val) -> tinycoro::SlimTaskNIC<int32_t> {
         auto ss = co_await tinycoro::this_coro::stop_source();
         EXPECT_EQ(ss, stopSource);
 
         co_return val;
     };
 
-    std::vector<tinycoro::InlineTaskNIC<int32_t>> tasks;
+    std::vector<tinycoro::SlimTaskNIC<int32_t>> tasks;
     tasks.push_back(task(40));
     tasks.push_back(task(41));
     tasks.push_back(task(42));
 
-    auto wrapper = [&]() -> tinycoro::InlineTask<> {
+    auto wrapper = [&]() -> tinycoro::SlimTask<> {
         // those tasks are not initial cancellable.
         // So they will just simply return
         auto res = co_await tinycoro::AnyOfAwait(stopSource, tasks);

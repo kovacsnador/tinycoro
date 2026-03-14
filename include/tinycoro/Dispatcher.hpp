@@ -16,8 +16,8 @@ namespace tinycoro { namespace detail {
 
     namespace local {
 
-        template<template <typename> class AtomT, typename T>
-        using notifyFunc_t = void(*)(AtomT<T>*);
+        template <template <typename> class AtomT, typename T>
+        using notifyFunc_t = void (*)(AtomT<T>*);
 
         template <template <typename> class AtomT, typename T>
             requires std::unsigned_integral<T>
@@ -53,22 +53,10 @@ namespace tinycoro { namespace detail {
                 _popEvent.wait(state);
         }
 
-        void wait_for_push() const noexcept
-        {  
-            auto state = _popEvent.load(std::memory_order::relaxed);
-            wait_for_push(state);
-        }
-
         void wait_for_pop(state_type state) const noexcept
         {
-            if (state + _queue.capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false)
+            if (state + QueueT::capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false)
                 _pushEvent.wait(state);
-        }
-
-        void wait_for_pop() const noexcept
-        {
-            auto state = _pushEvent.load(std::memory_order::acquire);
-            wait_for_pop(state);
         }
 
         void notify_all() noexcept
@@ -105,7 +93,7 @@ namespace tinycoro { namespace detail {
         }
 
         [[nodiscard]] auto full() const noexcept { return _pushEvent.load(std::memory_order::relaxed) == _popEvent.load(std::memory_order::relaxed); }
-        
+
         [[nodiscard]] auto empty() const noexcept
         {
             auto push = _pushEvent.load(std::memory_order::relaxed) + QueueT::capacity();
@@ -121,6 +109,64 @@ namespace tinycoro { namespace detail {
         QueueT& _queue;
 
         std::stop_token _stopToken;
+    };
+
+    template <typename QueueT, typename TaskT>
+    struct ConcurrentDispatcher
+    {
+        using value_type   = TaskT;
+        using dispatcher_t = detail::Dispatcher<QueueT>;
+
+        static_assert(std::same_as<decltype(QueueT::capacity()), typename dispatcher_t::state_type>,
+                      "QueueT::capacity() need to match with dispatcher_t::state_type");
+
+        ConcurrentDispatcher(QueueT& queue, std::stop_token stopToken)
+        : _dispatcher{queue, std::move(stopToken)}
+        {
+        }
+
+        ~ConcurrentDispatcher()
+        {
+            // destroy remaining tasks in the queue.
+            typename TaskT::element_type* ptr{};
+            while (_dispatcher.try_pop(ptr))
+            {
+                TaskT destroyer{ptr};
+            }
+        }
+
+        [[nodiscard]] auto pop_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _dispatcher.pop_state(order); }
+        [[nodiscard]] auto push_state(std::memory_order order = std::memory_order::relaxed) const noexcept { return _dispatcher.push_state(order); }
+
+        void wait_for_push(dispatcher_t::state_type state) const noexcept { _dispatcher.wait_for_push(state); }
+        void wait_for_pop(dispatcher_t::state_type state) const noexcept { _dispatcher.wait_for_pop(state); }
+
+        void notify_all() noexcept { _dispatcher.notify_all(); }
+
+        [[nodiscard]] auto try_push(TaskT&& elem) noexcept
+        {
+            auto ptr = elem.release();
+
+            if (_dispatcher.try_push(ptr))
+                return true;
+
+            elem.reset(ptr);
+            return false;
+        }
+
+        [[nodiscard]] bool try_pop(TaskT& elem) noexcept
+        {
+            typename TaskT::element_type* ptr{};
+
+            auto succeed = _dispatcher.try_pop(ptr);
+            if (succeed)
+                elem.reset(ptr);
+
+            return succeed;
+        }
+
+    private:
+        detail::Dispatcher<QueueT> _dispatcher;
     };
 
 }} // namespace tinycoro::detail

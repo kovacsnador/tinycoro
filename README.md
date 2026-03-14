@@ -28,7 +28,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
     - [SyncFunctions](#syncfunctions)
     - [AllOf](#allof)
     - [AnyOf](#anyof)
-    - [InlineTask](#inlinetask)
+    - [SlimTask](#slimtask)
     - [Cancellation](#cancellation)
     - [TaskGroup](#taskgroup)
     - [MakeBound](#makebound)
@@ -234,10 +234,10 @@ You can run coroutine tasks in **tinycoro** either **inline (on the current thre
 
 #### ✅ Without a scheduler — cooperative, inline execution
 
-For single-threaded, inline usage, `AllOf` is the preferred helper. It runs multiple `tinycoro::Task` or `tinycoro::InlineTask` instances and returns a tuple of `std::optional<T>` results.
+For single-threaded, inline usage, `AllOf` is the preferred helper. It runs multiple `tinycoro::Task` or `tinycoro::SlimTask` instances and returns a tuple of `std::optional<T>` results.
 
 ```cpp
-auto [res1, res2] = tinycoro::AllOf(Task1(), InlineTask2());
+auto [res1, res2] = tinycoro::AllOf(Task1(), SlimTask2());
 if (res1 && res2) {
     std::cout << *res1 << " and " << *res2 << '\n';
 }
@@ -417,21 +417,21 @@ std::optional<int32_t> val_42 = tinycoro::AllOf(scheduler, Coro());
 #### Overview:
 
 - **`tinycoro::AllOf(tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until all finish.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively on the current thread. Blocks until all finish.
 
 - **`tinycoro::AllOf(scheduler, tasks...)`**  
   Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **all** complete.
 
 ---
 - **`tinycoro::AnyOf(tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Blocks until the first finishes. Others are cancelled.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively on the current thread. Blocks until the first finishes. Others are cancelled.
 
 - **`tinycoro::AnyOf(scheduler, tasks...)`**  
   Runs multiple `tinycoro::Task`s concurrently via the scheduler. Blocks until **any one** finishes. Others are cancelled.
 ---
 
 - **`tinycoro::AnyOf(stopSource, tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`tinycoro::AnyOf(scheduler, stopSource, tasks...)`**  
  Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
@@ -439,19 +439,19 @@ std::optional<int32_t> val_42 = tinycoro::AllOf(scheduler, Coro());
 #### Helper Awaitables:
 ---
 - **`co_await tinycoro::AllOfAwait(tasks...)`**  
-  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when all finish.
+  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively on the current thread. Resumes when all finish.
 
 - **`co_await tinycoro::AllOfAwait(scheduler, tasks...)`**  
   Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **all** complete.
 ---
 - **`co_await tinycoro::AnyOfAwait(tasks...)`**  
-  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively on the current thread. Resumes when the first finishes. Others are cancelled.
+  Asynchronously runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively on the current thread. Resumes when the first finishes. Others are cancelled.
 
 - **`co_await tinycoro::AnyOfAwait(scheduler, tasks...)`**  
   Asynchronously runs multiple `tinycoro::Task`s concurrently via the scheduler. Resumes when **any one** finishes. All others are cancelled.
 ---
 - **`co_await tinycoro::AnyOfAwait(stopSource, tasks...)`**  
-  Runs multiple tasks (`tinycoro::Task` or `tinycoro::InlineTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
+  Runs multiple tasks (`tinycoro::Task` or `tinycoro::SlimTask`) cooperatively with custom stop source. Blocks until **any one** finishes or stop source set.
 
 - **`co_await tinycoro::AnyOfAwait(scheduler, stopSource, tasks...)`**  
  Runs multiple `tinycoro::Task`s concurrently via the scheduler with an option for custom stop source. Blocks until **any one** finishes or stop source set.
@@ -464,12 +464,12 @@ std::optional<int32_t> val_42 = tinycoro::AllOf(scheduler, Coro());
 You can use it in two modes:
 
 - With a **scheduler** for concurrent execution — using `tinycoro::Task`.
-- With **inline cooperative execution** on the current thread — using either `tinycoro::InlineTask` or `tinycoro::Task`.
+- With **inline cooperative execution** on the current thread — using either `tinycoro::SlimTask` or `tinycoro::Task`.
 
 > ⚠️ **Important**:
 > - `tinycoro::AllOf(scheduler, tasks...)` **requires** all tasks to be `tinycoro::Task`, because they will be executed on the provided scheduler.
-> - `tinycoro::AllOf(tasks...)` **runs without a scheduler** and supports both `tinycoro::Task` and `tinycoro::InlineTask`.
-> - `tinycoro::InlineTask` **cannot** be executed on a scheduler.
+> - `tinycoro::AllOf(tasks...)` **runs without a scheduler** and supports both `tinycoro::Task` and `tinycoro::SlimTask`.
+> - `tinycoro::SlimTask` **cannot** be executed on a scheduler.
 
 ---
 
@@ -492,11 +492,11 @@ tinycoro::AllOf(scheduler, task1, task2, ...); // each task is a tinycoro::Task
 Runs all given tasks on the current thread. Blocks until all finish.
 
 ```cpp
-tinycoro::AllOf(task1, task2, ...); // task1, task2 can be Task or InlineTask
+tinycoro::AllOf(task1, task2, ...); // task1, task2 can be Task or SlimTask
 ```
 
 - Executes cooperatively in the current thread context.
-- Accepts **both** `tinycoro::Task` and `tinycoro::InlineTask`.
+- Accepts **both** `tinycoro::Task` and `tinycoro::SlimTask`.
 - No scheduler required.
 
 ---
@@ -520,12 +520,12 @@ co_await AllOfAwait(scheduler, task1, task2, ...); // each task is a tinycoro::T
 Waits for all tasks to complete on the current coroutine thread.
 
 ```cpp
-co_await AllOfAwait(task1, task2, ...); // task1, task2 can be Task or InlineTask
+co_await AllOfAwait(task1, task2, ...); // task1, task2 can be Task or SlimTask
 ```
 
 - Non-blocking.
 - Runs cooperatively.
-- Works with both `Task` and `InlineTask`.
+- Works with both `Task` and `SlimTask`.
 
 ---
 
@@ -533,7 +533,7 @@ co_await AllOfAwait(task1, task2, ...); // task1, task2 can be Task or InlineTas
 
 💡 **Use:**
 - `tinycoro::Task` when calling the scheduler-based functions — tasks may run in parallel.
-- `tinycoro::InlineTask` or `tinycoro::Task` with the non-scheduler functions — everything runs synchronously on the same thread.
+- `tinycoro::SlimTask` or `tinycoro::Task` with the non-scheduler functions — everything runs synchronously on the same thread.
 
 ---
 
@@ -543,7 +543,7 @@ co_await AllOfAwait(task1, task2, ...); // task1, task2 can be Task or InlineTas
 
 Same pattern applies here:
 - Scheduler-based versions use `tinycoro::Task`.
-- Inline versions support both `Task` and `InlineTask`.
+- Inline versions support both `Task` and `SlimTask`.
 
 ---
 
@@ -566,11 +566,11 @@ tinycoro::AnyOf(scheduler, task1, task2, ...); // each task must be tinycoro::Ta
 Runs all tasks cooperatively on the current thread.
 
 ```cpp
-tinycoro::AnyOf(task1, task2, ...); // task1, task2 can be tinycoro::Task or tinycoro::InlineTask
+tinycoro::AnyOf(task1, task2, ...); // task1, task2 can be tinycoro::Task or tinycoro::SlimTask
 ```
 
 - No scheduler needed.
-- Accepts both `tinycoro::Task` and `tinycoro::InlineTask`.
+- Accepts both `tinycoro::Task` and `tinycoro::SlimTask`.
 - Returns after the first task completes.
 
 ---
@@ -609,7 +609,7 @@ co_await AnyOfAwait(stopSource, task1, task2, ...); // custom stopSource from ou
 ```
 
 - Cooperative, no scheduler.
-- Accepts both `tinycoro::Task` and `tinycoro::InlineTask`.
+- Accepts both `tinycoro::Task` and `tinycoro::SlimTask`.
 - Custom stop source if needed.
 
 ---
@@ -621,26 +621,26 @@ co_await AnyOfAwait(stopSource, task1, task2, ...); // custom stopSource from ou
 - Use `tinycoro::Task` with `AllOf/AnyOf` **when a scheduler is provided**  
   (scheduler-based execution requires `Task`).
 
-- Use `tinycoro::Task` or `tinycoro::InlineTask` with `AllOf/AnyOf` **when no scheduler is provided**  
+- Use `tinycoro::Task` or `tinycoro::SlimTask` with `AllOf/AnyOf` **when no scheduler is provided**  
   (synchronous/cooperative execution).
 
 
-## `InlineTask`
+## `SlimTask`
 
-`tinycoro::InlineTask<T>` is a **lightweight coroutine type** with the same cancellation support as `tinycoro::Task<T>`, but it differs in several important ways:
+`tinycoro::SlimTask<T>` is a **lightweight coroutine type** with the same cancellation support as `tinycoro::Task<T>`, but it differs in several important ways:
 
 - It does **not** interact with the `tinycoro::Scheduler`.
 - It always runs **on the current thread**, no asynchronous execution.
 - It uses **significantly less memory** than `tinycoro::Task`, since it doesn't need to store any scheduling state.
 
-This makes `InlineTask` ideal for **local, synchronous coroutine flows** where you don't need scheduling or cross-thread execution.
+This makes `SlimTask` ideal for **local, synchronous coroutine flows** where you don't need scheduling or cross-thread execution.
 
-You can `co_await` an `InlineTask` directly from within another coroutine, or run it synchronously using the `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)` helper function.
+You can `co_await` a `SlimTask` directly from within another coroutine, or run it synchronously using the `tinycoro::AllOf(...)` or `tinycoro::AnyOf(...)` helper function.
 
 ```cpp
 #include <tinycoro/tinycoro_all.h>
 
-tinycoro::InlineTask<int> InlineTask(int val)
+tinycoro::SlimTask<int> SlimTask(int val)
 {
     co_return val;
 }
@@ -648,7 +648,7 @@ tinycoro::InlineTask<int> InlineTask(int val)
 tinycoro::Task<int> Task(int val)
 {
     // Option 1: co_await inside another coroutine 
-    auto value = co_await InlineTask(val);
+    auto value = co_await SlimTask(val);
 
     co_return value;
 }
@@ -659,24 +659,24 @@ void RunExample()
     //
     // You don't need to be inside a coroutine context
     // to use AllOf — it works in any regular function too.
-    auto [val_41, val_42] = tinycoro::AllOf(InlineTask(41), InlineTask(42)); // Ok
+    auto [val_41, val_42] = tinycoro::AllOf(SlimTask(41), SlimTask(42)); // Ok
 }
 ```
 
 ⚠️ Important Limitation
-❌ InlineTask cannot be used with the scheduler-based variants of functions like AllOf, AnyOf, or any other function that expects tasks to be scheduled on a tinycoro::Scheduler.
+❌ SlimTask cannot be used with the scheduler-based variants of functions like AllOf, AnyOf, or any other function that expects tasks to be scheduled on a tinycoro::Scheduler.
 
 ```cpp
 // ❌ This will NOT work:
-tinycoro::AllOf(scheduler, InlineTask(1), InlineTask(2)); // Error
+tinycoro::AllOf(scheduler, SlimTask(1), SlimTask(2)); // Error
 
 // ✅ Use this instead if you want synchronous execution:
-tinycoro::AllOf(InlineTask(1), InlineTask(2)); // OK
+tinycoro::AllOf(SlimTask(1), SlimTask(2)); // OK
 ```
 
-### When to use `InlineTask`
+### When to use `SlimTask`
 
-Use `InlineTask` when:
+Use `SlimTask` when:
 - You **don't need scheduler-based execution**.
 - You want to keep coroutine execution **strictly on the current thread**.
 - You want to build small, composable coroutine helpers.
@@ -687,20 +687,20 @@ Use `Task` when:
 
 ### `Cancellation`
 
-By default, all `Task` and `InlineTask` instances are **cancellable at their initial suspend point**.  
+By default, all `Task` and `SlimTask` instances are **cancellable at their initial suspend point**.  
 This allows cancellation to prevent a coroutine from starting execution at all — useful for avoiding unnecessary work.
 
 If you want to **disable cancellation at the initial suspend**, you can use the `tinycoro::noninitial_cancellable` policy as the 3. template parameter:
 
 ```cpp
 tinycoro::Task<void, tinycoro::DefaultAllocator, tinycoro::noninitial_cancellable>
-tinycoro::InlineTask<void, tinycoro::DefaultAllocator, tinycoro::noninitial_cancellable>
+tinycoro::SlimTask<void, tinycoro::DefaultAllocator, tinycoro::noninitial_cancellable>
 ```
 
 But much more conveniently, you can just use the provided type aliases, which are recommended and super easy to use:
 ```cpp
 tinycoro::TaskNIC<void>
-tinycoro::InlineTaskNIC<void>
+tinycoro::SlimTaskNIC<void>
 
 // NIC stands for 'non initial cancellable'.
 ```
@@ -710,7 +710,7 @@ All other suspension points are **not** cancellable by default, but you can expl
 ```cpp
 co_await tinycoro::Cancellable{autoEvent.Wait()};
 ```
-This works with almost all awaitables in tinycoro, including `Task` and `InlineTask` themselves (since they are awaitables too).
+This works with almost all awaitables in tinycoro, including `Task` and `SlimTask` themselves (since they are awaitables too).
 It gives you fine-grained control over cancellation at any suspension point.
 
 > ℹ️ You can also **read cancellation behavior directly from the code**:  
@@ -2012,11 +2012,11 @@ The operations on `BufferedChannel` and `UnbufferedChannel` returns an `EChannel
 
 ## `Allocators`
 
-Tinycoro supports **custom allocators** for controlling memory allocation of coroutine frames. This is achieved by specifying an **allocator adapter** as a template argument in the `Task` or `InlineTask` types. For example:
+Tinycoro supports **custom allocators** for controlling memory allocation of coroutine frames. This is achieved by specifying an **allocator adapter** as a template argument in the `Task` or `SlimTask` types. For example:
 
 ```cpp
 tinycoro::Task<void, CustomAllocatorAdapter>
-tinycoro::InlineTask<int32_t, CustomAllocatorAdapter>
+tinycoro::SlimTask<int32_t, CustomAllocatorAdapter>
 ```
 
 Here’s a simple coroutine using a custom allocator adapter:
@@ -2031,7 +2031,7 @@ tinycoro::Task<int32_t, AllocAdapter> Coroutine() {
 
 ### `AllocatorAdapter`
 
-An **allocator adapter** is a class template that defines how memory is allocated and deallocated for the coroutine’s promise type included coroutine frame. It is passed as a **single template argument** to `Task` or `InlineTask`, and must accept exactly **one template parameter**, which is the promise type.
+An **allocator adapter** is a class template that defines how memory is allocated and deallocated for the coroutine’s promise type included coroutine frame. It is passed as a **single template argument** to `Task` or `SlimTask`, and must accept exactly **one template parameter**, which is the promise type.
 
 The adapter must define (at minimum) these two static functions:
 

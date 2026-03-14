@@ -36,7 +36,7 @@ void TimeoutAwaitTestHelper(auto& awaitable, bool hasValue)
 {
     tinycoro::SoftClock clock;
 
-    auto task = [&]<template <typename> class AwaiterT, typename T>(AwaiterT<T>& awaiter) -> tinycoro::InlineTask<> {
+    auto task = [&]<template <typename> class AwaiterT, typename T>(AwaiterT<T>& awaiter) -> tinycoro::SlimTask<> {
         auto res = co_await tinycoro::TimeoutAwait{clock, std::move(awaiter), 1ms};
         if constexpr (std::same_as<void, T>)
         {
@@ -90,7 +90,7 @@ void TimeoutAwaitFunctionalTest(AwaitableT&& awaitable, TimeT time)
 {
     tinycoro::SoftClock clock;
 
-    auto task = [&]() -> tinycoro::InlineTask<> {
+    auto task = [&]() -> tinycoro::SlimTask<> {
         [[maybe_unused]] auto start = clock.Now();
 
         // This is now cancellable with a timeout
