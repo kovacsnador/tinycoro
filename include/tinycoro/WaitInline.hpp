@@ -127,7 +127,7 @@ namespace tinycoro {
 
         // runs all the tasks inline on the current thread.
         template <typename TupleT, typename StopSourceT = std::stop_source>
-        class InlineScheduler
+        class OnPlaceScheduler
         {
             static_assert([]<typename... T>(std::type_identity<std::tuple<T...>>) {
                     return (!detail::IsDetached<T>::value && ...);
@@ -135,20 +135,20 @@ namespace tinycoro {
 
         public:
             // constructor
-            InlineScheduler(TupleT tuple)
+            OnPlaceScheduler(TupleT tuple)
             : _tasks{std::move(tuple)}
             {
             }
 
             // constructor
-            InlineScheduler(StopSourceT stopSource, TupleT tuple)
+            OnPlaceScheduler(StopSourceT stopSource, TupleT tuple)
             : _tasks{std::move(tuple)}
             , _stopSource{stopSource}
             {
             }
 
             // disable copy and move
-            InlineScheduler(InlineScheduler&&) = delete;
+            OnPlaceScheduler(OnPlaceScheduler&&) = delete;
 
             // run all the tasks sequntially
             auto Run()
@@ -275,7 +275,7 @@ namespace tinycoro {
         requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
     [[nodiscard]] auto AllOf(TaskT&&... tasks)
     {
-        detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
+        detail::OnPlaceScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
         return inlineScheduler.Run();
     }
 
@@ -283,7 +283,7 @@ namespace tinycoro {
         requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
     void AllOf(TaskT&&... tasks)
     {
-        detail::InlineScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
+        detail::OnPlaceScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
         std::ignore = inlineScheduler.Run();
     }
 
@@ -291,7 +291,7 @@ namespace tinycoro {
         requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
     [[nodiscard]] auto AnyOf(StopSourceT stopSource, TaskT&&... tasks)
     {
-        detail::InlineScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
+        detail::OnPlaceScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
         return inlineScheduler.Run();
     }
 
@@ -299,7 +299,7 @@ namespace tinycoro {
         requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
     void AnyOf(StopSourceT stopSource, TaskT&&... tasks)
     {
-        detail::InlineScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
+        detail::OnPlaceScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
         std::ignore = inlineScheduler.Run();
     }
 

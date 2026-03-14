@@ -153,7 +153,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_with_cross_thread_enque
 
     std::atomic<int32_t> sum{};
 
-    auto addTask = [&sum](int32_t v) -> tinycoro::Task<> {
+    auto addTask = [&sum](int32_t v) -> tinycoro::Task<> {  
         sum.fetch_add(v, std::memory_order_relaxed);
         co_return;
     };
@@ -210,4 +210,97 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard)
     scheduler.Run();
 
     fut.get();
+}
+
+TEST(InlineSchedulerTest, InlineSchedulerTest_multi_work_guard)
+{
+    tinycoro::InlineScheduler scheduler;
+
+    auto workGuard1 = tinycoro::MakeWorkGuard(scheduler);
+    auto workGuard2 = tinycoro::MakeWorkGuard(scheduler);
+    auto workGuard3 = tinycoro::MakeWorkGuard(scheduler);
+
+    tinycoro::ManualEvent event;
+
+    auto work = [&event, &scheduler]([[maybe_unused]] auto workGuard) {
+        
+        tinycoro::TaskGroup<int32_t> group;
+
+        auto task = [&event](int32_t v)->tinycoro::Task<int32_t> { 
+            co_await event;
+            co_return v;
+        };
+
+        group.Spawn(scheduler, task(0));
+        group.Spawn(scheduler, task(1));
+        group.Spawn(scheduler, task(2));
+
+        tinycoro::Join(group);
+
+        std::array<bool, 3> arr{};
+
+        auto res1 = group.TryNext();
+        auto res2 = group.TryNext();
+        auto res3 = group.TryNext();
+
+        EXPECT_FALSE(std::exchange(arr[*res1], true));
+        EXPECT_FALSE(std::exchange(arr[*res2], true));
+        EXPECT_FALSE(std::exchange(arr[*res3], true));
+    };
+
+    auto fut1 = std::async(std::launch::async, work, std::move(workGuard1));
+    auto fut2 = std::async(std::launch::async, work, std::move(workGuard2));
+    auto fut3 = std::async(std::launch::async, work, std::move(workGuard3));
+    auto fut4 = std::async(std::launch::async, [&event] { event.Set(); });
+
+    scheduler.Run();
+}
+
+struct InlineSchedulerFunctionalTest : testing::TestWithParam<size_t>
+{
+};
+
+INSTANTIATE_TEST_SUITE_P(InlineSchedulerFunctionalTest, InlineSchedulerFunctionalTest, testing::Values(1, 2, 10, 100, 1000));
+
+TEST_P(InlineSchedulerFunctionalTest, InlineSchedulerFunctionalTest_simple)
+{
+    const auto count = GetParam(); 
+
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::BufferedChannel<size_t> channel{100};
+
+    tinycoro::Latch latch{count};
+
+    std::atomic<size_t> totalCount{};
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for(size_t i = 0; i < count; ++i)
+        {
+            co_await channel.PushWait(i);
+        }
+
+        co_await latch.ArriveAndWait();
+        co_await channel.PushAndCloseWait(0u); // dummy and value
+    };
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        size_t v{};
+        while(tinycoro::EChannelOpStatus::SUCCESS == co_await channel.PopWait(v))
+        {
+            EXPECT_TRUE(v < count);
+            totalCount.fetch_add(1, std::memory_order::relaxed);
+        }
+    };
+
+    tinycoro::TaskGroup<> group;
+
+    for(size_t i = 0; i < count; ++i)
+    {
+        group.Spawn(scheduler, producer());
+        group.Spawn(scheduler, consumer());
+    }
+
+    scheduler.Run();
+
+    EXPECT_EQ(totalCount, count * count);
 }

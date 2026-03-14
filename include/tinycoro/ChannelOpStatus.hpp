@@ -10,9 +10,9 @@ namespace tinycoro {
 
     enum class EChannelOpStatus
     {
-        SUCCESS,
-        LAST,
-        CLOSED
+        SUCCESS = 0,
+        LAST = 1,
+        CLOSED = 2,
     };
 
 } // namespace tinycoro

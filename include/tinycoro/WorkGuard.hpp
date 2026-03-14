@@ -6,6 +6,15 @@
 
 namespace tinycoro
 {
+    /// A RAII helper used to keep an inline scheduler alive while work is outstanding.
+    ///
+    /// `InlineScheduler` (a.k.a. `detail::ConcurrentScheduler`) uses a work guard
+    /// reference count to determine when it can exit its `Run()` loop. `MakeWorkGuard`
+    /// increments the scheduler's internal counter on creation and decrements it on
+    /// destruction.
+    ///
+    /// This helper is intentionally lightweight and is intended for use with the
+    /// inline scheduler (no support for the threaded `ParallelScheduler`).
     struct WorkGuard
     {
         using callback_t = std::function<void()>;

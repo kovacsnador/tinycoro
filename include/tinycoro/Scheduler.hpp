@@ -182,13 +182,13 @@ namespace tinycoro {
             friend enqueuer_t;
 
         public:
-            /// Construct a scheduler with an internal stop source.
-            ///
-            /// The scheduler creates `workerThreadCount` worker threads and binds the
-            /// stop callback to its own internal stop token.
-            ///
-            /// \param workerThreadCount Number of worker threads to start.
-            ///        Must be greater than zero.
+            // Construct a scheduler with an internal stop source.
+            //
+            // The scheduler creates `workerThreadCount` worker threads and binds the
+            // stop callback to its own internal stop token.
+            //
+            // \param workerThreadCount Number of worker threads to start.
+            //        Must be greater than zero.
             ParallelScheduler(size_t workerThreadCount = local::HardwareConcurrency())
             : enqueuer_t{this}
             , _dispatcher{_sharedTasks, _stopSource.get_token()}
@@ -197,14 +197,14 @@ namespace tinycoro {
             {
             }
 
-            /// Construct a scheduler and bridge an external stop token.
-            ///
-            /// When `externalToken` is requested, this scheduler requests stop on its
-            /// internal stop source and wakes dispatcher waiters.
-            ///
-            /// \param externalToken External stop token that controls this scheduler.
-            /// \param workerThreadCount Number of worker threads to start.
-            ///        Must be greater than zero.
+            // Construct a scheduler and bridge an external stop token.
+            //
+            // When `externalToken` is requested, this scheduler requests stop on its
+            // internal stop source and wakes dispatcher waiters.
+            //
+            // \param externalToken External stop token that controls this scheduler.
+            // \param workerThreadCount Number of worker threads to start.
+            //        Must be greater than zero.
             ParallelScheduler(std::stop_token externalToken, size_t workerThreadCount = local::HardwareConcurrency())
             : enqueuer_t{this}
             , _dispatcher{_sharedTasks, _stopSource.get_token()}
@@ -223,8 +223,6 @@ namespace tinycoro {
                 // Note: we are using jthread
                 // so we don't need to explicitly join them.
                 _stopSource.request_stop();
-
-                _WaitForGuard();
 
                 // Explicitly join the jthread workers here to ensure proper destruction order.
                 // Although jthread automatically joins in its destructor, we must ensure
@@ -276,30 +274,8 @@ namespace tinycoro {
                 return false;
             }
 
-            void _Acquire() noexcept { _workGuardCount.fetch_add(1, std::memory_order::relaxed); }
-
-            void _Release() noexcept
-            {
-                auto last = _workGuardCount.fetch_sub(1, std::memory_order::relaxed);
-                assert(last > 0);
-
-                _workGuardCount.notify_one();
-            }
-
-            void _WaitForGuard()
-            {
-                auto c = _workGuardCount.fetch_add(1, std::memory_order::relaxed);
-                while (c != 0)
-                {
-                    _workGuardCount.wait(c, std::memory_order::relaxed);
-                    c = _workGuardCount.fetch_add(1, std::memory_order::relaxed);
-                }
-            }
-
             using queue_t      = detail::AtomicQueue<TaskT, CACHE_SIZE>;
             using dispatcher_t = detail::Dispatcher<queue_t>;
-
-            std::atomic<int32_t> _workGuardCount{};
 
             // currently active/scheduled tasks
             queue_t _sharedTasks;
@@ -329,11 +305,22 @@ namespace tinycoro {
             friend task_enqueuer_t;
 
         public:
+            // Constructs an concurrent scheduler that runs on the current thread.
+            //
+            // This scheduler does not spawn worker threads. Tasks enqueued via
+            // `Enqueue(...)` are executed when `Run()` is called on the current
+            // thread.
             ConcurrentScheduler()
             : task_enqueuer_t{this}
-            , _dispatcher{_queue, _stopSource.get_token()}
+            , _dispatcher{_queue, {}}   // stop_token with no stop state
             , _worker{_dispatcher}
             {
+            }
+
+            ~ConcurrentScheduler()
+            {
+                // debug check for guards
+                assert(_workGuardCount.load(std::memory_order::relaxed) == 0);
             }
 
             // Disable copy and move
@@ -374,16 +361,11 @@ namespace tinycoro {
                 // not allow to enqueue tasks with uninitialized std::coroutine_handler
                 // or if the a stop is requested
                 auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
-                if (_stopSource.stop_requested() == false)
-                {
-                    auto succeed = _dispatcher.try_push(std::move(task));
-                    // this shoould never at that point fail.
-                    assert(succeed);
-                    return succeed;
-                }
 
-                // coroutine task is not scheduled.
-                return false;
+                auto succeed = _dispatcher.try_push(std::move(task));
+                // this shoould never at that point fail.
+                assert(succeed);
+                return succeed;
             }
 
             void _Acquire() noexcept { _workGuardCount.fetch_add(1, std::memory_order::relaxed); }
@@ -396,11 +378,10 @@ namespace tinycoro {
                 // if this was the last, wake up waiting
                 // in the Run() function.
                 if (last == 1)
+                {
                     _dispatcher.notify_all();
+                }
             }
-
-            // stop_source to support safe cancellation
-            std::stop_source _stopSource{};
 
             std::atomic<int32_t> _workGuardCount{};
 

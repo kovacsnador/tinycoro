@@ -93,19 +93,27 @@ namespace tinycoro { namespace detail {
         {
             for (;;)
             {
-                // we can try to upload the cached tasks
                 Task_t task{};
 
-                if (_dispatcher.try_pop(task))
+                auto popState = _dispatcher.pop_state();
+                if(_dispatcher.try_pop(task))
                 {
                     // Invoke the task.
                     // wrapping the task into a Task_t
                     // to make sure, there is a  proper destruction
                     _InvokeTask(std::move(task));
                 }
+                else if(_pausedTaskCounter.load(std::memory_order::relaxed))
+                {
+                    // we could not pop active task from the queue
+                    // but we still have some paused task(s) which
+                    // they are waiting for resumption.
+                    _dispatcher.wait_for_pop(popState);
+                }
                 else
                 {
-                    // no tasks left
+                    // we are done, no tasks in the queue
+                    // and no tasks in pause state.
                     break;
                 }
             }
@@ -251,6 +259,8 @@ namespace tinycoro { namespace detail {
                         }
                     }
                 }
+
+                self->_pausedTaskCounter.fetch_sub(1, std::memory_order::release);
             };
 
             return {callback, this, promisePtr};
@@ -311,6 +321,7 @@ namespace tinycoro { namespace detail {
                         // so we try to pause it.
                         auto promisePtr = task.release();
 
+                        _pausedTaskCounter.fetch_add(1, std::memory_order::release);
                         // push back into the pause state
                         _pausedTasks.insert(promisePtr);
 
@@ -336,6 +347,7 @@ namespace tinycoro { namespace detail {
                         // so we need to remove it from the paused task queue
                         // and resume the task
                         _pausedTasks.erase(promisePtr);
+                        _pausedTaskCounter.fetch_sub(1, std::memory_order::release);
 
                         // reassign the pointer
                         // and continue with this task
@@ -412,6 +424,7 @@ namespace tinycoro { namespace detail {
 
         // tasks which are in pause state
         local::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
+        std::atomic<size_t> _pausedTaskCounter{};
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.
