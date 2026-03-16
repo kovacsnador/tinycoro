@@ -314,10 +314,8 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause)
     tinycoro::InlineScheduler inlineScheduler;
     tinycoro::Scheduler scheduler{1};
 
-    tinycoro::Latch latch{1};
+    tinycoro::Latch latch{count};
     tinycoro::Latch latch2{1};
-    tinycoro::ManualEvent event;
-    tinycoro::Barrier barrier{count};
 
     std::atomic<size_t> totalCount{};
 
@@ -343,49 +341,42 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause)
 
     inlineScheduler.Run();
 
+    tinycoro::Join(group);
+
     EXPECT_EQ(totalCount, count);
 }
 
 
-TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause_sema_release)
+TEST_P(InlineSchedulerTest, InlineSchedulerTest_semaphore_full_pause)
 {
     const auto count = GetParam(); 
 
     tinycoro::TaskGroup<> group;
 
     tinycoro::InlineScheduler inlineScheduler;
-    tinycoro::Scheduler scheduler;
+    tinycoro::Scheduler scheduler{1};
 
-    tinycoro::Semaphore<10> sema;
-    tinycoro::AutoEvent event{true};
+    tinycoro::Semaphore<1> sema;
+    tinycoro::Latch start{count * 2};
 
     std::atomic<size_t> totalCount{};
 
-    auto producer = [&]() -> tinycoro::Task<> {
-        for(size_t i = 0; i < count; ++i)
-        {
-            sema.Release(2);
-            co_await event;
-        }
-    };
-
     auto consumer = [&]()->tinycoro::Task<> {
+        co_await start.ArriveAndWait();
         auto lock = co_await sema;
-        event.Set();
-
         totalCount.fetch_add(1, std::memory_order::relaxed);
     };
 
-    // one producer
-    group.Spawn(scheduler, producer());
-
     // consumers
-    for(size_t i = 0; i < count * 10; ++i)
+    for(size_t i = 0; i < count; ++i)
     {
         group.Spawn(inlineScheduler, consumer());
+        group.Spawn(scheduler, consumer());
     }
 
     inlineScheduler.Run();
 
-    EXPECT_EQ(totalCount, count * 10);
+    tinycoro::Join(group);
+
+    EXPECT_EQ(totalCount, count * 2);
 }
