@@ -10,6 +10,7 @@
 
 TEST(LatchTest, LatchTest_countdown)
 {
+    // await_ready always returns false.
     tinycoro::Latch latch{4};
 
     auto awaiter = latch.operator co_await();
@@ -26,7 +27,7 @@ TEST(LatchTest, LatchTest_countdown)
     EXPECT_FALSE(awaiter.await_ready());
     latch.CountDown();
 
-    EXPECT_TRUE(awaiter.await_ready());
+    EXPECT_FALSE(awaiter.await_ready());
 }
 
 TEST(LatchTest, LatchTest_ArriveAndWait)
@@ -51,7 +52,8 @@ TEST(LatchTest, LatchTest_ArriveAndWait)
     auto awaiter4 = latch.ArriveAndWait();
     EXPECT_TRUE((std::same_as<decltype(awaiter4), decltype(awaiter)>));
 
-    EXPECT_TRUE(awaiter.await_ready());
+    // await_ready always returns false.
+    EXPECT_FALSE(awaiter.await_ready());
 }
 
 TEST(LatchTest, LatchTest_constructor)
@@ -88,7 +90,9 @@ TEST(LatchTest, LatchTest_await_ready)
 
     EXPECT_FALSE(awaiter.await_ready());
     latch.CountDown();
-    EXPECT_TRUE(awaiter.await_ready());
+
+    // returns always false
+    EXPECT_FALSE(awaiter.await_ready());
 }
 
 TEST(LatchTest, LatchTest_await_suspend)

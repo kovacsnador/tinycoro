@@ -256,13 +256,13 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_multi_work_guard)
     scheduler.Run();
 }
 
-struct InlineSchedulerFunctionalTest : testing::TestWithParam<size_t>
+struct InlineSchedulerTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(InlineSchedulerFunctionalTest, InlineSchedulerFunctionalTest, testing::Values(1, 2, 10, 100, 1000));
+INSTANTIATE_TEST_SUITE_P(InlineSchedulerTest, InlineSchedulerTest, testing::Values(1, 2, 10, 100, 1000));
 
-TEST_P(InlineSchedulerFunctionalTest, InlineSchedulerFunctionalTest_simple)
+TEST_P(InlineSchedulerTest, InlineSchedulerTest_simple)
 {
     const auto count = GetParam(); 
 
@@ -303,4 +303,89 @@ TEST_P(InlineSchedulerFunctionalTest, InlineSchedulerFunctionalTest_simple)
     scheduler.Run();
 
     EXPECT_EQ(totalCount, count * count);
+}
+
+TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause)
+{
+    const auto count = GetParam(); 
+
+    tinycoro::TaskGroup<> group;
+
+    tinycoro::InlineScheduler inlineScheduler;
+    tinycoro::Scheduler scheduler{1};
+
+    tinycoro::Latch latch{1};
+    tinycoro::Latch latch2{1};
+    tinycoro::ManualEvent event;
+    tinycoro::Barrier barrier{count};
+
+    std::atomic<size_t> totalCount{};
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        co_await latch;
+        latch2.CountDown(count);
+    };
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        latch.CountDown();
+        co_await latch2;
+        totalCount.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    // one producer
+    group.Spawn(scheduler, producer());
+
+    // consumers
+    for(size_t i = 0; i < count; ++i)
+    {
+        group.Spawn(inlineScheduler, consumer());
+    }
+
+    inlineScheduler.Run();
+
+    EXPECT_EQ(totalCount, count);
+}
+
+
+TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause_sema_release)
+{
+    const auto count = GetParam(); 
+
+    tinycoro::TaskGroup<> group;
+
+    tinycoro::InlineScheduler inlineScheduler;
+    tinycoro::Scheduler scheduler;
+
+    tinycoro::Semaphore<10> sema;
+    tinycoro::AutoEvent event{true};
+
+    std::atomic<size_t> totalCount{};
+
+    auto producer = [&]() -> tinycoro::Task<> {
+        for(size_t i = 0; i < count; ++i)
+        {
+            sema.Release(2);
+            co_await event;
+        }
+    };
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        auto lock = co_await sema;
+        event.Set();
+
+        totalCount.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    // one producer
+    group.Spawn(scheduler, producer());
+
+    // consumers
+    for(size_t i = 0; i < count * 10; ++i)
+    {
+        group.Spawn(inlineScheduler, consumer());
+    }
+
+    inlineScheduler.Run();
+
+    EXPECT_EQ(totalCount, count * 10);
 }

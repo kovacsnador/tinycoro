@@ -102,7 +102,7 @@ INSTANTIATE_TEST_SUITE_P(DecrementTest,
 TEST_P(DecrementTest, BarrierTest_Decrement)
 {
     auto [val, reset, expected] = GetParam();
-    EXPECT_EQ(tinycoro::detail::local::Decrement(val, reset), expected);
+    EXPECT_EQ(tinycoro::detail::local::Decrement(val, 1, reset), expected);
 }
 
 template <typename BarrierT, typename EventT>
@@ -734,6 +734,47 @@ TEST_P(BarrierTest, BarrierTest_timeout)
     {
         tasks.emplace_back(consumer());
     }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
+}
+
+TEST_P(BarrierTest, BarrierTest_Arrive_all_once)
+{
+    tinycoro::Scheduler scheduler;
+
+    auto count = GetParam();
+
+    tinycoro::Barrier barrier{count};
+    tinycoro::ManualEvent event;
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto producer = [&]()->tinycoro::Task<> {
+        while(event.IsSet() == false)
+        {
+            barrier.Arrive(count * 2);  // over arrive
+        }
+        co_return;
+    };
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        co_await barrier;
+        if(--cc == 0)
+        {
+            event.Set();
+        }
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tasks.emplace_back(producer());
 
     tinycoro::AllOf(scheduler, std::move(tasks));
 

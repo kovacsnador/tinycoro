@@ -85,6 +85,8 @@ namespace tinycoro { namespace detail {
             // and nobody can resume a paused task (at least not from this scheduler...)
             // so we can clean up here safely
             _Cleanup(_pausedTasks.begin());
+
+            assert(_pausedTaskCounter.load(std::memory_order::relaxed) == 0);
         }
 
         // Drains and executes queued tasks from
@@ -121,6 +123,9 @@ namespace tinycoro { namespace detail {
             // should be always empty
             assert(_notifiedCachedTasks.empty());
             assert(_cachedTasks.empty());
+
+            // no paused tasks any more
+            assert(_pausedTaskCounter.load(std::memory_order::relaxed) == 0);
         }
 
         void Run(std::stop_token stopToken) noexcept
