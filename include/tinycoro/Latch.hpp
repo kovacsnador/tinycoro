@@ -6,6 +6,8 @@
 #ifndef TINY_CORO_LATCH_HPP
 #define TINY_CORO_LATCH_HPP
 
+#include <algorithm>
+#include <cassert>
 #include <mutex>
 
 #include "LinkedPtrStack.hpp"

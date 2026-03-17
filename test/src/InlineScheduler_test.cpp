@@ -260,7 +260,7 @@ struct InlineSchedulerTest : testing::TestWithParam<size_t>
 {
 };
 
-INSTANTIATE_TEST_SUITE_P(InlineSchedulerTest, InlineSchedulerTest, testing::Values(1, 2, 10, 100, 1000));
+INSTANTIATE_TEST_SUITE_P(InlineSchedulerTest, InlineSchedulerTest, testing::Values(1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1,1, 2, 10, 100, 1000));
 
 TEST_P(InlineSchedulerTest, InlineSchedulerTest_simple)
 {
@@ -341,8 +341,6 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_full_pause)
 
     inlineScheduler.Run();
 
-    tinycoro::Join(group);
-
     EXPECT_EQ(totalCount, count);
 }
 
@@ -358,6 +356,7 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_semaphore_full_pause)
 
     tinycoro::Semaphore<1> sema;
     tinycoro::Latch start{count * 2};
+    tinycoro::Latch end{count * 2};
 
     std::atomic<size_t> totalCount{};
 
@@ -365,7 +364,10 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_semaphore_full_pause)
         co_await start.ArriveAndWait();
         auto lock = co_await sema;
         totalCount.fetch_add(1, std::memory_order::relaxed);
+        end.CountDown();
     };
+
+    auto waiter = [&]() -> tinycoro::Task<> { co_await end; };
 
     // consumers
     for(size_t i = 0; i < count; ++i)
@@ -376,7 +378,7 @@ TEST_P(InlineSchedulerTest, InlineSchedulerTest_semaphore_full_pause)
 
     inlineScheduler.Run();
 
-    tinycoro::Join(group);
+    AllOf(waiter());
 
     EXPECT_EQ(totalCount, count * 2);
 }

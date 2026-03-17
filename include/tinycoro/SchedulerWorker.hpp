@@ -105,18 +105,24 @@ namespace tinycoro { namespace detail {
                     // to make sure, there is a  proper destruction
                     _InvokeTask(std::move(task));
                 }
-                else if(_pausedTaskCounter.load(std::memory_order::relaxed))
-                {
-                    // we could not pop active task from the queue
-                    // but we still have some paused task(s) which
-                    // they are waiting for resumption.
-                    _dispatcher.wait_for_pop(popState);
-                }
                 else
                 {
-                    // we are done, no tasks in the queue
-                    // and no tasks in pause state.
-                    break;
+                    auto pausedTasks = _pausedTaskCounter.load(std::memory_order::relaxed);
+                    auto resumingTasks = _taskResuming.load(std::memory_order::acquire);
+
+                    if(pausedTasks == 0 && resumingTasks == 0 && popState == _dispatcher.pop_state())
+                    {
+                        // we are done, no tasks in the queue
+                        // and no tasks in pause state
+                        break;
+                    }
+                    else if(resumingTasks == 0)
+                    {
+                        // we could not pop active task from the queue
+                        // but we still have some paused task(s) which
+                        // they are waiting for resumption.
+                        _dispatcher.wait_for_pop(popState);
+                    }
                 }
             }
 
@@ -157,13 +163,16 @@ namespace tinycoro { namespace detail {
                                 break;
                         }
 
-                        // all the caches are empty, we can
-                        // wait safely for new tasks...
-                        //
-                        // now if some tasks need resumption
-                        // they will directly be pushed into the dispatcher queue.
-                        // (not in the local cache)
-                        _dispatcher.wait_for_pop(popState);
+                        if(_taskResuming.load(std::memory_order::acquire) == 0)
+                        {
+                            // all the caches are empty, we can
+                            // wait safely for new tasks...
+                            //
+                            // now if some tasks need resumption
+                            // they will directly be pushed into the dispatcher queue.
+                            // (not in the local cache)
+                            _dispatcher.wait_for_pop(popState);
+                        }
                     }
                 }
                 else
@@ -227,6 +236,8 @@ namespace tinycoro { namespace detail {
                 assert(expected & UTypeCast(EPauseState::PAUSED));
                 assert((expected & UTypeCast(EPauseState::NOTIFIED)) == 0);
 
+                self->_taskResuming.fetch_add(1, std::memory_order::acquire);
+
                 // If we reach this point
                 // that means that the task is already in paused state
                 // So we need to resume it manually
@@ -265,7 +276,11 @@ namespace tinycoro { namespace detail {
                     }
                 }
 
-                self->_pausedTaskCounter.fetch_sub(1, std::memory_order::release);
+                self->_pausedTaskCounter.fetch_sub(1, std::memory_order::relaxed);
+                
+                // memory order release is here mandatory. Everything before this
+                // should happen.
+                self->_taskResuming.fetch_sub(1, std::memory_order::release);
             };
 
             return {callback, this, promisePtr};
@@ -430,6 +445,7 @@ namespace tinycoro { namespace detail {
         // tasks which are in pause state
         local::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
         std::atomic<size_t> _pausedTaskCounter{};
+        std::atomic<size_t> _taskResuming{};
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.
