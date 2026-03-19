@@ -85,20 +85,18 @@ namespace tinycoro { namespace detail {
             // and nobody can resume a paused task (at least not from this scheduler...)
             // so we can clean up here safely
             _Cleanup(_pausedTasks.begin());
-
-            assert(_pausedTaskCounter.load(std::memory_order::relaxed) == 0);
         }
 
         // Drains and executes queued tasks from
         // the dispatcher until the queue becomes empty
         void DrainQueuedTasks() noexcept
         {
-            for (;;)
+            while (_dispatcher.task_counter())
             {
                 Task_t task{};
 
                 auto popState = _dispatcher.pop_state();
-                if(_dispatcher.try_pop(task))
+                if (_dispatcher.try_pop(task))
                 {
                     // Invoke the task.
                     // wrapping the task into a Task_t
@@ -107,31 +105,16 @@ namespace tinycoro { namespace detail {
                 }
                 else
                 {
-                    auto pausedTasks = _pausedTaskCounter.load(std::memory_order::relaxed);
-                    auto resumingTasks = _taskResuming.load(std::memory_order::acquire);
-
-                    if(pausedTasks == 0 && resumingTasks == 0 && popState == _dispatcher.pop_state())
-                    {
-                        // we are done, no tasks in the queue
-                        // and no tasks in pause state
-                        break;
-                    }
-                    else if(resumingTasks == 0)
-                    {
-                        // we could not pop active task from the queue
-                        // but we still have some paused task(s) which
-                        // they are waiting for resumption.
-                        _dispatcher.wait_for_pop(popState);
-                    }
+                    // we could not pop active task from the queue
+                    // but we still have some paused task(s) which
+                    // they are waiting for resumption.
+                    _dispatcher.wait_for_pop(popState);
                 }
             }
 
             // should be always empty
             assert(_notifiedCachedTasks.empty());
             assert(_cachedTasks.empty());
-
-            // no paused tasks any more
-            assert(_pausedTaskCounter.load(std::memory_order::relaxed) == 0);
         }
 
         void Run(std::stop_token stopToken) noexcept
@@ -152,18 +135,20 @@ namespace tinycoro { namespace detail {
                     auto popState = _dispatcher.pop_state();
                     if (_notifiedCachedTasks.empty())
                     {
-                        if (stopToken.stop_requested() && _pausedTasks.empty())
+                        if (stopToken.stop_requested() && _dispatcher.task_counter() == 0)
                         {
                             assert(_cachedTasks.empty());
+                            assert(_notifiedCachedTasks.empty());
 
                             // scheduler requested stop...
                             // Now we finished with all our thread bounded
                             // tasks, we are done here.
-                            if(_notifiedCachedTasks.empty())
-                                break;
+                            //if (_notifiedCachedTasks.empty())
+                            break;
                         }
 
-                        if(_taskResuming.load(std::memory_order::acquire) == 0)
+                        // TODO fix this
+                        // if(_resumingTask.load(std::memory_order::acquire) == 0)
                         {
                             // all the caches are empty, we can
                             // wait safely for new tasks...
@@ -187,6 +172,10 @@ namespace tinycoro { namespace detail {
             // Not strictly necessary, but notify others
             // in case somebody missed the stop request
             _dispatcher.notify_all();
+
+            // should be always empty
+            assert(_notifiedCachedTasks.empty());
+            assert(_cachedTasks.empty());
 
             // close the notified cache
             // and make a proper task cleanup here
@@ -236,8 +225,6 @@ namespace tinycoro { namespace detail {
                 assert(expected & UTypeCast(EPauseState::PAUSED));
                 assert((expected & UTypeCast(EPauseState::NOTIFIED)) == 0);
 
-                self->_taskResuming.fetch_add(1, std::memory_order::acquire);
-
                 // If we reach this point
                 // that means that the task is already in paused state
                 // So we need to resume it manually
@@ -245,42 +232,43 @@ namespace tinycoro { namespace detail {
 
                 // push back task to the queue for resumption
                 Task_t task{promise};
-                if (policy != ENotifyPolicy::DESTROY)
+
+                if (policy == ENotifyPolicy::DESTROY)
                 {
-                    // no stop was requested,
-                    // and no immediate destroy policy.
-
-                    // Save the dispatcher pointer for later use.
-                    //
-                    // This is not strictly necessary because tinycoro::ResumeCallback_t
-                    // uses value semantics to pass its parameters (void* selfPtr and void* promisePtr).
-                    auto dispatcherPtr = std::addressof(self->_dispatcher);
-
-                    // After a successful push, we must return immediately.
-                    //
-                    // The task may resume and destroy itself before this function continues,
-                    // which could lead to a heap use-after-free.
-                    if (dispatcherPtr->try_push(std::move(task)) == false)
-                    {
-                        if (self->_notifiedCachedTasks.try_push(task.release()))
-                        {
-                            // wake up waiters, in case we are waiting for pop
-                            dispatcherPtr->notify_all();
-                        }
-                        else
-                        {
-                            // The _notifiedCachedTasks stack is closed.
-                            // Reassign the raw pointer to the RAII wrapper for proper destruction.
-                            task.reset(promise);
-                        }
-                    }
+                    self->_dispatcher.decrease_task_counter(1);
+                    return;
                 }
 
-                self->_pausedTaskCounter.fetch_sub(1, std::memory_order::relaxed);
-                
-                // memory order release is here mandatory. Everything before this
-                // should happen.
-                self->_taskResuming.fetch_sub(1, std::memory_order::release);
+                // no stop was requested,
+                // and no immediate destroy policy.
+
+                // Save the dispatcher pointer for later use.
+                //
+                // This is not strictly necessary because tinycoro::ResumeCallback_t
+                // uses value semantics to pass its parameters (void* selfPtr and void* promisePtr).
+                auto dispatcherPtr = std::addressof(self->_dispatcher);
+
+                // After a successful push, we must return immediately.
+                //
+                // The task may resume and destroy itself before this function continues,
+                // which could lead to a heap use-after-free.
+                if (dispatcherPtr->try_push(std::move(task)) == false)
+                {
+                    if (self->_notifiedCachedTasks.try_push(task.release()))
+                    {
+                        // wake up waiters, in case we are waiting for pop
+                        dispatcherPtr->notify_all();
+                    }
+                    else
+                    {
+                        // should be never reached
+                        assert(false);
+
+                        // The _notifiedCachedTasks stack is closed.
+                        // Reassign the raw pointer to the RAII wrapper for proper destruction.
+                        task.reset(promise);
+                    }
+                }
             };
 
             return {callback, this, promisePtr};
@@ -341,7 +329,6 @@ namespace tinycoro { namespace detail {
                         // so we try to pause it.
                         auto promisePtr = task.release();
 
-                        _pausedTaskCounter.fetch_add(1, std::memory_order::release);
                         // push back into the pause state
                         _pausedTasks.insert(promisePtr);
 
@@ -367,7 +354,6 @@ namespace tinycoro { namespace detail {
                         // so we need to remove it from the paused task queue
                         // and resume the task
                         _pausedTasks.erase(promisePtr);
-                        _pausedTaskCounter.fetch_sub(1, std::memory_order::release);
 
                         // reassign the pointer
                         // and continue with this task
@@ -383,6 +369,7 @@ namespace tinycoro { namespace detail {
                 case DONE:
                     [[fallthrough]];
                 default:
+                    _dispatcher.decrease_task_counter(1);
                     return;
                 }
             }
@@ -436,6 +423,7 @@ namespace tinycoro { namespace detail {
                 auto   next = promisePtr->next;
                 Task_t destroyer{promisePtr};
                 promisePtr = next;
+                _dispatcher.decrease_task_counter(1);
             }
         }
 
@@ -444,8 +432,6 @@ namespace tinycoro { namespace detail {
 
         // tasks which are in pause state
         local::ThreadSafeList<typename Task_t::element_type> _pausedTasks;
-        std::atomic<size_t> _pausedTaskCounter{};
-        std::atomic<size_t> _taskResuming{};
 
         // Cache for tasks which could not be push back
         // immediately into the shared task queue.

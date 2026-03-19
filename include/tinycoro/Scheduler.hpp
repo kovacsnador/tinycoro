@@ -253,9 +253,11 @@ namespace tinycoro {
                 // not allow to enqueue tasks with uninitialized std::coroutine_handler
                 // or if the a stop is requested
                 auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
+                
+                _dispatcher.increase_task_counter(1);
 
                 while (_stopSource.stop_requested() == false)
-                {
+                {   
                     auto pushState = _dispatcher.push_state(std::memory_order::relaxed);
                     if (_dispatcher.try_push(std::move(task)))
                     {
@@ -270,6 +272,7 @@ namespace tinycoro {
                     }
                 }
 
+                _dispatcher.decrease_task_counter(1);
                 // coroutine task is not scheduled.
                 return false;
             }
@@ -362,7 +365,11 @@ namespace tinycoro {
                 // or if the a stop is requested
                 auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
 
+                // push should always succeed
+                _dispatcher.increase_task_counter(1);
+
                 auto succeed = _dispatcher.try_push(std::move(task));
+
                 // this shoould never at that point fail.
                 assert(succeed);
                 return succeed;

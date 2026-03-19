@@ -65,6 +65,38 @@ namespace tinycoro { namespace detail {
             local::Notify(_popEvent, std::atomic_notify_all);
         }
 
+        void notify_push() noexcept
+        {
+            _pushEvent.notify_all();
+        }
+
+        auto increase_task_counter(size_t n, std::memory_order order = std::memory_order::relaxed) noexcept
+        {
+            return _taskCounter.fetch_add(n, order);
+        }
+
+        auto decrease_task_counter(size_t n, std::memory_order order = std::memory_order::relaxed) noexcept
+        {
+            auto before = _taskCounter.fetch_sub(n, order);
+            
+            assert(n <= before);
+
+            if(before == 1)
+            {
+                // in case this was the last task
+                // we notify everybody, that they not stay
+                // in a waiting state.
+                notify_all();
+            }
+
+            return before;
+        }
+
+        auto task_counter(std::memory_order order = std::memory_order::relaxed) const noexcept
+        {
+            return _taskCounter.load(order);
+        }
+
         template <typename T>
         [[nodiscard]] auto try_push(T&& elem) noexcept
         {
@@ -109,6 +141,7 @@ namespace tinycoro { namespace detail {
         QueueT& _queue;
 
         std::stop_token _stopToken;
+        std::atomic<size_t> _taskCounter{0};
     };
 
     template <typename QueueT, typename TaskT>
@@ -163,6 +196,22 @@ namespace tinycoro { namespace detail {
                 elem.reset(ptr);
 
             return succeed;
+        }
+
+        auto increase_task_counter(size_t n, std::memory_order order = std::memory_order::relaxed) noexcept
+        {
+            return _dispatcher.increase_task_counter(n, order);
+        }
+
+        auto decrease_task_counter(size_t n, std::memory_order order = std::memory_order::relaxed) noexcept
+        {
+            assert(n <= task_counter());
+            return _dispatcher.decrease_task_counter(n, order);
+        }
+
+        auto task_counter(std::memory_order order = std::memory_order::relaxed) const noexcept
+        {
+            return _dispatcher.task_counter(order);
         }
 
     private:

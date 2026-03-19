@@ -79,6 +79,7 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
 
     auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
+    dispatcher.increase_task_counter(1);
     EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
     latch.wait();
@@ -122,6 +123,7 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
 
         auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
+        dispatcher.increase_task_counter(1);
         EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
         latch.wait();

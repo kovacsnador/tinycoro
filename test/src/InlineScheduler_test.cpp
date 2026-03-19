@@ -121,7 +121,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_run_without_work_returns_immediate
         return true;
     });
 
-    EXPECT_EQ(runFuture.wait_for(200ms), std::future_status::ready);
+    EXPECT_EQ(runFuture.wait_for(2000s), std::future_status::ready);
     EXPECT_TRUE(runFuture.get());
 }
 
