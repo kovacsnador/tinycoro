@@ -239,8 +239,8 @@ namespace tinycoro {
             // Disable copy and move
             ParallelScheduler(ParallelScheduler&&) = delete;
 
-            auto GetStopToken() const noexcept { return _stopSource.get_token(); }
-            auto GetStopSource() const noexcept { return _stopSource; }
+            auto StopToken() const noexcept { return _stopSource.get_token(); }
+            auto StopSource() const noexcept { return _stopSource; }
 
         private:
             template <typename OnFinishCbT, typename FutureStateT, concepts::IsSchedulable CoroTaskT>
@@ -254,10 +254,16 @@ namespace tinycoro {
                 // or if the a stop is requested
                 auto task = MakeSchedulableTask<OnFinishCbT>(std::move(coro), std::move(futureState));
                 
-                _dispatcher.increase_task_counter(1);
+                bool counterIncreased{false}; 
 
                 while (_stopSource.stop_requested() == false)
-                {   
+                {
+                    if(counterIncreased == false)
+                    {
+                        _dispatcher.increase_task_counter(1);
+                        counterIncreased = true;
+                    }
+
                     auto pushState = _dispatcher.push_state(std::memory_order::relaxed);
                     if (_dispatcher.try_push(std::move(task)))
                     {
@@ -272,7 +278,9 @@ namespace tinycoro {
                     }
                 }
 
-                _dispatcher.decrease_task_counter(1);
+                if(counterIncreased)
+                    _dispatcher.decrease_task_counter(1);
+                    
                 // coroutine task is not scheduled.
                 return false;
             }

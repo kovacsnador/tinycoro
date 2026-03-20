@@ -29,7 +29,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
     {
         tinycoro::CustomScheduler<128> scheduler;
 
-        ss = scheduler.GetStopSource();
+        ss = scheduler.StopSource();
 
         for(size_t i = 0; i < count; ++i)
         {
@@ -96,7 +96,7 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_stop_source)
 
     auto task = [&]() -> tinycoro::Task<> {
         // close the scheduler
-        scheduler.GetStopSource().request_stop();
+        scheduler.StopSource().request_stop();
 
         for(size_t i=0; i < count; ++i)
         {
@@ -127,6 +127,9 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_external_token)
     auto task = [&]() -> tinycoro::Task<> {
         // close the scheduler
         ss.request_stop();
+
+        // make sure stop is triggered
+        while(scheduler.StopToken().stop_requested() == false) {}
 
         for(size_t i = 0; i < count; ++i)
         {
