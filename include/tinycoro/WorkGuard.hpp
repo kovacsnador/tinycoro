@@ -21,7 +21,6 @@ namespace tinycoro
 
         WorkGuard() = default;
         
-
         explicit WorkGuard(callback_t cb)
         : _release{std::move(cb)}
         {
