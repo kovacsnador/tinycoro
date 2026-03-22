@@ -38,9 +38,8 @@ namespace tinycoro { namespace detail {
 
         static_assert(std::unsigned_integral<state_type>, "state_type needs to be unsigned for safe overflow");
 
-        explicit Dispatcher(QueueT& queue, std::stop_token stopToken)
+        explicit Dispatcher(QueueT& queue)
         : _queue{queue}
-        , _stopToken{std::move(stopToken)}
         {
         }
 
@@ -49,14 +48,20 @@ namespace tinycoro { namespace detail {
 
         void wait_for_push(state_type state) const noexcept
         {
-            if (state == _pushEvent.load(std::memory_order::relaxed) /*isFull*/ && _stopToken.stop_requested() == false)
+            if (state == _pushEvent.load(std::memory_order::relaxed))
+            {
+                // dispatcher is full
                 _popEvent.wait(state);
+            }
         }
 
         void wait_for_pop(state_type state) const noexcept
         {
-            if (state + QueueT::capacity() == _popEvent.load(std::memory_order::relaxed) /* isEmpty */ && _stopToken.stop_requested() == false)
+            if (state + QueueT::capacity() == _popEvent.load(std::memory_order::relaxed))
+            {
+                // dispatcher is empty
                 _pushEvent.wait(state);
+            }
         }
 
         void notify_all() noexcept
@@ -140,7 +145,6 @@ namespace tinycoro { namespace detail {
 
         QueueT& _queue;
 
-        std::stop_token _stopToken;
         std::atomic<size_t> _taskCounter{0};
     };
 
@@ -153,8 +157,8 @@ namespace tinycoro { namespace detail {
         static_assert(std::same_as<decltype(QueueT::capacity()), typename dispatcher_t::state_type>,
                       "QueueT::capacity() need to match with dispatcher_t::state_type");
 
-        ConcurrentDispatcher(QueueT& queue, std::stop_token stopToken)
-        : _dispatcher{queue, std::move(stopToken)}
+        ConcurrentDispatcher(QueueT& queue)
+        : _dispatcher{queue}
         {
         }
 

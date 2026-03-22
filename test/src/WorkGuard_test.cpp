@@ -3,6 +3,9 @@
 #include <tinycoro/Scheduler.hpp>
 
 #include <utility>
+#include <thread>
+#include <vector>
+#include <atomic>
 
 namespace {
     struct FakeScheduler
@@ -42,6 +45,29 @@ TEST(WorkGuardTest, unlock_calls_release_once)
     guard.Unlock();
 
     EXPECT_EQ(called, 1);
+}
+
+TEST(WorkGuardTest, unlock_is_thread_safe)
+{
+    std::atomic<int> called{0};
+    tinycoro::WorkGuard guard{[&called] { called.fetch_add(1, std::memory_order::relaxed); }};
+
+    const int numThreads = 10;
+    std::vector<std::thread> threads;
+
+    for (int i = 0; i < numThreads; ++i)
+    {
+        threads.emplace_back([&guard]() {
+            guard.Unlock();
+        });
+    }
+
+    for (auto& t : threads)
+    {
+        t.join();
+    }
+
+    EXPECT_EQ(called.load(std::memory_order::relaxed), 1);
 }
 
 TEST(WorkGuardTest, move_constructor_transfers_ownership)

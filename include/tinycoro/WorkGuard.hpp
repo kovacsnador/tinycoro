@@ -27,7 +27,8 @@ namespace tinycoro
         }
 
         WorkGuard(WorkGuard&& other) noexcept
-        : _release{std::exchange(other._release, nullptr)}
+        : _flag{other._flag.load(std::memory_order::relaxed)}
+        , _release{std::move(other._release)}
         {
         }
 
@@ -37,13 +38,16 @@ namespace tinycoro
             return *this;
         }
 
-        void Unlock() noexcept
+        bool Unlock() noexcept
         {
-            if(_release)
+            if(_flag.exchange(true, std::memory_order::relaxed) == false)
             {
-                _release();
-                _release = nullptr;
+                if(_release)
+                    _release();
+
+                return true;
             }
+            return false;
         }
 
         ~WorkGuard()
@@ -54,9 +58,13 @@ namespace tinycoro
         void swap(WorkGuard& other) noexcept
         {
             std::swap(_release, other._release);
+
+            auto f = other._flag.load(std::memory_order::relaxed);
+            other._flag.store(_flag.exchange(f, std::memory_order::relaxed), std::memory_order::relaxed);
         }
 
     private:
+        std::atomic<bool> _flag{false};
         callback_t _release{nullptr};
     };
 
