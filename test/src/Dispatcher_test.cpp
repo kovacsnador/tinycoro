@@ -41,7 +41,7 @@ namespace test {
 TEST(DispatcherTest, DispatcherTest_try_push_pop)
 {
     tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher                dispatcher{queue};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -64,7 +64,7 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
 TEST(DispatcherTest, DispatcherTest_small_cache)
 {
     tinycoro::detail::AtomicQueue<int32_t, 4> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -128,7 +128,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 1024, size_t> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher                dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&] {
         for (size_t i = 0; i < count;)
@@ -165,7 +165,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     auto asyncFunc = [&] {
         for (size_t i = 0; i < count; i++)
@@ -202,7 +202,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     // this need to move
     dispatcher.wait_for_push(dispatcher.push_state());
@@ -249,7 +249,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     {
         auto consumer = [&] {

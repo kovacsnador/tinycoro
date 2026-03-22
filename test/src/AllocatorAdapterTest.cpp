@@ -100,7 +100,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc)
     bad_alloc(mock, std::move(task));
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_inlineTask)
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_slimTask)
 {
     auto task = [](int32_t i) -> tinycoro::SlimTask<int32_t, AllocatorAdapterNoExcept> {
         i++;
@@ -250,7 +250,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new)
     throw_in_operator_new(mock, task);
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_InlineTask)
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_slimTask)
 {
     auto task = [](int32_t i) -> tinycoro::SlimTask<int32_t, AllocatorAdapter> {
         i++;

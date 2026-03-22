@@ -24,6 +24,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 * [Usage](#usage)
 * [Examples](#examples)
     - [Task](#task)
+    - [InlineScheduler](#inlinescheduler)
     - [Scheduler](#scheduler)
     - [SyncFunctions](#syncfunctions)
     - [AllOf](#allof)
@@ -332,6 +333,23 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
     co_return true;  // returns a bool
 }
 ```
+### `InlineScheduler`
+The `tinycoro::InlineScheduler` is a type alias for `detail::ConcurrentScheduler<detail::SchedulableTask>`, providing a convenient way to run coroutines inline on the current thread without spawning additional threads. This is useful for cooperative multitasking where you want to execute multiple coroutines sequentially on the same thread.
+
+```cpp
+#include <tinycoro/tinycoro_all.h>
+
+// Using InlineScheduler for inline execution
+tinycoro::InlineScheduler inlineScheduler;
+
+auto task1 = []() -> tinycoro::Task<int> { co_return 42; };
+auto task2 = []() -> tinycoro::Task<std::string> { co_return "hello"; };
+
+auto [result1, result2] = co_await tinycoro::AllOfAwait(inlineScheduler, task1(), task2());
+```
+
+This allows for efficient execution of coroutines without the overhead of thread management.
+
 ### `Scheduler`
 The `tinycoro::Scheduler` is responsible for managing and executing coroutines across multiple worker threads.
 It owns a thread pool internally and dispatches schedulable coroutine tasks to these workers in a thread-safe manner.

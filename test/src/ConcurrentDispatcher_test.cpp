@@ -44,7 +44,7 @@ namespace {
 TEST(ConcurrentDispatcherTest, try_push_pop_transfers_ownership)
 {
     IntQueue queue{};
-    IntDispatcher dispatcher{queue, {}};
+    IntDispatcher dispatcher{queue};
 
     IntTask in = std::make_unique<IntNode>(42);
     EXPECT_TRUE(dispatcher.try_push(std::move(in)));
@@ -59,7 +59,7 @@ TEST(ConcurrentDispatcherTest, try_push_pop_transfers_ownership)
 TEST(ConcurrentDispatcherTest, try_pop_empty_returns_false)
 {
     IntQueue queue{};
-    IntDispatcher dispatcher{queue, {}};
+    IntDispatcher dispatcher{queue};
 
     IntTask out;
     EXPECT_FALSE(dispatcher.try_pop(out));
@@ -72,7 +72,7 @@ TEST(ConcurrentDispatcherTest, destructor_drains_remaining_tasks)
 
     TrackedQueue queue{};
     {
-        TrackedDispatcher dispatcher{queue, {}};
+        TrackedDispatcher dispatcher{queue};
         for (int i = 0; i < 5; ++i)
         {
             EXPECT_TRUE(dispatcher.try_push(std::make_unique<TrackedNode>()));
@@ -85,7 +85,7 @@ TEST(ConcurrentDispatcherTest, destructor_drains_remaining_tasks)
 TEST(ConcurrentDispatcherTest, wait_for_pop_unblocks_after_push)
 {
     IntQueue queue{};
-    IntDispatcher dispatcher{queue, {}};
+    IntDispatcher dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&dispatcher] {
         dispatcher.wait_for_pop(dispatcher.pop_state());
@@ -107,7 +107,7 @@ TEST(ConcurrentDispatcherTest, wait_for_pop_unblocks_after_push)
 TEST(ConcurrentDispatcherTest, notify_all_unblocks_wait_for_push)
 {
     IntQueue queue{};
-    IntDispatcher dispatcher{queue, {}};
+    IntDispatcher dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&dispatcher] {
         dispatcher.wait_for_push(dispatcher.push_state());
@@ -124,7 +124,7 @@ TEST(ConcurrentDispatcherTest, notify_all_unblocks_wait_for_push)
 TEST(ConcurrentDispatcherTest, notify_all_unblocks_wait_for_pop)
 {
     IntQueue queue{};
-    IntDispatcher dispatcher{queue, {}};
+    IntDispatcher dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&dispatcher] {
         dispatcher.wait_for_pop(dispatcher.pop_state());

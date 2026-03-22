@@ -317,7 +317,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     tinycoro::Scheduler                      scheduler{8};
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher             dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher             dispatcher{queue};
 
     std::atomic<size_t> totalCount{};
 

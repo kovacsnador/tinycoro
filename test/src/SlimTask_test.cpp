@@ -6,15 +6,15 @@ TEST(SlimTaskTest, SlimTaskTest)
 {
     tinycoro::Scheduler scheduler;
 
-    auto inlineTask1 = []() -> tinycoro::SlimTask<int32_t> {
-        auto inlineTask2 = []() -> tinycoro::SlimTask<int32_t> { co_return 41; };
+    auto slimTask1 = []() -> tinycoro::SlimTask<int32_t> {
+        auto slimTask2 = []() -> tinycoro::SlimTask<int32_t> { co_return 41; };
 
-        auto val = co_await inlineTask2();
+        auto val = co_await slimTask2();
         co_return val += 1;
     };
 
     auto task = [&]() -> tinycoro::Task<void> {
-        auto val = co_await inlineTask1();
+        auto val = co_await slimTask1();
         EXPECT_EQ(val, 42);
     };
 
@@ -23,14 +23,14 @@ TEST(SlimTaskTest, SlimTaskTest)
 
 TEST(SlimTaskTest, SlimTaskTest_run_inline)
 {
-    auto inlineTask1 = []() -> tinycoro::SlimTask<int32_t> {
-        auto inlineTask2 = []() -> tinycoro::SlimTask<int32_t> { co_return 41; };
+    auto slimTask1 = []() -> tinycoro::SlimTask<int32_t> {
+        auto slimTask2 = []() -> tinycoro::SlimTask<int32_t> { co_return 41; };
 
-        auto val = co_await inlineTask2();
+        auto val = co_await slimTask2();
         co_return val += 1;
     };
 
-    auto val = tinycoro::AllOf(inlineTask1());
+    auto val = tinycoro::AllOf(slimTask1());
 
     EXPECT_EQ(val, 42);
 }

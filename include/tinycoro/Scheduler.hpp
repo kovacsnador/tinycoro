@@ -191,7 +191,7 @@ namespace tinycoro {
             //        Must be greater than zero.
             ParallelScheduler(size_t workerThreadCount = local::HardwareConcurrency())
             : enqueuer_t{this}
-            , _dispatcher{_sharedTasks, _stopSource.get_token()}
+            , _dispatcher{_sharedTasks}
             , _stopCallback{_stopSource.get_token(), [this] { _dispatcher.notify_all(); }}
             , _workersGroup{workerThreadCount, _dispatcher, _stopSource.get_token()}
             {
@@ -207,7 +207,7 @@ namespace tinycoro {
             //        Must be greater than zero.
             ParallelScheduler(std::stop_token externalToken, size_t workerThreadCount = local::HardwareConcurrency())
             : enqueuer_t{this}
-            , _dispatcher{_sharedTasks, _stopSource.get_token()}
+            , _dispatcher{_sharedTasks}
             , _stopCallback{externalToken,
                             [this] {
                                 _stopSource.request_stop();
@@ -323,7 +323,7 @@ namespace tinycoro {
             // thread.
             ConcurrentScheduler()
             : task_enqueuer_t{this}
-            , _dispatcher{_queue, {}}   // stop_token with no stop state
+            , _dispatcher{_queue}
             , _worker{_dispatcher}
             {
             }
@@ -346,6 +346,9 @@ namespace tinycoro {
             // and wait for new tasks.
             void Run()
             {
+                if(_running.exchange(true, std::memory_order::relaxed))
+                    throw SchedulerException{"InlineScheduler is already running"};
+
                 for (;;)
                 {
                     auto state = _dispatcher.push_state();
@@ -359,6 +362,8 @@ namespace tinycoro {
 
                     _dispatcher.wait_for_push(state);
                 }
+
+                _running.store(false, std::memory_order::relaxed);
             }
 
         private:
@@ -398,6 +403,7 @@ namespace tinycoro {
                 }
             }
 
+            std::atomic<bool> _running{false};
             std::atomic<int32_t> _workGuardCount{};
 
             using queue_t      = detail::MPSCPtrQueue<typename TaskT::element_type>;
