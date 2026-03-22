@@ -4,6 +4,10 @@ cmake_minimum_required(VERSION 3.10)
 # Project's name
 project(tinycoro_example)
 
+# Always generate compile_commands.json so editors can discover the real
+# compiler flags, include paths, and C++ standard for IntelliSense.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Register tests in the top-level build tree so `ctest` works from `build/`.
 enable_testing()
 
