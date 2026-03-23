@@ -176,8 +176,6 @@ namespace tinycoro {
         template <typename TaskT, size_t CACHE_SIZE>
         class ParallelScheduler : public TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>
         {
-            friend tinycoro::WorkGuard tinycoro::MakeWorkGuard<ParallelScheduler>(ParallelScheduler&) noexcept;
-
             using enqueuer_t = TaskEnqueuer<ParallelScheduler<TaskT, CACHE_SIZE>>;
             friend enqueuer_t;
 
@@ -310,7 +308,7 @@ namespace tinycoro {
         template <typename TaskT>
         class ConcurrentScheduler : public TaskEnqueuer<ConcurrentScheduler<TaskT>>
         {
-            friend tinycoro::WorkGuard tinycoro::MakeWorkGuard<ConcurrentScheduler>(ConcurrentScheduler&) noexcept;
+            friend struct WorkGuard<ConcurrentScheduler>;
 
             using task_enqueuer_t = TaskEnqueuer<ConcurrentScheduler<TaskT>>;
             friend task_enqueuer_t;

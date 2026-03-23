@@ -3,32 +3,37 @@
 
 #include <functional>
 #include <utility>
+#include <atomic>
 
 namespace tinycoro
 {
-    /// A RAII helper used to keep an inline scheduler alive while work is outstanding.
-    ///
-    /// `InlineScheduler` (a.k.a. `detail::ConcurrentScheduler`) uses a work guard
-    /// reference count to determine when it can exit its `Run()` loop. `MakeWorkGuard`
-    /// increments the scheduler's internal counter on creation and decrements it on
-    /// destruction.
-    ///
-    /// This helper is intentionally lightweight and is intended for use with the
-    /// inline scheduler (no support for the threaded `ParallelScheduler`).
+    // A move-only RAII handle that keeps an `InlineScheduler` alive while work is
+    // still expected to arrive.
+    //
+    // `InlineScheduler` is an alias of `detail::ConcurrentScheduler` and uses an
+    // internal reference count to decide when `Run()` may exit. Constructing a
+    // `WorkGuard` calls the scheduler's `_Acquire()`, while destroying the guard
+    // or calling `Unlock()` releases that ownership exactly once via `_Release()`.
+    //
+    // Ownership may be transferred by move construction, move assignment, or
+    // `swap()`. After a guard has been moved from or unlocked, it no longer keeps
+    // the scheduler alive.
+    //
+    // This helper is intended for the inline scheduler only; the threaded
+    // `ParallelScheduler` does not use work guards at the moment.
+    template<typename SchedulerT>
     struct WorkGuard
     {
-        using callback_t = std::function<void()>;
-
         WorkGuard() = default;
         
-        explicit WorkGuard(callback_t cb)
-        : _release{std::move(cb)}
+        explicit WorkGuard(SchedulerT& s)
+        : _scheduler{std::addressof(s)}
         {
+            s._Acquire();
         }
 
         WorkGuard(WorkGuard&& other) noexcept
-        : _flag{other._flag.load(std::memory_order::relaxed)}
-        , _release{std::move(other._release)}
+        : _scheduler{other._scheduler.exchange(nullptr, std::memory_order::relaxed)}
         {
         }
 
@@ -38,16 +43,13 @@ namespace tinycoro
             return *this;
         }
 
+        // Releases the owned scheduler reference, if any.
+        //
+        // \return `true` if this call released ownership, `false` if the guard was
+        //         already empty.
         bool Unlock() noexcept
         {
-            if(_flag.exchange(true, std::memory_order::relaxed) == false)
-            {
-                if(_release)
-                    _release();
-
-                return true;
-            }
-            return false;
+            return _ExchangeUnlock(nullptr);
         }
 
         ~WorkGuard()
@@ -57,27 +59,29 @@ namespace tinycoro
 
         void swap(WorkGuard& other) noexcept
         {
-            std::swap(_release, other._release);
-
-            auto f = other._flag.load(std::memory_order::relaxed);
-            other._flag.store(_flag.exchange(f, std::memory_order::relaxed), std::memory_order::relaxed);
+            if (this == std::addressof(other))
+                return;
+        
+            auto old = other._scheduler.exchange(
+                _scheduler.exchange(nullptr, std::memory_order::relaxed),
+                std::memory_order::relaxed);
+            
+            _ExchangeUnlock(old);
         }
 
     private:
-        std::atomic<bool> _flag{false};
-        callback_t _release{nullptr};
+        bool _ExchangeUnlock(SchedulerT* desired) noexcept
+        {
+            if(auto schedulerPtr = _scheduler.exchange(desired, std::memory_order::relaxed))
+            {
+                schedulerPtr->_Release();
+                return true;
+            }
+            return false;
+        }
+
+        std::atomic<SchedulerT*> _scheduler{nullptr};
     };
-
-    template<typename SchedulerT>
-    static WorkGuard MakeWorkGuard(SchedulerT& scheduler) noexcept
-    {
-        scheduler._Acquire();
-
-        return WorkGuard{[p = std::addressof(scheduler)] { 
-            assert(p);
-            p->_Release();
-        }};
-    }
     
 } // namespace tinycoro
 

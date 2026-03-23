@@ -44,7 +44,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_run_exception)
 
     auto func = [&]
     {
-        auto wg = tinycoro::MakeWorkGuard(scheduler);
+        tinycoro::WorkGuard wg{scheduler};
         auto fut = std::async(std::launch::async, [&]{ 
             auto exit = tinycoro::Finally([&wg] { wg.Unlock(); });
             scheduler.Run();
@@ -162,7 +162,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_keeps_scheduler_alive)
 {
     tinycoro::InlineScheduler scheduler;
 
-    auto workGuard = tinycoro::MakeWorkGuard(scheduler);
+    tinycoro::WorkGuard workGuard{scheduler};
 
     auto runFuture = std::async(std::launch::async, [&scheduler] {
         scheduler.Run();
@@ -182,7 +182,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_with_cross_thread_enque
 {
     tinycoro::InlineScheduler scheduler;
 
-    auto workGuard = tinycoro::MakeWorkGuard(scheduler);
+    tinycoro::WorkGuard workGuard{scheduler};
 
     std::atomic<int32_t> sum{};
 
@@ -215,7 +215,7 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard)
 {
     tinycoro::InlineScheduler scheduler;
 
-    auto workGuard = tinycoro::MakeWorkGuard(scheduler);
+    tinycoro::WorkGuard workGuard{scheduler};
 
     auto fut = std::async(std::launch::async, [wg = std::move(workGuard), &scheduler] () mutable {
         
@@ -249,9 +249,9 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_multi_work_guard)
 {
     tinycoro::InlineScheduler scheduler;
 
-    auto workGuard1 = tinycoro::MakeWorkGuard(scheduler);
-    auto workGuard2 = tinycoro::MakeWorkGuard(scheduler);
-    auto workGuard3 = tinycoro::MakeWorkGuard(scheduler);
+    tinycoro::WorkGuard workGuard1{scheduler};
+    tinycoro::WorkGuard workGuard2{scheduler};
+    tinycoro::WorkGuard workGuard3{scheduler};
 
     tinycoro::ManualEvent event;
 
