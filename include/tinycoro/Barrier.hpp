@@ -152,7 +152,7 @@ namespace tinycoro {
             std::unique_lock lock{_mtx};
 
             // drop the total count
-            DropTotal();
+            DropTotal(1u);
 
             return _Arrive(lock, 1u);
         }
@@ -207,7 +207,7 @@ namespace tinycoro {
             else if (policy == ARRIVE_AND_DROP)
             {
                 // drop the total count
-                DropTotal();
+                DropTotal(1u);
 
                 ready = _Arrive(lock, 1u);
             }
@@ -229,12 +229,10 @@ namespace tinycoro {
             return _waiters.erase(awaiter);
         }
 
-        void DropTotal() noexcept
+        void DropTotal(size_t count) noexcept
         {
-            if (_total > 1)
-            {
-                --_total;
-            }
+            assert(count > 0);
+            _total -= std::min(_total, count);
         }
 
         std::mutex _mtx;

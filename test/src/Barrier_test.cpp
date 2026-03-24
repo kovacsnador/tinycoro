@@ -655,7 +655,9 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
 {
     auto count = GetParam();
 
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    // This is a functional barrier test, not a scheduler scalability benchmark.
+    // Limiting the worker count keeps runtime predictable across machines.
+    tinycoro::Scheduler scheduler{4};
 
     size_t controlCount{0};
 
@@ -668,14 +670,16 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
 
     tinycoro::Barrier barrier{count, onComplition};
 
-    auto arrivel = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
+    using task_t = tinycoro::Task<void, BarrierFunctionalTest::AllocatorT>;
+
+    auto arrival = [&]() -> task_t {
         for (size_t i = 0; i < count; ++i)
         {
             co_await barrier.ArriveAndWait();
         }
     };
 
-    auto worker = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
+    auto worker = [&]() -> task_t {
         for (size_t i = 0; i < count; ++i)
         {
             controlCount++;
@@ -683,10 +687,10 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
         }
     };
 
-    std::vector<tinycoro::Task<void, BarrierFunctionalTest::AllocatorT>> tasks;
+    std::vector<task_t> tasks;
     for (size_t i = 0; i < count - 1; ++i)
     {
-        tasks.push_back(arrivel());
+        tasks.push_back(arrival());
     }
     tasks.push_back(worker());
 

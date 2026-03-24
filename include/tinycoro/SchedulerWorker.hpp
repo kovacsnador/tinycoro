@@ -66,7 +66,6 @@ namespace tinycoro { namespace detail {
             {
                 // we can try to upload the cached tasks
                 Task_t task = _TryToUploadCachedTasks();
-
                 if (task == nullptr && _dispatcher.try_pop(task) == false)
                 {
                     assert(_cachedTasks.empty());
