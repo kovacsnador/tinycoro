@@ -334,18 +334,35 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 }
 ```
 ### `InlineScheduler`
-The `tinycoro::InlineScheduler` is a type alias for `detail::ConcurrentScheduler<detail::SchedulableTask>`, providing a convenient way to run coroutines inline on the current thread without spawning additional threads. This is useful for cooperative multitasking where you want to execute multiple coroutines sequentially on the same thread.
+`tinycoro::InlineScheduler` runs scheduled coroutines on the current thread.
+Unlike `tinycoro::Scheduler`, it does not create worker threads.
+
+This is useful when you want deterministic single-threaded execution, for
+example in tests, small programs, or places where you want to drive coroutine
+progress manually by calling `Run()`.
 
 ```cpp
+#include <cassert>
 #include <tinycoro/tinycoro_all.h>
 
-// Using InlineScheduler for inline execution
-tinycoro::InlineScheduler inlineScheduler;
+tinycoro::Task<int32_t> Task()
+{
+    co_return 42;
+}
 
-auto task1 = []() -> tinycoro::Task<int> { co_return 42; };
-auto task2 = []() -> tinycoro::Task<std::string> { co_return "hello"; };
+int main()
+{
+    tinycoro::InlineScheduler scheduler;
 
-auto [result1, result2] = co_await tinycoro::AllOfAwait(inlineScheduler, task1(), task2());
+    tinycoro::TaskGroup taskGroup;
+    taskGroup.Spawn(scheduler, Task());
+
+    // Execute queued coroutines on this thread until all work is finished.
+    scheduler.Run();
+
+    auto result = taskGroup.TryNext();
+    assert(result && *result == 42);
+}
 ```
 
 This allows for efficient execution of coroutines without the overhead of thread management.
