@@ -6,22 +6,23 @@
 #include <thread>
 #include <vector>
 #include <atomic>
+#include <latch>
 
 namespace {
     struct FakeScheduler
     {
         void _Acquire() noexcept
         {
-            ++acquireCount;
+            acquireCount.fetch_add(1, std::memory_order::relaxed);
         }
 
         void _Release() noexcept
         {
-            ++releaseCount;
+            releaseCount.fetch_add(1, std::memory_order::relaxed);
         }
 
-        int acquireCount{};
-        int releaseCount{};
+        std::atomic<int> acquireCount{};
+        std::atomic<int> releaseCount{};
     };
 } // namespace
 
@@ -63,6 +64,29 @@ TEST(WorkGuardTest, self_swap)
     }
 
     EXPECT_EQ(scheduler.releaseCount, 1);
+}
+
+TEST(WorkGuardTest, multi_swap)
+{
+    FakeScheduler scheduler;
+    {
+        tinycoro::WorkGuard guard1{scheduler};
+        tinycoro::WorkGuard guard2{scheduler};
+
+        for(size_t i = 0; i < 10000; ++i)
+        {
+            guard1.swap(guard2);
+            guard2.swap(guard1);
+            guard1.swap(guard2);
+            guard2.swap(guard1);
+        }
+
+        EXPECT_EQ(scheduler.acquireCount, 2);
+        EXPECT_EQ(scheduler.releaseCount, 0);
+    }
+
+    EXPECT_EQ(scheduler.releaseCount, 2);
+    EXPECT_EQ(scheduler.acquireCount, 2);
 }
 
 TEST(WorkGuardTest, unlock_calls_release_once)
@@ -190,49 +214,58 @@ TEST(WorkGuardTest, make_work_guard_unlock_releases_once)
 
 TEST(WorkGuardTest, multithreaded_test)
 {
+    constexpr size_t count{100000};
+
     FakeScheduler scheduler1{};
     FakeScheduler scheduler2{};
     FakeScheduler scheduler3{};
 
-    using WorkGuard_t = tinycoro::WorkGuard<FakeScheduler>;
-
-    std::vector<WorkGuard_t> guards1(1000);
-    std::vector<WorkGuard_t> guards2(1000);
-    std::vector<WorkGuard_t> guards3(1000);
-
-    for(size_t i = 0; i < 1000; ++i)
     {
-        guards1[i] = WorkGuard_t{scheduler1};
-        guards2[i] = WorkGuard_t{scheduler2};
-        guards3[i] = WorkGuard_t{scheduler3};
+        using WorkGuard_t = tinycoro::WorkGuard<FakeScheduler>;
+
+        std::vector<WorkGuard_t> guards1(count);
+        std::vector<WorkGuard_t> guards2(count);
+        std::vector<WorkGuard_t> guards3(count);
+
+        std::latch latch{1};
+
+        for(size_t i = 0; i < count; ++i)
+        {
+            guards1[i] = WorkGuard_t{scheduler1};
+            guards2[i] = WorkGuard_t{scheduler2};
+            guards3[i] = WorkGuard_t{scheduler3};
+        }
+
+        std::vector<std::future<void>> futures;
+
+        for(size_t i = 0; i < 10; ++i)
+        {
+            futures.emplace_back(std::async(std::launch::async, [&]{
+
+                latch.wait();
+
+                for(size_t j = 0; j < count; ++j)
+                {
+                    WorkGuard_t temp = std::move(guards1[j]);
+                    guards1[j] = std::move(guards2[j]);
+                    guards2[j] = std::move(guards3[j]);
+                    guards3[j] = std::move(temp);
+                }
+            }));
+        }
+
+        latch.count_down();
+
+        for(auto& it : futures)
+            it.wait();
     }
 
-    std::vector<std::future<void>> futures;
+    EXPECT_EQ(scheduler1.acquireCount, count);
+    EXPECT_EQ(scheduler1.releaseCount, count);
 
-    for(size_t i = 0; i < 10; ++i)
-    {
-        futures.emplace_back(std::async(std::launch::async, [&]{
-            for(size_t j=0; j < 1000; ++j)
-            {
-                guards1[j] = std::move(guards2[j]);
-                guards3[j] = std::move(guards1[j]);
-                guards2[j] = std::move(guards3[j]);
-            }
-        }));
-    }
+    EXPECT_EQ(scheduler2.acquireCount, count);
+    EXPECT_EQ(scheduler2.releaseCount, count);
 
-    futures.clear();
-
-    guards1.clear();
-    guards2.clear();
-    guards3.clear();
-
-    EXPECT_EQ(scheduler1.acquireCount, 1000);
-    EXPECT_EQ(scheduler1.releaseCount, 1000);
-
-    EXPECT_EQ(scheduler2.acquireCount, 1000);
-    EXPECT_EQ(scheduler2.releaseCount, 1000);
-
-    EXPECT_EQ(scheduler3.acquireCount, 1000);
-    EXPECT_EQ(scheduler3.releaseCount, 1000);
+    EXPECT_EQ(scheduler3.acquireCount, count);
+    EXPECT_EQ(scheduler3.releaseCount, count);
 }
