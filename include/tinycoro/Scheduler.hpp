@@ -386,8 +386,10 @@ namespace tinycoro {
                 return succeed;
             }
 
+            // used by WorkGuard
             void _Acquire() noexcept { _workGuardCount.fetch_add(1, std::memory_order::relaxed); }
 
+            // used by WorkGuard
             void _Release() noexcept
             {
                 auto last = _workGuardCount.fetch_sub(1, std::memory_order::relaxed);

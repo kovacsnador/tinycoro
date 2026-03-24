@@ -258,6 +258,10 @@ TEST(WorkGuardTest, multithreaded_test)
 
         for(auto& it : futures)
             it.wait();
+
+        EXPECT_EQ(scheduler1.acquireCount, count);
+        EXPECT_EQ(scheduler2.acquireCount, count);
+        EXPECT_EQ(scheduler3.acquireCount, count);
     }
 
     EXPECT_EQ(scheduler1.acquireCount, count);
