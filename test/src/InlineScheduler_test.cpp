@@ -245,6 +245,51 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard)
     fut.get();
 }
 
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_all_of)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    auto fut = std::async(std::launch::async, [&scheduler] () {
+        scheduler.Run();
+    });
+
+    auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+        co_return v;
+    };
+
+    auto [r1, r2, r3] = tinycoro::AllOf(scheduler, task(1), task(2), task(3));
+
+    EXPECT_EQ(*r1, 1);
+    EXPECT_EQ(*r2, 2);
+    EXPECT_EQ(*r3, 3);
+
+    workGuard.Unlock();
+}
+
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_any_of)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    auto fut = std::async(std::launch::async, [&scheduler] () {
+        scheduler.Run();
+    });
+
+    auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+        co_await tinycoro::CancellableSuspend{};
+        co_return v;
+    };
+
+    auto [r1, r2, r3] = tinycoro::AnyOf(scheduler, task(1), task(2), task(3));
+
+    EXPECT_EQ(*r1, 1);
+    EXPECT_FALSE(r2.has_value());
+    EXPECT_FALSE(r3.has_value());
+
+    workGuard.Unlock();
+}
+
 TEST(InlineSchedulerTest, InlineSchedulerTest_multi_work_guard)
 {
     tinycoro::InlineScheduler scheduler;

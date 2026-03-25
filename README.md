@@ -25,6 +25,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 * [Examples](#examples)
     - [Task](#task)
     - [InlineScheduler](#inlinescheduler)
+    - [WorkGuard](#workguard)
     - [Scheduler](#scheduler)
     - [SyncFunctions](#syncfunctions)
     - [AllOf](#allof)
@@ -334,40 +335,67 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 }
 ```
 ### `InlineScheduler`
-`tinycoro::InlineScheduler` runs scheduled coroutines on the current thread.
-Unlike `tinycoro::Scheduler`, it does not create worker threads.
-
-This is useful when you want deterministic single-threaded execution, for
-example in tests, small programs, or places where you want to drive coroutine
-progress manually by calling `Run()`.
+`tinycoro::InlineScheduler` runs coroutines on the current thread without creating worker threads.
+Useful for deterministic single-threaded execution in tests or when manually driving task progress.
 
 ```cpp
-#include <cassert>
-#include <tinycoro/tinycoro_all.h>
+tinycoro::InlineScheduler scheduler;
+tinycoro::TaskGroup<void> taskGroup;
 
-tinycoro::Task<int32_t> Task()
-{
-    co_return 42;
-}
+taskGroup.Spawn(scheduler, MyTask());
 
-int main()
-{
-    tinycoro::InlineScheduler scheduler;
-
-    tinycoro::TaskGroup taskGroup;
-    taskGroup.Spawn(scheduler, Task());
-
-    // Execute queued coroutines on this thread until all work is finished.
-    scheduler.Run();
-
-    auto result = taskGroup.TryNext();
-    assert(result && *result == 42);
-}
+scheduler.Run();  // Executes all queued tasks and returns
 ```
 
-This allows for efficient execution of coroutines without the overhead of thread management.
+The `Run()` method drains the task queue. With `WorkGuard`, it can be made to wait for tasks from other threads.
+
+### `WorkGuard`
+
+`tinycoro::WorkGuard` is an RAII handle that keeps an `InlineScheduler::Run()` loop alive while waiting for tasks from other threads.
+It uses atomic reference counting: constructing a guard increments a counter, destruction/unlock decrements it.
+`Run()` exits only when the counter reaches 0 and his queue is empty.
+
+#### Basic example
+
+```cpp
+tinycoro::InlineScheduler scheduler;
+
+// create a work guard
+tinycoro::WorkGuard workGuard{scheduler};
+
+scheduler.Run();
+
+std::cout << "You will never reach this line.\n";
+```
+
+#### Common Pattern: Cross-Thread Task Enqueueing
+
+```cpp
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    // Run the scheduler on a separate thread
+    auto fut = std::async(std::launch::async, [&scheduler] () {
+        scheduler.Run();
+    });
+
+    auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+        co_return v;
+    };
+
+    // Important: AllOf/AnyOf must be called from a DIFFERENT thread than where Run() executes.
+    // In this example, Run() is on the async thread, so AllOf runs on the main thread.
+    auto [r1, r2, r3] = tinycoro::AllOf(scheduler, task(1), task(2), task(3));
+
+    assert(*r1 == 1);
+    assert(*r2 == 2);
+    assert(*r3 == 3);
+
+    workGuard.Unlock();
+```
 
 ### `Scheduler`
+
 The `tinycoro::Scheduler` is responsible for managing and executing coroutines across multiple worker threads.
 It owns a thread pool internally and dispatches schedulable coroutine tasks to these workers in a thread-safe manner.
 
