@@ -336,24 +336,27 @@ tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 ```
 ### `InlineScheduler`
 `tinycoro::InlineScheduler` runs coroutines on the current thread without creating worker threads.
-Useful for deterministic single-threaded execution in tests or when manually driving task progress.
+Useful for deterministic single-threaded execution and for compromised hardware.
 
 ```cpp
 tinycoro::InlineScheduler scheduler;
 tinycoro::TaskGroup<void> taskGroup;
 
+// Spawns a task on the provided inline scheduler.
 taskGroup.Spawn(scheduler, MyTask());
 
 scheduler.Run();  // Executes all queued tasks and returns
+...
 ```
 
-The `Run()` method drains the task queue. With `WorkGuard`, it can be made to wait for tasks from other threads.
+The `Run()` method drains the task queue. With `WorkGuard`, it can be made to wait for tasks even if the scheduler queue is empty.
 
 ### `WorkGuard`
 
-`tinycoro::WorkGuard` is an RAII handle that keeps an `InlineScheduler::Run()` loop alive while waiting for tasks from other threads.
+`tinycoro::WorkGuard` is an RAII handle that keeps an `InlineScheduler::Run()` loop alive while waiting for new tasks.
 It uses atomic reference counting: constructing a guard increments a counter, destruction/unlock decrements it.
 `Run()` exits only when the counter reaches 0 and his queue is empty.
+WorkGuard is moveable.
 
 #### Basic example
 
@@ -368,11 +371,52 @@ scheduler.Run();
 std::cout << "You will never reach this line.\n";
 ```
 
-#### Common Pattern: Cross-Thread Task Enqueueing
+#### Common Pattern: Execute tasks concurrently on a single thread.
+
+Here, `co_await AllOfAwait(...)` starts all four tasks on the same scheduler and suspends until every task completes. The three `waiter(...)` tasks pause on `event`, and `notify()` calls `event.Set()`, which resumes them so they can return `1`, `2`, and `3`.
+
+```cpp
+TEST(InlineSchedulerTest, InlineSchedulerTest_co_await)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::TaskGroup<void> group;
+
+    auto task = [&scheduler]() mutable -> tinycoro::Task<void> {
+
+        tinycoro::ManualEvent event;
+        
+        auto waiter = [&](int32_t v) -> tinycoro::Task<int32_t> { 
+            co_await event; // wait for the event
+            co_return v;
+        };
+
+        auto notify = [&]() -> tinycoro::Task<> { 
+            event.Set();    // notify waiters
+            co_return;
+        };
+
+        auto [r1, r2, r3, r4] = co_await AllOfAwait(scheduler, waiter(1), waiter(2), waiter(3), notify());
+
+        assert(*r1 == 1);
+        assert(*r2 == 2);
+        assert(*r3 == 3);
+        assert(r4.has_value());
+    };
+
+    group.Spawn(scheduler, task());
+
+    scheduler.Run();
+}
+```
+#### Deadlock danger with InlineScheduler.
+
+This is only a low-level example of using `tinycoro::AllOf(...)` with `InlineScheduler`. In normal coroutine code, prefer `co_await tinycoro::AllOfAwait(...)` instead. `AllOf(...)` blocks the calling thread until the scheduled tasks finish, so it is safe only when another thread is already running `scheduler.Run()` and draining the queue. If nobody is draining the scheduler, this pattern can deadlock.
 
 ```cpp
     tinycoro::InlineScheduler scheduler;
     tinycoro::WorkGuard workGuard{scheduler};
+
+    ...
 
     // Run the scheduler on a separate thread
     auto fut = std::async(std::launch::async, [&scheduler] () {
@@ -384,6 +428,7 @@ std::cout << "You will never reach this line.\n";
     };
 
     // Important: AllOf/AnyOf must be called from a DIFFERENT thread than where Run() executes.
+    // Run() must be actively draining the task queue on another thread, otherwise AllOf/AnyOf will deadlock.
     // In this example, Run() is on the async thread, so AllOf runs on the main thread.
     auto [r1, r2, r3] = tinycoro::AllOf(scheduler, task(1), task(2), task(3));
 

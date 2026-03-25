@@ -73,14 +73,25 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_co_await)
 
     tinycoro::TaskGroup<void> group;
 
-    auto task = [&scheduler]() mutable -> tinycoro::Task<void> { 
-        
-        auto task2 = [](int32_t v) -> tinycoro::Task<int32_t> { co_return v; };
+    auto task = [&scheduler]() mutable -> tinycoro::Task<void> {
 
-        auto [res1, res2, res3] = co_await AllOfAwait(scheduler, task2(1), task2(2), task2(3));
-        EXPECT_EQ(*res1, 1);
-        EXPECT_EQ(*res2, 2);
-        EXPECT_EQ(*res3, 3);
+        tinycoro::ManualEvent event;
+        
+        auto task2 = [&](int32_t v) -> tinycoro::Task<int32_t> { 
+            co_await event;
+            co_return v;
+        };
+
+        auto notify = [&]() -> tinycoro::Task<> { 
+            event.Set();
+            co_return;
+        };
+
+        auto [r1, r2, r3, r4] = co_await AllOfAwait(scheduler, task2(1), task2(2), task2(3), notify());
+        EXPECT_EQ(*r1, 1);
+        EXPECT_EQ(*r2, 2);
+        EXPECT_EQ(*r3, 3);
+        EXPECT_TRUE(r4.has_value());
     };
 
     group.Spawn(scheduler, task());
@@ -267,6 +278,59 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_all_of)
     workGuard.Unlock();
 }
 
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_all_of_await)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    auto fut = std::async(std::launch::async, [&scheduler] () {
+        scheduler.Run();
+    });
+
+    auto waitTask = [&]() -> tinycoro::Task<>
+    {
+        auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+            co_return v;
+        };
+
+        auto [r1, r2, r3] = co_await tinycoro::AllOfAwait(scheduler, task(1), task(2), task(3));
+
+        EXPECT_EQ(*r1, 1);
+        EXPECT_EQ(*r2, 2);
+        EXPECT_EQ(*r3, 3);
+
+        workGuard.Unlock();
+    };
+
+    tinycoro::AllOf(scheduler, waitTask());
+}
+
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_all_of_await_single_threaded)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::TaskGroup<> group;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    auto waitTask = [&]() -> tinycoro::Task<>
+    {
+        auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+            co_return v;
+        };
+
+        auto [r1, r2, r3] = co_await tinycoro::AllOfAwait(scheduler, task(1), task(2), task(3));
+
+        EXPECT_EQ(*r1, 1);
+        EXPECT_EQ(*r2, 2);
+        EXPECT_EQ(*r3, 3);
+
+        workGuard.Unlock();
+    };
+
+    group.Spawn(scheduler, waitTask());
+
+    scheduler.Run();
+}
+
 TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_any_of)
 {
     tinycoro::InlineScheduler scheduler;
@@ -288,6 +352,34 @@ TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_any_of)
     EXPECT_FALSE(r3.has_value());
 
     workGuard.Unlock();
+}
+
+TEST(InlineSchedulerTest, InlineSchedulerTest_work_guard_any_of_await)
+{
+    tinycoro::InlineScheduler scheduler;
+    tinycoro::WorkGuard workGuard{scheduler};
+
+    auto fut = std::async(std::launch::async, [&scheduler] () {
+        scheduler.Run();
+    });
+
+    auto waitTask = [&]() -> tinycoro::Task<>
+    {
+        auto task = [](int32_t v) -> tinycoro::Task<int32_t> {
+            co_await tinycoro::CancellableSuspend{};
+            co_return v;
+        };
+
+        auto [r1, r2, r3] = co_await tinycoro::AnyOfAwait(scheduler, task(1), task(2), task(3));
+
+        EXPECT_EQ(*r1, 1);
+        EXPECT_FALSE(r2.has_value());
+        EXPECT_FALSE(r3.has_value());
+
+        workGuard.Unlock();
+    };
+
+    tinycoro::AllOf(scheduler, waitTask());
 }
 
 TEST(InlineSchedulerTest, InlineSchedulerTest_multi_work_guard)
