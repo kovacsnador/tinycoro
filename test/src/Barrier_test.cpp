@@ -74,6 +74,26 @@ TEST_P(BarrierTest, BarrierTest_arriveAndDrop)
     EXPECT_TRUE(complete);
 }
 
+TEST_P(BarrierTest, BarrierTest_ArriveDropCount)
+{
+    const auto count = GetParam();
+
+    bool complete{false};
+    auto complition = [&] { complete = true; };
+
+    tinycoro::Barrier barrier{count, complition};
+
+    EXPECT_FALSE(complete);
+    barrier.ArriveAndDrop(count);
+
+    EXPECT_TRUE(complete);
+    complete = false;
+
+    // total count should be 0 here, so no suspend any more
+    EXPECT_TRUE(barrier.Arrive());
+    EXPECT_TRUE(complete);
+}
+
 TEST(BarrierTest, BarrierTest_constructor)
 {
     EXPECT_NO_THROW(tinycoro::Barrier{10});
@@ -714,6 +734,37 @@ TEST(BarrierTest, BarrierTest_completionException)
 
     EXPECT_THROW(tinycoro::AllOf(scheduler, task(), task()), std::runtime_error);
     EXPECT_EQ(fullyCompleted, 1);
+}
+
+TEST(BarrierTest, BarrierTest_drop_all)
+{
+    tinycoro::InlineScheduler scheduler{};
+    tinycoro::TaskGroup<void> group;
+
+    std::atomic<size_t> fullyCompleted{0};
+
+    tinycoro::Barrier barrier{100};
+    tinycoro::Latch ready{3};
+
+    auto listener = [&]() -> tinycoro::Task<void> {
+        ready.CountDown();
+        co_await barrier.Wait();
+        fullyCompleted.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    auto notifier = [&]() -> tinycoro::Task<> {
+        co_await ready.Wait();
+        barrier.ArriveAndDrop(1000);
+    };
+
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, notifier());
+
+    scheduler.Run();
+
+    EXPECT_EQ(fullyCompleted, 3);
 }
 
 TEST_P(BarrierTest, BarrierTest_timeout)

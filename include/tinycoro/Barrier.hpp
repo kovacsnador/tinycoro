@@ -147,14 +147,14 @@ namespace tinycoro {
 
         [[nodiscard]] auto ArriveAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_WAIT); }
 
-        bool ArriveAndDrop()
+        bool ArriveAndDrop(size_t count = 1u)
         {
             std::unique_lock lock{_mtx};
 
             // drop the total count
-            DropTotal(1u);
+            DropTotal(count);
 
-            return _Arrive(lock, 1u);
+            return _Arrive(lock, count);
         }
 
         [[nodiscard]] auto ArriveDropAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_DROP); }
@@ -168,6 +168,8 @@ namespace tinycoro {
 
             auto before = _current;
             _current = detail::local::Decrement(_current, count, _total);
+
+            assert(_current > 0);
 
             if (before <= count)
             {
@@ -232,7 +234,10 @@ namespace tinycoro {
         void DropTotal(size_t count) noexcept
         {
             assert(count > 0);
-            _total -= std::min(_total, count);
+            _total -= std::min(_total - 1, count);
+
+            // total can reach 0.
+            assert(_total > 0);
         }
 
         std::mutex _mtx;
