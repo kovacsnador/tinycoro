@@ -12,6 +12,14 @@ TEST(ParallelSchedulerTest, constructor_throw)
     EXPECT_THROW(tinycoro::Scheduler{0}, tinycoro::SchedulerException);
 }
 
+TEST(ParallelSchedulerTest, enqueue_throw_uninitializedTask)
+{
+    tinycoro::Scheduler scheduler;
+    tinycoro::Task<> uninitializedTask;
+
+    EXPECT_THROW([&] { std::ignore = scheduler.Enqueue(std::move(uninitializedTask)); }(), tinycoro::SchedulerException);
+}
+
 struct SchedulerFunctionalTest : testing::TestWithParam<size_t>
 {
 };
@@ -45,6 +53,35 @@ TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_destroy)
         //
         // This test is intended to be checked with sanitizers
     }
+}
+
+TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_async_push_cancel)
+{
+    const auto count = GetParam();
+
+    std::stop_source    ss;
+    tinycoro::SoftClock clock;
+
+    std::latch latch{1};
+
+    tinycoro::CustomScheduler<2> scheduler{ss.get_token(), 1};
+
+    auto future = std::async(std::launch::async, [&] {
+        bool releaseLatch{true};
+        
+        for (size_t i = 0; i < count; ++i)
+        {
+            std::ignore = scheduler.Enqueue([]() -> tinycoro::Task<> { co_return; }());
+
+            if (std::exchange(releaseLatch, false))
+                latch.count_down();
+        }
+    });
+
+    latch.wait();
+    ss.request_stop();
+
+    // this test is intended to be checked with sanitizers
 }
 
 TEST_P(SchedulerFunctionalTest, SchedulerFunctionalTest_full_queue_cache_task)
