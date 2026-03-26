@@ -39,6 +39,21 @@ namespace {
     using TrackedTask = std::unique_ptr<TrackedNode>;
     using TrackedQueue = tinycoro::detail::MPSCPtrQueue<TrackedNode>;
     using TrackedDispatcher = tinycoro::detail::ConcurrentDispatcher<TrackedQueue, TrackedTask>;
+
+    template<typename T>
+    struct QueueFailed
+    {
+        using value_type = std::add_pointer_t<std::remove_pointer_t<T>>;
+
+        [[nodiscard]] bool try_push(value_type) noexcept { return false; }
+
+        [[nodiscard]] bool try_pop(value_type&) noexcept { return false; }
+        
+        [[nodiscard]] bool empty() const noexcept { return true; }
+
+        [[nodiscard]] constexpr static size_t capacity() noexcept { return std::numeric_limits<size_t>::max(); } 
+    };
+
 } // namespace
 
 TEST(ConcurrentDispatcherTest, try_push_pop_transfers_ownership)
@@ -54,6 +69,17 @@ TEST(ConcurrentDispatcherTest, try_push_pop_transfers_ownership)
     EXPECT_TRUE(dispatcher.try_pop(out));
     ASSERT_NE(out, nullptr);
     EXPECT_EQ(out->value, 42);
+}
+
+TEST(ConcurrentDispatcherTest, try_push_failed)
+{
+    QueueFailed<IntNode> queue;
+    tinycoro::detail::ConcurrentDispatcher<decltype(queue), IntTask> dispatcher{queue};
+
+    IntTask in = std::make_unique<IntNode>(42);
+    EXPECT_FALSE(dispatcher.try_push(std::move(in)));
+    EXPECT_NE(in, nullptr);
+    EXPECT_EQ(in->value, 42);
 }
 
 TEST(ConcurrentDispatcherTest, try_pop_empty_returns_false)
