@@ -6,6 +6,8 @@
 #ifndef TINY_CORO_LATCH_HPP
 #define TINY_CORO_LATCH_HPP
 
+#include <algorithm>
+#include <cassert>
 #include <mutex>
 
 #include "LinkedPtrStack.hpp"
@@ -19,9 +21,8 @@ namespace tinycoro {
         class Latch
         {
         public:
-            friend class AwaiterT<Latch, detail::ResumeSignalEvent>;
-
             using awaiter_type = AwaiterT<Latch, detail::ResumeSignalEvent>;
+            friend awaiter_type;
 
             Latch(size_t count)
             : _count{count}
@@ -32,6 +33,14 @@ namespace tinycoro {
                 }
             }
 
+#ifndef NDEBUG
+            ~Latch()
+            {
+                std::scoped_lock lock{_mtx};
+                assert(_waiters.empty());
+            }
+#endif
+
             // disable move and copy
             Latch(Latch&&) = delete;
 
@@ -39,20 +48,17 @@ namespace tinycoro {
 
             [[nodiscard]] auto Wait() noexcept { return awaiter_type{*this, detail::ResumeSignalEvent{}}; }
 
-            [[nodiscard]] auto ArriveAndWait() noexcept
+            [[nodiscard]] auto ArriveAndWait(size_t count = 1) noexcept
             {
-                CountDown();
+                CountDown(count);
                 return Wait();
             }
 
-            void CountDown() noexcept
+            void CountDown(size_t count = 1) noexcept
             {
                 std::unique_lock lock{_mtx};
 
-                if (_count > 0)
-                {
-                    --_count;
-                }
+                _count -= std::min(count, _count); 
 
                 if (_count == 0)
                 {
@@ -64,12 +70,6 @@ namespace tinycoro {
             }
 
         private:
-            [[nodiscard]] bool IsReady() const noexcept
-            {
-                std::scoped_lock lock{_mtx};
-                return _count == 0;
-            }
-
             [[nodiscard]] bool Add(awaiter_type* waiter) noexcept
             {
                 std::scoped_lock lock{_mtx};
@@ -106,7 +106,7 @@ namespace tinycoro {
             // disabe move and copy
             LatchAwaiter(LatchAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() const noexcept { return _latch.IsReady(); }
+            [[nodiscard]] constexpr bool await_ready() const noexcept { return false; }
 
             [[nodiscard]] constexpr auto await_suspend(auto parentCoro) noexcept
             {

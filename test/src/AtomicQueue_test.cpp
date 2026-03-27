@@ -317,7 +317,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
     tinycoro::Scheduler                      scheduler{8};
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher             dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher             dispatcher{queue};
 
     std::atomic<size_t> totalCount{};
 
@@ -326,7 +326,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
         {
             while (dispatcher.try_push(i) == false)
             {
-                dispatcher.wait_for_push();
+                dispatcher.wait_for_push(dispatcher.push_state());
             }
             totalCount++;
         }
@@ -339,7 +339,7 @@ TEST_P(AtomicQueueFunctionalTest, AtomicQueueFunctionalTest_small_cache_test)
             size_t val;
             if (dispatcher.try_pop(val) == false)
             {
-                dispatcher.wait_for_pop();
+                dispatcher.wait_for_pop(dispatcher.pop_state());
             }
             else
             {

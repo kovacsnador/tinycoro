@@ -41,7 +41,7 @@ namespace test {
 TEST(DispatcherTest, DispatcherTest_try_push_pop)
 {
     tinycoro::detail::AtomicQueue<int32_t, 256> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher                dispatcher{queue};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -64,7 +64,7 @@ TEST(DispatcherTest, DispatcherTest_try_push_pop)
 TEST(DispatcherTest, DispatcherTest_small_cache)
 {
     tinycoro::detail::AtomicQueue<int32_t, 4> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     EXPECT_TRUE(dispatcher.empty());
     EXPECT_FALSE(dispatcher.full());
@@ -72,23 +72,23 @@ TEST(DispatcherTest, DispatcherTest_small_cache)
     int32_t val;
     EXPECT_FALSE(dispatcher.try_pop(val));
 
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
     EXPECT_TRUE(dispatcher.try_push(0));
 
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
     EXPECT_TRUE(dispatcher.try_push(1));
     
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
     EXPECT_TRUE(dispatcher.try_push(2));
 
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
     EXPECT_TRUE(dispatcher.try_push(3));
 
     EXPECT_TRUE(dispatcher.full());
 
     EXPECT_FALSE(dispatcher.try_push(4));
 
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 0);
 
@@ -97,23 +97,23 @@ TEST(DispatcherTest, DispatcherTest_small_cache)
     EXPECT_FALSE(dispatcher.empty());
     EXPECT_TRUE(dispatcher.full());
 
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 1);
 
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 2);
 
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 3);
 
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
     EXPECT_TRUE(dispatcher.try_pop(val));
     EXPECT_EQ(val, 4);
 
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
     EXPECT_TRUE(dispatcher.empty());
 }
 
@@ -128,13 +128,13 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_pop)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 1024, size_t> queue;
-    tinycoro::detail::Dispatcher                dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher                dispatcher{queue};
 
     auto fut = std::async(std::launch::async, [&] {
         for (size_t i = 0; i < count;)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop();
+            dispatcher.wait_for_pop(dispatcher.pop_state());
 
             size_t val;
             if (dispatcher.try_pop(val))
@@ -165,13 +165,13 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     auto asyncFunc = [&] {
         for (size_t i = 0; i < count; i++)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop();
+            dispatcher.wait_for_pop(dispatcher.pop_state());
 
             EXPECT_FALSE(dispatcher.empty());
 
@@ -186,7 +186,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push)
 
     for (size_t i = 0; i < count; i++)
     {
-        dispatcher.wait_for_push();
+        dispatcher.wait_for_push(dispatcher.push_state());
 
         EXPECT_FALSE(dispatcher.full());
 
@@ -202,23 +202,23 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<size_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     // this need to move
-    dispatcher.wait_for_push();
+    dispatcher.wait_for_push(dispatcher.push_state());
 
     // make the queue full
     EXPECT_TRUE(dispatcher.try_push(0));
     EXPECT_TRUE(dispatcher.try_push(1));
 
     // this need to move
-    dispatcher.wait_for_pop();
+    dispatcher.wait_for_pop(dispatcher.pop_state());
 
     auto asyncFunc = [&] {
         for (size_t i = 0; i < count; i++)
         {
             // wait until we can pop
-            dispatcher.wait_for_pop();
+            dispatcher.wait_for_pop(dispatcher.pop_state());
 
             EXPECT_FALSE(dispatcher.empty());
 
@@ -234,7 +234,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_full_queue)
 
     for (size_t i = 2; i < count; i++)
     {
-        dispatcher.wait_for_push();
+        dispatcher.wait_for_push(dispatcher.push_state());
 
         EXPECT_FALSE(dispatcher.full());
 
@@ -249,14 +249,14 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
     const auto count = GetParam();
 
     tinycoro::detail::AtomicQueue<int32_t, 2> queue;
-    tinycoro::detail::Dispatcher              dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher              dispatcher{queue};
 
     {
         auto consumer = [&] {
             for (size_t i = 0; i < count;)
             {
                 // wait until we can pop
-                dispatcher.wait_for_pop();
+                dispatcher.wait_for_pop(dispatcher.pop_state());
 
                 int32_t val;
                 auto    succeed = dispatcher.try_pop(val);
@@ -275,7 +275,7 @@ TEST_P(DispatcherTest, DispatcherTest_wait_for_push_mpmc)
         auto producer = [&] {
             for (size_t i = 0; i < count;)
             {
-                dispatcher.wait_for_push();
+                dispatcher.wait_for_push(dispatcher.push_state());
 
                 if (dispatcher.try_push(42))
                 {

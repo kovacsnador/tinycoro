@@ -100,9 +100,9 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc)
     bad_alloc(mock, std::move(task));
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_inlineTask)
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_bad_alloc_slimTask)
 {
-    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapterNoExcept> {
+    auto task = [](int32_t i) -> tinycoro::SlimTask<int32_t, AllocatorAdapterNoExcept> {
         i++;
         co_return i;
     };
@@ -150,7 +150,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi)
 
 TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_inline)
 {
-    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapterNoExcept> {
+    auto task = [](int32_t i) -> tinycoro::SlimTask<int32_t, AllocatorAdapterNoExcept> {
         i++;
         co_return i;
     };
@@ -195,7 +195,7 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_second_bad_alloc_multi_sync_aw
 
     auto task = []() -> tinycoro::Task<int32_t, AllocatorAdapterNoExcept> { co_return 42; };
 
-    auto wrapperTask = [&]() -> tinycoro::InlineTask<void, AllocatorAdapterNoExcept> {
+    auto wrapperTask = [&]() -> tinycoro::SlimTask<void, AllocatorAdapterNoExcept> {
         std::ignore = co_await tinycoro::AllOfAwait(scheduler, task(), task(), task());
     };
 
@@ -250,9 +250,9 @@ TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new)
     throw_in_operator_new(mock, task);
 }
 
-TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_InlineTask)
+TEST_F(AllocatorAdapterTest, AllocatorAdapterTest_throw_in_operator_new_slimTask)
 {
-    auto task = [](int32_t i) -> tinycoro::InlineTask<int32_t, AllocatorAdapter> {
+    auto task = [](int32_t i) -> tinycoro::SlimTask<int32_t, AllocatorAdapter> {
         i++;
         co_return i;
     };

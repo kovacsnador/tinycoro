@@ -390,7 +390,7 @@ namespace tinycoro {
                     return true;
                 }
 
-                // check if there place int the queue
+                // check if there is place in the queue
                 if (_valueCollection.size() < _maxQueueSize)
                 {
                     auto [valueRef, lastElement] = waiter->Value();

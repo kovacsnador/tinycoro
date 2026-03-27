@@ -74,6 +74,26 @@ TEST_P(BarrierTest, BarrierTest_arriveAndDrop)
     EXPECT_TRUE(complete);
 }
 
+TEST_P(BarrierTest, BarrierTest_ArriveDropCount)
+{
+    const auto count = GetParam();
+
+    bool complete{false};
+    auto complition = [&] { complete = true; };
+
+    tinycoro::Barrier barrier{count, complition};
+
+    EXPECT_FALSE(complete);
+    barrier.ArriveAndDrop(count);
+
+    EXPECT_TRUE(complete);
+    complete = false;
+
+    // total count should be 0 here, so no suspend any more
+    EXPECT_TRUE(barrier.Arrive());
+    EXPECT_TRUE(complete);
+}
+
 TEST(BarrierTest, BarrierTest_constructor)
 {
     EXPECT_NO_THROW(tinycoro::Barrier{10});
@@ -102,7 +122,7 @@ INSTANTIATE_TEST_SUITE_P(DecrementTest,
 TEST_P(DecrementTest, BarrierTest_Decrement)
 {
     auto [val, reset, expected] = GetParam();
-    EXPECT_EQ(tinycoro::detail::local::Decrement(val, reset), expected);
+    EXPECT_EQ(tinycoro::detail::local::Decrement(val, 1, reset), expected);
 }
 
 template <typename BarrierT, typename EventT>
@@ -655,7 +675,9 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
 {
     auto count = GetParam();
 
-    tinycoro::Scheduler scheduler{std::thread::hardware_concurrency()};
+    // This is a functional barrier test, not a scheduler scalability benchmark.
+    // Limiting the worker count keeps runtime predictable across machines.
+    tinycoro::Scheduler scheduler{4};
 
     size_t controlCount{0};
 
@@ -668,14 +690,16 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
 
     tinycoro::Barrier barrier{count, onComplition};
 
-    auto arrivel = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
+    using task_t = tinycoro::Task<void, BarrierFunctionalTest::AllocatorT>;
+
+    auto arrival = [&]() -> task_t {
         for (size_t i = 0; i < count; ++i)
         {
             co_await barrier.ArriveAndWait();
         }
     };
 
-    auto worker = [&]() -> tinycoro::Task<void, BarrierFunctionalTest::AllocatorT> {
+    auto worker = [&]() -> task_t {
         for (size_t i = 0; i < count; ++i)
         {
             controlCount++;
@@ -683,10 +707,10 @@ TEST_P(BarrierFunctionalTest, BarrierTest_functionalTest_4)
         }
     };
 
-    std::vector<tinycoro::Task<void, BarrierFunctionalTest::AllocatorT>> tasks;
+    std::vector<task_t> tasks;
     for (size_t i = 0; i < count - 1; ++i)
     {
-        tasks.push_back(arrivel());
+        tasks.push_back(arrival());
     }
     tasks.push_back(worker());
 
@@ -712,6 +736,37 @@ TEST(BarrierTest, BarrierTest_completionException)
     EXPECT_EQ(fullyCompleted, 1);
 }
 
+TEST(BarrierTest, BarrierTest_drop_all)
+{
+    tinycoro::InlineScheduler scheduler{};
+    tinycoro::TaskGroup<void> group;
+
+    std::atomic<size_t> fullyCompleted{0};
+
+    tinycoro::Barrier barrier{100};
+    tinycoro::Latch ready{3};
+
+    auto listener = [&]() -> tinycoro::Task<void> {
+        ready.CountDown();
+        co_await barrier.Wait();
+        fullyCompleted.fetch_add(1, std::memory_order::relaxed);
+    };
+
+    auto notifier = [&]() -> tinycoro::Task<> {
+        co_await ready.Wait();
+        barrier.ArriveAndDrop(1000);
+    };
+
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, listener());
+    group.Spawn(scheduler, notifier());
+
+    scheduler.Run();
+
+    EXPECT_EQ(fullyCompleted, 3);
+}
+
 TEST_P(BarrierTest, BarrierTest_timeout)
 {
     tinycoro::Scheduler scheduler;
@@ -734,6 +789,47 @@ TEST_P(BarrierTest, BarrierTest_timeout)
     {
         tasks.emplace_back(consumer());
     }
+
+    tinycoro::AllOf(scheduler, std::move(tasks));
+
+    EXPECT_EQ(cc, 0);
+}
+
+TEST_P(BarrierTest, BarrierTest_Arrive_all_once)
+{
+    tinycoro::Scheduler scheduler;
+
+    auto count = GetParam();
+
+    tinycoro::Barrier barrier{count};
+    tinycoro::ManualEvent event;
+
+    std::atomic<decltype(count)> cc = count;
+
+    auto producer = [&]()->tinycoro::Task<> {
+        while(event.IsSet() == false)
+        {
+            barrier.Arrive(count * 2);  // over arrive
+        }
+        co_return;
+    };
+
+    auto consumer = [&]()->tinycoro::Task<> {
+        co_await barrier;
+        if(--cc == 0)
+        {
+            event.Set();
+        }
+    };
+
+    std::vector<tinycoro::Task<>> tasks;
+    tasks.reserve(count);
+    for([[maybe_unused]] auto _ : std::ranges::views::iota(0u, count))
+    {
+        tasks.emplace_back(consumer());
+    }
+
+    tasks.emplace_back(producer());
 
     tinycoro::AllOf(scheduler, std::move(tasks));
 

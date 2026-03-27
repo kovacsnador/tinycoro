@@ -24,11 +24,11 @@ namespace tinycoro {
         namespace local {
 
             template <concepts::Integral T>
-            constexpr T Decrement(T value, T reset)
+            constexpr T Decrement(T value, T count, T reset)
             {
-                if (value > 0)
+                if(value > count)
                 {
-                    return --value ? value : reset;
+                    return value - count;
                 }
                 return reset;
             }
@@ -139,36 +139,39 @@ namespace tinycoro {
 
         [[nodiscard]] auto Wait() { return MakeAwaiter(detail::EBarrierAwaiterState::WAIT); }
 
-        bool Arrive()
+        bool Arrive(size_t count = 1u)
         {
             std::unique_lock lock{_mtx};
-            return _Arrive(lock);
+            return _Arrive(lock, count);
         }
 
         [[nodiscard]] auto ArriveAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_WAIT); }
 
-        bool ArriveAndDrop()
+        bool ArriveAndDrop(size_t count = 1u)
         {
             std::unique_lock lock{_mtx};
 
             // drop the total count
-            DecrementTotal();
+            DropTotal(count);
 
-            return _Arrive(lock);
+            return _Arrive(lock, count);
         }
 
         [[nodiscard]] auto ArriveDropAndWait() { return MakeAwaiter(detail::EBarrierAwaiterState::ARRIVE_AND_DROP); }
 
     private:
         template <typename MutexT>
-        [[nodiscard]] bool _Arrive(std::unique_lock<MutexT>& lock)
+        [[nodiscard]] bool _Arrive(std::unique_lock<MutexT>& lock, const size_t count)
         {
             assert(lock.owns_lock());
+            assert(count > 0);
 
             auto before = _current;
-            _current    = detail::local::Decrement(_current, _total);
+            _current = detail::local::Decrement(_current, count, _total);
 
-            if (before == 1)
+            assert(_current > 0);
+
+            if (before <= count)
             {
                 auto waiters = _waiters.steal();
 
@@ -201,14 +204,14 @@ namespace tinycoro {
 
             if (policy == ARRIVE_AND_WAIT)
             {
-                ready = _Arrive(lock);
+                ready = _Arrive(lock, 1u);
             }
             else if (policy == ARRIVE_AND_DROP)
             {
                 // drop the total count
-                DecrementTotal();
+                DropTotal(1u);
 
-                ready = _Arrive(lock);
+                ready = _Arrive(lock, 1u);
             }
 
             if (ready == false)
@@ -228,12 +231,13 @@ namespace tinycoro {
             return _waiters.erase(awaiter);
         }
 
-        void DecrementTotal() noexcept
+        void DropTotal(size_t count) noexcept
         {
-            if (_total > 1)
-            {
-                --_total;
-            }
+            assert(count > 0);
+            _total -= std::min(_total - 1, count);
+
+            // total can reach 0.
+            assert(_total > 0);
         }
 
         std::mutex _mtx;

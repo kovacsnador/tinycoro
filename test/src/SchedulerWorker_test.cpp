@@ -12,7 +12,7 @@ TEST(RequestStopForQueueTest, RequestStopForQueue_fullQueue)
 
     tinycoro::detail::AtomicQueue<int32_t*, 2> queue;
 
-    tinycoro::detail::Dispatcher dispatcher{queue, {}};
+    tinycoro::detail::Dispatcher dispatcher{queue};
 
     EXPECT_TRUE(dispatcher.try_push(&val));
     EXPECT_TRUE(dispatcher.try_push(&val));
@@ -73,12 +73,13 @@ TEST(SchedulerWorkerTest, SchedulerWorkerTest_task_execution)
     EXPECT_CALL(task->mock, SetResumeCallback);
 
     tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-    tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
+    tinycoro::detail::Dispatcher                                     dispatcher{queue};
 
-    tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+    tinycoro::detail::SchedulerWorker worker{dispatcher};
 
     auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
+    dispatcher.increase_task_counter(1);
     EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
     latch.wait();
@@ -116,12 +117,13 @@ TEST_P(SchedulerWorkerTest, SchedulerWorkerTest_task_suspend)
         EXPECT_CALL(task->mock, SetResumeCallback).Times(2);
 
         tinycoro::detail::AtomicQueue<std::unique_ptr<Schedubable>, 128> queue;
-        tinycoro::detail::Dispatcher                                     dispatcher{queue, ss.get_token()};
+        tinycoro::detail::Dispatcher                                     dispatcher{queue};
 
-        tinycoro::detail::SchedulerWorker worker{dispatcher, ss.get_token()};
+        tinycoro::detail::SchedulerWorker worker{dispatcher};
 
         auto fut = std::async(std::launch::async, [&]{ worker.Run(ss.get_token()); });
 
+        dispatcher.increase_task_counter(1);
         EXPECT_TRUE(dispatcher.try_push(std::move(task)));
 
         latch.wait();

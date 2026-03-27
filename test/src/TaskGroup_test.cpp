@@ -1003,7 +1003,7 @@ TEST_P(TaskGroupStressTest, TaskGroupStressTest_scheduler_destroy)
             if (count == i / 2)
             {
                 // request stop at the middle somewhere
-                scheduler->GetStopSource().request_stop();
+                scheduler->StopSource().request_stop();
                 open = false;
             }
         }

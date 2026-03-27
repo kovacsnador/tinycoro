@@ -252,7 +252,7 @@ namespace tinycoro {
                 Close();
 
                 // After Join(), no tasks are running and no further Finish-callbacks can occur.
-                auto joinAll = [this]() -> InlineTask<> { co_await Join(); };
+                auto joinAll = [this]() -> SlimTask<> { co_await Join(); };
                 tinycoro::AllOf(joinAll());
 
                 std::unique_lock lock{_mtx};
@@ -604,7 +604,7 @@ namespace tinycoro {
     template <typename T>
     void Join(TaskGroup<T>& taskGroup) noexcept
     {
-        auto joinBlocking = [&taskGroup]() -> tinycoro::InlineTask<> { co_await taskGroup.Join(); };
+        auto joinBlocking = [&taskGroup]() -> tinycoro::SlimTask<> { co_await taskGroup.Join(); };
         tinycoro::AllOf(joinBlocking());
     }
 

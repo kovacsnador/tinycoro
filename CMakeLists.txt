@@ -4,6 +4,10 @@ cmake_minimum_required(VERSION 3.10)
 # Project's name
 project(tinycoro_example)
 
+# Always generate compile_commands.json so editors can discover the real
+# compiler flags, include paths, and C++ standard for IntelliSense.
+set(CMAKE_EXPORT_COMPILE_COMMANDS ON)
+
 # Register tests in the top-level build tree so `ctest` works from `build/`.
 enable_testing()
 
@@ -36,7 +40,16 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   # using GCC
   set(CMAKE_CXX_FLAGS                     "${CMAKE_CXX_FLAGS} -Wall -Wextra -Wpedantic -Wno-interference-size") # disable warning for std::hardware_destructive_interference_size
   set(CMAKE_CXX_FLAGS_DEBUG               "${CMAKE_CXX_FLAGS} -O0 -g")
-  set(CMAKE_CXX_FLAGS_RELEASE             "${CMAKE_CXX_FLAGS} -O3")
+  
+  # GCC 11.x has linker issues with O3, use O0 for release builds.
+  # GitHub Actions typically reports versions like 11.4.0, so match the
+  # whole GCC 11 series instead of only the exact string "11".
+  if (CMAKE_CXX_COMPILER_VERSION VERSION_GREATER_EQUAL "11"
+      AND CMAKE_CXX_COMPILER_VERSION VERSION_LESS "12")
+    set(CMAKE_CXX_FLAGS_RELEASE           "${CMAKE_CXX_FLAGS} -O0")
+  else()
+    set(CMAKE_CXX_FLAGS_RELEASE           "${CMAKE_CXX_FLAGS} -O3")
+  endif()
 endif()
 
 if (WithASAN)
