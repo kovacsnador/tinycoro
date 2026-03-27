@@ -376,37 +376,37 @@ std::cout << "You will never reach this line.\n";
 Here, `co_await AllOfAwait(...)` starts all four tasks on the same scheduler and suspends until every task completes. The three `waiter(...)` tasks pause on `event`, and `notify()` calls `event.Set()`, which resumes them so they can return `1`, `2`, and `3`.
 
 ```cpp
-TEST(InlineSchedulerTest, InlineSchedulerTest_co_await)
-{
-    tinycoro::InlineScheduler scheduler;
-    tinycoro::TaskGroup<void> group;
+tinycoro::InlineScheduler scheduler;
+tinycoro::TaskGroup<void> group;
 
-    auto task = [&scheduler]() mutable -> tinycoro::Task<void> {
-
-        tinycoro::ManualEvent event;
-        
-        auto waiter = [&](int32_t v) -> tinycoro::Task<int32_t> { 
-            co_await event; // wait for the event
-            co_return v;
-        };
-
-        auto notify = [&]() -> tinycoro::Task<> { 
-            event.Set();    // notify waiters
-            co_return;
-        };
-
-        auto [r1, r2, r3, r4] = co_await AllOfAwait(scheduler, waiter(1), waiter(2), waiter(3), notify());
-
-        assert(*r1 == 1);
-        assert(*r2 == 2);
-        assert(*r3 == 3);
-        assert(r4.has_value());
+auto task = [&scheduler]() -> tinycoro::Task<void> {
+    tinycoro::ManualEvent event;
+    
+    // waiting for the event to fire
+    auto waiter = [&](int32_t v) -> tinycoro::Task<int32_t> { 
+        co_await event; // wait here
+        co_return v;
     };
 
-    group.Spawn(scheduler, task());
+    // wake up waiters
+    auto notify = [&]() -> tinycoro::Task<> { 
+        event.Set();    // notify here
+        co_return;
+    };
 
-    scheduler.Run();
-}
+    auto [r1, r2, r3, r4] = co_await AllOfAwait(scheduler, waiter(1), waiter(2), waiter(3), notify());
+    
+    assert(*r1 == 1);
+    assert(*r2 == 2);
+    assert(*r3 == 3);
+    assert(r4.has_value());
+};
+
+// spawn a task in the provided inline scheduler
+group.Spawn(scheduler, task());
+
+// Run the scheduler
+scheduler.Run();
 ```
 #### Deadlock danger with InlineScheduler.
 
