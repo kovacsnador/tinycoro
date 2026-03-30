@@ -23,6 +23,7 @@
 #include "LinkedPtrQueue.hpp"
 #include "LinkedPtrList.hpp"
 #include "AwaiterHelper.hpp"
+#include "WorkGuard.hpp"
 
 namespace tinycoro {
     namespace detail {
@@ -185,8 +186,7 @@ namespace tinycoro {
                 return suspend;
             }
 
-            // only the first join awaiter gets the results
-            constexpr void await_resume() noexcept { _taskGroup._Resume(this); }
+            constexpr void await_resume() const noexcept { }
 
             void Notify() noexcept { _event.Notify(ENotifyPolicy::RESUME); }
 
@@ -210,6 +210,8 @@ namespace tinycoro {
         template <typename ReturnT, template <typename> class FutureStateT>
         class TaskGroup
         {
+            friend struct WorkGuard<TaskGroup>;
+
             using futureTypeGetter_t = detail::FutureTypeGetter<ReturnT, FutureStateT>;
 
             using future_t       = futureTypeGetter_t::future_t;
@@ -249,8 +251,6 @@ namespace tinycoro {
             // tasks to finish and suppresses exceptions.
             ~TaskGroup()
             {
-                Close();
-
                 // After Join(), no tasks are running and no further Finish-callbacks can occur.
                 auto joinAll = [this]() -> SlimTask<> { co_await Join(); };
                 tinycoro::AllOf(joinAll());
@@ -433,6 +433,40 @@ namespace tinycoro {
             [[nodiscard]] auto StopSource() noexcept { return _stopSource; }
 
         private:
+
+             // used by WorkGuard
+            void _Acquire() noexcept 
+            { 
+                std::scoped_lock lock{_mtx};
+                _workGuardCount++;
+            }
+
+            // used by WorkGuard
+            void _Release() noexcept
+            {
+                std::unique_lock lock{_mtx};
+                auto last = _workGuardCount--;
+
+                assert(last > 0);
+
+                if (last == 1 && _runningTaskblocks.empty())
+                {
+                    // this is the last guard,
+                    // and we don't have any running tasks left
+                    // so we will notify all the awaiters.
+                    auto nextAwaiters = _nextAwaiters.steal();
+                    auto joinAwaiters = _joinAwaiters.steal();
+
+                    if(nextAwaiters)
+                        assert(_awaitReadyBlocks.empty());
+
+                    lock.unlock();
+
+                    _NotifyAll(nextAwaiters);
+                    _NotifyAll(joinAwaiters);
+                }
+            }
+
             template <typename T>
             void _NotifyAll(T* awaiter)
             {
@@ -455,16 +489,23 @@ namespace tinycoro {
                 auto awaiter = isCancelled ? nullptr : _nextAwaiters.pop();
 
                 joinAwaiter_t* joinAwaiters{nullptr};
+                nextAwaiter_t* zombieNextAwaiters{nullptr};
 
                 // check if we are done
-                if (_runningTaskblocks.empty())
+                if (_runningTaskblocks.empty() && _workGuardCount == 0)
                 {
                     // there are no tasks which needs to be waited
-                    // and we are in the close state.
                     //
-                    // So we notify here all the join awaiters.
+                    // So we notify here all the join awaiters
+                    // and the zombie next awaiters.
                     joinAwaiters = _joinAwaiters.steal();
+                    zombieNextAwaiters = _nextAwaiters.steal();
                 }
+                
+                // in case we have some zombie awaiters, (next awaiters without results)
+                // we cant have any _awaitReadyBlock at all.
+                if(zombieNextAwaiters)
+                    assert(_awaitReadyBlocks.empty());
 
                 if (awaiter)
                 {
@@ -490,9 +531,9 @@ namespace tinycoro {
 
                 assert(lock.owns_lock() == false);
 
-                // notify join awaiters, in case we have some
-                // which is waiting.
+                // notify awaiters in case we are done with all the work
                 _NotifyAll(joinAwaiters);
+                _NotifyAll(zombieNextAwaiters);
             }
 
             [[nodiscard]] auto _Suspend(nextAwaiter_t* awaiter) noexcept
@@ -510,8 +551,13 @@ namespace tinycoro {
                     return false;
                 }
 
-                _nextAwaiters.push(awaiter);
-                return true;
+                if(_runningTaskblocks.empty() == false || _workGuardCount > 0)
+                {
+                    _nextAwaiters.push(awaiter);
+                    return true;
+                }
+
+                return false;
             }
 
             [[nodiscard]] bool _Cancel(nextAwaiter_t* awaiter) noexcept
@@ -524,7 +570,7 @@ namespace tinycoro {
             {
                 std::scoped_lock lock{_mtx};
 
-                if (_runningTaskblocks.empty())
+                if (_runningTaskblocks.empty() && _workGuardCount == 0)
                 {
                     // if we have no running futures
                     // No suspend necessary.
@@ -533,29 +579,6 @@ namespace tinycoro {
 
                 _joinAwaiters.push(awaiter);
                 return true;
-            }
-
-            void _Resume([[maybe_unused]] const joinAwaiter_t* awaiter) noexcept
-            {
-                std::unique_lock lock{_mtx};
-
-                if (_closed)
-                {
-                    assert(_runningTaskblocks.empty());
-                    assert(_joinAwaiters.empty());
-                }
-
-                // Woke up zombie NextAwaiters
-                //
-                // Those next awaiter will never get tasks assigned
-                // because the group is closed.
-                if (_awaitReadyBlocks.empty() && _nextAwaiters.size())
-                {
-                    auto awaiters = _nextAwaiters.steal();
-                    lock.unlock();
-
-                    _NotifyAll(awaiters);
-                }
             }
 
             [[nodiscard]] bool _Cancel(joinAwaiter_t* awaiter) noexcept
@@ -573,6 +596,9 @@ namespace tinycoro {
 
             std::stop_source _stopSource{};
             stopCallback_t   _stopCallback;
+
+            // Counter for the WorkGuards
+            size_t _workGuardCount{0};
 
             // Queue storing currently running task blocks (not yet ready).
             //
