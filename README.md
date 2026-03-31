@@ -1086,11 +1086,11 @@ The following operations are thread-safe:
 | `Spawn()`     | Adds and schedules a task |
 | `Next()`      | Awaits the next completed task result |
 | `TryNext()`   | Retrieves the next result without suspension |
-| `Wait()`      | Waits for all tasks |
-| `Join()`      | Closes the group and waits for all tasks |
+| `Wait()`      | Waits for all work |
+| `Join()`      | Closes the group and waits for all work |
 | `Close()`     | Closes the group which prevents new tasks from being spawned |
 | `CancelAll()` | Requests cancellation of all tasks |
-| Destructor  | Implicitly waits for all tasks |
+| Destructor  | Implicitly waits for all work |
 
 ---
 

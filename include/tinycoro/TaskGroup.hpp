@@ -474,8 +474,6 @@ namespace tinycoro {
                 detail::IterInvoke(awaiter, &T::Notify);
             }
 
-            [[nodiscard]] bool _IsDone() const noexcept { return (_closed && _awaitReadyBlocks.empty() && _runningTaskblocks.empty()); }
-
             void _OnTaskFinish(std::unique_ptr<block_t>& block, bool isCancelled) noexcept
             {
                 std::unique_lock lock{_mtx};
@@ -501,7 +499,7 @@ namespace tinycoro {
                     joinAwaiters = _joinAwaiters.steal();
                     zombieNextAwaiters = _nextAwaiters.steal();
                 }
-                
+
                 // in case we have some zombie awaiters, (next awaiters without results)
                 // we cant have any _awaitReadyBlock at all.
                 if(zombieNextAwaiters)
@@ -540,24 +538,27 @@ namespace tinycoro {
             {
                 std::scoped_lock lock{_mtx};
 
-                if (_IsDone())
-                {
-                    return false;
-                }
-
                 if (auto block = safe::Pop(_awaitReadyBlocks))
                 {
+                    // We have some work ready so assign
+                    // it to the awaiter. 
                     awaiter->Set(std::move(block->future));
                     return false;
                 }
 
-                if(_runningTaskblocks.empty() == false || _workGuardCount > 0)
+                // no await ready blocks
+                assert(_awaitReadyBlocks.empty());
+
+                if(_runningTaskblocks.empty() && _workGuardCount == 0)
                 {
-                    _nextAwaiters.push(awaiter);
-                    return true;
+                    // No running tasks
+                    // no work guard. No suspend
+                    return false;
                 }
 
-                return false;
+                // suspend, we still have work
+                _nextAwaiters.push(awaiter);
+                return true;
             }
 
             [[nodiscard]] bool _Cancel(nextAwaiter_t* awaiter) noexcept
