@@ -355,8 +355,8 @@ The `Run()` method drains the task queue. With `WorkGuard`, it can be made to wa
 
 `tinycoro::WorkGuard` is an RAII handle that keeps an `InlineScheduler::Run()` loop alive while waiting for new tasks.
 It uses atomic reference counting: constructing a guard increments a counter, destruction/unlock decrements it.
-`Run()` exits only when the counter reaches 0 and his queue is empty.
-WorkGuard is moveable.
+`Run()` exits only when the counter reaches `0` and the scheduler queue is empty.
+`WorkGuard` is copyable and moveable. Copies acquire an additional ownership reference, and `Unlock()` releases the current ownership exactly once.
 
 #### Basic example
 
@@ -829,6 +829,8 @@ It gives you fine-grained control over cancellation at any suspension point.
 `TaskGroup<T>` is a structured concurrency primitive for managing multiple coroutines as a single unit.  
 It provides task spawning, result collection, cooperative cancellation, and synchronization with well-defined lifetime semantics.
 
+`TaskGroup` can also be guarded by `tinycoro::WorkGuard`. In that mode, the group may stay "open for future work" even when there are currently no running tasks. This is useful for producer/consumer setups where producers will spawn more work later.
+
 ### Basic Example
 
 ```cpp
@@ -873,7 +875,7 @@ Schedules a task on the given scheduler and transfers task ownership to the unde
     std::optional<T> res = co_await tinycoro::Cancellable{group.Next()};
 ```
 
-Suspends until the next task finishes or the group becomes closed and empty. Cancellable.
+Suspends until the next task finishes or the group becomes done. Cancellable.
 
 Returns `std::optional<T>`:
 
@@ -882,6 +884,12 @@ Returns `std::optional<T>`:
 - Explicitly cancellable.
 
 Multiple concurrent `Next()` awaiters are supported.
+
+Completion rules:
+
+- Without a `WorkGuard`, `Next()` completes with `std::nullopt` once the group is closed and drained.
+- With a `WorkGuard`, `Next()` may remain suspended while the group is temporarily empty but still guarded.
+- Once the last guard is released and no tasks remain, all pending `Next()` awaiters resume with `std::nullopt`.
 
 ⚠️Calling Next() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
 This pattern can easily lead to deadlocks, because the task may end up waiting for results that cannot be produced while it is suspended.
@@ -896,7 +904,7 @@ This pattern can easily lead to deadlocks, because the task may end up waiting f
     std::optional<T> res = group.TryNext();
 ```
 
-TryNext() is Non-blocking variant of Next():
+TryNext() is the non-blocking variant of `Next()`:
 
 - Returns the next available result immediately if present.
 - Returns `std::nullopt` if no completed task is available.
@@ -915,13 +923,19 @@ TryNext() is Non-blocking variant of Next():
     co_await tinycoro::Cancellable{group.Wait()};
 ```
 
-Suspends until all tasks in the group have finished.
+Suspends until the group has no running tasks and no outstanding `WorkGuard`.
 
 Properties:
 
 - Multiple `Wait()` awaiters are allowed.
 - All `Wait()` awaiter observes the completion state directly.
 - Explicitly cancellable.
+
+Notes:
+
+- `Wait()` does not close the group.
+- If the group is guarded, `Wait()` can stay suspended even when there are currently no running tasks, because more tasks may still be spawned.
+- `Wait()` resumes only after the last guard is released and all running tasks are finished.
 
 ⚠️Calling Wait() from within a task that belongs to the same TaskGroup is technically possible, but strongly discouraged.
 This can easily lead to deadlocks, because the task waits for the group to finish while it is still part of the group.
@@ -938,7 +952,7 @@ This can easily lead to deadlocks, because the task waits for the group to finis
     co_await tinycoro::Cancellable{group.Join()};
 ```
 
-Suspends until all tasks in the group have finished.
+Closes the group, then suspends until the group has no running tasks and no outstanding `WorkGuard`.
 
 Properties:
 
@@ -993,6 +1007,39 @@ Blocks the current thread until all tasks completes. Can be invoked from a <b>no
 
 ---
 
+### Keeping A `TaskGroup` Open With `WorkGuard`
+
+When a `TaskGroup` is used as a producer/consumer queue, consumers often call `Next()` or `Wait()` before producers have spawned every task. A `tinycoro::WorkGuard` keeps the group alive during that gap.
+
+```cpp
+tinycoro::TaskGroup<int> group;
+tinycoro::WorkGuard guard{group};
+
+auto producer = [&]() -> tinycoro::Task<> {
+    group.Spawn(scheduler, MakeTask(1));
+    group.Spawn(scheduler, MakeTask(2));
+
+    // no more tasks will be produced
+    guard.Unlock();
+    co_return;
+};
+
+auto consumer = [&]() -> tinycoro::Task<> {
+    while (auto result = co_await group.Next())
+    {
+        std::print("{}\n", *result);
+    }
+};
+```
+
+In this pattern:
+
+- `Next()` does not finish early just because the group is temporarily empty.
+- `Wait()` also keeps waiting while the guard exists.
+- Releasing the last guard tells the group that no more externally-produced work is expected.
+
+---
+
 ### Stop Token Propagation
 
 `TaskGroup` with external `std::stop_source`:
@@ -1039,11 +1086,11 @@ The following operations are thread-safe:
 | `Spawn()`     | Adds and schedules a task |
 | `Next()`      | Awaits the next completed task result |
 | `TryNext()`   | Retrieves the next result without suspension |
-| `Wait()`      | Waits for all tasks |
-| `Join()`      | Closes the group and waits for all tasks |
+| `Wait()`      | Waits for all work |
+| `Join()`      | Closes the group and waits for all work |
 | `Close()`     | Closes the group which prevents new tasks from being spawned |
 | `CancelAll()` | Requests cancellation of all tasks |
-| Destructor  | Implicitly waits for all tasks |
+| Destructor  | Implicitly waits for all work |
 
 ---
 

@@ -7,34 +7,52 @@
 
 namespace tinycoro
 {
-    // A move-only RAII handle that keeps an `InlineScheduler` alive while work is
-    // still expected to arrive.
+    // A small RAII handle that keeps a guarded object alive while work is still
+    // expected to arrive.
     //
-    // `InlineScheduler` is an alias of `detail::ConcurrentScheduler` and uses an
-    // internal reference count to decide when `Run()` may exit. Constructing a
-    // `WorkGuard` calls the scheduler's `_Acquire()`, while destroying the guard
-    // or calling `Unlock()` releases that ownership exactly once via `_Release()`.
+    // The guarded type must provide `_Acquire()` and `_Release()` members.
+    // Constructing a `WorkGuard` acquires one ownership reference by calling
+    // `_Acquire()`. Destroying the guard, or calling `Unlock()`, releases that
+    // ownership exactly once via `_Release()`.
     //
-    // Ownership may be transferred by move construction, move assignment, or
-    // `swap()`. After a guard has been moved from or unlocked, it no longer keeps
-    // the scheduler alive.
+    // `WorkGuard` is copyable and moveable:
+    // - copying acquires an additional ownership reference,
+    // - moving transfers the existing ownership without touching the counter,
+    // - `swap()` exchanges ownership between guards.
     //
-    // This helper is intended for the inline scheduler only; the threaded
-    // `ParallelScheduler` does not use work guards at the moment.
-    template<typename SchedulerT>
+    // After a guard has been moved from or unlocked, it becomes empty and no
+    // longer keeps the guarded object alive.
+    //
+    // Typical guarded objects are `InlineScheduler` and `TaskGroup`.
+    template<typename GuardedT>
     struct WorkGuard
     {
         WorkGuard() = default;
         
-        explicit WorkGuard(SchedulerT& s)
-        : _scheduler{std::addressof(s)}
+        explicit WorkGuard(GuardedT& s)
+        : _guarded{std::addressof(s)}
         {
             s._Acquire();
         }
 
-        WorkGuard(WorkGuard&& other) noexcept
-        : _scheduler{other._scheduler.exchange(nullptr, std::memory_order::relaxed)}
+        WorkGuard(const WorkGuard& other)
         {
+            if(auto guarded = other._guarded.load(std::memory_order::relaxed))
+            {
+                guarded->_Acquire();
+                _guarded.store(guarded, std::memory_order::relaxed);
+            }
+        }
+
+        WorkGuard(WorkGuard&& other) noexcept
+        : _guarded{other._guarded.exchange(nullptr, std::memory_order::relaxed)}
+        {
+        }
+
+        WorkGuard& operator=(const WorkGuard& other)
+        {
+            WorkGuard{other}.swap(*this);
+            return *this;
         }
 
         WorkGuard& operator=(WorkGuard&& other) noexcept
@@ -43,7 +61,7 @@ namespace tinycoro
             return *this;
         }
 
-        // Releases the owned scheduler reference, if any.
+        // Releases the owned reference, if any.
         //
         // \return `true` if this call released ownership, `false` if the guard was
         //         already empty.
@@ -51,6 +69,9 @@ namespace tinycoro
         {
             return _ExchangeUnlock(nullptr);
         }
+
+        // Returns `true` if this guard currently owns a reference.
+        [[nodiscard]] bool Owner() const noexcept { return _guarded.load(std::memory_order::relaxed); }
 
         ~WorkGuard()
         {
@@ -62,17 +83,17 @@ namespace tinycoro
             if (this == std::addressof(other))
                 return;
         
-            auto old = other._scheduler.exchange(
-                _scheduler.exchange(nullptr, std::memory_order::relaxed),
+            auto old = other._guarded.exchange(
+                _guarded.exchange(nullptr, std::memory_order::relaxed),
                 std::memory_order::relaxed);
             
             _ExchangeUnlock(old);
         }
 
     private:
-        bool _ExchangeUnlock(SchedulerT* desired) noexcept
+        bool _ExchangeUnlock(GuardedT* desired) noexcept
         {
-            if(auto schedulerPtr = _scheduler.exchange(desired, std::memory_order::relaxed))
+            if(auto schedulerPtr = _guarded.exchange(desired, std::memory_order::relaxed))
             {
                 schedulerPtr->_Release();
                 return true;
@@ -80,7 +101,7 @@ namespace tinycoro
             return false;
         }
 
-        std::atomic<SchedulerT*> _scheduler{nullptr};
+        std::atomic<GuardedT*> _guarded{nullptr};
     };
     
 } // namespace tinycoro

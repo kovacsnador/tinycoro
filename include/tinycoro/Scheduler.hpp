@@ -349,7 +349,7 @@ namespace tinycoro {
 
                 for (;;)
                 {
-                    auto state = _dispatcher.push_state();
+                    auto state = _dispatcher.pop_state();
 
                     // run the next batch
                     _worker.DrainQueuedTasks();
@@ -358,7 +358,7 @@ namespace tinycoro {
                     if (_workGuardCount.load(std::memory_order::relaxed) == 0)
                         break;
 
-                    _dispatcher.wait_for_push(state);
+                    _dispatcher.wait_for_pop(state);
                 }
 
                 _running.store(false, std::memory_order::relaxed);
