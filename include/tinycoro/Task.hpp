@@ -109,8 +109,11 @@ namespace tinycoro {
 
             template <typename T>
                 requires std::constructible_from<StopSourceT, T>
-            void SetStopSource(T&& arg)
+            void SetStopSource(T&& arg, detail::EStopSourcePolicy policy = EStopSourcePolicy::STOP_SOURCE_USER)
             {
+                if(policy == EStopSourcePolicy::STOP_TOKEN_USER)
+                    _hdl.promise().SharedState()->MarkStopTokenUser();
+                    
                 _hdl.promise().SetStopSource(std::forward<T>(arg));
             }
 

@@ -213,15 +213,7 @@ namespace tinycoro {
 
     } // namespace detail
 
-    template <typename SchedulerT, concepts::Iterable ContainerT>
-    [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, ContainerT&& container)
-    {
-        using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
-        return detail::AsyncAwaiterT<SchedulerT, detail::ResumeSignalEvent, FuturesType, ContainerT>{
-            scheduler, {}, std::forward<ContainerT>(container)};
-    }
-
-    template <typename SchedulerT, concepts::IsCorouitneTask... Args>
+    template <typename SchedulerT, typename... Args>
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AllOfAwait(SchedulerT& scheduler, Args&&... args)
     {
@@ -229,21 +221,13 @@ namespace tinycoro {
         return detail::AsyncAwaiterT<SchedulerT, detail::ResumeSignalEvent, FutureTupleType, Args...>{scheduler, {}, std::forward<Args>(args)...};
     }
 
-    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
-    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, ContainerT&& container)
+    template <typename SchedulerT, concepts::IsStopSource StopSourceT, typename... ArgsT>
+        requires (sizeof...(ArgsT) > 0)
+    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, ArgsT&&... args)
     {
-        using FuturesType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::move(container)));
-        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::ResumeSignalEvent, FuturesType, ContainerT>{
-            scheduler, std::move(stopSource), {}, std::forward<ContainerT>(container)};
-    }
-
-    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... Args>
-        requires (sizeof...(Args) > 0)
-    [[nodiscard]] auto AnyOfAwait(SchedulerT& scheduler, StopSourceT stopSource, Args&&... args)
-    {
-        using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<Args>(args)...));
-        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::ResumeSignalEvent, FutureTupleType, Args...>{
-            scheduler, std::move(stopSource), {}, std::forward<Args>(args)...};
+        using FutureTupleType = decltype(std::declval<SchedulerT>().template Enqueue<tinycoro::unsafe::Promise>(std::forward<ArgsT>(args)...));
+        return detail::AsyncAnyOfAwaiterT<SchedulerT, StopSourceT, detail::ResumeSignalEvent, FutureTupleType, ArgsT...>{
+            scheduler, std::move(stopSource), {}, std::forward<ArgsT>(args)...};
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... Args>

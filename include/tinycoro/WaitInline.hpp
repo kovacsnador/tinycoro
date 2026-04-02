@@ -143,7 +143,7 @@ namespace tinycoro {
             // constructor
             OnPlaceScheduler(StopSourceT stopSource, TupleT tuple)
             : _tasks{std::move(tuple)}
-            , _stopSource{stopSource}
+            , _stopSource{std::move(stopSource)}
             {
             }
 
@@ -207,28 +207,31 @@ namespace tinycoro {
                     // if we had an exception
                     std::rethrow_exception(exception);
                 }
+            }
 
+            [[nodiscard]] auto CollectResults()
+            {
                 auto resultConverter = []<typename T>(T& task) {
                     if constexpr (requires { { task.await_resume() } -> std::same_as<void>; })
-                    {
-                        TaskResult_t<VoidType> result{};
-                        if (task.IsDone())
-                        {
-                            result = VoidType{};
-                        }
-                        return result;
-                    }
-                    else
-                    {
-                        using return_t = typename T::value_type;
-
-                        TaskResult_t<return_t> result{};
-                        if (task.IsDone())
-                        {
-                            result = std::move(task.await_resume());
-                        }
-                        return result;
-                    }
+                      {
+                          TaskResult_t<VoidType> result{};
+                          if (task.IsDone())
+                          {
+                              result = VoidType{};
+                          }
+                          return result;
+                      }
+                      else
+                      {
+                          using return_t = typename T::value_type;
+                        
+                          TaskResult_t<return_t> result{};
+                          if (task.IsDone())
+                          {
+                              result = std::move(task.await_resume());
+                          }
+                          return result;
+                      }
                 };
 
                 // collecting and return all the return values.
@@ -266,41 +269,36 @@ namespace tinycoro {
             TupleT      _tasks;
             StopSourceT _stopSource{std::nostopstate};
         };
+
     } // namespace detail
 
     // runs a simple task/tasks inline on current thread.
     // Ideal if you want to run a task in a non coroutine environment,
     // and you anyway want to wait for the result. (No need for a scheduler)
     template <typename... TaskT>
-        requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
+        requires (sizeof...(TaskT) > 0)
     [[nodiscard]] auto AllOf(TaskT&&... tasks)
     {
         detail::OnPlaceScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
-        return inlineScheduler.Run();
-    }
+        inlineScheduler.Run();
 
-    template <typename... TaskT>
-        requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
-    void AllOf(TaskT&&... tasks)
-    {
-        detail::OnPlaceScheduler inlineScheduler{std::forward_as_tuple(tasks...)};
-        std::ignore = inlineScheduler.Run();
+        if constexpr (!concepts::SameAsValueType<void, TaskT...>)
+        {
+            return inlineScheduler.CollectResults();
+        }
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, typename... TaskT>
-        requires (sizeof...(TaskT) > 0) && (!concepts::SameAsValueType<void, TaskT...>)
+        requires (sizeof...(TaskT) > 0)
     [[nodiscard]] auto AnyOf(StopSourceT stopSource, TaskT&&... tasks)
     {
         detail::OnPlaceScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
-        return inlineScheduler.Run();
-    }
+        inlineScheduler.Run();
 
-    template <concepts::IsStopSource StopSourceT = std::stop_source, typename... TaskT>
-        requires (sizeof...(TaskT) > 0) && concepts::SameAsValueType<void, TaskT...>
-    void AnyOf(StopSourceT stopSource, TaskT&&... tasks)
-    {
-        detail::OnPlaceScheduler inlineScheduler{stopSource, std::forward_as_tuple(tasks...)};
-        std::ignore = inlineScheduler.Run();
+        if constexpr (!concepts::SameAsValueType<void, TaskT...>)
+        {
+            return inlineScheduler.CollectResults();
+        }
     }
 
     template <concepts::IsStopSource StopSourceT = std::stop_source, concepts::IsCorouitneTask... TaskT>
@@ -428,37 +426,25 @@ namespace tinycoro {
     } // namespace detail
 
     template <concepts::Iterable ContainerT>
-        requires (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
     [[nodiscard]] auto AllOf(ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
-        return detail::CollectResults(container);
-    }
-
-    template <concepts::Iterable ContainerT>
-        requires std::same_as<detail::TaskReturnT<ContainerT>, void>
-    void AllOf(ContainerT&& container)
-    {
-        // Runs all the tasks sequentialy
-        detail::WaitInlineImplContainer(container, std::stop_source{std::nostopstate});
+        if constexpr (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
+        {
+            return detail::CollectResults(container);
+        }
     }
 
     template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
-        requires (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
     [[nodiscard]] auto AnyOf(StopSourceT stopSource, ContainerT&& container)
     {
         // Runs all the tasks sequentialy
         detail::WaitInlineImplContainer(container, stopSource);
-        return detail::CollectResults(container);
-    }
-
-    template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
-        requires std::same_as<detail::TaskReturnT<ContainerT>, void>
-    void AnyOf(StopSourceT stopSource, ContainerT&& container)
-    {
-        // Runs all the tasks sequentialy
-        detail::WaitInlineImplContainer(container, stopSource);
+        if constexpr (!std::same_as<detail::TaskReturnT<ContainerT>, void>)
+        {
+            return detail::CollectResults(container);
+        }
     }
 
     template < concepts::IsStopSource StopSourceT = std::stop_source, concepts::Iterable ContainerT>

@@ -324,6 +324,28 @@ namespace tinycoro {
         {
         };
 
+        enum class EStopSourcePolicy
+        {
+            STOP_SOURCE_USER,
+            STOP_TOKEN_USER
+        };
+
+        template<concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... TasksT>
+            requires (sizeof...(TasksT) > 0)
+        void PropagateStopSource(EStopSourcePolicy policy, StopSourceT& stopSource, TasksT&&... tasks)
+        {
+            (tasks.SetStopSource(stopSource, policy), ...);
+        }
+
+        template<concepts::IsStopSource StopSourceT, concepts::Iterable TasksT>
+        void PropagateStopSource(EStopSourcePolicy policy, StopSourceT& stopSource, TasksT&& tasks)
+        {
+            for(auto& it : tasks)
+            {
+                it.SetStopSource(stopSource, policy);
+            }
+        }
+
         namespace helper {
 
             // Only for debug purposes.
