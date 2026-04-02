@@ -127,43 +127,25 @@ namespace tinycoro {
 
     } // namespace detail
 
-    template <concepts::IsCorouitneTask... Args>
+    template <typename... Args>
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AllOfAwait(Args&&... args)
     {
         return detail::AllOfAwaitT{std::forward<Args>(args)...};
     }
 
-    template <concepts::Iterable ContainerT>
-    [[nodiscard]] auto AllOfAwait(ContainerT&& container)
-    {
-        return detail::AllOfAwaitT{std::forward<ContainerT>(container)};
-    }
-
-    template <concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... Args>
+    template <concepts::IsStopSource StopSourceT, typename... Args>
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AnyOfAwait(StopSourceT& stopSource, Args&&... args)
     {
         return detail::AnyOfAwaitT{stopSource, std::forward<Args>(args)...};
     }
 
-    template <concepts::IsStopSource StopSourceT, concepts::Iterable ContainerT>
-    [[nodiscard]] auto AnyOfAwait(StopSourceT& stopSource, ContainerT&& container)
-    {
-        return detail::AnyOfAwaitT{stopSource, std::forward<ContainerT>(container)};
-    }
-
-    template <concepts::IsCorouitneTask... Args>
+    template <typename... Args>
         requires (sizeof...(Args) > 0)
     [[nodiscard]] auto AnyOfAwait(Args&&... args)
     {
         return detail::AnyOfAwaitT{std::stop_source{}, std::forward<Args>(args)...};
-    }
-
-    template <concepts::Iterable ContainerT>
-    [[nodiscard]] auto AnyOfAwait(ContainerT&& container)
-    {
-        return detail::AnyOfAwaitT{std::stop_source{}, std::forward<ContainerT>(container)};
     }
 
 } // namespace tinycoro

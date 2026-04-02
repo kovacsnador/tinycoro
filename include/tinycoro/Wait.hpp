@@ -35,93 +35,67 @@ namespace tinycoro {
     } // namespace concepts
 
     namespace detail {
-        using FutureVoid_t = std::optional<VoidType>;
-    } // namespace detail
+        using FutureVoid_t = FutureReturnT<void>::value_type;//  std::optional<VoidType>;
 
-    template <template <typename> class FutureT, typename... Ts>
-        requires (!concepts::AllSame<detail::FutureVoid_t, Ts...>)
-    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>&...>& futures)
-    {
-        std::exception_ptr exception;
-
-        auto waiter = [&exception]<typename T>(FutureT<T>& f) {
+        template<template <typename> class FutureT, typename T>
+        auto GetOne(FutureT<T>& future, std::exception_ptr& firstException)
+        {
             using opt_t = T;
 
             try
             {
-                return f.get();
+                return future.get();
             }
             catch (...)
             {
-                if (!exception)
+                if (!firstException)
                 {
-                    exception = std::current_exception();
+                    firstException = std::current_exception();
                 }
             }
 
             return opt_t{};
-        };
-
-        auto tupleResultOpt = std::apply([waiter]<typename... TypesT>(TypesT&... args) { return std::tuple{waiter(args)...}; }, futures);
-
-        if (exception)
-        {
-            // rethrows the first exception
-            std::rethrow_exception(exception);
         }
 
-        if constexpr (sizeof...(Ts) == 1)
-        {
-            return std::move(std::get<0>(tupleResultOpt));
-        }
-        else
-        {
-            return tupleResultOpt;
-        }
-    }
+
+    } // namespace detail
 
     template <template <typename> class FutureT, typename... Ts>
-        requires (!concepts::AllSame<detail::FutureVoid_t, Ts...>)
-    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>...>& futures)
-    {
-        auto tuple = std::apply([](auto&... elems) { return std::forward_as_tuple(elems...); }, futures);
-        return GetAll(tuple);
-    }
-
-    template <template <typename> class FutureT, typename... Ts>
-        requires concepts::AllSame<detail::FutureVoid_t, Ts...>
-    void GetAll(std::tuple<FutureT<Ts>&...>& futures)
+        requires concepts::AllFuture<FutureT<Ts>...>
+    [[nodiscard]] auto GetAll(FutureT<Ts>&... futures)
     {
         std::exception_ptr exception;
-
-        auto futureGet = [&exception](auto& fut) {
-            try
-            {
-                std::ignore = fut.get();
-            }
-            catch (...)
-            {
-                if (!exception)
-                {
-                    exception = std::current_exception();
-                }
-            }
-        };
-        std::apply([futureGet](auto&... future) { ((futureGet(future)), ...); }, futures);
+        [[maybe_unused]] std::tuple result{detail::GetOne(futures, exception)...};
 
         if (exception)
         {
             // rethrows the first exception
             std::rethrow_exception(exception);
         }
+
+        if constexpr (!concepts::AllSame<detail::FutureVoid_t, Ts...>)
+        {
+            // in case we need to return something.
+            if constexpr (sizeof...(Ts) == 1)
+            {
+                // we need this std::move here to support
+                // only moveable types
+                return std::move(std::get<0>(result));
+            }
+            else
+            {
+                return result;
+            }
+        }
     }
 
+
     template <template <typename> class FutureT, typename... Ts>
-        requires concepts::AllSame<detail::FutureVoid_t, Ts...>
-    void GetAll(std::tuple<FutureT<Ts>...>& futures)
+        requires concepts::AllFuture<FutureT<Ts>...>
+        //requires (!concepts::AllSame<detail::FutureVoid_t, Ts...>)
+    [[nodiscard]] auto GetAll(std::tuple<FutureT<Ts>...>& futures)
     {
-        auto tuple = std::apply([](auto&... elems) { return std::forward_as_tuple(elems...); }, futures);
-        return GetAll(tuple);
+        return std::apply([]<typename... ArgsT>(ArgsT&&... args) { return GetAll(std::forward<ArgsT>(args)...); }, futures);
     }
 
     template <template <typename> class FutureT, typename ReturnT>
@@ -135,17 +109,7 @@ namespace tinycoro {
 
         for (auto& it : futures)
         {
-            try
-            {
-                results.emplace_back(std::move(it.get()));
-            }
-            catch (...)
-            {
-                if (!exception)
-                {
-                    exception = std::current_exception();
-                }
-            }
+            results.emplace_back(detail::GetOne(it, exception));
         }
 
         if (exception)
@@ -165,17 +129,7 @@ namespace tinycoro {
 
         for (auto& it : futures)
         {
-            try
-            {
-                std::ignore = it.get();
-            }
-            catch (...)
-            {
-                if (!exception)
-                {
-                    exception = std::current_exception();
-                }
-            }
+            std::ignore = detail::GetOne(it, exception);
         }
 
         if (exception)
@@ -183,14 +137,6 @@ namespace tinycoro {
             // rethrows the first exception
             std::rethrow_exception(exception);
         }
-    }
-
-    template <typename... FutureT>
-        requires concepts::AllFuture<FutureT...>
-    [[nodiscard]] auto GetAll(FutureT&&... futures)
-    {
-        auto tuple = std::forward_as_tuple(std::forward<FutureT>(futures)...);
-        return GetAll(tuple);
     }
 
     template <typename SchedulerT, typename... Args>
@@ -201,37 +147,21 @@ namespace tinycoro {
         return GetAll(future);
     }
 
-    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::IsCorouitneTask... CoroTasksT>
+    template <typename SchedulerT, concepts::IsStopSource StopSourceT, typename... CoroTasksT>
         requires (sizeof...(CoroTasksT) > 0)
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroTasksT&&... tasks)
     {
-        (tasks.SetStopSource(source), ...);
+        detail::PropagateStopSource(detail::EStopSourcePolicy::STOP_SOURCE_USER, source, std::forward<CoroTasksT>(tasks)...);
 
         auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroTasksT>(tasks)...);
         return GetAll(futures);
     }
 
-    template <typename SchedulerT, concepts::IsStopSource StopSourceT, concepts::Iterable CoroContainerT>
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, StopSourceT source, CoroContainerT&& tasks)
-    {
-        std::ranges::for_each(tasks, [&source](auto& t) { t.SetStopSource(source); });
-
-        auto futures = scheduler.template Enqueue<tinycoro::unsafe::Promise>(std::forward<CoroContainerT>(tasks));
-        return GetAll(futures);
-    }
-
-    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::IsCorouitneTask... CoroTasksT>
+    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, typename... CoroTasksT>
         requires (sizeof...(CoroTasksT) > 0) && concepts::IsScheduler<SchedulerT, CoroTasksT...>
     [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroTasksT&&... tasks)
     {
         return AnyOf(scheduler, StopSourceT{}, std::forward<CoroTasksT>(tasks)...);
-    }
-
-    template <concepts::IsStopSource StopSourceT = std::stop_source, typename SchedulerT, concepts::Iterable CoroContainerT>
-        requires concepts::IsScheduler<SchedulerT, CoroContainerT>
-    [[nodiscard]] auto AnyOf(SchedulerT& scheduler, CoroContainerT&& tasks)
-    {
-        return AnyOf(scheduler, StopSourceT{}, std::forward<CoroContainerT>(tasks));
     }
 
 } // namespace tinycoro

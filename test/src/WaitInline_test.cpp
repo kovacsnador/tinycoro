@@ -117,7 +117,7 @@ TEST(WaitInlineTest, WaitInlineTest_void)
 
     EXPECT_CALL(*mock.mock, Resume()).Times(1);
     EXPECT_CALL(*mock.mock, IsPaused()).Times(1);
-    EXPECT_CALL(*mock.mock, IsDone()).WillOnce(testing::Return(false)).WillOnce(testing::Return(true));
+    EXPECT_CALL(*mock.mock, IsDone()).WillOnce(testing::Return(false));
     EXPECT_CALL(*mock.mock, ResumeState()).WillOnce(testing::Return(tinycoro::detail::ETaskResumeState::DONE));
 
  

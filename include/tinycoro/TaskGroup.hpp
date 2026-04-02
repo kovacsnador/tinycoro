@@ -297,8 +297,7 @@ namespace tinycoro {
                 // stop token users, but they self cannot trigger
                 // a stop.
                 task.SetCustomData(block.get());
-                task.SharedState()->MarkStopTokenUser();
-                task.SetStopSource(_stopSource);
+                task.SetStopSource(_stopSource, detail::EStopSourcePolicy::STOP_TOKEN_USER);
 
                 futureState_t futureState{};
 
