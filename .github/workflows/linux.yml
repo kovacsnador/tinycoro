@@ -81,8 +81,8 @@ jobs:
 
     - name: Install dependencies
       run: |
-        apt-get update
-        apt-get install -y ninja-build libcurl4-openssl-dev
+        sudo apt-get update
+        sudo apt-get install -y ninja-build libcurl4-openssl-dev
         ${{ matrix.install }}
 
     - name: Create Build Environment
