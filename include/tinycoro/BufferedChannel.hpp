@@ -40,13 +40,13 @@ namespace tinycoro {
                 ValueT value;
             };
 
-            friend class PopAwaiterT<BufferedChannel, detail::ResumeSignalEvent, ValueT>;
-            friend class ListenerAwaiterT<BufferedChannel, detail::ResumeSignalEvent>;
-            friend class PushAwaiterT<BufferedChannel, detail::ResumeSignalEvent, ValueT>;
-
             using pop_awaiter_type      = PopAwaiterT<BufferedChannel, detail::ResumeSignalEvent, ValueT>;
             using listener_awaiter_type = ListenerAwaiterT<BufferedChannel, detail::ResumeSignalEvent>;
             using push_awaiter_type     = PushAwaiterT<BufferedChannel, detail::ResumeSignalEvent, ValueT>;
+
+            friend pop_awaiter_type;
+            friend listener_awaiter_type;
+            friend push_awaiter_type;
 
             using cleanupFunction_t = std::function<void(ValueT&)>;
 
@@ -77,6 +77,8 @@ namespace tinycoro {
             ~BufferedChannel() { Close(); }
 
             [[nodiscard]] auto PopWait(ValueT& val) { return pop_awaiter_type{*this, detail::ResumeSignalEvent{}, val}; }
+
+            bool TryPop(ValueT& val) { return _PopBackElement(val); }
 
             [[nodiscard]] auto WaitForListeners(size_t listenerCount)
             {
@@ -171,6 +173,12 @@ namespace tinycoro {
             {
                 std::scoped_lock lock{_mtx};
                 return !_closed;
+            }
+
+            [[nodiscard]] bool IsClosed() const noexcept
+            {
+                std::scoped_lock lock{_mtx};
+                return _closed;
             }
 
             [[nodiscard]] auto MaxSize() const noexcept
@@ -271,23 +279,6 @@ namespace tinycoro {
                 }
             }
 
-            [[nodiscard]] bool IsReady(pop_awaiter_type* waiter) noexcept
-            {
-                std::unique_lock lock{_mtx};
-
-                auto [ready, lastElement] = _SetValue(waiter);
-
-                // we don't need too hold the lock any more
-                lock.unlock();
-
-                if (lastElement)
-                {
-                    Close();
-                }
-
-                return ready;
-            }
-
             [[nodiscard]] bool Add(pop_awaiter_type* waiter)
             {
                 std::unique_lock lock{_mtx};
@@ -322,19 +313,6 @@ namespace tinycoro {
             bool Cancel(pop_awaiter_type* waiter)
             {
                 return _Cancel(waiter, _popAwaiters);
-            }
-
-            [[nodiscard]] bool IsReady(listener_awaiter_type* waiter) noexcept
-            {
-                std::scoped_lock lock{_mtx};
-
-                if (_closed)
-                {
-                    // no suspend, the channel is closed
-                    return true;
-                }
-
-                return waiter->value() <= _popAwaiters.size();
             }
 
             [[nodiscard]] bool Add(listener_awaiter_type* waiter)
@@ -408,19 +386,6 @@ namespace tinycoro {
                 return false;
             }
 
-            [[nodiscard]] bool IsReady(push_awaiter_type* waiter)
-            {
-                std::unique_lock lock{_mtx};
-
-                if (_closed)
-                {
-                    // no suspend if the channel is closed, we do nothing
-                    return true;
-                }
-
-                return _EmplaceValue(lock, waiter);
-            }
-
             [[nodiscard]] bool Add(push_awaiter_type* waiter)
             {
                 std::unique_lock lock{_mtx};
@@ -446,6 +411,30 @@ namespace tinycoro {
             bool Cancel(push_awaiter_type* waiter)
             {
                 return _Cancel(waiter, _pushAwaiters);
+            }
+
+            auto _PopBackElement(ValueT& val)
+            {
+                std::unique_lock lock{_mtx};
+
+                if (_valueCollection.empty() == false)
+                {
+                    auto& [lastElement, value] = _valueCollection.back();
+                    _valueCollection.pop_back();
+
+                    if (lastElement)
+                    {
+                        // close the channel, last element reached
+                        _closed = true;
+                        lock.unlock();
+
+                        Close();
+                    }
+
+                    val = std::move(value);
+                    return true;
+                }
+                return false;
             }
 
             // auto [ready, lastElement] = std::tuple<bool, bool>
@@ -536,10 +525,7 @@ namespace tinycoro {
             // disable move and copy
             BufferedChannelPopAwaiter(BufferedChannelPopAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept
-            {
-                return _channel.IsReady(this);
-            }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return false; }
 
             [[nodiscard]] constexpr bool await_suspend(auto parentCoro)
             {
@@ -623,7 +609,7 @@ namespace tinycoro {
             // disable move and copy
             BufferedChannelListenerAwaiter(BufferedChannelListenerAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept { return _channel.IsReady(this); }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return false; }
 
             constexpr bool await_suspend(auto parentCoro)
             {
@@ -680,10 +666,7 @@ namespace tinycoro {
             // disable move and copy
             BufferedChannelPushAwaiter(BufferedChannelPushAwaiter&&) = delete;
 
-            [[nodiscard]] constexpr bool await_ready() noexcept
-            {
-                return _channel.IsReady(this);
-            }
+            [[nodiscard]] constexpr bool await_ready() noexcept { return false; }
 
             constexpr bool await_suspend(auto parentCoro)
             {
