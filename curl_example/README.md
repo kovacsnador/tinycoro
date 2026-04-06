@@ -1,6 +1,6 @@
 # Modernizing libcurl with coroutines
 
-This **very basic** example demonstrates how to modernize **libcurl** with **C++ coroutines** using Tinycoro.
+This **very basic** example demonstrates how to modernize **libcurl** with **C++ coroutines** using tinycoro.
 
 ## What this example demonstrates
 
@@ -8,7 +8,7 @@ This **very basic** example demonstrates how to modernize **libcurl** with **C++
 * Suspending coroutines while a transfer is in progress
 * Resuming the waiting coroutine when libcurl reports completion
 * Using `tinycoro::BufferedChannel` as a lightweight work queue
-* Running the libcurl event loop itself as a Tinycoro task
+* Running the libcurl event loop itself as a tinycoro task
 * Coordinating several requests with `tinycoro::AllOfAwait`
 
 ## Architecture
@@ -39,7 +39,7 @@ This pattern is a good blueprint for adapting **other callback- or event-based l
 
 ## Main components
 
-### `Easy`
+### `CurlEasy`
 
 A lightweight wrapper around a single CURL easy handle.
 
@@ -50,11 +50,11 @@ Responsibilities:
 * attach coroutine wake-up state through `CURLOPT_PRIVATE`
 * expose an awaitable request interface
 
-Each `Easy` instance represents **one HTTP request**.
+Each `CurlEasy` instance represents **one HTTP request**.
 
 ### `CurlMulti`
 
-A Tinycoro-friendly wrapper around the CURL multi interface.
+A tinycoro-friendly wrapper around the CURL multi interface.
 
 Responsibilities:
 
@@ -64,7 +64,7 @@ Responsibilities:
 * detect completed transfers
 * wake the suspended request coroutine
 
-`CurlMulti::Run()` is itself a coroutine task, which makes the event loop naturally fit into Tinycoro’s scheduler.
+`CurlMulti::Run()` is itself a coroutine task, which makes the event loop naturally fit into tinycoro’s scheduler concept.
 
 ## Why this example matters
 
@@ -90,9 +90,4 @@ This example can only built when **libcurl** is available.
 CMake automatically checks for:
 
 * `CURL::libcurl`
-
-## Suggested reading order
-
-If you are new to Tinycoro, start with the simpler examples first.
-
-This example is best viewed as an **advanced integration tutorial** that explains how to connect Tinycoro to external event loops and callback-based systems.
+##

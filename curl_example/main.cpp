@@ -6,7 +6,7 @@
 #include "include/CurlEasy.hpp"
 #include "include/CurlMulti.hpp"
 
-// This is out start/root corouitne.
+// This is our main/root corouitne.
 auto main_coroutine() -> tinycoro::Task<>
 {
     CurlMulti multi;
