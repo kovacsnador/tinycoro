@@ -8,9 +8,9 @@
 #include <string>
 #include <cassert>
 
-struct Easy
+struct CurlEasy
 {
-    explicit Easy(std::string_view url)
+    explicit CurlEasy(std::string_view url)
     : _easy(curl_easy_init())
     {
         assert(_easy);
@@ -27,9 +27,10 @@ struct Easy
         curl_easy_setopt(_easy, CURLOPT_CONNECTTIMEOUT_MS, 2000L);
     }
 
-    Easy(Easy&&) = delete;
+    // disallow copy and move
+    CurlEasy(CurlEasy&&) = delete;
 
-    ~Easy() { curl_easy_cleanup(_easy); }
+    ~CurlEasy() { curl_easy_cleanup(_easy); }
 
     auto Fetch(auto& multi) -> tinycoro::Task<const std::string&>
     {
@@ -62,9 +63,8 @@ private:
 auto FetchUrl(std::string_view url, auto& multi) -> tinycoro::Task<std::string>
 {
     // Keep the easy handle alive for the whole request, then return the collected response body.
-    Easy easy{url};
-    std::string result = co_await easy.Fetch(multi);
-    co_return result;
+    CurlEasy easy{url};
+    co_return co_await easy.Fetch(multi);
 }
 
 #endif // TINY_CORO_CURL_EXAMPLE_EASY_HPP

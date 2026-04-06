@@ -14,13 +14,15 @@ struct CurlMulti
         assert(_multi);
     }
 
+    // disallow copy and move
     CurlMulti(CurlMulti&&) = delete;
 
     ~CurlMulti() { curl_multi_cleanup(_multi); }
 
     auto AddEasyHandle(CURL* easy) -> tinycoro::Task<>
     {
-        // Queue new work from request coroutines; Run() will attach it to libcurl on its next iteration.
+        // Queue new work from request coroutines
+        // Run() will attach it to libcurl on its next iteration.
         co_await _channel.PushWait(easy);
         Notify();
     }
@@ -53,7 +55,8 @@ struct CurlMulti
                 break;
             }
 
-            // Give TinyCoro a suspend point so cancellation stays responsive while requests are in flight.
+            // Explicit suspend point.
+            // This makes the corouinte scheduler friendly.
             easy_left ? co_await tinycoro::this_coro::yield() : co_await tinycoro::this_coro::yield_cancellable();
 
             if(easy_left)

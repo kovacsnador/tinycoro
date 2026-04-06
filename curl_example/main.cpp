@@ -3,8 +3,8 @@
 
 #include <iostream>
 
-#include "include/Easy.hpp"
-#include "include/Multi.hpp"
+#include "include/CurlEasy.hpp"
+#include "include/CurlMulti.hpp"
 
 // This is out start/root corouitne.
 auto main_coroutine() -> tinycoro::Task<>
