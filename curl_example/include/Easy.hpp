@@ -20,10 +20,11 @@ struct Easy
         curl_easy_setopt(_easy, CURLOPT_WRITEFUNCTION, write_cb);
         curl_easy_setopt(_easy, CURLOPT_WRITEDATA, std::addressof(_body));
         curl_easy_setopt(_easy, CURLOPT_FOLLOWLOCATION, 1L);
-        curl_easy_setopt(_easy, CURLOPT_NOSIGNAL, 1L);
+        curl_easy_setopt(_easy, CURLOPT_NOSIGNAL, 0L);
         // Keep a pointer to our completion event so the multi loop can wake this coroutine up.
         curl_easy_setopt(_easy, CURLOPT_PRIVATE, std::addressof(_event));
         curl_easy_setopt(_easy, CURLOPT_TIMEOUT_MS, 3000L);
+        curl_easy_setopt(_easy, CURLOPT_CONNECTTIMEOUT_MS, 2000L);
     }
 
     Easy(Easy&&) = delete;
@@ -62,7 +63,8 @@ auto FetchUrl(std::string_view url, auto& multi) -> tinycoro::Task<std::string>
 {
     // Keep the easy handle alive for the whole request, then return the collected response body.
     Easy easy{url};
-    co_return co_await easy.Fetch(multi);
+    std::string result = co_await easy.Fetch(multi);
+    co_return result;
 }
 
 #endif // TINY_CORO_CURL_EXAMPLE_EASY_HPP
