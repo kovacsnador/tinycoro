@@ -83,8 +83,16 @@ if(BUILD_WITH_EXAMPLES)
 add_executable(${PROJECT_NAME} example/example.cpp)
 
 if(UNIX)
-# on linux we also build the echo server stress test
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/example/echo_server_example)
+  # on linux we also build the echo server stress test
+  add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/example/echo_server_example)
+  
+  # on linux we also build the curl_example
+  find_package(CURL QUIET)
+  if(CURL_FOUND)
+    add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/curl_example)
+  else()
+    message(STATUS "libcurl not found, skipping curl_example")
+  endif()
 endif()
 
 # add include directories

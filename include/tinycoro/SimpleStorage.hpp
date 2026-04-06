@@ -86,7 +86,7 @@ namespace tinycoro { namespace detail {
     private:
         // the underlying buffer
         // which stores the real object
-        alignas(ALIGNMENT) Storage_t _buffer;
+        alignas(ALIGNMENT) Storage_t _buffer{};
 
         // The dedicated destructor
         //
