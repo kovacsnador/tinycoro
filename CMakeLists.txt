@@ -15,11 +15,20 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+# Header-only, INTERFACE target for dependents
+add_library(tinycoro INTERFACE)
+add_library(tinycoro::tinycoro ALIAS tinycoro)
+target_include_directories(tinycoro INTERFACE "${CMAKE_CURRENT_SOURCE_DIR}/include")
+target_compile_features(tinycoro INTERFACE cxx_std_20)
+find_package(Threads REQUIRED)
+target_link_libraries(tinycoro INTERFACE Threads::Threads)
+
 # Option to enable ASAN
 option(WithASAN "Build with AddressSanitizer" OFF)
 option(WithTSAN "Build with ThreadSanitizer" OFF)
 option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
 option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
+option(TINYCORO_BUILD_TESTS "Build tinycoro unit tests" ON)
 
 if (WithASAN AND WithTSAN)
   message(FATAL_ERROR "WithASAN and WithTSAN cannot be enabled together")
@@ -102,5 +111,6 @@ target_include_directories(${PROJECT_NAME} PUBLIC
 
 endif()
 
-# build unit tests
-add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+if(TINYCORO_BUILD_TESTS)
+	add_subdirectory(${CMAKE_CURRENT_SOURCE_DIR}/test)
+endif()
