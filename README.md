@@ -2319,18 +2319,7 @@ In a coroutine-based environment, it is not recommended to use thread_local vari
 
 ## Contributing
 
-Contributions to `tinycoro` are welcome and encouraged! If you'd like to contribute, please follow these steps:
-
-1. **Fork the repository**: Start by forking the project on GitHub and cloning your fork locally.
-2. **Create a branch**: Create a new branch for your feature or bugfix. Ensure the branch name reflects the purpose of your changes (e.g., `feature/new-feature` or `bugfix/issue-123`).
-3. **Make your changes**: Implement your feature or fix. Please ensure your code follows the project's style guidelines and includes appropriate tests.
-4. **Commit and push**: Commit your changes with clear, descriptive messages, and push your branch to your forked repository.
-5. **Open a pull request**: Submit a pull request (PR) to the main repository. Be sure to explain the purpose and impact of your changes in the PR description.
-
-### Code Style and Guidelines
-- Follow the project's existing code structure and style.
-- Ensure all code is properly documented, especially new features or APIs.
-- Write tests to validate your changes and ensure they do not introduce regressions.
+See [CONTRIBUTING.md](CONTRIBUTING.md) for a short list of ways to help.
 
 ### Reporting Issues
 If you find a bug or have a feature request, please open an issue on the GitHub repository. Provide as much detail as possible, including steps to reproduce the issue, expected behavior, and any relevant system information.
