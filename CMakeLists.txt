@@ -15,6 +15,12 @@ enable_testing()
 set(CMAKE_CXX_STANDARD 20)
 set(CMAKE_CXX_STANDARD_REQUIRED True)
 
+if("${CMAKE_CURRENT_SOURCE_DIR}" STREQUAL "${CMAKE_SOURCE_DIR}")
+  set(TINYCORO_IS_TOP_LEVEL ON)
+else()
+  set(TINYCORO_IS_TOP_LEVEL OFF)
+endif()
+
 # Header-only, INTERFACE target for dependents
 add_library(tinycoro INTERFACE)
 add_library(tinycoro::tinycoro ALIAS tinycoro)
@@ -24,14 +30,14 @@ find_package(Threads REQUIRED)
 target_link_libraries(tinycoro INTERFACE Threads::Threads)
 
 # Option to enable ASAN
-option(WithASAN "Build with AddressSanitizer" OFF)
-option(WithTSAN "Build with ThreadSanitizer" OFF)
-option(BUILD_WITH_EXAMPLES "Build with Examples" ON)
-option(BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
-option(TINYCORO_BUILD_TESTS "Build tinycoro unit tests" ON)
+option(TINYCORO_WITH_ASAN "Build with AddressSanitizer" OFF)
+option(TINYCORO_WITH_TSAN "Build with ThreadSanitizer" OFF)
+option(TINYCORO_BUILD_WITH_DIAGNOSTICS "Build with diagnostics" OFF)
+option(TINYCORO_BUILD_EXAMPLES "Build with Examples" ${TINYCORO_IS_TOP_LEVEL})
+option(TINYCORO_BUILD_TESTS "Build tinycoro unit tests" ${TINYCORO_IS_TOP_LEVEL})
 
-if (WithASAN AND WithTSAN)
-  message(FATAL_ERROR "WithASAN and WithTSAN cannot be enabled together")
+if (TINYCORO_WITH_ASAN AND TINYCORO_WITH_TSAN)
+  message(FATAL_ERROR "TINYCORO_WITH_ASAN and TINYCORO_WITH_TSAN cannot be enabled together")
 endif()
 
 if (CMAKE_CXX_COMPILER_ID STREQUAL "Clang")
@@ -61,7 +67,7 @@ elseif (CMAKE_CXX_COMPILER_ID STREQUAL "GNU")
   endif()
 endif()
 
-if (WithASAN)
+if (TINYCORO_WITH_ASAN)
     message("Setting sanitizers...")
     add_compile_options(-fsanitize=address -fsanitize=undefined -fsanitize=leak)
     add_link_options(-fsanitize=address -fsanitize=undefined -fsanitize=leak)
@@ -69,7 +75,7 @@ if (WithASAN)
     set(ENV{LSAN_OPTIONS} "verbosity=2:log_threads=1")
 endif()
 
-if (WithTSAN)
+if (TINYCORO_WITH_TSAN)
   message("Setting ThreadSanitizer...")
   add_compile_options(-fsanitize=thread -fno-omit-frame-pointer -g -O0)
   add_link_options(-fsanitize=thread)
@@ -81,12 +87,12 @@ elseif (CMAKE_BUILD_TYPE STREQUAL "Release")
   message("CMAKE_CXX_FLAGS_RELEASE -> ${CMAKE_CXX_FLAGS_RELEASE}")
 endif()
 
-if(BUILD_WITH_DIAGNOSTICS)
+if(TINYCORO_BUILD_WITH_DIAGNOSTICS)
   # add global flag for diagnostics
   add_compile_definitions(TINYCORO_DIAGNOSTICS)
 endif()
 
-if(BUILD_WITH_EXAMPLES)
+if(TINYCORO_BUILD_EXAMPLES)
 
 # Add an executable with the source file
 add_executable(${PROJECT_NAME} example/example.cpp)

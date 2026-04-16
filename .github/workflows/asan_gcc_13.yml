@@ -39,7 +39,7 @@ jobs:
       working-directory: ${{ github.workspace }}
     
     - name: Configure
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D WithASAN=ON -D BUILD_WITH_DIAGNOSTICS=ON
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D TINYCORO_WITH_ASAN=ON -D TINYCORO_BUILD_WITH_DIAGNOSTICS=ON
       working-directory: ${{ github.workspace }}
 
     - name: Build
