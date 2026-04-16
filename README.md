@@ -265,6 +265,15 @@ Simply copy the `include` folder into your C++20 (or greater) project. If necess
 #include <tinycoro/tinycoro_all.h>
 ```
 
+### Using tinycoro as a git submodule
+
+You can add `tinycoro` to your project as a git submodule and then use it from CMake by adding the subdirectory and linking the header-only target:
+
+```cmake
+add_subdirectory(pathTo/tinycoro)
+target_link_libraries(my_app PRIVATE tinycoro::tinycoro)
+```
+
 ## Examples
 The following examples demonstrate various use cases of the `tinycoro` library:
 

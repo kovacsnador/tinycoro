@@ -34,7 +34,7 @@ jobs:
       working-directory: ${{ github.workspace }}
     
     - name: Configure with coverage flags
-      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_FLAGS="--coverage" -D WithASAN=OFF -D BUILD_WITH_EXAMPLES=OFF
+      run: cmake -B build -D CMAKE_BUILD_TYPE=Debug -D CMAKE_CXX_FLAGS="--coverage" -D TINYCORO_WITH_ASAN=OFF -D TINYCORO_BUILD_EXAMPLES=OFF
       working-directory: ${{ github.workspace }}
 
     - name: Build

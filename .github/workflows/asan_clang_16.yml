@@ -39,8 +39,8 @@ jobs:
         -D CMAKE_BUILD_TYPE=Debug \
         -D CMAKE_CXX_COMPILER=clang++-16 \
         -D CMAKE_C_COMPILER=clang-16 \
-        -D WithASAN=ON \
-        -D BUILD_WITH_DIAGNOSTICS=ON
+        -D TINYCORO_WITH_ASAN=ON \
+        -D TINYCORO_BUILD_WITH_DIAGNOSTICS=ON
 
     - name: Build
       run: cmake --build build
