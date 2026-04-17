@@ -21,6 +21,7 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 
 ## Overview
 * [Acknowledgement](#acknowledgement)
+* [Getting the source and building](#getting-the-source-and-building)
 * [Motivation](#motivation)
 * [Usage](#usage)
 * [Examples](#examples)
@@ -66,6 +67,46 @@ I would like to extend my heartfelt thanks to my brother [`László Kovács`](ht
 * [Warning](#warning)
 * [Contributing](#contributing)
 * [Support](#support)
+
+## Getting the source and building
+
+Clone the whole project with its submodules in one step:
+
+```bash
+git clone --recurse-submodules https://github.com/kovacsnador/tinycoro.git
+cd tinycoro
+```
+
+Create a first CMake build:
+
+```bash
+cmake -S . -B build
+cmake --build build
+```
+
+You can run the test and example binaries directly.
+
+Linux/macOS:
+
+```bash
+cd build
+./test/tinycoro_tests
+./tinycoro_example
+```
+
+Windows:
+
+```powershell
+cd build
+.\test\tinycoro_tests.exe
+.\tinycoro_example.exe
+```
+
+Or run the tests with CTest:
+
+```bash
+ctest --test-dir build
+```
 
 ## Motivation
 ### Simple breakfast

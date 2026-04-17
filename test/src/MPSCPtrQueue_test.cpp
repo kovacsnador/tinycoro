@@ -15,9 +15,14 @@ struct MPSCNode : tinycoro::detail::SingleLinkable<MPSCNode>
 TEST(MPSCPtrQueueTest, push_pop_fifo_single_thread)
 {
     tinycoro::detail::MPSCPtrQueue<MPSCNode> queue;
-    MPSCNode n1{.id = 1};
-    MPSCNode n2{.id = 2};
-    MPSCNode n3{.id = 3};
+    MPSCNode n1;
+    n1.id = 1;
+
+    MPSCNode n2;
+    n2.id = 2;
+    
+    MPSCNode n3;
+    n3.id = 3;
 
     EXPECT_TRUE(queue.empty());
 
