@@ -6,22 +6,25 @@
 #ifndef TINY_CORO_CACHELINE_ALIGN_HPP
 #define TINY_CORO_CACHELINE_ALIGN_HPP
 
-#include <new> // std::hardware_destructive_interference_size
 #include <cstddef>
 
+// Public override hook for projects embedding tinycoro.
+// Define this before including tinycoro headers, or pass it from the build
+// system/compiler command line, for example:
+//   target_compile_definitions(app PRIVATE TINYCORO_CACHELINE_SIZE=128)
+//   g++ ... -DTINYCORO_CACHELINE_SIZE=128
+#ifndef TINYCORO_CACHELINE_SIZE
+#define TINYCORO_CACHELINE_SIZE 64
+#endif 
+
 namespace tinycoro { namespace detail {
-
-#ifdef __cpp_lib_hardware_interference_size
-    using std::hardware_constructive_interference_size;
-    using std::hardware_destructive_interference_size;
-#else
-    // 64 bytes on x86-64 │ L1_CACHE_BYTES │ L1_CACHE_SHIFT │ __cacheline_aligned │ ...
-    constexpr size_t hardware_constructive_interference_size = 64;
-    constexpr size_t hardware_destructive_interference_size  = 64;
-#endif
-
+ 
     // this is only an estimation....
-    static constexpr size_t CACHELINE_SIZE = hardware_destructive_interference_size;
+    static constexpr size_t CACHELINE_SIZE = TINYCORO_CACHELINE_SIZE;
+
+    static_assert(CACHELINE_SIZE > 0, "TINYCORO_CACHELINE_SIZE must be greater than zero.");
+    static_assert((CACHELINE_SIZE & (CACHELINE_SIZE - 1)) == 0,
+                  "TINYCORO_CACHELINE_SIZE must be a power of two.");
 
 }} // namespace tinycoro::detail
 
