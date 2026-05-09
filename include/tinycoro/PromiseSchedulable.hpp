@@ -27,7 +27,7 @@ namespace tinycoro
 #endif
 
     template <std::unsigned_integral auto BUFFER_SIZE, concepts::IsAwaiter FinalAwaiterT, typename StopSourceT>
-    struct SchedulablePromise : PromiseBase<FinalAwaiterT, StopSourceT>, detail::DoubleLinkable<SchedulablePromise<BUFFER_SIZE, FinalAwaiterT, StopSourceT>>
+    struct SchedulablePromise : PromiseBase<FinalAwaiterT, StopSourceT>, detail::SingleLinkable<SchedulablePromise<BUFFER_SIZE, FinalAwaiterT, StopSourceT>>
     {
         static_assert(BUFFER_SIZE >= PROMISE_BASE_BUFFER_SIZE, "SchedulablePromise: Buffer size is too small to hold the promise object.");
 

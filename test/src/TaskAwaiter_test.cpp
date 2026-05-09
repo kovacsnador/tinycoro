@@ -15,6 +15,8 @@ struct SharedStateMock
     {
     }
 
+    void* conti;
+
     size_t val;
 };
 
@@ -83,8 +85,7 @@ struct HandleMock<void>
 template<typename ValueT>
 struct PromiseMock
 {
-    PromiseMock<ValueT>* child;
-    PromiseMock<ValueT>* parent;
+    PromiseMock<ValueT>* conti;
     StopSourceMock stopSource;
     SharedStateMock sharedState;
 
@@ -105,8 +106,7 @@ struct PromiseMock
 template<>
 struct PromiseMock<void>
 {
-    PromiseMock<void>* child;
-    PromiseMock<void>* parent;
+    PromiseMock<void>* conti;
     StopSourceMock stopSource;
     SharedStateMock sharedState;
 
@@ -124,6 +124,11 @@ template<typename ValueT, template<typename, typename> class AwaiterT>
 struct CoroTaskMock : public AwaiterT<ValueT, CoroTaskMock<ValueT, AwaiterT>>
 {
     using handle_type = tinycoro::test::CoroutineHandleMock<PromiseMock<ValueT>>;
+
+    void InitConti()
+    {   
+        _hdl.promise().sharedState.conti = &_hdl.promise();
+    }
 
     handle_type _hdl;
 };
@@ -165,13 +170,12 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_int)
     task._hdl.promise()._value = 42;
 
     CoroTaskMock<int32_t, tinycoro::AwaiterValue> parent;
+    parent.InitConti();
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(parent._hdl.promise().child->value(), 42);
-
-    EXPECT_EQ(task._hdl.promise().parent->sharedState.val, parent._hdl.promise().sharedState.val);
-    EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
+    EXPECT_EQ(task._hdl.promise().conti->sharedState.val, parent._hdl.promise().sharedState.val);
+    EXPECT_EQ(task._hdl.promise().conti->stopSource.val, parent._hdl.promise().stopSource.val);
 }
 
 TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_void)
@@ -179,9 +183,10 @@ TEST(TaskAwaiterTest, TaskAwaiterTest_await_suspend_void)
     CoroTaskMock<void, tinycoro::AwaiterValue> task;
 
     CoroTaskMock<void, tinycoro::AwaiterValue> parent;
+    parent.InitConti();
 
     std::ignore = task.await_suspend(parent._hdl);
 
-    EXPECT_EQ(task._hdl.promise().parent->sharedState.val, parent._hdl.promise().sharedState.val);
-    EXPECT_EQ(task._hdl.promise().parent->stopSource.val, parent._hdl.promise().stopSource.val);
+    EXPECT_EQ(task._hdl.promise().conti->sharedState.val, parent._hdl.promise().sharedState.val);
+    EXPECT_EQ(task._hdl.promise().conti->stopSource.val, parent._hdl.promise().stopSource.val);
 }

@@ -20,10 +20,18 @@ namespace tinycoro {
             auto  hdl           = coroTask->_hdl;
             auto& promise       = hdl.promise();
 
-            parentPromise.child  = std::addressof(promise);
-            promise.parent       = std::addressof(parentPromise);
+            using promiseBase_t = decltype(promise.conti);
+
+            auto* sharedState = parentPromise.SharedState();
+            auto* conti = static_cast<promiseBase_t>(sharedState->conti);
+
+            assert(conti);
+
+            promise.conti = conti;
+            sharedState->conti = &promise; 
+
             promise.stopSource   = parentPromise.StopSource();
-            promise.AssignSharedState(parentPromise.SharedState());
+            promise.AssignSharedState(sharedState);
             
             return hdl;
         }
