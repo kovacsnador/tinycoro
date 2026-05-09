@@ -49,7 +49,7 @@ namespace tinycoro { namespace detail {
         {
             auto stopTokenUser = SharedState() ? SharedState()->IsStopTokenUser() : false;
 
-            if (parent == nullptr && stopTokenUser == false)
+            if (Parent() == nullptr && stopTokenUser == false)
             {
                 // The parent coroutine is nullptr,
                 // that means this is a root
@@ -67,11 +67,11 @@ namespace tinycoro { namespace detail {
         // Disallow copy and move
         PromiseBase(PromiseBase&&) = delete;
 
-        // These are navigation pointers used to
-        // resume and chain together coroutines,
-        // enabling continuous execution.
-        PromiseBase_t* parent{nullptr};
-        PromiseBase_t* child{nullptr};
+        // Link to the previous promise (parent) in the continuation chain.
+        // When a task awaits another task, the child promise is pushed
+        // onto "SharedState::conti" head and this field points to the promise
+        // that was previously at the top of that stack.
+        PromiseBase_t* conti{nullptr};
 
         // At the beginning we not initialize
         // the stop source here, the initialization
@@ -106,8 +106,8 @@ namespace tinycoro { namespace detail {
         //  - the current awaitable pointer for CoWait constructs, or
         //  - any data required for resumption in a TaskGroup.
         void SetCustomData(void* data) noexcept
-        {   
-            assert(parent == nullptr);  // need to be a root corouitne
+        {
+            assert(Parent() == nullptr); // need to be a root corouitne
             assert(_customData == nullptr); //  must not be set
 
             _customData = data;
@@ -116,7 +116,7 @@ namespace tinycoro { namespace detail {
         // Get the stored custom data and clears it.
         [[nodiscard]] constexpr auto CustomData() const noexcept
         {
-            assert(parent == nullptr);  // need to be a root corouitne
+            assert(Parent() == nullptr); // need to be a root corouitne
 
             return _customData;
         }
@@ -127,32 +127,32 @@ namespace tinycoro { namespace detail {
 
         constexpr void unhandled_exception() const { std::rethrow_exception(std::current_exception()); }
 
-        constexpr auto SharedState() noexcept
-        {
-            return detail::PtrVisit(_sharedState);
-        }
+        constexpr auto SharedState() noexcept { return detail::PtrVisit(_sharedState); }
 
-        constexpr auto SharedState() const noexcept
-        {
-            return detail::PtrVisit(_sharedState);
-        }
+        constexpr auto SharedState() const noexcept { return detail::PtrVisit(_sharedState); }
 
         constexpr void AssignSharedState(auto sharedStatePtr) noexcept
         {
             assert(sharedStatePtr);
-            assert(parent != nullptr);
+            assert(Parent() != nullptr);
 
             _sharedState = sharedStatePtr;
         }
 
-protected:
+        constexpr PromiseBase_t* Parent() const noexcept { return conti; }
+
+    protected:
         constexpr void CreateSharedState(bool initialCancellable = tinycoro::default_initial_cancellable_policy::value) noexcept
         {
             // make sure this is called only once
             assert(SharedState() == nullptr);
-            assert(parent == nullptr);
+            assert(Parent() == nullptr);
 
-            _sharedState.emplace<detail::SharedState>(initialCancellable);
+            // create the shared state
+            auto& sharedState = _sharedState.emplace<detail::SharedState>(initialCancellable);
+
+            // set continuation as this
+            sharedState.conti = this;
         }
 
     private:

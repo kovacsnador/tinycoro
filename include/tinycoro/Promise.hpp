@@ -24,16 +24,17 @@ namespace tinycoro {
             {
                 auto& promise = hdl.promise();
 
-                if (promise.parent)
+                if (auto* parent = promise.Parent())
                 {
-                    using promise_t = std::remove_pointer_t<decltype(promise.parent)>;
-                    // reset the parent child,
-                    // because we are done.
-                    promise.parent->child = nullptr;
+                    using promise_t = std::remove_pointer_t<decltype(promise.conti)>;
+                    auto sharedState = promise.SharedState();
+
+                    // pop the first element from the stack.
+                    sharedState->conti = parent;
 
                     // We can strait jump and resume
                     // the parent coroutine.
-                    return std::coroutine_handle<promise_t>::from_promise(*promise.parent);
+                    return std::coroutine_handle<promise_t>::from_promise(*parent);
                 }
 
                 return std::noop_coroutine();

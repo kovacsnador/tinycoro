@@ -104,6 +104,11 @@ namespace tinycoro {
                 // clear the first bits which are responsible for the pause state in scheduler.
                 return _state.fetch_and(~detail::UTypeCast(detail::EPauseState::IDLE), order);
             };
+            
+            // Type-erased head of the continuation stack.
+            // The stack contains promise objects linked through
+            // PromiseBase::conti, with the most recently awaited task on top.
+            void* conti{nullptr};
 
         private:
             // atomic flag to store shared state

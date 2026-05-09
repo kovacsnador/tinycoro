@@ -48,6 +48,19 @@ TEST_P(YieldValueTest, YieldValueTest_generator)
 // See: https://stackoverflow.com/questions/67860049/why-cant-co-await-return-a-string
 #ifndef TINY_CORO_GCC_11
 
+tinycoro::Task<int32_t> NestedYieldCoroutine()
+{
+    co_yield 41;
+    co_return 42;
+}
+
+tinycoro::Task<int32_t> IntYieldCoroutine()
+{
+    auto nested = NestedYieldCoroutine();
+    co_yield co_await nested;
+    co_return co_await nested;
+}
+
 tinycoro::Task<std::variant<int32_t, bool>> YieldCoroutine()
 {
     co_yield 41;
@@ -68,6 +81,23 @@ TEST(YieldValueTest, YieldValueTest_variant_yield)
         val = co_await task;
 
         EXPECT_EQ(std::get<bool>(val), true);
+    };
+
+    tinycoro::AllOf(scheduler, runner());
+}
+
+TEST(YieldValueTest, NestedYieldValueTest_int_yield)
+{
+    tinycoro::Scheduler scheduler;
+
+    auto runner = []() -> tinycoro::Task<void> {
+        auto task = IntYieldCoroutine();
+
+        auto val = co_await task;
+        EXPECT_EQ(val, 41);
+
+        val = co_await task;
+        EXPECT_EQ(val, 42);
     };
 
     tinycoro::AllOf(scheduler, runner());

@@ -14,47 +14,29 @@ namespace tinycoro { namespace detail {
 
     struct TaskResumer
     {
-        // Find the last continuation
-        // and set up the loop at the end
-        // if necessary.
-        template <typename PromiseBaseT>
-        [[nodiscard]] static inline auto FindContinuation(PromiseBaseT* promisePtr) noexcept
-        {
-            assert(promisePtr);
-
-            // Iterate until we found the last corouinte
-            // in the chain, which we need to resume.
-            while (promisePtr->child != nullptr)
-            {
-                // moving forward...
-                promisePtr = promisePtr->child;
-            }
-
-            return promisePtr;
-        }
-
         template <typename PromiseT>
         static inline void Resume(PromiseT& promise)
         {
-            auto        sharedStatePtr = promise.SharedState();
-            const auto& stopSource     = promise.stopSource;
+            auto*        sharedState = promise.SharedState();
+            const auto& stopSource   = promise.stopSource;
+
+            assert(sharedState);
+            assert(sharedState->conti);
 
             // reset the pause state by every resume.
-            sharedStatePtr->ClearPauseStateBits();
+            sharedState->ClearPauseStateBits();
 
-            if (sharedStatePtr->IsCancellable() && stopSource.stop_requested())
+            if (sharedState->IsCancellable() && stopSource.stop_requested())
             {
                 return; // need to cancel the corouitne
             }
 
             // Resets all the flags.
-            sharedStatePtr->ClearFlags();
+            sharedState->ClearFlags();
 
             // check for continuation type
             using promise_base_t = PromiseT::PromiseBase_t;
-
-            // find the continuation
-            auto promiseToResume = FindContinuation<promise_base_t>(std::addressof(promise));
+            auto* promiseToResume = static_cast<promise_base_t*>(sharedState->conti);
 
             // Resume the coroutine.
             //
