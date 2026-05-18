@@ -25,7 +25,7 @@ namespace tinycoro {
         // In our use case with `co_await`, this is essential because
         // we must notify the awaitable object once the coroutine
         // has completed execution and all associated `co_await` tasks are done.
-        template <typename AwaitableT>
+        template <concepts::IsPointer AwaitableT>
         struct AsyncAwaitOnFinishWrapper
         {
             template <typename PromiseT, typename FutureStateT>
@@ -94,6 +94,8 @@ namespace tinycoro {
 
             void await_suspend(auto hdl)
             {
+                using SelfT = std::remove_pointer_t<decltype(this)>;
+
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
@@ -101,7 +103,7 @@ namespace tinycoro {
                 this->_futures = std::apply(
                     [this]<typename... Ts>(Ts&&... ts) {
                         (ts.SetCustomData(this), ...);
-                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
+                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<SelfT*>>(
                             std::forward<Ts>(ts)...);
                     },
                     std::move(this->_coroutineTasks));
@@ -159,6 +161,8 @@ namespace tinycoro {
 
             void await_suspend(auto hdl)
             {
+                using SelfT = std::remove_pointer_t<decltype(this)>;
+
                 // put tast on pause
                 this->_event.Set(context::PauseTask(hdl));
 
@@ -166,7 +170,7 @@ namespace tinycoro {
                 this->_futures = std::apply(
                     [this]<typename... Ts>(Ts&&... ts) {
                         ((ts.SetCustomData(this), ts.SetStopSource(_stopSource)), ...);
-                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<decltype(this)>>(
+                        return this->_scheduler.template Enqueue<tinycoro::unsafe::Promise, AsyncAwaitOnFinishWrapper<SelfT*>>(
                             std::forward<Ts>(ts)...);
                     },
                     std::move(this->_coroutineTasks));

@@ -5,6 +5,7 @@
 #include <sys/epoll.h>
 #include <netdb.h>
 #include <fcntl.h>
+#include <unistd.h>
 
 #include <iostream>
 #include <vector>

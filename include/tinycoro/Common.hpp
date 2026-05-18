@@ -256,6 +256,9 @@ namespace tinycoro {
         template<typename... Args>
         concept IsTuple = detail::IsTupleT<Args...>::value;
 
+        template <typename T>
+        concept IsPointer = std::is_pointer<T>::value;
+
     } // namespace concepts
 
     namespace detail {
