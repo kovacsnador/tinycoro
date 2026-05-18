@@ -20,7 +20,7 @@ jobs:
     strategy:
       fail-fast: false   # prevents cancelling other matrix jobs
       matrix:
-        compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15, Clang-16, Clang-17, Clang-18, Clang-19, Clang-20]
+        compiler: [GCC-11, GCC-12, GCC-13, GCC-14, GCC-15, GCC-16, Clang-16, Clang-17, Clang-18, Clang-19, Clang-20]
         build_type: [Debug, Release]
 
         include:
@@ -44,6 +44,10 @@ jobs:
             cxx: g++-15
             install: |
               brew install gcc@15 ninja
+          - compiler: GCC-16
+            cxx: g++-16
+            install: |
+              brew install gcc@16 ninja
           - compiler: Clang-16
             cxx: $(brew --prefix llvm@16)/bin/clang++
             install: |
